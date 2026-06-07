@@ -183,4 +183,51 @@ class ServiceLayerTest {
         Booking booking = new Booking("b1", user, vehicle, service, LocalDateTime.now().plusDays(1), "none");
         return bookingService.createBooking(booking);
     }
+    // ==================== DUPLICATE EMAIL HANDLING TESTS ====================
+
+    @Test
+    void testCreateUser_DuplicateEmail_ThrowsException() {
+        // Create first user
+        User user1 = new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
+        userService.createUser(user1);
+        
+        // Try to create second user with same email
+        User user2 = new User("u2", "John Doe", "jane@example.com", "456", "hash2", null);
+        
+        assertThrows(BusinessRuleViolationException.class, () -> {
+            userService.createUser(user2);
+        });
+    }
+
+    @Test
+    void testUpdateUser_DuplicateEmail_ThrowsException() {
+        // Create first user
+        User user1 = new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
+        userService.createUser(user1);
+        
+        // Create second user with different email
+        User user2 = new User("u2", "John Doe", "john@example.com", "456", "hash2", null);
+        userService.createUser(user2);
+        
+        // Try to update user2 to user1's email
+        user2.setEmail("jane@example.com");
+        
+        assertThrows(BusinessRuleViolationException.class, () -> {
+            userService.updateUser(user2);
+        });
+    }
+
+    @Test
+    void testDuplicateEmailCaseInsensitive_ThrowsException() {
+        // Create first user with mixed case email
+        User user1 = new User("u1", "Jane Doe", "Test@Example.com", "123", "hash", null);
+        userService.createUser(user1);
+        
+        // Try to create second user with same email different case
+        User user2 = new User("u2", "John Doe", "test@example.com", "456", "hash2", null);
+        
+        assertThrows(BusinessRuleViolationException.class, () -> {
+            userService.createUser(user2);
+        });
+    }
 }
