@@ -7,6 +7,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -60,4 +61,28 @@ public class ApiIntegrationTest {
     void openApiDocsEndpointAvailable() throws Exception {
         mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
     }
+
+    @Test
+void bookingValidationErrorIncludesFieldLevelMessage() throws Exception {
+    String invalidBooking = """
+            {
+              "bookingId": "",
+              "userId": "",
+              "vehicleId": "v-test",
+              "serviceId": "s-test",
+              "scheduledDateTime": null,
+              "specialRequest": "validation test"
+            }
+            """;
+
+    mockMvc.perform(post("/api/bookings")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(invalidBooking))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("bookingId")))
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("userId")))
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("scheduledDateTime")))
+            .andExpect(jsonPath("$.path").value("/api/bookings"));
+}
 }

@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.List;
 
@@ -57,12 +58,12 @@ public class BookingController {
             @ApiResponse(responseCode = "404", description = "Not found", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public Booking create(@RequestBody CreateBookingRequest req) {
+    public Booking create(@Valid @RequestBody CreateBookingRequest req) {
         return service.createBooking(req.toBooking());
     }
 
     @PutMapping("/{id}")
-    public Booking update(@PathVariable String id, @RequestBody CreateBookingRequest req) {
+    public Booking update(@PathVariable String id, @Valid @RequestBody CreateBookingRequest req) {
         Booking b = req.toBooking(); b.setBookingId(id); return service.updateBooking(b);
     }
 
