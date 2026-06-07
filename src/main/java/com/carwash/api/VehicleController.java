@@ -39,7 +39,7 @@ public class VehicleController {
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Create")
+    @Operation(summary = "Get by ID")
     public Vehicle getById(@PathVariable String id) {
         return service.findById(id);
     }
