@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -64,6 +65,55 @@ class ServiceLayerTest {
         userService.createUser(new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null));
         Vehicle vehicle = new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", "");
         assertEquals("v1", vehicleService.createVehicle(vehicle, "u1").getVehicleId());
+    }
+
+    @Test
+    void vehicleLookupByUserReturnsSingleOwnedVehicle() {
+        userService.createUser(new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null));
+        Vehicle vehicle = new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", "");
+
+        vehicleService.createVehicle(vehicle, "u1");
+
+        List<Vehicle> vehicles = vehicleService.findByUserId("u1");
+        assertEquals(1, vehicles.size());
+        assertEquals("v1", vehicles.get(0).getVehicleId());
+    }
+
+    @Test
+    void vehicleLookupByUserReturnsMultipleOwnedVehicles() {
+        userService.createUser(new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null));
+        Vehicle first = new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", "");
+        Vehicle second = new Vehicle("v2", "CA456", "SUV", "Honda", "CR-V", "Black", "");
+
+        vehicleService.createVehicle(first, "u1");
+        vehicleService.createVehicle(second, "u1");
+
+        List<String> vehicleIds = vehicleService.findByUserId("u1").stream()
+                .map(Vehicle::getVehicleId)
+                .toList();
+        assertEquals(2, vehicleIds.size());
+        assertTrue(vehicleIds.contains("v1"));
+        assertTrue(vehicleIds.contains("v2"));
+    }
+
+    @Test
+    void vehicleLookupByUserExcludesOtherUsersVehicles() {
+        userService.createUser(new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null));
+        userService.createUser(new User("u2", "John Doe", "john@example.com", "456", "hash2", null));
+        vehicleService.createVehicle(new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", ""), "u1");
+        vehicleService.createVehicle(new Vehicle("v2", "CA456", "SUV", "Honda", "CR-V", "Black", ""), "u2");
+
+        List<Vehicle> vehicles = vehicleService.findByUserId("u1");
+
+        assertEquals(1, vehicles.size());
+        assertEquals("v1", vehicles.get(0).getVehicleId());
+    }
+
+    @Test
+    void vehicleLookupByUserWithNoVehiclesReturnsEmptyList() {
+        userService.createUser(new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null));
+
+        assertTrue(vehicleService.findByUserId("u1").isEmpty());
     }
 
     @Test

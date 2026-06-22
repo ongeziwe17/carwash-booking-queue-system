@@ -8,7 +8,7 @@ import java.util.List;
 public class InMemoryVehicleRepository extends InMemoryRepository<Vehicle, String> implements VehicleRepository {
     @Override
     public List<Vehicle> findByUserId(String userId) {
-        return List.of();
+        return storage.values().stream().filter(vehicle -> vehicle.getUserId() != null && vehicle.getUserId().equals(userId)).toList();
     }
 
     @Override

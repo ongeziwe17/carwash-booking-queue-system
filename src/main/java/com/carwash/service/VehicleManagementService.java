@@ -24,6 +24,7 @@ public class VehicleManagementService {
         validateVehicle(vehicle);
         User owner = requireUser(userId);
         rejectDuplicatePlateForOwner(owner, vehicle.getPlateNumber());
+        vehicle.setUserId(owner.getUserId());
         owner.getVehicles().add(vehicle);
         vehicleRepository.save(vehicle);
         userRepository.save(owner);
