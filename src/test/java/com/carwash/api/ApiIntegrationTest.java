@@ -63,6 +63,70 @@ public class ApiIntegrationTest {
     }
 
     @Test
+    void serviceApiGetAllReturnsUnfilteredCatalog() throws Exception {
+        createService("catalog-all-active", "Exterior Wash", true);
+        createService("catalog-all-inactive", "Interior Wash", false);
+
+        String response = mockMvc.perform(get("/api/services"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        org.junit.jupiter.api.Assertions.assertTrue(response.contains("catalog-all-active"));
+        org.junit.jupiter.api.Assertions.assertTrue(response.contains("catalog-all-inactive"));
+    }
+
+    @Test
+    void serviceApiGetAllFiltersActiveServices() throws Exception {
+        createService("catalog-active-only", "Deluxe Wash", true);
+        createService("catalog-active-excluded", "Archived Wash", false);
+
+        String response = mockMvc.perform(get("/api/services").param("active", "true"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        org.junit.jupiter.api.Assertions.assertTrue(response.contains("catalog-active-only"));
+        org.junit.jupiter.api.Assertions.assertFalse(response.contains("catalog-active-excluded"));
+    }
+
+    @Test
+    void serviceApiGetAllFiltersInactiveServices() throws Exception {
+        createService("catalog-inactive-excluded", "Express Wash", true);
+        createService("catalog-inactive-only", "Seasonal Wash", false);
+
+        String response = mockMvc.perform(get("/api/services").param("active", "false"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        org.junit.jupiter.api.Assertions.assertTrue(response.contains("catalog-inactive-only"));
+        org.junit.jupiter.api.Assertions.assertFalse(response.contains("catalog-inactive-excluded"));
+    }
+
+    private void createService(String serviceId, String serviceName, boolean active) throws Exception {
+        Map<String, Object> service = new HashMap<>();
+        service.put("serviceId", serviceId);
+        service.put("serviceName", serviceName);
+        service.put("description", serviceName + " description");
+        service.put("price", BigDecimal.valueOf(100));
+        service.put("estimatedDurationMin", 30);
+
+        mockMvc.perform(post("/api/services")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(service)))
+                .andExpect(status().isCreated());
+
+        if (!active) {
+            mockMvc.perform(post("/api/services/" + serviceId + "/deactivate"))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Test
 void bookingValidationErrorIncludesFieldLevelMessage() throws Exception {
     String invalidBooking = """
             {

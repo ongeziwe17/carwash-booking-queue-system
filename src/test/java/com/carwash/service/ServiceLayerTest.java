@@ -76,7 +76,7 @@ class ServiceLayerTest {
 
         List<Vehicle> vehicles = vehicleService.findByUserId("u1");
         assertEquals(1, vehicles.size());
-        assertEquals("v1", vehicles.get(0).getVehicleId());
+        assertEquals("v1", vehicles.getFirst().getVehicleId());
     }
 
     @Test
@@ -106,13 +106,12 @@ class ServiceLayerTest {
         List<Vehicle> vehicles = vehicleService.findByUserId("u1");
 
         assertEquals(1, vehicles.size());
-        assertEquals("v1", vehicles.get(0).getVehicleId());
+        assertEquals("v1", vehicles.getFirst().getVehicleId());
     }
 
     @Test
     void vehicleLookupByUserWithNoVehiclesReturnsEmptyList() {
         userService.createUser(new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null));
-
         assertTrue(vehicleService.findByUserId("u1").isEmpty());
     }
 
@@ -152,6 +151,57 @@ class ServiceLayerTest {
         Service service = new Service("s1", "Premium Wash", "desc", BigDecimal.TEN, 30);
         catalogService.createService(service);
         assertFalse(catalogService.deactivateService("s1").isActive());
+    }
+
+    @Test
+    void findAllServicesReturnsUnfilteredCatalog() {
+        Service activeService = new Service("active-service", "Premium Wash", "desc", BigDecimal.TEN, 30);
+        Service inactiveService = new Service("inactive-service", "Basic Wash", "desc", BigDecimal.ONE, 15);
+        inactiveService.deactivate();
+        catalogService.createService(activeService);
+        catalogService.createService(inactiveService);
+
+        List<Service> services = catalogService.findAll();
+
+        assertEquals(2, services.size());
+        assertTrue(services.stream().anyMatch(service -> service.getServiceId().equals("active-service")));
+        assertTrue(services.stream().anyMatch(service -> service.getServiceId().equals("inactive-service")));
+    }
+
+    @Test
+    void findByActiveReturnsOnlyActiveServices() {
+        Service activeService = new Service("active-service", "Premium Wash", "desc", BigDecimal.TEN, 30);
+        Service inactiveService = new Service("inactive-service", "Basic Wash", "desc", BigDecimal.ONE, 15);
+        inactiveService.deactivate();
+        catalogService.createService(activeService);
+        catalogService.createService(inactiveService);
+
+        List<Service> services = catalogService.findByActive(true);
+
+        assertEquals(1, services.size());
+        assertEquals("active-service", services.get(0).getServiceId());
+    }
+
+    @Test
+    void findByActiveReturnsOnlyInactiveServices() {
+        Service activeService = new Service("active-service", "Premium Wash", "desc", BigDecimal.TEN, 30);
+        Service inactiveService = new Service("inactive-service", "Basic Wash", "desc", BigDecimal.ONE, 15);
+        inactiveService.deactivate();
+        catalogService.createService(activeService);
+        catalogService.createService(inactiveService);
+
+        List<Service> services = catalogService.findByActive(false);
+
+        assertEquals(1, services.size());
+        assertEquals("inactive-service", services.get(0).getServiceId());
+    }
+
+    @Test
+    void findByActiveReturnsEmptyListWhenNoServicesMatch() {
+        Service activeService = new Service("active-service", "Premium Wash", "desc", BigDecimal.TEN, 30);
+        catalogService.createService(activeService);
+
+        assertTrue(catalogService.findByActive(false).isEmpty());
     }
 
     @Test
