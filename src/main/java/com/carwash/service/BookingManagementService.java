@@ -55,12 +55,24 @@ public class BookingManagementService {
         return existing;
     }
 
-    public Booking cancelBooking(String bookingId) {
+    public Booking cancelBooking(String bookingId, String customerId) {
         Booking booking = findById(bookingId);
-        if (booking.getStatus() == BookingStatus.COMPLETED) throw new BusinessRuleViolationException("Completed booking cannot be cancelled");
+        validateCancellationRequest(booking, customerId);
         if (!booking.cancel()) throw new BusinessRuleViolationException("Invalid booking status transition");
         bookingRepository.save(booking);
         return booking;
+    }
+
+    private void validateCancellationRequest(Booking booking, String customerId){
+        if (customerId == null || customerId.isBlank()) throw new BusinessRuleViolationException("Customer ID is required to cancel booking");
+        if (booking.getUser() == null || booking.getUser().getUserId() == null || !booking.getUser().getUserId().equals(customerId)) {
+            throw new BusinessRuleViolationException("Booking can only be cancelled by the owning customer");
+        }
+        if (booking.getScheduledDateTime() == null || booking.getScheduledDateTime().isBefore(LocalDateTime.now())) {
+            throw new BusinessRuleViolationException("Only future bookings can be cancelled");
+        }
+        if (booking.getStatus() == BookingStatus.COMPLETED) throw new BusinessRuleViolationException("Completed booking cannot be cancelled");
+        if (booking.getStatus() == BookingStatus.CANCELLED) throw new BusinessRuleViolationException("Cancelled booking cannot be cancelled again");
     }
 
     public Booking confirmBooking(String bookingId) {

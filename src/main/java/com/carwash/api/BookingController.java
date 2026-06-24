@@ -69,7 +69,9 @@ public class BookingController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable String id) { service.cancelBooking(id); }
+    public void delete(@PathVariable String id, @RequestParam String customerId) {
+        service.cancelBooking(id, customerId);
+    }
 
     @PostMapping("/{id}/confirm")
     @Operation(summary = "Confirm booking")
@@ -90,7 +92,7 @@ public class BookingController {
             @ApiResponse(responseCode = "404", description = "Not found", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public Booking cancel(@PathVariable String id) {
-        return service.cancelBooking(id);
+    public Booking cancel(@PathVariable String id, @RequestParam String customerId) {
+        return service.cancelBooking(id, customerId);
     }
 }
