@@ -32,6 +32,11 @@ public class ServiceCatalogService {
         return serviceRepository.findAll();
     }
 
+    public List<Service> findByActive(boolean active) {
+        return serviceRepository.findAll().stream()
+                .filter(service -> service.isActive() == active).toList();
+    }
+
     public Service updateService(Service service) {
         Service existing = findById(service.getServiceId());
         validateService(service);

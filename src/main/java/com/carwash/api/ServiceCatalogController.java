@@ -33,8 +33,11 @@ public class ServiceCatalogController {
             @ApiResponse(responseCode = "404", description = "Not found", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public List<Service> getAll() {
-        return service.findAll();
+    public List<Service> getAll(@RequestParam(required = false) Boolean active) {
+        if (active == null) {
+            return service.findAll();
+        }
+        return service.findByActive(active);
     }
 
     @GetMapping("/{id}")
@@ -64,7 +67,8 @@ public class ServiceCatalogController {
 
     @PutMapping("/{id}")
     public Service update(@PathVariable String id, @RequestBody Service s) {
-        s.setServiceId(id); return service.updateService(s);
+        s.setServiceId(id);
+        return service.updateService(s);
     }
 
     @DeleteMapping("/{id}")

@@ -9,7 +9,8 @@ import java.util.List;
 public class InMemoryBookingRepository extends InMemoryRepository<Booking, String> implements BookingRepository {
     @Override
     public List<Booking> findByUserId(String userId) {
-        return storage.values().stream().filter(booking -> booking.getUser() != null && booking.getUser().getUserId().equals(userId)).toList();
+        return storage.values().stream()
+                .filter(booking -> booking.getUser() != null && booking.getUser().getUserId().equals(userId)).toList();
     }
 
     @Override
