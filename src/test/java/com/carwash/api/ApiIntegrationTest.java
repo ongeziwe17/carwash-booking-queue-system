@@ -156,6 +156,145 @@ public class ApiIntegrationTest {
     }
 
     @Test
+    void bookingAndQueueWorkflow_shouldCompleteSuccessfully() throws Exception {
+        String prefix = "workflow-success";
+
+        createBookingWorkflowFixture(prefix);
+
+        Map<String, Object> booking = new HashMap<>();
+        booking.put("bookingId", prefix + "-booking");
+        booking.put("userId", prefix + "-user");
+        booking.put("vehicleId", prefix + "-vehicle");
+        booking.put("serviceId", prefix + "-service");
+        booking.put("scheduledDateTime", LocalDateTime.now().plusDays(2).toString());
+        booking.put("specialRequest", "workflow coverage");
+
+        mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(booking)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.bookingId").value(prefix + "-booking"))
+                .andExpect(jsonPath("$.user.userId").value(prefix + "-user"))
+                .andExpect(jsonPath("$.vehicle.vehicleId").value(prefix + "-vehicle"))
+                .andExpect(jsonPath("$.service.serviceId").value(prefix + "-service"))
+                .andExpect(jsonPath("$.status").value("CREATED"));
+
+        mockMvc.perform(post("/api/bookings/" + prefix + "-booking/confirm"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bookingId").value(prefix + "-booking"))
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+
+        Map<String, Object> queueEntry = new HashMap<>();
+        queueEntry.put("queueEntryId", prefix + "-queue-entry");
+        queueEntry.put("bookingId", prefix + "-booking");
+        queueEntry.put("serviceId", prefix + "-service");
+        queueEntry.put("position", 1);
+
+        mockMvc.perform(post("/api/queue-entries")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(queueEntry)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.queueEntryId").value(prefix + "-queue-entry"))
+                .andExpect(jsonPath("$.booking.bookingId").value(prefix + "-booking"))
+                .andExpect(jsonPath("$.service.serviceId").value(prefix + "-service"))
+                .andExpect(jsonPath("$.position").value(1))
+                .andExpect(jsonPath("$.queueStatus").value("WAITING"));
+
+        mockMvc.perform(post("/api/queue-entries/" + prefix + "-queue-entry/call-next"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.queueStatus").value("CALLED"))
+                .andExpect(jsonPath("$.calledAt").exists());
+
+        mockMvc.perform(post("/api/queue-entries/" + prefix + "-queue-entry/start"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.queueStatus").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.startedAt").exists());
+
+        mockMvc.perform(post("/api/queue-entries/" + prefix + "-queue-entry/complete"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.queueStatus").value("COMPLETED"))
+                .andExpect(jsonPath("$.estimatedWaitMin").value(0))
+                .andExpect(jsonPath("$.completedAt").exists());
+    }
+
+    @Test
+    void queueWorkflow_shouldRejectInvalidTransition() throws Exception {
+        String prefix = "workflow-invalid";
+
+        createBookingApiFixture(prefix, LocalDateTime.now().plusDays(2));
+        mockMvc.perform(post("/api/bookings/" + prefix + "-booking/confirm"))
+                .andExpect(status().isOk());
+
+        Map<String, Object> queueEntry = new HashMap<>();
+        queueEntry.put("queueEntryId", prefix + "-queue-entry");
+        queueEntry.put("bookingId", prefix + "-booking");
+        queueEntry.put("serviceId", prefix + "-service");
+        queueEntry.put("position", 1);
+
+        mockMvc.perform(post("/api/queue-entries")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(queueEntry)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.queueStatus").value("WAITING"));
+
+        mockMvc.perform(post("/api/queue-entries/" + prefix + "-queue-entry/complete"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("cannot be completed before it has started")));
+
+        mockMvc.perform(get("/api/queue-entries/" + prefix + "-queue-entry"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.queueStatus").value("WAITING"))
+                .andExpect(jsonPath("$.completedAt").doesNotExist());
+    }
+
+    private void createBookingWorkflowFixture(String prefix) throws Exception {
+        Map<String, Object> user = Map.of(
+                "userId", prefix + "-user",
+                "fullName", "Workflow User",
+                "email", prefix + "@test.com",
+                "phone", "123",
+                "passwordHash", "x"
+        );
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(user)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.userId").value(prefix + "-user"));
+
+        Map<String, Object> vehicle = Map.of(
+                "userId", prefix + "-user",
+                "vehicleId", prefix + "-vehicle",
+                "plateNumber", prefix + "-plate",
+                "vehicleType", "SUV",
+                "brand", "Toyota",
+                "model", "Rav4",
+                "color", "Black",
+                "notes", ""
+        );
+        mockMvc.perform(post("/api/vehicles")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(vehicle)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.vehicleId").value(prefix + "-vehicle"))
+                .andExpect(jsonPath("$.userId").value(prefix + "-user"));
+
+        Map<String, Object> service = new HashMap<>();
+        service.put("serviceId", prefix + "-service");
+        service.put("serviceName", "Workflow Service");
+        service.put("description", "workflow service");
+        service.put("price", BigDecimal.valueOf(250));
+        service.put("estimatedDurationMin", 30);
+        mockMvc.perform(post("/api/services")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(service)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.serviceId").value(prefix + "-service"));
+        mockMvc.perform(post("/api/services/" + prefix + "-service/activate"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(true));
+    }
+
+    @Test
     void bookingValidationErrorIncludesFieldLevelMessage() throws Exception {
         String invalidBooking = """
                 {
