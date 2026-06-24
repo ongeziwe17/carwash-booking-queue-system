@@ -239,8 +239,55 @@ class ServiceLayerTest {
     @Test
     void cancelledBookingCannotBeConfirmed() {
         Booking booking = createSavedBooking();
-        bookingService.cancelBooking(booking.getBookingId());
+        bookingService.cancelBooking(booking.getBookingId(), "u1");
         assertThrows(BusinessRuleViolationException.class, () -> bookingService.confirmBooking(booking.getBookingId()));
+    }
+
+    @Test
+    void customerCanCancelOwnFutureBooking() {
+        Booking booking = createSavedBooking();
+
+        Booking cancelled = bookingService.cancelBooking(booking.getBookingId(), "u1");
+
+        assertEquals(BookingStatus.CANCELLED, cancelled.getStatus());
+        assertEquals(BookingStatus.CANCELLED, bookingService.findById(booking.getBookingId()).getStatus());
+    }
+
+    @Test
+    void customerCannotCancelAnotherCustomersBooking() {
+        Booking booking = createSavedBooking();
+
+        assertThrows(BusinessRuleViolationException.class, () -> bookingService.cancelBooking(booking.getBookingId(), "u2"));
+        assertEquals(BookingStatus.CREATED, bookingService.findById(booking.getBookingId()).getStatus());
+    }
+
+    @Test
+    void customerCannotCancelPastBooking() {
+        Booking booking = createSavedBooking();
+        booking.setScheduledDateTime(LocalDateTime.now().minusHours(1));
+
+        assertThrows(BusinessRuleViolationException.class, () -> bookingService.cancelBooking(booking.getBookingId(), "u1"));
+        assertEquals(BookingStatus.CREATED, bookingService.findById(booking.getBookingId()).getStatus());
+    }
+
+    @Test
+    void completedBookingCannotBeCancelled() {
+        Booking booking = createSavedBooking();
+        assertTrue(booking.confirm());
+        assertTrue(booking.startService());
+        assertTrue(booking.completeService());
+
+        assertThrows(BusinessRuleViolationException.class, () -> bookingService.cancelBooking(booking.getBookingId(), "u1"));
+        assertEquals(BookingStatus.COMPLETED, bookingService.findById(booking.getBookingId()).getStatus());
+    }
+
+    @Test
+    void alreadyCancelledBookingCannotBeCancelledAgain() {
+        Booking booking = createSavedBooking();
+        bookingService.cancelBooking(booking.getBookingId(), "u1");
+
+        assertThrows(BusinessRuleViolationException.class, () -> bookingService.cancelBooking(booking.getBookingId(), "u1"));
+        assertEquals(BookingStatus.CANCELLED, bookingService.findById(booking.getBookingId()).getStatus());
     }
 
     @Test

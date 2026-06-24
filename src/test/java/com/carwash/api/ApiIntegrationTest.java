@@ -58,6 +58,35 @@ public class ApiIntegrationTest {
     }
 
     @Test
+    void bookingApiCancelOwnFutureBookingSucceeds() throws Exception {
+        createBookingApiFixture("cancel-ok", LocalDateTime.now().plusDays(1));
+
+        mockMvc.perform(post("/api/bookings/cancel-ok-booking/cancel").param("customerId", "cancel-ok-user"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    @Test
+    void bookingApiCancelWrongCustomerRejected() throws Exception {
+        createBookingApiFixture("cancel-wrong-owner", LocalDateTime.now().plusDays(1));
+
+        mockMvc.perform(post("/api/bookings/cancel-wrong-owner-booking/cancel").param("customerId", "other-user"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("owning customer")));
+    }
+
+    @Test
+    void bookingApiCancelAlreadyCancelledBookingRejected() throws Exception {
+        createBookingApiFixture("cancel-again", LocalDateTime.now().plusDays(1));
+        mockMvc.perform(post("/api/bookings/cancel-again-booking/cancel").param("customerId", "cancel-again-user"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/bookings/cancel-again-booking/cancel").param("customerId", "cancel-again-user"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("cancelled again")));
+    }
+
+    @Test
     void openApiDocsEndpointAvailable() throws Exception {
         mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
     }
@@ -127,26 +156,80 @@ public class ApiIntegrationTest {
     }
 
     @Test
-void bookingValidationErrorIncludesFieldLevelMessage() throws Exception {
-    String invalidBooking = """
-            {
-              "bookingId": "",
-              "userId": "",
-              "vehicleId": "v-test",
-              "serviceId": "s-test",
-              "scheduledDateTime": null,
-              "specialRequest": "validation test"
-            }
-            """;
+    void bookingValidationErrorIncludesFieldLevelMessage() throws Exception {
+        String invalidBooking = """
+                {
+                  "bookingId": "",
+                  "userId": "",
+                  "vehicleId": "v-test",
+                  "serviceId": "s-test",
+                  "scheduledDateTime": null,
+                  "specialRequest": "validation test"
+                }
+                """;
 
-    mockMvc.perform(post("/api/bookings")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(invalidBooking))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("bookingId")))
-            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("userId")))
-            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("scheduledDateTime")))
-            .andExpect(jsonPath("$.path").value("/api/bookings"));
-}
+        mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidBooking))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("bookingId")))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("userId")))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("scheduledDateTime")))
+                .andExpect(jsonPath("$.path").value("/api/bookings"));
+    }
+
+    private void createBookingApiFixture(String prefix, LocalDateTime scheduledDateTime) throws Exception {
+        Map<String, Object> user = Map.of(
+                "userId", prefix + "-user",
+                "fullName", prefix + " User",
+                "email", prefix + "@test.com",
+                "phone", "123",
+                "passwordHash", "x"
+        );
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(user)))
+                .andExpect(status().isCreated());
+
+        Map<String, Object> vehicle = Map.of(
+                "userId", prefix + "-user",
+                "vehicleId", prefix + "-vehicle",
+                "plateNumber", prefix + "-plate",
+                "vehicleType", "SUV",
+                "brand", "Toyota",
+                "model", "Rav4",
+                "color", "Black",
+                "notes", ""
+        );
+        mockMvc.perform(post("/api/vehicles")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(vehicle)))
+                .andExpect(status().isCreated());
+
+        Map<String, Object> service = new HashMap<>();
+        service.put("serviceId", prefix + "-service");
+        service.put("serviceName", prefix + " Service");
+        service.put("description", "premium");
+        service.put("price", BigDecimal.valueOf(300));
+        service.put("estimatedDurationMin", 45);
+        mockMvc.perform(post("/api/services")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(service)))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/services/" + prefix + "-service/activate"))
+                .andExpect(status().isOk());
+
+        Map<String, Object> booking = new HashMap<>();
+        booking.put("bookingId", prefix + "-booking");
+        booking.put("userId", prefix + "-user");
+        booking.put("vehicleId", prefix + "-vehicle");
+        booking.put("serviceId", prefix + "-service");
+        booking.put("scheduledDateTime", scheduledDateTime.toString());
+        booking.put("specialRequest", "none");
+        mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(booking)))
+                .andExpect(status().isCreated());
+    }
 }
