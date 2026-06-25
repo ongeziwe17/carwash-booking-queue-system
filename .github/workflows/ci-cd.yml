@@ -46,6 +46,9 @@ jobs:
       - name: Make mvnw executable
         run: chmod +x mvnw
 
+      ## - name: Validate Docker Compose config
+      ##  run: docker compose -f docker-compose.yml config
+
       - name: Run tests
         run: ./mvnw clean verify
 

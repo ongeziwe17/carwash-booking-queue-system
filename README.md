@@ -59,6 +59,33 @@ cd carwash-booking-queue-system
 ./mvnw spring-boot:run
 ```
 
+### Run with Docker Compose
+
+Build and start the Spring Boot API locally with Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+The API is available at:
+
+```text
+http://localhost:8080
+```
+
+Swagger UI is available at:
+
+```text
+http://localhost:8080/swagger-ui/index.html
+```
+
+Stop the Compose stack with:
+
+```bash
+docker compose down
+```
+
+
 ### Swagger UI
 
 After starting the Spring Boot application, open Swagger UI at:
