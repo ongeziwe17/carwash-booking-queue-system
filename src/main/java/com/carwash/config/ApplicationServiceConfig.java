@@ -32,6 +32,11 @@ public class ApplicationServiceConfig {
     }
 
     @Bean
+    public NotificationRepository notificationRepository() {
+        return RepositoryFactory.getNotificationRepository(StorageType.MEMORY);
+    }
+
+    @Bean
     public UserManagementService userManagementService(UserRepository userRepository) {
         return new UserManagementService(userRepository);
     }
@@ -44,11 +49,15 @@ public class ApplicationServiceConfig {
         return new ServiceCatalogService(serviceRepository);
     }
     @Bean
-    public BookingManagementService bookingManagementService(BookingRepository bookingRepository, UserRepository userRepository, VehicleRepository vehicleRepository, ServiceRepository serviceRepository) {
-        return new BookingManagementService(bookingRepository, userRepository, vehicleRepository, serviceRepository);
+    public NotificationManagementService notificationManagementService(NotificationRepository notificationRepository) {
+        return new NotificationManagementService(notificationRepository);
     }
     @Bean
-    public QueueManagementService queueManagementService(QueueEntryRepository queueEntryRepository, BookingRepository bookingRepository, ServiceRepository serviceRepository) {
-        return new QueueManagementService(queueEntryRepository, bookingRepository, serviceRepository);
+    public BookingManagementService bookingManagementService(BookingRepository bookingRepository, UserRepository userRepository, VehicleRepository vehicleRepository, ServiceRepository serviceRepository, NotificationManagementService notificationManagementService) {
+        return new BookingManagementService(bookingRepository, userRepository, vehicleRepository, serviceRepository, notificationManagementService);
+    }
+    @Bean
+    public QueueManagementService queueManagementService(QueueEntryRepository queueEntryRepository, BookingRepository bookingRepository, ServiceRepository serviceRepository, NotificationManagementService notificationManagementService) {
+        return new QueueManagementService(queueEntryRepository, bookingRepository, serviceRepository, notificationManagementService);
     }
 }

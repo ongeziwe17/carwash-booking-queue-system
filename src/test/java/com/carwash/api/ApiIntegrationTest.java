@@ -318,6 +318,49 @@ public class ApiIntegrationTest {
                 .andExpect(jsonPath("$.path").value("/api/bookings"));
     }
 
+    @Test
+    void notificationApiReturnsRecentNotificationsForUser() throws Exception {
+        String prefix = "notifications-recent";
+        createBookingApiFixture(prefix, LocalDateTime.now().plusDays(2));
+        mockMvc.perform(post("/api/bookings/" + prefix + "-booking/confirm"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/notifications/user/" + prefix + "-user"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].type").value("BOOKING_CONFIRMED"))
+                .andExpect(jsonPath("$[0].message").value("Your booking has been confirmed."))
+                .andExpect(jsonPath("$[0].user.userId").value(prefix + "-user"));
+    }
+
+    @Test
+    void notificationApiReturnsOnlyRequestedUsersNotifications() throws Exception {
+        String firstPrefix = "notifications-owner";
+        String secondPrefix = "notifications-other";
+        createBookingApiFixture(firstPrefix, LocalDateTime.now().plusDays(2));
+        createBookingApiFixture(secondPrefix, LocalDateTime.now().plusDays(2));
+        mockMvc.perform(post("/api/bookings/" + firstPrefix + "-booking/confirm"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/bookings/" + secondPrefix + "-booking/confirm"))
+                .andExpect(status().isOk());
+
+        String response = mockMvc.perform(get("/api/notifications/user/" + firstPrefix + "-user"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].user.userId").value(firstPrefix + "-user"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        org.junit.jupiter.api.Assertions.assertTrue(response.contains(firstPrefix + "-booking"));
+        org.junit.jupiter.api.Assertions.assertFalse(response.contains(secondPrefix + "-booking"));
+    }
+
+    @Test
+    void notificationApiReturnsEmptyListWhenUserHasNoNotifications() throws Exception {
+        mockMvc.perform(get("/api/notifications/user/no-notifications-user"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
     private void createBookingApiFixture(String prefix, LocalDateTime scheduledDateTime) throws Exception {
         Map<String, Object> user = Map.of(
                 "userId", prefix + "-user",

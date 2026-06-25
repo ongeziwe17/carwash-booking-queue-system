@@ -21,6 +21,7 @@ class ServiceLayerTest {
     private ServiceCatalogService catalogService;
     private BookingManagementService bookingService;
     private QueueManagementService queueService;
+    private NotificationManagementService notificationService;
 
     @BeforeEach
     void setup() {
@@ -29,12 +30,14 @@ class ServiceLayerTest {
         InMemoryServiceRepository serviceRepository = new InMemoryServiceRepository();
         InMemoryBookingRepository bookingRepository = new InMemoryBookingRepository();
         InMemoryQueueEntryRepository queueRepository = new InMemoryQueueEntryRepository();
+        InMemoryNotificationRepository notificationRepository = new InMemoryNotificationRepository();
 
         userService = new UserManagementService(userRepository);
         vehicleService = new VehicleManagementService(vehicleRepository, userRepository);
         catalogService = new ServiceCatalogService(serviceRepository);
-        bookingService = new BookingManagementService(bookingRepository, userRepository, vehicleRepository, serviceRepository);
-        queueService = new QueueManagementService(queueRepository, bookingRepository, serviceRepository);
+        notificationService = new NotificationManagementService(notificationRepository);
+        bookingService = new BookingManagementService(bookingRepository, userRepository, vehicleRepository, serviceRepository, notificationService);
+        queueService = new QueueManagementService(queueRepository, bookingRepository, serviceRepository, notificationService);
     }
 
     @Test
@@ -318,6 +321,84 @@ class ServiceLayerTest {
     @Test
     void missingQueueLookupThrows() {
         assertThrows(ResourceNotFoundException.class, () -> queueService.findById("missing"));
+    }
+
+    @Test
+    void bookingConfirmationCreatesNotification() {
+        Booking booking = createSavedBooking();
+
+        bookingService.confirmBooking(booking.getBookingId());
+
+        List<Notification> notifications = notificationService.findByUserId("u1");
+        assertEquals(1, notifications.size());
+        assertEquals("BOOKING_CONFIRMED", notifications.getFirst().getType());
+        assertEquals("Your booking has been confirmed.", notifications.getFirst().getMessage());
+    }
+
+    @Test
+    void bookingCancellationCreatesNotification() {
+        Booking booking = createSavedBooking();
+
+        bookingService.cancelBooking(booking.getBookingId(), "u1");
+
+        List<Notification> notifications = notificationService.findByUserId("u1");
+        assertEquals(1, notifications.size());
+        assertEquals("BOOKING_CANCELLED", notifications.getFirst().getType());
+        assertEquals("Your booking has been cancelled.", notifications.getFirst().getMessage());
+    }
+
+    @Test
+    void queueCallCreatesNotification() {
+        QueueEntry queueEntry = createSavedQueueEntry();
+
+        queueService.callNext(queueEntry.getQueueEntryId());
+
+        List<Notification> notifications = notificationService.findByUserId("u1");
+        assertEquals(1, notifications.size());
+        assertEquals("QUEUE_CALLED", notifications.getFirst().getType());
+        assertEquals("Your vehicle is next in the queue.", notifications.getFirst().getMessage());
+    }
+
+    @Test
+    void queueServiceStartCreatesNotification() {
+        QueueEntry queueEntry = createSavedQueueEntry();
+
+        queueService.startService(queueEntry.getQueueEntryId());
+
+        List<Notification> notifications = notificationService.findByUserId("u1");
+        assertEquals(1, notifications.size());
+        assertEquals("SERVICE_STARTED", notifications.getFirst().getType());
+        assertEquals("Your service has started.", notifications.getFirst().getMessage());
+    }
+
+    @Test
+    void queueServiceCompletionCreatesNotification() {
+        QueueEntry queueEntry = createSavedQueueEntry();
+        queueService.startService(queueEntry.getQueueEntryId());
+
+        queueService.completeQueueEntry(queueEntry.getQueueEntryId());
+
+        List<Notification> notifications = notificationService.findByUserId("u1");
+        assertEquals(2, notifications.size());
+        assertTrue(notifications.stream().anyMatch(notification -> notification.getType().equals("SERVICE_COMPLETED")
+                && notification.getMessage().equals("Your service has been completed.")));
+    }
+
+    @Test
+    void recentNotificationsCanBeRetrievedByUserId() {
+        Booking booking = createSavedBooking();
+        bookingService.confirmBooking(booking.getBookingId());
+        bookingService.cancelBooking(booking.getBookingId(), "u1");
+
+        List<Notification> notifications = notificationService.findRecentByUserId("u1");
+
+        assertEquals(2, notifications.size());
+        assertEquals("BOOKING_CANCELLED", notifications.getFirst().getType());
+    }
+
+    private QueueEntry createSavedQueueEntry() {
+        Booking booking = createSavedBooking();
+        return queueService.createQueueEntry(new QueueEntry("q1", booking, booking.getService(), 1));
     }
 
     private Booking createSavedBooking() {
