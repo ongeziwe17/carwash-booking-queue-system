@@ -7,12 +7,12 @@
 		<relativePath/>
 		<!--  lookup parent from repository  -->
 	</parent>
-	<groupId>com.example</groupId>
-	<artifactId>demo</artifactId>
+	<groupId>com.carwash</groupId>
+	<artifactId>carwash-booking-queue-system</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name/>
-	<description/>
-	<url/>
+	<name>carwash-booking-queue-system</name>
+	<description>Web-Based Car Wash Booking and Queue Management System</description>
+	<url>https://github.com/ongeziwe17/carwash-booking-queue-system</url>
 	<licenses>
 		<license/>
 	</licenses>
