@@ -21,13 +21,19 @@ public class BookingManagementService {
     private final UserRepository userRepository;
     private final VehicleRepository vehicleRepository;
     private final ServiceRepository serviceRepository;
+    private final NotificationManagementService notificationManagementService;
 
 
     public BookingManagementService(BookingRepository bookingRepository, UserRepository userRepository, VehicleRepository vehicleRepository, ServiceRepository serviceRepository) {
+        this(bookingRepository, userRepository, vehicleRepository, serviceRepository, null);
+    }
+
+    public BookingManagementService(BookingRepository bookingRepository, UserRepository userRepository, VehicleRepository vehicleRepository, ServiceRepository serviceRepository, NotificationManagementService notificationManagementService) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.vehicleRepository = vehicleRepository;
         this.serviceRepository = serviceRepository;
+        this.notificationManagementService = notificationManagementService;
     }
 
     public Booking createBooking(Booking booking) {
@@ -60,6 +66,7 @@ public class BookingManagementService {
         validateCancellationRequest(booking, customerId);
         if (!booking.cancel()) throw new BusinessRuleViolationException("Invalid booking status transition");
         bookingRepository.save(booking);
+        notifyCustomer(booking, "BOOKING_CANCELLED", "Your booking has been cancelled.");
         return booking;
     }
 
@@ -80,7 +87,14 @@ public class BookingManagementService {
         if (booking.getStatus() == BookingStatus.CANCELLED) throw new BusinessRuleViolationException("Cancelled booking cannot be confirmed");
         if (!booking.confirm()) throw new BusinessRuleViolationException("Invalid booking status transition");
         bookingRepository.save(booking);
+        notifyCustomer(booking, "BOOKING_CONFIRMED", "Your booking has been confirmed.");
         return booking;
+    }
+
+    private void notifyCustomer(Booking booking, String type, String message) {
+        if (notificationManagementService != null) {
+            notificationManagementService.createNotification(booking.getUser(), booking, type, message);
+        }
     }
 
     private void validateBooking(Booking booking) {

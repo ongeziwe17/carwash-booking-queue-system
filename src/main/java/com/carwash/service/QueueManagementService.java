@@ -17,11 +17,17 @@ public class QueueManagementService {
     private final QueueEntryRepository queueEntryRepository;
     private final BookingRepository bookingRepository;
     private final ServiceRepository serviceRepository;
+    private final NotificationManagementService notificationManagementService;
 
     public QueueManagementService(QueueEntryRepository queueEntryRepository, BookingRepository bookingRepository, ServiceRepository serviceRepository) {
+        this(queueEntryRepository, bookingRepository, serviceRepository, null);
+    }
+
+    public QueueManagementService(QueueEntryRepository queueEntryRepository, BookingRepository bookingRepository, ServiceRepository serviceRepository, NotificationManagementService notificationManagementService) {
         this.queueEntryRepository = queueEntryRepository;
         this.bookingRepository = bookingRepository;
         this.serviceRepository = serviceRepository;
+        this.notificationManagementService = notificationManagementService;
     }
 
     public QueueEntry createQueueEntry(QueueEntry queueEntry) {
@@ -52,6 +58,7 @@ public class QueueManagementService {
         QueueEntry queueEntry = findById(queueEntryId);
         if (!queueEntry.callNext()) throw new BusinessRuleViolationException("Queue entry cannot be called in current state");
         queueEntryRepository.save(queueEntry);
+        notifyCustomer(queueEntry, "QUEUE_CALLED", "Your vehicle is next in the queue.");
         return queueEntry;
     }
 
@@ -59,6 +66,7 @@ public class QueueManagementService {
         QueueEntry queueEntry = findById(queueEntryId);
         if (!queueEntry.startService()) throw new BusinessRuleViolationException("Queue entry cannot start service in current state");
         queueEntryRepository.save(queueEntry);
+        notifyCustomer(queueEntry, "SERVICE_STARTED", "Your service has started.");
         return queueEntry;
     }
 
@@ -67,12 +75,19 @@ public class QueueManagementService {
         if (queueEntry.getStartedAt() == null) throw new BusinessRuleViolationException("Queue entry cannot be completed before it has started");
         if (!queueEntry.complete()) throw new BusinessRuleViolationException("Queue entry cannot be completed in current state");
         queueEntryRepository.save(queueEntry);
+        notifyCustomer(queueEntry, "SERVICE_COMPLETED", "Your service has been completed.");
         return queueEntry;
     }
 
     public void deleteQueueEntry(String queueEntryId) {
         findById(queueEntryId);
         queueEntryRepository.delete(queueEntryId);
+    }
+
+    private void notifyCustomer(QueueEntry queueEntry, String type, String message) {
+        if (notificationManagementService != null && queueEntry.getBooking() != null) {
+            notificationManagementService.createNotification(queueEntry.getBooking().getUser(), queueEntry.getBooking(), type, message);
+        }
     }
 
     private void validateQueueEntry(QueueEntry queueEntry) {
