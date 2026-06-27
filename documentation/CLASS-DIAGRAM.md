@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-This class diagram translates the Assignment 9 domain model into an object-oriented design view for implementation. It defines the core classes, their attributes and responsibilities, and the relationships that support user management, booking, queue flow, and notifications in the MVP.
+This class diagram translates the current domain model into an object-oriented design view for implementation. It defines the core classes, their attributes and responsibilities, and the relationships that support user management, booking, queue flow, and notifications in the MVP.
 
 ## 2. Mermaid Class Diagram
 

@@ -2,7 +2,7 @@
 
 ## 1. Use Case Diagram
 
-The following UML-style use case diagram models the MVP interactions for the **Web-Based Car Wash Booking and Queue Management System**, aligned with the functional requirements from Assignment 4 (FR-01 to FR-07).
+The following UML-style use case diagram models the MVP interactions for the **Web-Based Car Wash Booking and Queue Management System**, aligned with the functional requirements from the product requirements (FR-01 to FR-07).
 
 ![alt text](../assets/Use-Case-Diagram.png)
 
@@ -19,7 +19,7 @@ The following UML-style use case diagram models the MVP interactions for the **W
 
 ### 2.2 Relationships between actors and use cases
 
-The diagram maps all major stakeholders identified in Assignment 4 to concrete interactions in the MVP:
+The diagram maps all major stakeholders identified in the product requirements to concrete interactions in the MVP:
 
 - **Customer-facing flow** centers on FR-01, FR-02, FR-03, FR-04, and FR-05.
 - **Operations flow** for Business Owner and Service Staff centers on FR-02, FR-04, and FR-06.
@@ -34,11 +34,11 @@ The diagram maps all major stakeholders identified in Assignment 4 to concrete i
 - `Receive Booking Notifications` **extends** both `Create Booking` and `Join Virtual Queue`, because notification behavior is conditional and event-driven.
 - `Generate Basic Reports` **extends** `View Admin Dashboard` to represent deeper analytics access that is initiated from dashboard activity.
 
-### 2.4 Alignment with Assignment 3 and Assignment 4
+### 2.4 Alignment with Product Scope and Requirements
 
-This use case model remains consistent with the architecture and scope defined in Assignment 3 by keeping to MVP functions (booking, queue, service management, and basic reporting) without introducing out-of-scope capabilities such as payments or loyalty programs.
+This use case model remains consistent with the current architecture and MVP scope by keeping to MVP functions (booking, queue, service management, and basic reporting) without introducing out-of-scope capabilities such as payments or loyalty programs.
 
-It also directly reflects Assignment 4 stakeholder concerns by:
+It also directly reflects the product requirements stakeholder concerns by:
 
 - reducing customer uncertainty through booking, queue visibility, and notifications,
 - improving business operational control through service and queue workflows,
