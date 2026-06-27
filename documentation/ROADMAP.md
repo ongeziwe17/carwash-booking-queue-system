@@ -1,6 +1,6 @@
 # Project Roadmap
 
-This roadmap summarizes completed capabilities and planned enhancements for the **Web-Based Car Wash Booking and Queue Management System**. It is intended to help contributors understand the project direction and identify areas where they can participate.
+This roadmap summarizes completed capabilities and planned enhancements for the **Web-Based Car Wash Booking and Queue Management System**. It is intended to document the project direction for academic review and portfolio demonstration.
 
 ## In progress
 
@@ -37,7 +37,3 @@ This roadmap summarizes completed capabilities and planned enhancements for the 
 - Payment integration
 - Mobile application
 - Real-time queue updates via WebSockets
-
-## Contribution Guidance
-
-Planned items should be implemented through focused GitHub Issues and Pull Requests. Contributors are encouraged to start with short-term improvements before moving into larger architecture or infrastructure enhancements.

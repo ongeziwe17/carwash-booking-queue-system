@@ -122,37 +122,3 @@ The class diagram also had to align with prior work. The chosen classes and rela
 One of the most valuable lessons from this was that object-oriented design is not just about drawing classes and connecting them with lines. It is about making thoughtful design decisions that balance clarity, correctness, maintainability, and scope. The exercise improved my understanding of how domain entities emerge from requirements, how business rules influence relationships, and how UML class diagrams can serve as a bridge between analysis and implementation.
 
 Overall, this strengthened my ability to think about software systems in terms of both **business concepts** and **design structure**. It reinforced the importance of abstraction, careful relationship modeling, and consistency with prior requirements and behavioral models. Most importantly, it showed that a well-designed class diagram is not only a documentation artifact, but also a practical guide for implementation.
-
-## Reflection: Open-Source Collaboration and Repository Readiness
-
-### 1. Improving the Repository Based on Peer Feedback
-
-Assignment 14 required me to review the Web-Based Car Wash Booking and Queue Management System from the perspective of a potential contributor rather than only as the original developer. This was a valuable shift because it revealed that a technically complete repository is not automatically easy to understand, extend, or maintain. Earlier assignments had focused on the full software engineering lifecycle, from requirements and UML modelling to REST APIs, Swagger documentation, CI/CD, and GitHub project management. Peer feedback helped me see that contributors also need clear guidance about where to begin, how the project is organised, and how to participate responsibly.
-
-The most important improvement was strengthening onboarding and repository navigation. Adding `CONTRIBUTING.md`, `ROADMAP.md`, and `LICENSE` helped communicate how contributions should be made, where the project may go next, and what legal permissions apply to the codebase. README enhancements were also important because the README is usually the first document a new developer reads. By improving the README and connecting it to supporting documentation, the repository became more approachable and easier to explore.
-
-I also learned the value of contributor issue labels and community engagement documentation. Labels such as bug, enhancement, documentation, priority, and beginner-friendly tasks guide contributors toward suitable work. They reduce uncertainty and make the issue tracker more useful as an onboarding tool. This matters because the repository already has visible community interest, reflected by 19 stars and 21 forks. These metrics suggest that other developers have found the project interesting or useful, but visibility alone is not enough. Contributor-focused documentation remains important even when the project is technically complete because it turns interest into possible participation. Through these changes, the repository evolved from a coursework repository into something closer to a professional open-source project.
-
-### 2. Challenges in Onboarding Contributors
-
-One of the main challenges was recognising how much knowledge I had been assuming. Because I worked on the project across multiple assignments, I understood the requirements, design decisions, architecture, API structure, testing process, and GitHub workflow. A new contributor does not have that same background. They need explanations of the booking and queue management logic, the purpose of different layers, and the relationship between planning artefacts and implemented features.
-
-The project size also made onboarding difficult. Its lifecycle artefacts demonstrate engineering maturity but can overwhelm newcomers if information is not structured. I had to decide how much detail belonged in the README and how much should be placed in separate documents. The README needed to remain a clear entry point, while files such as `CONTRIBUTING.md` and `ROADMAP.md` provided more detailed guidance. This taught me that documentation also requires design decisions: information must be organised, discoverable, and readable.
-
-Another challenge was explaining development expectations clearly. Contributors need to understand the Git workflow, issue tracking process, branch strategy, testing requirements, and pull request expectations before they can contribute effectively. Without this guidance, even well-intentioned contributions may create confusion or extra maintenance work. I learned that onboarding is not only a technical activity. It also requires communication skills, empathy for new developers, and the ability to translate internal project knowledge into clear public instructions.
-
-### 3. Lessons Learned About Open-Source Collaboration
-
-A major lesson from this assignment is that open-source success depends on documentation as much as code quality. Good code is important, but contributors need context before they can safely improve it. Documentation explains the purpose of the project, the expected standards, and the roadmap for future work. It also helps maintain consistency by making contribution rules visible rather than relying on assumptions.
-
-I also learned that contributor experience should be treated as part of the engineering process. Issue labels, roadmap visibility, and contribution guidelines reduce barriers to participation by helping contributors identify suitable tasks and understand project priorities. GitHub stars and forks provide useful feedback about the project's visibility and usefulness, but they do not automatically create collaboration. Structured collaboration practices are needed to convert interest into meaningful contributions.
-
-This assignment also showed me that maintainability and collaboration should be considered from the beginning rather than added at the end. Naming conventions, testing practices, documentation quality, branch strategies, and pull request expectations all affect how easily a project can grow. These lessons connect directly to real-world software engineering teams and open-source communities, where developers must read existing code, follow shared standards, review changes, and communicate decisions.
-
-### 4. Conclusion
-
-Completing this reflection helped me understand the transition from individual development to community-oriented development. The Web-Based Car Wash Booking and Queue Management System now represents more than a functional application; it demonstrates a complete software engineering process supported by documentation, collaboration practices, and repository readiness.
-
-The assignment reinforced the importance of maintainability, transparency, and contributor support. Professional GitHub practice is not limited to committing code or building APIs. It also includes preparing a repository so that others can understand, evaluate, use, and contribute to it confidently. The 19 stars and 21 forks show that repository visibility has value, but long-term value depends on how well the project supports potential contributors.
-
-Overall, Assignment 14 strengthened my understanding of collaborative software development. It showed me that a mature software project must be technically sound, clearly documented, legally prepared, and welcoming to contributors. These are professional skills that I will carry forward into future academic, open-source, and industry software engineering work.

@@ -38,7 +38,7 @@ The initial system prototype will support:
 
 ## Getting Started
 
-Follow these steps to set up the project locally for development, testing, or contribution.
+Follow these steps to set up the project locally for development and testing.
 
 ### Clone
 
@@ -100,73 +100,11 @@ OpenAPI JSON is available at:
 http://localhost:8080/v3/api-docs
 ```
 
-## Looking to Contribute?
+## Project Status
 
-Start with one of our beginner-friendly issues:
+This repository is maintained as an academic and portfolio project.
+External contributions are not currently being accepted.
 
-Issues marked with code '**Contr-**:'
-
-- good-first-issue
-- help-wanted
-- enhancement
-
-View Issues:
-
-```text
-https://github.com/ongeziwe17/carwash-booking-queue-system/issues
-```
-
-## Features Available for Contribution
-
-| Area | Difficulty | Suggested Label |
-|--------|--------|--------|
-| Input Validation Improvements | Beginner | good-first-issue |
-| API Pagination | Beginner | good-first-issue |
-| Audit Logging | Intermediate | feature-request |
-| JWT Authentication | Intermediate | feature-request |
-| Redis Caching | Advanced | feature-request |
-| Kubernetes Deployment | Advanced | feature-request |
-
-## Community Engagement
-
-This repository is an open-source learning project for building a practical web-based car wash booking and queue management system. The project has already attracted community interest with **19 stars** and **21 forks**, and contributions are welcome from reviewers, and external contributors.
-
-## Community and Peer Review
-
-This repository was prepared using open-source collaboration practices.
-
-The project includes:
-
-- contribution guidelines
-- roadmap documentation
-- issue labeling strategy
-- CI/CD automation
-- onboarding documentation
-
-Community engagement metrics:
-
-| Metric | Count |
-|--------|--------|
-| Stars | 19 |
-| Forks | 21 |
-
-Contributions, suggestions, and peer reviews are welcome.
-
-## Evidence
-
-Files included:
-
-- [Contribution](documentation/CONTRIBUTION.md)
-- [Roadmap](documentation/ROADMAP.md)
-- [Licence](LICENCE)
-- VOTING-RESULTS.md
-- [Reflection](documentation/REFLECTION.md)
-
-Screenshots:
-
-```text
-documentation/screenshots/peer-review/
-```
 
 ## Project Documentation
 
@@ -192,9 +130,7 @@ Detailed system documentation and architecture diagrams are available in the fol
 - [Class Diagram](documentation/CLASS-DIAGRAM.md)
 - [Repository Class Diagram](documentation/REPOSITORY-CLASS-DIAGRAM.md)
 - [Branch Protection Rules](documentation/PROTECTION.md)
-- [Contribution](documentation/CONTRIBUTION.md)
 - [Roadmap](documentation/ROADMAP.md)
-- [Licence](LICENCE)
 
 ## Technology Stack (Planned)
 
