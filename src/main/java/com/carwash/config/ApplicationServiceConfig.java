@@ -60,4 +60,9 @@ public class ApplicationServiceConfig {
     public QueueManagementService queueManagementService(QueueEntryRepository queueEntryRepository, BookingRepository bookingRepository, ServiceRepository serviceRepository, NotificationManagementService notificationManagementService) {
         return new QueueManagementService(queueEntryRepository, bookingRepository, serviceRepository, notificationManagementService);
     }
+
+    @Bean
+    public DailySummaryReportService dailySummaryReportService(BookingRepository bookingRepository, QueueEntryRepository queueEntryRepository) {
+        return new DailySummaryReportService(bookingRepository, queueEntryRepository);
+    }
 }
