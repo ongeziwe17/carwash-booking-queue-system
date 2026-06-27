@@ -37,8 +37,8 @@ flowchart TD
   - `no open booking` before permanent deletion to preserve booking consistency.
 - **Traceability**:
   - Aligns strongly with **FR-01 User Registration and Authentication**.
-  - Supports Assignment 5 use cases **Register Account** and **Authenticate User**.
-  - Matches Assignment 6 sprint/user story focus on onboarding and secure sign-in as MVP priorities.
+  - Supports the product use cases use cases **Register Account** and **Authenticate User**.
+  - Matches the product backlog delivery cycle/user story focus on onboarding and secure sign-in as MVP priorities.
 
 ## 3. Booking State Diagram
 
@@ -75,7 +75,7 @@ flowchart TD
 - **Traceability**:
   - Directly maps to **FR-03 Booking System** and integrates with **FR-04 Queue Management**.
   - Aligns with use cases **Create Booking**, **Join Virtual Queue**, **View Queue Position**, and **Manage Bookings and Queue**.
-  - Reflects Assignment 6 sprint scope around booking + queue MVP execution.
+  - Reflects the product backlog delivery cycle scope around booking + queue MVP execution.
 
 ## 4. Queue Entry State Diagram
 
@@ -109,7 +109,7 @@ flowchart TD
 - **Traceability**:
   - Core to **FR-04 Queue Management**.
   - Supports use cases **Join Virtual Queue**, **View Queue Position**, and **Manage Bookings and Queue**.
-  - Fits Assignment 6 sprint items involving live queue visibility and queue progression rules.
+  - Fits the product backlog delivery cycle items involving live queue visibility and queue progression rules.
 
 ## 5. Service State Diagram
 
@@ -140,7 +140,7 @@ flowchart TD
 - **Traceability**:
   - Maps to **FR-02 Service Catalog** and admin operations in **FR-06 Administrative Dashboard**.
   - Supports use cases **Browse Service Catalog** and **Manage Services**.
-  - Connects with Assignment 6 backlog items for service management and pricing visibility.
+  - Connects with the product backlog backlog items for service management and pricing visibility.
 
 ## 6. Notification State Diagram
 
@@ -172,7 +172,7 @@ flowchart TD
 - **Traceability**:
   - Implements **FR-05 Notifications** behavior.
   - Reinforces booking/queue use cases by surfacing status changes to users.
-  - Matches agile concerns on user communication and operational transparency from Assignment 6.
+  - Matches agile concerns on user communication and operational transparency from the product backlog.
 
 ## 7. Report State Diagram
 
@@ -205,7 +205,7 @@ flowchart TD
 - **Traceability**:
   - Corresponds to **FR-07 Basic Reporting** and admin access in **FR-06**.
   - Supports operational management use case **Manage Bookings and Queue** through analytics/visibility.
-  - Aligns with Assignment 6 planning where reporting is typically secondary but still part of MVP completeness.
+  - Aligns with the product backlog planning where reporting is typically secondary but still part of MVP completeness.
 
 ## 8. Authentication Session State Diagram
 
@@ -243,7 +243,7 @@ flowchart TD
 - **Traceability**:
   - Strongly supports **FR-01 User Registration and Authentication**.
   - Maps to use case **Authenticate User**.
-  - Mirrors Assignment 6 stories around secure login and session security for MVP readiness.
+  - Mirrors the product backlog stories around secure login and session security for MVP readiness.
 
 ## 9. GitHub Issue / Work Item State Diagram
 
@@ -269,13 +269,13 @@ flowchart TD
 
 ### Explanation
 
-- **Key states**: `Open`, `Prioritized`, `In Progress`, `In Review`, `Testing`, `Done`, and `Closed` reflect the lifecycle of a work item in the GitHub Kanban workflow.
+- **Key states**: `Open`, `Prioritized`, `In Progress`, `In Review`, `Testing`, `Done`, and `Closed` reflect the lifecycle of a work item in the delivery workflow.
 - **Key transitions**: issues move from backlog into implementation, then through review and testing before closure.
 - **Relevant guards**:
   - `review approved` before entering testing.
   - `tests passed` before being marked done.
   - blocked work can only resume once dependencies or issues are resolved.
 - **Traceability**:
-  - Supports Assignment 6 backlog and sprint planning artefacts.
-  - Directly aligns with Assignment 7 GitHub Kanban workflow columns.
+  - Supports the product backlog backlog and delivery planning artefacts.
+  - Directly aligns with the product delivery workflow.
   - Reinforces implementation readiness for functional requirements and user stories.

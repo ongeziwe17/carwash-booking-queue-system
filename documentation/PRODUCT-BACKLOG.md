@@ -44,4 +44,4 @@ The backlog is prioritized using the MoSCoW technique:
 
 - Effort estimates use a simplified Fibonacci-like scale (1–5)
 - Dependencies ensure logical implementation order
-- Backlog aligns with Agile principles and supports sprint planning
+- Backlog aligns with Agile principles and supports delivery planning

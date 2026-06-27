@@ -1,31 +1,56 @@
-# System Specification
+# Product Specification
 
-## Project Title
+## Product Vision
 
-Web-Based Car Wash Booking and Queue Management System
+A web-based car wash booking and queue management platform that helps customers book services, join and manage queues, receive updates, and helps car wash businesses manage daily operations efficiently.
 
----
+## Stakeholders
 
-## Domain
+- **Customers**: Book wash services, manage vehicles, view queue status, and receive updates.
+- **Car wash staff**: Monitor bookings, manage queue progress, and coordinate customer service.
+- **Business owners**: Configure service offerings and track operational performance.
+- **Product maintainers**: Build and operate a secure, maintainable backend platform.
 
-The domain of this system is **Automotive Service Management**, specifically focusing on digital platforms that support service operations for car wash businesses. Car wash services typically operate as small to medium-sized service providers that manage customer queues, service scheduling, and workforce coordination.
+## MVP Scope
 
-In many cases, these businesses rely on manual walk-in processes where customers physically arrive and wait for service. This lack of digital coordination limits visibility into queue length, service availability, and estimated waiting times. By introducing a digital platform within this domain, the system aims to improve how customers and service providers interact and manage service operations.
+The current backend supports the core API foundation for:
 
----
+- User record management.
+- Vehicle registration and lookup.
+- Service catalog operations.
+- Booking creation and retrieval.
+- Queue entry creation and position management.
+- Notification record creation and retrieval.
 
-## Problem Statement
+## Functional Requirements
 
-Many car wash businesses currently rely on manual queue management systems where customers must physically arrive and wait in line for service. These processes provide little to no visibility into queue length, service availability, or estimated waiting time. As a result, customers often experience long and unpredictable waiting times, while businesses struggle to efficiently manage service demand and resource utilisation.
+| ID | Requirement |
+| --- | --- |
+| FR-01 | The system shall expose APIs for managing user records. |
+| FR-02 | The system shall allow customers to register and retrieve vehicles. |
+| FR-03 | The system shall expose service catalog APIs for available wash services. |
+| FR-04 | The system shall allow booking creation for a customer, vehicle, and service. |
+| FR-05 | The system shall allow customers to join and track queue entries. |
+| FR-06 | The system shall maintain notification records for customer updates. |
+| FR-07 | The system shall return consistent error responses for invalid requests and missing resources. |
 
-Without a digital system to coordinate customer bookings and service queues, both customers and service providers face inefficiencies that affect service quality and operational performance. A web-based booking and queue management system can address this problem by allowing customers to view service availability and join queues digitally while enabling businesses to manage service flow more effectively.
+## Non-Functional Requirements
 
----
+| Category | Requirement |
+| --- | --- |
+| Maintainability | Code should remain layered by controller, service, repository, domain, and DTO responsibilities. |
+| Testability | Core service and API workflows should be covered by automated tests. |
+| API usability | Swagger/OpenAPI documentation should remain available for local development. |
+| Extensibility | Storage implementations should remain replaceable behind repository interfaces. |
+| Deployment | Docker and Docker Compose should continue to support repeatable local execution. |
 
-## Individual Scope
+## Business Rules
 
-This project will design and develop a prototype web-based system that enables digital interaction between customers and car wash service providers. The system will allow customers to register, register their vehicles, view available car wash businesses, and join service queues or make bookings online.
+- A booking must reference valid customer, vehicle, and service records.
+- Queue entries must reference valid bookings or service context as supported by the API workflow.
+- Queue positions should be managed consistently when entries are created or updated.
+- Notification records should preserve delivery channel, recipient, message, and status information.
 
-Car wash businesses will be able to register their services, manage service queues, update service status, and monitor daily bookings through a centralized interface. The system will focus on core queue management and booking functionality rather than full-scale enterprise features.
+## Out of Scope for This Cleanup
 
-The scope of this individual project is intentionally limited to ensure feasibility within the semester timeframe while still demonstrating a complete system design, including backend services, database management, and a user interface. The system architecture will also be designed to allow future expansion, such as recommendation systems, service analytics, and multi-location car wash support.location car wash support.
+This cleanup does not add authentication, role-based access control, payment processing, durable persistence, or multi-tenancy. Those remain roadmap items.

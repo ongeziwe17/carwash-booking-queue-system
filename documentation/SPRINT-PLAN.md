@@ -2,9 +2,9 @@
 
 ## 1. Sprint Goal
 
-This 2-week sprint aims to deliver a usable MVP flow that allows a customer to create an account, securely sign in, browse available car wash services, book a service slot, and join the virtual queue. Completing this flow provides the project’s first end-to-end customer journey and establishes the technical foundation for future operational and reporting features.
+This 2-week delivery cycle aims to deliver a usable MVP flow that allows a customer to create an account, securely sign in, browse available car wash services, book a service slot, and join the virtual queue. Completing this flow provides the project’s first end-to-end customer journey and establishes the technical foundation for future operational and reporting features.
 
-By the end of the sprint, the team should have reliable core APIs, validated data handling, and basic user-facing endpoints/pages that support booking and queue entry with proper authentication. This creates immediate business value by enabling digital self-service, reducing manual booking overhead, and preparing the platform for staff-side management features in later sprints.
+By the end of the delivery cycle, the team should have reliable core APIs, validated data handling, and basic user-facing endpoints/pages that support booking and queue entry with proper authentication. This creates immediate business value by enabling digital self-service, reducing manual booking overhead, and preparing the platform for staff-side management features in later delivery cycles.
 
 ---
 
@@ -39,6 +39,6 @@ By the end of the sprint, the team should have reliable core APIs, validated dat
 
 ## 4. Notes
 
-- All sprint tasks are derived directly from selected Must-have user stories (US-001 to US-005).
-- Hour estimates are sized for a 2-week sprint and include implementation plus basic verification.
-- This sprint focuses on the core system foundation and a usable customer-facing vertical slice for MVP delivery.
+- All delivery cycle tasks are derived directly from selected Must-have user stories (US-001 to US-005).
+- Hour estimates are sized for a 2-week delivery cycle and include implementation plus basic verification.
+- This delivery cycle focuses on the core system foundation and a usable customer-facing vertical slice for MVP delivery.

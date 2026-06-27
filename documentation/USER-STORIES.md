@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-These user stories are derived from the functional requirements defined in Assignment 4 and the use cases defined in Assignment 5. They provide an MVP-focused Agile breakdown of the car wash booking and queue system so the backlog can be prioritized and implemented incrementally while remaining consistent with earlier project deliverables.
+These user stories are derived from the functional requirements defined in the product requirements and the use cases defined in the product use cases. They provide an MVP-focused Agile breakdown of the car wash booking and queue system so the backlog can be prioritized and implemented incrementally while remaining consistent with the product specification.
 
 ## 2. User Stories Table
 
@@ -24,4 +24,4 @@ These user stories are derived from the functional requirements defined in Assig
 
 ## 3. INVEST Alignment Note
 
-These stories are written to satisfy INVEST principles for Agile planning: they are **independent** enough to schedule in different sprints, **negotiable** in implementation detail, **valuable** to specific stakeholders, **estimable** at MVP scope, **small** enough for incremental delivery, and **testable** through clear acceptance criteria. This makes them suitable for prioritized backlog refinement and sprint planning.
+These stories are written to satisfy INVEST principles for Agile planning: they are **independent** enough to schedule in different delivery cycles, **negotiable** in implementation detail, **valuable** to specific stakeholders, **estimable** at MVP scope, **small** enough for incremental delivery, and **testable** through clear acceptance criteria. This makes them suitable for prioritized backlog refinement and delivery planning.
