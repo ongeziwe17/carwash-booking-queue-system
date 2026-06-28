@@ -361,6 +361,93 @@ public class ApiIntegrationTest {
                 .andExpect(jsonPath("$").isEmpty());
     }
 
+    @Test
+    void dailySummaryReportReturnsExpectedTotals() throws Exception {
+        String prefix = "daily-summary";
+        LocalDateTime reportDateTime = LocalDateTime.now().plusDays(12).withHour(9).withMinute(0).withSecond(0).withNano(0);
+        createBookingApiFixture(prefix + "-confirmed", reportDateTime);
+        createBookingApiFixture(prefix + "-cancelled", reportDateTime.plusHours(1));
+        createBookingApiFixture(prefix + "-waiting", reportDateTime.plusHours(2));
+        createBookingApiFixture(prefix + "-called", reportDateTime.plusHours(3));
+        createBookingApiFixture(prefix + "-progress", reportDateTime.plusHours(4));
+        createBookingApiFixture(prefix + "-completed", reportDateTime.plusHours(5));
+        createBookingApiFixture(prefix + "-other-day", reportDateTime.plusDays(1));
+
+        mockMvc.perform(post("/api/bookings/" + prefix + "-confirmed-booking/confirm"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/bookings/" + prefix + "-cancelled-booking/cancel")
+                        .param("customerId", prefix + "-cancelled-user"))
+                .andExpect(status().isOk());
+
+        createQueueEntry(prefix + "-waiting");
+        createQueueEntry(prefix + "-called");
+        mockMvc.perform(post("/api/queue-entries/" + prefix + "-called-queue-entry/call-next"))
+                .andExpect(status().isOk());
+        createQueueEntry(prefix + "-progress");
+        mockMvc.perform(post("/api/queue-entries/" + prefix + "-progress-queue-entry/start"))
+                .andExpect(status().isOk());
+        createQueueEntry(prefix + "-completed");
+        mockMvc.perform(post("/api/queue-entries/" + prefix + "-completed-queue-entry/start"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/queue-entries/" + prefix + "-completed-queue-entry/complete"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/reports/daily-summary")
+                        .param("date", reportDateTime.toLocalDate().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reportDate").value(reportDateTime.toLocalDate().toString()))
+                .andExpect(jsonPath("$.totalBookings").value(6))
+                .andExpect(jsonPath("$.confirmedBookings").value(1))
+                .andExpect(jsonPath("$.cancelledBookings").value(1))
+                .andExpect(jsonPath("$.completedBookings").value(0))
+                .andExpect(jsonPath("$.totalQueueEntries").value(4))
+                .andExpect(jsonPath("$.waitingQueueEntries").value(1))
+                .andExpect(jsonPath("$.calledQueueEntries").value(1))
+                .andExpect(jsonPath("$.inProgressQueueEntries").value(1))
+                .andExpect(jsonPath("$.completedQueueEntries").value(1))
+                .andExpect(jsonPath("$.pendingWorkload").value(5));
+    }
+
+    @Test
+    void dailySummaryReportDateWithNoDataReturnsZeroTotals() throws Exception {
+        LocalDateTime reportDateTime = LocalDateTime.now().plusDays(30);
+
+        mockMvc.perform(get("/api/reports/daily-summary")
+                        .param("date", reportDateTime.toLocalDate().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reportDate").value(reportDateTime.toLocalDate().toString()))
+                .andExpect(jsonPath("$.totalBookings").value(0))
+                .andExpect(jsonPath("$.totalQueueEntries").value(0))
+                .andExpect(jsonPath("$.pendingWorkload").value(0));
+    }
+
+    @Test
+    void dailySummaryReportMissingDateReturnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/reports/daily-summary"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void dailySummaryReportInvalidDateReturnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/reports/daily-summary").param("date", "06/28/2026"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    private void createQueueEntry(String prefix) throws Exception {
+        Map<String, Object> queueEntry = new HashMap<>();
+        queueEntry.put("queueEntryId", prefix + "-queue-entry");
+        queueEntry.put("bookingId", prefix + "-booking");
+        queueEntry.put("serviceId", prefix + "-service");
+        queueEntry.put("position", 1);
+
+        mockMvc.perform(post("/api/queue-entries")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(queueEntry)))
+                .andExpect(status().isCreated());
+    }
+
     private void createBookingApiFixture(String prefix, LocalDateTime scheduledDateTime) throws Exception {
         Map<String, Object> user = Map.of(
                 "userId", prefix + "-user",

@@ -1,7 +1,9 @@
 package com.carwash.service;
 
+import com.carwash.api.dto.DailySummaryReportResponse;
 import com.carwash.domain.*;
 import com.carwash.enums.BookingStatus;
+import com.carwash.enums.QueueStatus;
 import com.carwash.repository.inmemory.*;
 import com.carwash.service.exception.BusinessRuleViolationException;
 import com.carwash.service.exception.ResourceNotFoundException;
@@ -22,6 +24,7 @@ class ServiceLayerTest {
     private BookingManagementService bookingService;
     private QueueManagementService queueService;
     private NotificationManagementService notificationService;
+    private DailySummaryReportService dailySummaryReportService;
 
     @BeforeEach
     void setup() {
@@ -38,6 +41,7 @@ class ServiceLayerTest {
         notificationService = new NotificationManagementService(notificationRepository);
         bookingService = new BookingManagementService(bookingRepository, userRepository, vehicleRepository, serviceRepository, notificationService);
         queueService = new QueueManagementService(queueRepository, bookingRepository, serviceRepository, notificationService);
+        dailySummaryReportService = new DailySummaryReportService(bookingRepository, queueRepository);
     }
 
     @Test
@@ -182,7 +186,7 @@ class ServiceLayerTest {
         List<Service> services = catalogService.findByActive(true);
 
         assertEquals(1, services.size());
-        assertEquals("active-service", services.get(0).getServiceId());
+        assertEquals("active-service", services.getFirst().getServiceId());
     }
 
     @Test
@@ -196,7 +200,7 @@ class ServiceLayerTest {
         List<Service> services = catalogService.findByActive(false);
 
         assertEquals(1, services.size());
-        assertEquals("inactive-service", services.get(0).getServiceId());
+        assertEquals("inactive-service", services.getFirst().getServiceId());
     }
 
     @Test
@@ -411,6 +415,112 @@ class ServiceLayerTest {
         Booking booking = new Booking("b1", user, vehicle, service, LocalDateTime.now().plusDays(1), "none");
         return bookingService.createBooking(booking);
     }
+
+    @Test
+    void dailySummaryReturnsZeroTotalsWhenNoDataExists() {
+        DailySummaryReportResponse report = dailySummaryReportService.generateDailySummary(LocalDateTime.now().plusDays(10).toLocalDate());
+
+        assertEquals(0, report.totalBookings());
+        assertEquals(0, report.totalQueueEntries());
+        assertEquals(0, report.pendingWorkload());
+    }
+
+    @Test
+    void dailySummaryCountsBookingsForSelectedDateOnly() {
+        LocalDateTime reportDateTime = LocalDateTime.now().plusDays(10);
+        createSavedBooking("report-selected", reportDateTime, BookingStatus.CREATED);
+        createSavedBooking("report-other", reportDateTime.plusDays(1), BookingStatus.CREATED);
+
+        DailySummaryReportResponse report = dailySummaryReportService.generateDailySummary(reportDateTime.toLocalDate());
+
+        assertEquals(1, report.totalBookings());
+    }
+
+    @Test
+    void dailySummaryCountsConfirmedBookings() {
+        LocalDateTime reportDateTime = LocalDateTime.now().plusDays(10);
+        createSavedBooking("report-confirmed", reportDateTime, BookingStatus.CONFIRMED);
+        createSavedBooking("report-created", reportDateTime, BookingStatus.CREATED);
+
+        DailySummaryReportResponse report = dailySummaryReportService.generateDailySummary(reportDateTime.toLocalDate());
+
+        assertEquals(2, report.totalBookings());
+        assertEquals(1, report.confirmedBookings());
+    }
+
+    @Test
+    void dailySummaryCountsCancelledBookings() {
+        LocalDateTime reportDateTime = LocalDateTime.now().plusDays(10);
+        createSavedBooking("report-cancelled", reportDateTime, BookingStatus.CANCELLED);
+        createSavedBooking("report-active", reportDateTime, BookingStatus.CONFIRMED);
+
+        DailySummaryReportResponse report = dailySummaryReportService.generateDailySummary(reportDateTime.toLocalDate());
+
+        assertEquals(1, report.cancelledBookings());
+    }
+
+    @Test
+    void dailySummaryExcludesCancelledBookingsFromCompletedTotals() {
+        LocalDateTime reportDateTime = LocalDateTime.now().plusDays(10);
+        createSavedBooking("report-cancelled-complete", reportDateTime, BookingStatus.CANCELLED);
+        createSavedBooking("report-complete", reportDateTime, BookingStatus.COMPLETED);
+
+        DailySummaryReportResponse report = dailySummaryReportService.generateDailySummary(reportDateTime.toLocalDate());
+
+        assertEquals(1, report.completedBookings());
+        assertEquals(1, report.cancelledBookings());
+    }
+
+    @Test
+    void dailySummaryCountsQueueEntriesByStatus() {
+        LocalDateTime reportDateTime = LocalDateTime.now().plusDays(10);
+        createSavedQueueEntry("queue-waiting", reportDateTime, QueueStatus.WAITING);
+        createSavedQueueEntry("queue-called", reportDateTime, QueueStatus.CALLED);
+        createSavedQueueEntry("queue-progress", reportDateTime, QueueStatus.IN_PROGRESS);
+        createSavedQueueEntry("queue-completed", reportDateTime, QueueStatus.COMPLETED);
+
+        DailySummaryReportResponse report = dailySummaryReportService.generateDailySummary(reportDateTime.toLocalDate());
+
+        assertEquals(4, report.totalQueueEntries());
+        assertEquals(1, report.waitingQueueEntries());
+        assertEquals(1, report.calledQueueEntries());
+        assertEquals(1, report.inProgressQueueEntries());
+        assertEquals(1, report.completedQueueEntries());
+    }
+
+    @Test
+    void dailySummaryCalculatesPendingWorkloadCorrectly() {
+        LocalDateTime reportDateTime = LocalDateTime.now().plusDays(10);
+        createSavedBooking("pending-created", reportDateTime, BookingStatus.CREATED);
+        createSavedBooking("pending-confirmed", reportDateTime, BookingStatus.CONFIRMED);
+        createSavedBooking("pending-service", reportDateTime, BookingStatus.IN_SERVICE);
+        createSavedBooking("pending-cancelled", reportDateTime, BookingStatus.CANCELLED);
+        createSavedBooking("pending-completed", reportDateTime, BookingStatus.COMPLETED);
+
+        DailySummaryReportResponse report = dailySummaryReportService.generateDailySummary(reportDateTime.toLocalDate());
+
+        assertEquals(3, report.pendingWorkload());
+    }
+
+    private void createSavedQueueEntry(String prefix, LocalDateTime scheduledDateTime, QueueStatus queueStatus) {
+        Booking booking = createSavedBooking(prefix, scheduledDateTime, BookingStatus.CONFIRMED);
+        QueueEntry queueEntry = queueService.createQueueEntry(new QueueEntry(prefix + "-queue", booking, booking.getService(), 1));
+        queueEntry.setQueueStatus(queueStatus);
+    }
+
+    private Booking createSavedBooking(String prefix, LocalDateTime scheduledDateTime, BookingStatus bookingStatus) {
+        User user = new User(prefix + "-user", "Report User", prefix + "@example.com", "123", "hash", null);
+        Vehicle vehicle = new Vehicle(prefix + "-vehicle", prefix + "-plate", "Sedan", "Toyota", "Corolla", "Blue", "");
+        Service service = new Service(prefix + "-service", "Premium Wash", "desc", BigDecimal.TEN, 30);
+        userService.createUser(user);
+        vehicleService.createVehicle(vehicle, user.getUserId());
+        catalogService.createService(service);
+        Booking booking = new Booking(prefix + "-booking", user, vehicle, service, scheduledDateTime, "none");
+        Booking savedBooking = bookingService.createBooking(booking);
+        savedBooking.setStatus(bookingStatus);
+        return savedBooking;
+    }
+
     // ==================== DUPLICATE EMAIL HANDLING TESTS ====================
 
     @Test
