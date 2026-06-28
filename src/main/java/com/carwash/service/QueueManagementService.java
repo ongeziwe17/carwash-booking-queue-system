@@ -97,6 +97,9 @@ public class QueueManagementService {
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found: " + queueEntry.getBooking().getBookingId()));
         Service service = serviceRepository.findById(queueEntry.getService().getServiceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Service not found: " + queueEntry.getService().getServiceId()));
+        if (booking.getService() == null || booking.getService().getServiceId() == null || !booking.getService().getServiceId().equals(service.getServiceId())) {
+            throw new BusinessRuleViolationException("Queue entry service must match booking service");
+        }
         queueEntry.setBooking(booking);
         queueEntry.setService(service);
     }

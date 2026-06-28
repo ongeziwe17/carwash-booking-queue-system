@@ -106,6 +106,9 @@ public class BookingManagementService {
         Service service = serviceRepository.findById(booking.getService().getServiceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Service not found: " + booking.getService().getServiceId()));
         if (!service.isActive()) throw new BusinessRuleViolationException("Inactive service cannot be booked");
+        if (vehicle.getUserId() == null || !vehicle.getUserId().equals(user.getUserId())) {
+            throw new BusinessRuleViolationException("Vehicle does not belong to selected user");
+        }
         if (booking.getScheduledDateTime() == null || booking.getScheduledDateTime().isBefore(LocalDateTime.now())) {
             throw new BusinessRuleViolationException("Scheduled date/time cannot be in the past");
         }
