@@ -67,6 +67,39 @@ public class ApiIntegrationTest {
     }
 
     @Test
+    void bookingApiDeleteCancelWithValidCustomerIdSucceeds() throws Exception {
+        createBookingApiFixture("cancel-delete-ok", LocalDateTime.now().plusDays(1));
+
+        mockMvc.perform(delete("/api/bookings/cancel-delete-ok-booking").param("customerId", "cancel-delete-ok-user"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void bookingApiCancelWithoutCustomerIdReturnsBadRequest() throws Exception {
+        createBookingApiFixture("cancel-missing-customer", LocalDateTime.now().plusDays(1));
+
+        mockMvc.perform(post("/api/bookings/cancel-missing-customer-booking/cancel"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("customerId")))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("missing")))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.path").value("/api/bookings/cancel-missing-customer-booking/cancel"));
+    }
+
+    @Test
+    void bookingApiCancelWithBlankCustomerIdReturnsBadRequest() throws Exception {
+        createBookingApiFixture("cancel-blank-customer", LocalDateTime.now().plusDays(1));
+
+        mockMvc.perform(post("/api/bookings/cancel-blank-customer-booking/cancel").param("customerId", ""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Customer ID is required")))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.path").value("/api/bookings/cancel-blank-customer-booking/cancel"));
+    }
+
+    @Test
     void bookingApiCancelWrongCustomerRejected() throws Exception {
         createBookingApiFixture("cancel-wrong-owner", LocalDateTime.now().plusDays(1));
 
