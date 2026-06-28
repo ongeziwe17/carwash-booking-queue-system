@@ -120,6 +120,146 @@ public class ApiIntegrationTest {
     }
 
     @Test
+    void createBooking_shouldRejectUnknownUser() throws Exception {
+        createBookingWorkflowFixture("booking-unknown-user");
+
+        Map<String, Object> booking = bookingRequest("booking-unknown-user-reject", "missing-user", "booking-unknown-user-vehicle", "booking-unknown-user-service", LocalDateTime.now().plusDays(1));
+
+        mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(booking)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("User not found")))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.path").value("/api/bookings"));
+    }
+
+    @Test
+    void createBooking_shouldRejectUnknownVehicle() throws Exception {
+        createBookingWorkflowFixture("booking-unknown-vehicle");
+
+        Map<String, Object> booking = bookingRequest("booking-unknown-vehicle-reject", "booking-unknown-vehicle-user", "missing-vehicle", "booking-unknown-vehicle-service", LocalDateTime.now().plusDays(1));
+
+        mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(booking)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Vehicle not found")))
+                .andExpect(jsonPath("$.path").value("/api/bookings"));
+    }
+
+    @Test
+    void createBooking_shouldRejectUnknownService() throws Exception {
+        createBookingWorkflowFixture("booking-unknown-service");
+
+        Map<String, Object> booking = bookingRequest("booking-unknown-service-reject", "booking-unknown-service-user", "booking-unknown-service-vehicle", "missing-service", LocalDateTime.now().plusDays(1));
+
+        mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(booking)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Service not found")))
+                .andExpect(jsonPath("$.path").value("/api/bookings"));
+    }
+
+    @Test
+    void createBooking_shouldRejectInactiveService() throws Exception {
+        createBookingWorkflowFixture("booking-inactive-service");
+        mockMvc.perform(post("/api/services/booking-inactive-service-service/deactivate"))
+                .andExpect(status().isOk());
+
+        Map<String, Object> booking = bookingRequest("booking-inactive-service-reject", "booking-inactive-service-user", "booking-inactive-service-vehicle", "booking-inactive-service-service", LocalDateTime.now().plusDays(1));
+
+        mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(booking)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Inactive service")))
+                .andExpect(jsonPath("$.path").value("/api/bookings"));
+    }
+
+    @Test
+    void createBooking_shouldRejectVehicleOwnedByDifferentUser() throws Exception {
+        createBookingWorkflowFixture("booking-owner-a");
+        createBookingWorkflowFixture("booking-owner-b");
+
+        Map<String, Object> booking = bookingRequest("booking-owner-reject", "booking-owner-a-user", "booking-owner-b-vehicle", "booking-owner-a-service", LocalDateTime.now().plusDays(1));
+
+        mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(booking)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Vehicle does not belong")))
+                .andExpect(jsonPath("$.path").value("/api/bookings"));
+    }
+
+    @Test
+    void createQueueEntry_shouldRejectUnknownBooking() throws Exception {
+        createBookingApiFixture("queue-unknown-booking", LocalDateTime.now().plusDays(1));
+
+        Map<String, Object> queueEntry = queueEntryRequest("queue-unknown-booking-entry", "missing-booking", "queue-unknown-booking-service", 1);
+
+        mockMvc.perform(post("/api/queue-entries")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(queueEntry)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Booking not found")))
+                .andExpect(jsonPath("$.path").value("/api/queue-entries"));
+    }
+
+    @Test
+    void createQueueEntry_shouldRejectUnknownService() throws Exception {
+        createBookingApiFixture("queue-unknown-service", LocalDateTime.now().plusDays(1));
+
+        Map<String, Object> queueEntry = queueEntryRequest("queue-unknown-service-entry", "queue-unknown-service-booking", "missing-service", 1);
+
+        mockMvc.perform(post("/api/queue-entries")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(queueEntry)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Service not found")))
+                .andExpect(jsonPath("$.path").value("/api/queue-entries"));
+    }
+
+    @Test
+    void createQueueEntry_shouldRejectInvalidPosition() throws Exception {
+        createBookingApiFixture("queue-invalid-position", LocalDateTime.now().plusDays(1));
+
+        Map<String, Object> queueEntry = queueEntryRequest("queue-invalid-position-entry", "queue-invalid-position-booking", "queue-invalid-position-service", 0);
+
+        mockMvc.perform(post("/api/queue-entries")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(queueEntry)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Queue position")))
+                .andExpect(jsonPath("$.path").value("/api/queue-entries"));
+    }
+
+    @Test
+    void createQueueEntry_shouldRejectMismatchedBookingService() throws Exception {
+        createBookingApiFixture("queue-mismatch-a", LocalDateTime.now().plusDays(1));
+        createBookingApiFixture("queue-mismatch-b", LocalDateTime.now().plusDays(1));
+
+        Map<String, Object> queueEntry = queueEntryRequest("queue-mismatch-entry", "queue-mismatch-a-booking", "queue-mismatch-b-service", 1);
+
+        mockMvc.perform(post("/api/queue-entries")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(queueEntry)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("must match booking service")))
+                .andExpect(jsonPath("$.path").value("/api/queue-entries"));
+    }
+
+    @Test
     void openApiDocsEndpointAvailable() throws Exception {
         mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
     }
@@ -328,6 +468,46 @@ public class ApiIntegrationTest {
     }
 
     @Test
+    void queueWorkflow_shouldRejectStartBeforeCall() throws Exception {
+        String prefix = "workflow-start-before-call";
+        createBookingApiFixture(prefix, LocalDateTime.now().plusDays(2));
+        createQueueEntry(prefix);
+
+        mockMvc.perform(post("/api/queue-entries/" + prefix + "-queue-entry/start"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("cannot start service")))
+                .andExpect(jsonPath("$.path").value("/api/queue-entries/" + prefix + "-queue-entry/start"));
+    }
+
+    @Test
+    void queueWorkflow_shouldRejectAlreadyCompletedTransitions() throws Exception {
+        String prefix = "workflow-completed-transition";
+        createBookingApiFixture(prefix, LocalDateTime.now().plusDays(2));
+        createQueueEntry(prefix);
+        mockMvc.perform(post("/api/queue-entries/" + prefix + "-queue-entry/call-next"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/queue-entries/" + prefix + "-queue-entry/start"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/queue-entries/" + prefix + "-queue-entry/complete"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.queueStatus").value("COMPLETED"));
+
+        mockMvc.perform(post("/api/queue-entries/" + prefix + "-queue-entry/call-next"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("cannot be called")));
+        mockMvc.perform(post("/api/queue-entries/" + prefix + "-queue-entry/start"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("cannot start service")));
+        mockMvc.perform(post("/api/queue-entries/" + prefix + "-queue-entry/complete"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("cannot be completed")));
+    }
+
+    @Test
     void bookingValidationErrorIncludesFieldLevelMessage() throws Exception {
         String invalidBooking = """
                 {
@@ -417,9 +597,13 @@ public class ApiIntegrationTest {
         mockMvc.perform(post("/api/queue-entries/" + prefix + "-called-queue-entry/call-next"))
                 .andExpect(status().isOk());
         createQueueEntry(prefix + "-progress");
+        mockMvc.perform(post("/api/queue-entries/" + prefix + "-progress-queue-entry/call-next"))
+                .andExpect(status().isOk());
         mockMvc.perform(post("/api/queue-entries/" + prefix + "-progress-queue-entry/start"))
                 .andExpect(status().isOk());
         createQueueEntry(prefix + "-completed");
+        mockMvc.perform(post("/api/queue-entries/" + prefix + "-completed-queue-entry/call-next"))
+                .andExpect(status().isOk());
         mockMvc.perform(post("/api/queue-entries/" + prefix + "-completed-queue-entry/start"))
                 .andExpect(status().isOk());
         mockMvc.perform(post("/api/queue-entries/" + prefix + "-completed-queue-entry/complete"))
@@ -466,6 +650,26 @@ public class ApiIntegrationTest {
         mockMvc.perform(get("/api/reports/daily-summary").param("date", "06/28/2026"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400));
+    }
+
+    private Map<String, Object> bookingRequest(String bookingId, String userId, String vehicleId, String serviceId, LocalDateTime scheduledDateTime) {
+        Map<String, Object> booking = new HashMap<>();
+        booking.put("bookingId", bookingId);
+        booking.put("userId", userId);
+        booking.put("vehicleId", vehicleId);
+        booking.put("serviceId", serviceId);
+        booking.put("scheduledDateTime", scheduledDateTime.toString());
+        booking.put("specialRequest", "negative coverage");
+        return booking;
+    }
+
+    private Map<String, Object> queueEntryRequest(String queueEntryId, String bookingId, String serviceId, int position) {
+        Map<String, Object> queueEntry = new HashMap<>();
+        queueEntry.put("queueEntryId", queueEntryId);
+        queueEntry.put("bookingId", bookingId);
+        queueEntry.put("serviceId", serviceId);
+        queueEntry.put("position", position);
+        return queueEntry;
     }
 
     private void createQueueEntry(String prefix) throws Exception {

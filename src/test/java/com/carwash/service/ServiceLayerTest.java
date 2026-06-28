@@ -238,6 +238,72 @@ class ServiceLayerTest {
     }
 
     @Test
+    void createBooking_shouldRejectUnknownUser() {
+        Vehicle vehicle = new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", "");
+        Service service = new Service("s1", "Premium Wash", "desc", BigDecimal.TEN, 30);
+        catalogService.createService(service);
+
+        Booking booking = new Booking("b1", new User("missing", "Missing", "missing@example.com", "123", "hash", null), vehicle, service, LocalDateTime.now().plusDays(1), "none");
+
+        assertThrows(ResourceNotFoundException.class, () -> bookingService.createBooking(booking));
+    }
+
+    @Test
+    void createBooking_shouldRejectUnknownVehicle() {
+        User user = new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
+        Service service = new Service("s1", "Premium Wash", "desc", BigDecimal.TEN, 30);
+        userService.createUser(user);
+        catalogService.createService(service);
+
+        Booking booking = new Booking("b1", user, new Vehicle("missing", "CA123", "Sedan", "Toyota", "Corolla", "Blue", ""), service, LocalDateTime.now().plusDays(1), "none");
+
+        assertThrows(ResourceNotFoundException.class, () -> bookingService.createBooking(booking));
+    }
+
+    @Test
+    void createBooking_shouldRejectUnknownService() {
+        User user = new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
+        Vehicle vehicle = new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", "");
+        userService.createUser(user);
+        vehicleService.createVehicle(vehicle, "u1");
+
+        Booking booking = new Booking("b1", user, vehicle, new Service("missing", "Missing", "desc", BigDecimal.TEN, 30), LocalDateTime.now().plusDays(1), "none");
+
+        assertThrows(ResourceNotFoundException.class, () -> bookingService.createBooking(booking));
+    }
+
+    @Test
+    void createBooking_shouldRejectInactiveService() {
+        User user = new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
+        Vehicle vehicle = new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", "");
+        Service service = new Service("s1", "Premium Wash", "desc", BigDecimal.TEN, 30);
+        service.deactivate();
+        userService.createUser(user);
+        vehicleService.createVehicle(vehicle, "u1");
+        catalogService.createService(service);
+
+        Booking booking = new Booking("b1", user, vehicle, service, LocalDateTime.now().plusDays(1), "none");
+
+        assertThrows(BusinessRuleViolationException.class, () -> bookingService.createBooking(booking));
+    }
+
+    @Test
+    void createBooking_shouldRejectVehicleOwnedByDifferentUser() {
+        User firstUser = new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
+        User secondUser = new User("u2", "John Doe", "john@example.com", "456", "hash", null);
+        Vehicle vehicle = new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", "");
+        Service service = new Service("s1", "Premium Wash", "desc", BigDecimal.TEN, 30);
+        userService.createUser(firstUser);
+        userService.createUser(secondUser);
+        vehicleService.createVehicle(vehicle, "u2");
+        catalogService.createService(service);
+
+        Booking booking = new Booking("b1", firstUser, vehicle, service, LocalDateTime.now().plusDays(1), "none");
+
+        assertThrows(BusinessRuleViolationException.class, () -> bookingService.createBooking(booking));
+    }
+
+    @Test
     void bookingConfirmationSucceeds() {
         Booking booking = createSavedBooking();
         assertEquals(BookingStatus.CONFIRMED, bookingService.confirmBooking(booking.getBookingId()).getStatus());
@@ -318,8 +384,63 @@ class ServiceLayerTest {
         QueueEntry queueEntry = queueService.createQueueEntry(new QueueEntry("q1", booking, booking.getService(), 1));
         assertThrows(BusinessRuleViolationException.class, () -> queueService.completeQueueEntry(queueEntry.getQueueEntryId()));
 
+        queueService.callNext(queueEntry.getQueueEntryId());
         queueService.startService(queueEntry.getQueueEntryId());
         assertNotNull(queueService.completeQueueEntry(queueEntry.getQueueEntryId()).getCompletedAt());
+    }
+
+    @Test
+    void createQueueEntry_shouldRejectUnknownBooking() {
+        Service service = new Service("s1", "Premium Wash", "desc", BigDecimal.TEN, 30);
+        catalogService.createService(service);
+        Booking booking = new Booking("missing", new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null), new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", ""), service, LocalDateTime.now().plusDays(1), "none");
+
+        assertThrows(ResourceNotFoundException.class, () -> queueService.createQueueEntry(new QueueEntry("q1", booking, service, 1)));
+    }
+
+    @Test
+    void createQueueEntry_shouldRejectUnknownService() {
+        Booking booking = createSavedBooking();
+
+        assertThrows(ResourceNotFoundException.class, () -> queueService.createQueueEntry(new QueueEntry("q1", booking, new Service("missing", "Missing", "desc", BigDecimal.TEN, 30), 1)));
+    }
+
+    @Test
+    void createQueueEntry_shouldRejectMismatchedBookingService() {
+        Booking booking = createSavedBooking();
+        Service otherService = new Service("s2", "Detail", "desc", BigDecimal.TEN, 30);
+        catalogService.createService(otherService);
+
+        assertThrows(BusinessRuleViolationException.class, () -> queueService.createQueueEntry(new QueueEntry("q1", booking, otherService, 1)));
+    }
+
+    @Test
+    void queueWorkflow_shouldRejectStartBeforeCall() {
+        QueueEntry queueEntry = createSavedQueueEntry();
+
+        assertThrows(BusinessRuleViolationException.class, () -> queueService.startService(queueEntry.getQueueEntryId()));
+        assertEquals(QueueStatus.WAITING, queueService.findById(queueEntry.getQueueEntryId()).getQueueStatus());
+    }
+
+    @Test
+    void queueWorkflow_shouldRejectCallAlreadyCompleted() {
+        QueueEntry queueEntry = createCompletedQueueEntry();
+
+        assertThrows(BusinessRuleViolationException.class, () -> queueService.callNext(queueEntry.getQueueEntryId()));
+    }
+
+    @Test
+    void queueWorkflow_shouldRejectStartAlreadyCompleted() {
+        QueueEntry queueEntry = createCompletedQueueEntry();
+
+        assertThrows(BusinessRuleViolationException.class, () -> queueService.startService(queueEntry.getQueueEntryId()));
+    }
+
+    @Test
+    void queueWorkflow_shouldRejectCompleteAlreadyCompleted() {
+        QueueEntry queueEntry = createCompletedQueueEntry();
+
+        assertThrows(BusinessRuleViolationException.class, () -> queueService.completeQueueEntry(queueEntry.getQueueEntryId()));
     }
 
     @Test
@@ -367,23 +488,25 @@ class ServiceLayerTest {
     void queueServiceStartCreatesNotification() {
         QueueEntry queueEntry = createSavedQueueEntry();
 
+        queueService.callNext(queueEntry.getQueueEntryId());
         queueService.startService(queueEntry.getQueueEntryId());
 
         List<Notification> notifications = notificationService.findByUserId("u1");
-        assertEquals(1, notifications.size());
-        assertEquals("SERVICE_STARTED", notifications.getFirst().getType());
-        assertEquals("Your service has started.", notifications.getFirst().getMessage());
+        assertEquals(2, notifications.size());
+        assertTrue(notifications.stream().anyMatch(notification -> notification.getType().equals("SERVICE_STARTED")
+                && notification.getMessage().equals("Your service has started.")));
     }
 
     @Test
     void queueServiceCompletionCreatesNotification() {
         QueueEntry queueEntry = createSavedQueueEntry();
+        queueService.callNext(queueEntry.getQueueEntryId());
         queueService.startService(queueEntry.getQueueEntryId());
 
         queueService.completeQueueEntry(queueEntry.getQueueEntryId());
 
         List<Notification> notifications = notificationService.findByUserId("u1");
-        assertEquals(2, notifications.size());
+        assertEquals(3, notifications.size());
         assertTrue(notifications.stream().anyMatch(notification -> notification.getType().equals("SERVICE_COMPLETED")
                 && notification.getMessage().equals("Your service has been completed.")));
     }
@@ -403,6 +526,13 @@ class ServiceLayerTest {
     private QueueEntry createSavedQueueEntry() {
         Booking booking = createSavedBooking();
         return queueService.createQueueEntry(new QueueEntry("q1", booking, booking.getService(), 1));
+    }
+
+    private QueueEntry createCompletedQueueEntry() {
+        QueueEntry queueEntry = createSavedQueueEntry();
+        queueService.callNext(queueEntry.getQueueEntryId());
+        queueService.startService(queueEntry.getQueueEntryId());
+        return queueService.completeQueueEntry(queueEntry.getQueueEntryId());
     }
 
     private Booking createSavedBooking() {
