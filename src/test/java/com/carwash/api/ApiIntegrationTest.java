@@ -364,7 +364,7 @@ public class ApiIntegrationTest {
     @Test
     void dailySummaryReportReturnsExpectedTotals() throws Exception {
         String prefix = "daily-summary";
-        LocalDateTime reportDateTime = LocalDateTime.now().plusDays(12).withNano(0);
+        LocalDateTime reportDateTime = LocalDateTime.now().plusDays(12).withHour(9).withMinute(0).withSecond(0).withNano(0);
         createBookingApiFixture(prefix + "-confirmed", reportDateTime);
         createBookingApiFixture(prefix + "-cancelled", reportDateTime.plusHours(1));
         createBookingApiFixture(prefix + "-waiting", reportDateTime.plusHours(2));
