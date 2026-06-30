@@ -22,6 +22,7 @@ public class BookingManagementService {
     private final VehicleRepository vehicleRepository;
     private final ServiceRepository serviceRepository;
     private final NotificationManagementService notificationManagementService;
+    private static final int MAX_ACTIVE_BOOKINGS_PER_SLOT = 1;
 
 
     public BookingManagementService(BookingRepository bookingRepository, UserRepository userRepository, VehicleRepository vehicleRepository, ServiceRepository serviceRepository) {
@@ -112,8 +113,42 @@ public class BookingManagementService {
         if (booking.getScheduledDateTime() == null || booking.getScheduledDateTime().isBefore(LocalDateTime.now())) {
             throw new BusinessRuleViolationException("Scheduled date/time cannot be in the past");
         }
+        validateSlotAvailability(booking, user, vehicle);
         booking.setUser(user);
         booking.setVehicle(vehicle);
         booking.setService(service);
+    }
+
+    private void validateSlotAvailability(Booking booking, User user, Vehicle vehicle) {
+        List<Booking> bookingsInSlot = bookingRepository.findByScheduledDateTime(booking.getScheduledDateTime()).stream()
+                .filter(existingBooking -> !isSameBooking(existingBooking, booking))
+                .filter(this::isActiveBooking)
+                .toList();
+
+        boolean hasSameCustomerVehicleConflict = bookingsInSlot.stream()
+                .anyMatch(existingBooking -> hasSameCustomerAndVehicle(existingBooking, user, vehicle));
+        if (hasSameCustomerVehicleConflict) {
+            throw new BusinessRuleViolationException("Customer vehicle already has an active booking for this scheduled date/time");
+        }
+
+        if (!bookingsInSlot.isEmpty()) {
+            throw new BusinessRuleViolationException("Booking time slot is already full");
+        }
+    }
+
+    private boolean isActiveBooking(Booking booking) {
+        return booking.getStatus() != BookingStatus.CANCELLED;
+    }
+
+    private boolean isSameBooking(Booking existingBooking, Booking requestedBooking) {
+        return existingBooking.getBookingId() != null
+                && existingBooking.getBookingId().equals(requestedBooking.getBookingId());
+    }
+
+    private boolean hasSameCustomerAndVehicle(Booking existingBooking, User user, Vehicle vehicle) {
+        return existingBooking.getUser() != null
+                && existingBooking.getVehicle() != null
+                && existingBooking.getUser().getUserId().equals(user.getUserId())
+                && existingBooking.getVehicle().getVehicleId().equals(vehicle.getVehicleId());
     }
 }
