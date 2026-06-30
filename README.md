@@ -1,21 +1,30 @@
 # Car Wash Booking Queue System
 
-A Spring Boot backend for a SaaS-oriented car wash booking and queue management platform. The system helps customers register vehicles, browse wash services, create bookings, join service queues, and receive operational notifications while giving car wash businesses API building blocks for service catalog, booking, queue, and customer management workflows.
+Spring Boot backend foundation for car wash booking and queue management. The current codebase exposes local-development APIs for user records, vehicles, service catalog items, bookings, queue entries, in-app notification records, and daily summary reporting over in-memory repositories.
 
-## Who It Serves
+## Current Backend Foundation
 
-- **Customers** who want convenient digital booking, vehicle management, queue visibility, and service updates.
-- **Car wash operators** who need structured booking intake, queue control, service catalog management, and customer communication workflows.
-- **Product contributors** who are extending the backend toward a maintainable SaaS platform.
+Implemented in the current backend:
 
-## Current Backend Capabilities
+- User record CRUD APIs.
+- Vehicle CRUD APIs with owner lookup and duplicate plate validation per owner.
+- Service catalog CRUD APIs with activate/deactivate workflows.
+- Booking CRUD APIs with confirm/cancel workflows and service-layer validation.
+- Queue entry APIs for creation, position updates, call/start/complete transitions, and deletion.
+- In-app notification record lookup for users.
+- Daily summary report API computed from current in-memory booking and queue data.
+- Swagger/OpenAPI documentation for local API exploration.
+- Docker/local development setup.
+- Service-layer, repository, and API integration tests.
 
-- REST APIs for users, vehicles, services, bookings, queue entries, and notifications.
-- In-memory repository implementations for local development and testable business workflows.
-- Service-layer validation for booking creation, queue joining, and resource lookup rules.
-- OpenAPI/Swagger documentation for interactive API exploration.
-- Docker and Docker Compose setup for reproducible local runs.
-- Maven-based test and verification workflow.
+## Important Current Limitations
+
+- Storage is currently in-memory only for the running application; data is not durable across restarts.
+- Authentication, login sessions, JWTs, RBAC enforcement, and secure credential storage are not implemented.
+- Roles exist as domain data but are not enforced by Spring Security or controller authorization.
+- Notification records are stored in-app; external SMS/email delivery is not implemented.
+- Daily summary reporting is basic and in-memory; analytics dashboards and revenue reporting are future work.
+- Payments, business registration, multi-tenancy, production observability, and production SaaS hardening are planned/future work.
 
 ## Tech Stack
 
@@ -34,23 +43,11 @@ A Spring Boot backend for a SaaS-oriented car wash booking and queue management 
 ./mvnw spring-boot:run
 ```
 
-The API starts on:
+The API starts on `http://localhost:8080`.
 
-```text
-http://localhost:8080
-```
+Swagger UI is available at `http://localhost:8080/swagger-ui.html` or `http://localhost:8080/swagger-ui/index.html`.
 
-Swagger UI is available at:
-
-```text
-http://localhost:8080/swagger-ui.html
-```
-
-The raw OpenAPI document is available at:
-
-```text
-http://localhost:8080/v3/api-docs
-```
+The raw OpenAPI document is available at `http://localhost:8080/v3/api-docs`.
 
 ## Run with Docker Compose
 
@@ -80,12 +77,13 @@ Run the full Maven verification lifecycle:
 
 ## API Areas
 
-- `/api/users` - customer and account data workflows.
-- `/api/vehicles` - customer vehicle registration and lookup.
-- `/api/services` - car wash service catalog workflows.
-- `/api/bookings` - service booking workflows.
-- `/api/queue` - queue entry and queue-position workflows.
-- `/api/notifications` - customer notification records.
+- `/api/users` - user record management.
+- `/api/vehicles` - vehicle registration, lookup, update, and deletion.
+- `/api/services` - service catalog management and activation state.
+- `/api/bookings` - booking creation, lookup, update, confirmation, cancellation, and deletion-as-cancel.
+- `/api/queue-entries` - queue entry creation, position updates, status transitions, and deletion.
+- `/api/notifications` - in-app notification record lookup by user.
+- `/api/reports/daily-summary` - basic daily summary from current in-memory data.
 
 See [API Documentation](documentation/API-DOCUMENTATION.md) and Swagger UI for endpoint details.
 
@@ -100,15 +98,8 @@ See [API Documentation](documentation/API-DOCUMENTATION.md) and Swagger UI for e
 - [User Stories](documentation/USER-STORIES.md)
 - [Product Backlog](documentation/PRODUCT-BACKLOG.md)
 
-## Contribution Workflow
+## Planned and Future Capabilities
 
-1. Create a focused branch, for example `feature/queue-estimates` or `chore/document-api-workflows`.
-2. Keep changes scoped to one product or maintenance concern.
-3. Run `./mvnw clean test` before opening a pull request.
-4. Run `./mvnw clean verify` for broader validation when changing backend behavior.
-5. Include API or documentation updates when behavior changes.
-6. Open a pull request with a clear summary, testing notes, and any follow-up work.
+Planned near-term work focuses on backend hardening: stronger booking/queue rules, broader API tests, improved error contracts, persistent storage design, and clearer notification boundaries.
 
-## Product Direction
-
-This repository is being maintained as a SaaS-ready backend foundation. Near-term work focuses on strengthening booking, queue, notification, and service-management workflows while preparing the codebase for secure authentication, persistence, observability, deployment readiness, and multi-tenant operations in future releases.
+Future SaaS hardening includes authentication, secure credential storage, RBAC enforcement, PostgreSQL persistence, migrations, tenant-aware business registration, external SMS/email providers, payment workflows, operational dashboards, monitoring/observability, and production deployment hardening.

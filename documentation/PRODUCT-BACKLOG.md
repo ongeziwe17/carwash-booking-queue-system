@@ -2,46 +2,66 @@
 
 ## 1. Overview
 
-This product backlog compiles user stories derived from functional requirements and use cases. The backlog is prioritized using the MoSCoW method to ensure that core system functionality is delivered first in alignment with stakeholder needs and MVP scope.
+This backlog separates completed backend foundation work from planned and future work. Items marked completed describe the current backend implementation only; they do not imply production readiness.
 
----
+## 2. Completed / Current Backend Foundation
 
-## 2. Backlog Table
+| Item ID     | Backlog Item                    | Status              | Notes                                                                                            |
+|-------------|---------------------------------|---------------------|--------------------------------------------------------------------------------------------------|
+| Feature-001 | User record management          | Completed           | CRUD-style user record APIs and validation are present.                                          |
+| Feature-002 | Vehicle management              | Completed           | Vehicle CRUD, owner association, and duplicate plate checks per owner are present.               |
+| Feature-003 | Service catalog management      | Completed           | Service CRUD and activate/deactivate workflows are present.                                      |
+| Feature-004 | Booking workflow                | Completed           | Create, retrieve, update, confirm, and cancel workflows are present.                             |
+| Feature-005 | Queue workflow                  | Completed           | Queue create, position update, call, start, complete, and delete workflows are present.          |
+| Feature-006 | In-app notification records     | Completed           | Recent notification records can be retrieved by user. External delivery is not present.          |
+| Feature-007 | Swagger/OpenAPI documentation   | Completed           | Springdoc Swagger UI/OpenAPI is available locally.                                               |
+| Feature-008 | Docker/local development setup  | Completed           | Dockerfile and Docker Compose support local runs.                                                |
+| Feature-009 | Daily summary report foundation | Partially completed | Basic in-memory daily summary endpoint exists; dashboards and revenue reporting are future work. |
 
-| Story ID | User Story | Priority (MoSCoW) | Effort (Story Points) | Dependencies |
-|----------|------------|------------------|----------------------|--------------|
-| US-001 | Register account | Must-have | 3 | None |
-| US-002 | Authenticate user | Must-have | 3 | US-001 |
-| US-003 | Browse service catalog | Must-have | 2 | None |
-| US-004 | Create booking | Must-have | 5 | US-002, US-003 |
-| US-005 | Join virtual queue | Must-have | 5 | US-004 |
-| US-006 | View queue position | Should-have | 2 | US-005 |
-| US-007 | Receive notifications | Could-have | 3 | US-004, US-005 |
-| US-008 | Manage services | Must-have | 3 | US-002 |
-| US-009 | Manage bookings and queue | Must-have | 5 | US-004, US-005 |
-| US-010 | View reports | Should-have | 3 | US-009 |
-| US-011 | Role-based access control | Must-have | 5 | US-002 |
-| US-012 | Cancel booking | Should-have | 2 | US-004 |
-| US-013 | Secure credential storage | Must-have | 3 | US-002 |
+## 3. Planned Near-Term Backend Hardening
 
----
+| Item ID   | Backlog Item                                        | Priority | Notes                                                                                     |
+|-----------|-----------------------------------------------------|----------|-------------------------------------------------------------------------------------------|
+| Fix-001   | Strengthen booking validation                       | High     | Time slot, past-date, capacity, and cancellation-window rules need hardening.             |
+| Fix-002   | Strengthen queue validation                         | High     | Queue ordering, transitions, and service capacity rules need deeper coverage.             |
+| Test-001  | Expand API integration tests                        | High     | Add more end-to-end API scenarios for booking, queue, notification, and report workflows. |
+| Docs-006  | Align implemented and planned feature documentation | High     | Keep docs from overclaiming planned SaaS capabilities.                                    |
+| Chore-005 | Audit project status, documentation, and backlog    | High     | Related umbrella documentation/status audit.                                              |
 
-## 3. Prioritization Justification
+## 4. Planned Security and Access-Control Work
 
-The backlog is prioritized using the MoSCoW technique:
+| Item ID      | Backlog Item                               | Priority | Status                                                       |
+|--------------|--------------------------------------------|----------|--------------------------------------------------------------|
+| Security-001 | Add authentication                         | High     | Planned; not implemented.                                    |
+| Security-002 | Add secure credential hashing/storage      | High     | Planned; not implemented.                                    |
+| Security-003 | Add RBAC enforcement                       | High     | Planned; role data exists but authorization is not enforced. |
+| Security-004 | Add audit logging for sensitive operations | Medium   | Planned; not implemented.                                    |
 
-- **Must-have** features represent the core functionality required for the system to operate, including authentication, booking creation, queue management, and administrative controls. These directly align with stakeholder success metrics such as usability, reliability, and operational efficiency.
+## 5. Planned Persistence Work
 
-- **Should-have** features enhance user experience and system usability, such as viewing queue positions, reporting, and booking cancellation. These are important but not critical for initial system operation.
+| Item ID     | Backlog Item                      | Priority | Status                                                      |
+|-------------|-----------------------------------|----------|-------------------------------------------------------------|
+| Feature-010 | Add PostgreSQL persistence        | High     | Planned; running app currently uses in-memory repositories. |
+| Feature-011 | Add database migrations           | High     | Planned; not implemented.                                   |
+| Test-002    | Add persistence integration tests | Medium   | Planned after database persistence is introduced.           |
 
-- **Could-have** features provide additional convenience and user engagement, such as notifications. These can be deferred without affecting core system functionality.
+## 6. Future SaaS Hardening
 
-- **Won’t-have (for now)** features are intentionally excluded from the MVP scope to maintain focus on essential system delivery.
+| Item ID     | Backlog Item                       | Priority | Status  |
+|-------------|------------------------------------|----------|---------|
+| Feature-012 | Business registration              | Medium   | Future. |
+| Feature-013 | Multi-tenancy and tenant isolation | High     | Future. |
+| Feature-014 | Payments                           | Medium   | Future. |
+| Feature-015 | External SMS/email notifications   | Medium   | Future. |
+| Feature-016 | Monitoring and observability       | Medium   | Future. |
+| Feature-017 | Production deployment hardening    | High     | Future. |
 
----
+## 7. Future Product Capabilities
 
-## 4. Notes
-
-- Effort estimates use a simplified Fibonacci-like scale (1–5)
-- Dependencies ensure logical implementation order
-- Backlog aligns with Agile principles and supports delivery planning
+| Item ID     | Backlog Item                              | Priority | Status  |
+|-------------|-------------------------------------------|----------|---------|
+| Feature-018 | Ratings and feedback                      | Low      | Future. |
+| Feature-019 | Rich reports and dashboards               | Medium   | Future. |
+| Feature-020 | Customer/operator frontend                | Medium   | Future. |
+| Feature-021 | Advanced scheduling and capacity planning | Medium   | Future. |
+| Feature-022 | Advanced analytics and reporting          | Medium   | Future. |
