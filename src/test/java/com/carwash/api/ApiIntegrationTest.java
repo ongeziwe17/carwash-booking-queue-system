@@ -199,6 +199,58 @@ public class ApiIntegrationTest {
     }
 
     @Test
+    void createBooking_shouldRejectFullTimeSlot() throws Exception {
+        LocalDateTime scheduledDateTime = LocalDateTime.now().plusDays(11).withNano(0);
+        createBookingApiFixture("slot-full-a", scheduledDateTime);
+        createBookingWorkflowFixture("slot-full-b");
+
+        Map<String, Object> booking = bookingRequest("slot-full-b-booking", "slot-full-b-user", "slot-full-b-vehicle", "slot-full-b-service", scheduledDateTime);
+
+        mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(booking)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("time slot")))
+                .andExpect(jsonPath("$.path").value("/api/bookings"));
+    }
+
+    @Test
+    void createBooking_shouldRejectSameVehicleCustomerConflict() throws Exception {
+        LocalDateTime scheduledDateTime = LocalDateTime.now().plusDays(12).withNano(0);
+        createBookingApiFixture("slot-conflict", scheduledDateTime);
+
+        Map<String, Object> booking = bookingRequest("slot-conflict-booking-2", "slot-conflict-user", "slot-conflict-vehicle", "slot-conflict-service", scheduledDateTime);
+
+        mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(booking)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Customer vehicle")))
+                .andExpect(jsonPath("$.path").value("/api/bookings"));
+    }
+
+    @Test
+    void createBooking_shouldAllowBookingAfterPreviousBookingWasCancelled() throws Exception {
+        LocalDateTime scheduledDateTime = LocalDateTime.now().plusDays(13).withNano(0);
+        createBookingApiFixture("slot-cancelled-a", scheduledDateTime);
+        mockMvc.perform(post("/api/bookings/slot-cancelled-a-booking/cancel")
+                        .param("customerId", "slot-cancelled-a-user"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+        createBookingWorkflowFixture("slot-cancelled-b");
+
+        Map<String, Object> booking = bookingRequest("slot-cancelled-b-booking", "slot-cancelled-b-user", "slot-cancelled-b-vehicle", "slot-cancelled-b-service", scheduledDateTime);
+
+        mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(booking)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.bookingId").value("slot-cancelled-b-booking"));
+    }
+
+    @Test
     void createQueueEntry_shouldRejectUnknownBooking() throws Exception {
         createBookingApiFixture("queue-unknown-booking", LocalDateTime.now().plusDays(1));
 
@@ -577,7 +629,7 @@ public class ApiIntegrationTest {
     @Test
     void dailySummaryReportReturnsExpectedTotals() throws Exception {
         String prefix = "daily-summary";
-        LocalDateTime reportDateTime = LocalDateTime.now().plusDays(12).withHour(9).withMinute(0).withSecond(0).withNano(0);
+        LocalDateTime reportDateTime = LocalDateTime.now().plusYears(2).withHour(9).withMinute(0).withSecond(0).withNano(0);
         createBookingApiFixture(prefix + "-confirmed", reportDateTime);
         createBookingApiFixture(prefix + "-cancelled", reportDateTime.plusHours(1));
         createBookingApiFixture(prefix + "-waiting", reportDateTime.plusHours(2));
@@ -627,7 +679,7 @@ public class ApiIntegrationTest {
 
     @Test
     void dailySummaryReportDateWithNoDataReturnsZeroTotals() throws Exception {
-        LocalDateTime reportDateTime = LocalDateTime.now().plusDays(30);
+        LocalDateTime reportDateTime = LocalDateTime.now().plusYears(3);
 
         mockMvc.perform(get("/api/reports/daily-summary")
                         .param("date", reportDateTime.toLocalDate().toString()))

@@ -304,6 +304,55 @@ class ServiceLayerTest {
     }
 
     @Test
+    void createBooking_shouldRejectPastScheduledDateTime() {
+        Booking booking = newBookingWithFixture("past-slot", LocalDateTime.now().minusHours(1));
+
+        assertThrows(BusinessRuleViolationException.class, () -> bookingService.createBooking(booking));
+    }
+
+    @Test
+    void createBooking_shouldRejectFullTimeSlot() {
+        LocalDateTime scheduledDateTime = LocalDateTime.now().plusDays(3).withNano(0);
+        bookingService.createBooking(newBookingWithFixture("full-slot-a", scheduledDateTime));
+
+        Booking overlappingBooking = newBookingWithFixture("full-slot-b", scheduledDateTime);
+
+        BusinessRuleViolationException exception = assertThrows(BusinessRuleViolationException.class, () -> bookingService.createBooking(overlappingBooking));
+        assertTrue(exception.getMessage().contains("time slot"));
+    }
+
+    @Test
+    void createBooking_shouldIgnoreCancelledBookingWhenCheckingSlotCapacity() {
+        LocalDateTime scheduledDateTime = LocalDateTime.now().plusDays(4).withNano(0);
+        Booking cancelledBooking = bookingService.createBooking(newBookingWithFixture("cancelled-slot-a", scheduledDateTime));
+        bookingService.cancelBooking(cancelledBooking.getBookingId(), "cancelled-slot-a-user");
+
+        Booking replacementBooking = newBookingWithFixture("cancelled-slot-b", scheduledDateTime);
+
+        assertEquals("cancelled-slot-b-booking", bookingService.createBooking(replacementBooking).getBookingId());
+    }
+
+    @Test
+    void createBooking_shouldRejectSameVehicleConflictAtSameDateTime() {
+        LocalDateTime scheduledDateTime = LocalDateTime.now().plusDays(5).withNano(0);
+        Booking existingBooking = newBookingWithFixture("vehicle-conflict", scheduledDateTime);
+        bookingService.createBooking(existingBooking);
+
+        Booking conflictingBooking = new Booking("vehicle-conflict-booking-2", existingBooking.getUser(), existingBooking.getVehicle(), existingBooking.getService(), scheduledDateTime, "conflict");
+
+        BusinessRuleViolationException exception = assertThrows(BusinessRuleViolationException.class, () -> bookingService.createBooking(conflictingBooking));
+        assertTrue(exception.getMessage().contains("Customer vehicle"));
+    }
+
+    @Test
+    void createBooking_shouldStillAllowValidFutureBooking() {
+        LocalDateTime scheduledDateTime = LocalDateTime.now().plusDays(6).withNano(0);
+        Booking booking = newBookingWithFixture("valid-future-slot", scheduledDateTime);
+
+        assertEquals("valid-future-slot-booking", bookingService.createBooking(booking).getBookingId());
+    }
+
+    @Test
     void bookingConfirmationSucceeds() {
         Booking booking = createSavedBooking();
         assertEquals(BookingStatus.CONFIRMED, bookingService.confirmBooking(booking.getBookingId()).getStatus());
@@ -570,7 +619,7 @@ class ServiceLayerTest {
     void dailySummaryCountsConfirmedBookings() {
         LocalDateTime reportDateTime = LocalDateTime.now().plusDays(10);
         createSavedBooking("report-confirmed", reportDateTime, BookingStatus.CONFIRMED);
-        createSavedBooking("report-created", reportDateTime, BookingStatus.CREATED);
+        createSavedBooking("report-created", reportDateTime.plusMinutes(1), BookingStatus.CREATED);
 
         DailySummaryReportResponse report = dailySummaryReportService.generateDailySummary(reportDateTime.toLocalDate());
 
@@ -582,7 +631,7 @@ class ServiceLayerTest {
     void dailySummaryCountsCancelledBookings() {
         LocalDateTime reportDateTime = LocalDateTime.now().plusDays(10);
         createSavedBooking("report-cancelled", reportDateTime, BookingStatus.CANCELLED);
-        createSavedBooking("report-active", reportDateTime, BookingStatus.CONFIRMED);
+        createSavedBooking("report-active", reportDateTime.plusMinutes(1), BookingStatus.CONFIRMED);
 
         DailySummaryReportResponse report = dailySummaryReportService.generateDailySummary(reportDateTime.toLocalDate());
 
@@ -593,7 +642,7 @@ class ServiceLayerTest {
     void dailySummaryExcludesCancelledBookingsFromCompletedTotals() {
         LocalDateTime reportDateTime = LocalDateTime.now().plusDays(10);
         createSavedBooking("report-cancelled-complete", reportDateTime, BookingStatus.CANCELLED);
-        createSavedBooking("report-complete", reportDateTime, BookingStatus.COMPLETED);
+        createSavedBooking("report-complete", reportDateTime.plusMinutes(1), BookingStatus.COMPLETED);
 
         DailySummaryReportResponse report = dailySummaryReportService.generateDailySummary(reportDateTime.toLocalDate());
 
@@ -605,9 +654,9 @@ class ServiceLayerTest {
     void dailySummaryCountsQueueEntriesByStatus() {
         LocalDateTime reportDateTime = LocalDateTime.now().plusDays(10);
         createSavedQueueEntry("queue-waiting", reportDateTime, QueueStatus.WAITING);
-        createSavedQueueEntry("queue-called", reportDateTime, QueueStatus.CALLED);
-        createSavedQueueEntry("queue-progress", reportDateTime, QueueStatus.IN_PROGRESS);
-        createSavedQueueEntry("queue-completed", reportDateTime, QueueStatus.COMPLETED);
+        createSavedQueueEntry("queue-called", reportDateTime.plusMinutes(1), QueueStatus.CALLED);
+        createSavedQueueEntry("queue-progress", reportDateTime.plusMinutes(2), QueueStatus.IN_PROGRESS);
+        createSavedQueueEntry("queue-completed", reportDateTime.plusMinutes(3), QueueStatus.COMPLETED);
 
         DailySummaryReportResponse report = dailySummaryReportService.generateDailySummary(reportDateTime.toLocalDate());
 
@@ -622,14 +671,24 @@ class ServiceLayerTest {
     void dailySummaryCalculatesPendingWorkloadCorrectly() {
         LocalDateTime reportDateTime = LocalDateTime.now().plusDays(10);
         createSavedBooking("pending-created", reportDateTime, BookingStatus.CREATED);
-        createSavedBooking("pending-confirmed", reportDateTime, BookingStatus.CONFIRMED);
-        createSavedBooking("pending-service", reportDateTime, BookingStatus.IN_SERVICE);
-        createSavedBooking("pending-cancelled", reportDateTime, BookingStatus.CANCELLED);
-        createSavedBooking("pending-completed", reportDateTime, BookingStatus.COMPLETED);
+        createSavedBooking("pending-confirmed", reportDateTime.plusMinutes(1), BookingStatus.CONFIRMED);
+        createSavedBooking("pending-service", reportDateTime.plusMinutes(2), BookingStatus.IN_SERVICE);
+        createSavedBooking("pending-cancelled", reportDateTime.plusMinutes(3), BookingStatus.CANCELLED);
+        createSavedBooking("pending-completed", reportDateTime.plusMinutes(4), BookingStatus.COMPLETED);
 
         DailySummaryReportResponse report = dailySummaryReportService.generateDailySummary(reportDateTime.toLocalDate());
 
         assertEquals(3, report.pendingWorkload());
+    }
+
+    private Booking newBookingWithFixture(String prefix, LocalDateTime scheduledDateTime) {
+        User user = new User(prefix + "-user", "Slot User", prefix + "@example.com", "123", "hash", null);
+        Vehicle vehicle = new Vehicle(prefix + "-vehicle", prefix + "-plate", "Sedan", "Toyota", "Corolla", "Blue", "");
+        Service service = new Service(prefix + "-service", "Slot Wash", "desc", BigDecimal.TEN, 30);
+        userService.createUser(user);
+        vehicleService.createVehicle(vehicle, user.getUserId());
+        catalogService.createService(service);
+        return new Booking(prefix + "-booking", user, vehicle, service, scheduledDateTime, "none");
     }
 
     private void createSavedQueueEntry(String prefix, LocalDateTime scheduledDateTime, QueueStatus queueStatus) {
