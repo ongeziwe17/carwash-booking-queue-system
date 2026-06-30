@@ -2,26 +2,53 @@
 
 ## 1. Introduction
 
-These user stories are derived from the functional requirements defined in the product requirements and the use cases defined in the product use cases. They provide an MVP-focused Agile breakdown of the car wash booking and queue system so the backlog can be prioritized and implemented incrementally while remaining consistent with the product specification.
+These user stories are organized by implementation status so current backend capabilities are not mixed with planned security, persistence, SaaS, or product enhancements.
 
-## 2. User Stories Table
+## 2. Implemented in the Current Backend
 
-| Story ID | Source (FR / Use Case) | User Story | Acceptance Criteria | Priority |
-|----------|-------------------------|------------|---------------------|----------|
-| US-001 | FR-01, Use Case: Register Account | **As a Customer, I want to create an account so that I can manage my bookings and queue activity online.** | 1) Customer can submit name, email, and password.<br>2) System validates required fields and unique email.<br>3) Account is created and confirmation message is shown. | High |
-| US-002 | FR-01, Use Case: Authenticate User | **As a Customer, I want to log in securely so that I can access my booking and queue information.** | 1) Customer can log in with registered credentials.<br>2) Invalid credentials display an error without exposing sensitive details.<br>3) Successful login generates a secure authenticated session/token. | High |
-| US-003 | FR-02, Use Case: Browse Service Catalog | **As a Customer, I want to view available car wash services and prices so that I can choose a suitable option.** | 1) Service list shows service name, description, and price.<br>2) Only active services are visible to customers.<br>3) Catalog loads within acceptable response time for normal usage. | High |
-| US-004 | FR-03, Use Case: Create Booking | **As a Customer, I want to create a booking for a selected service and time so that I can plan my visit.** | 1) Customer can select service and preferred booking slot.<br>2) System prevents booking in unavailable or past slots.<br>3) Booking confirmation includes booking reference details. | High |
-| US-005 | FR-04, Use Case: Join Virtual Queue | **As a Customer, I want to join a virtual queue so that I can avoid waiting physically at the car wash.** | 1) Customer can join queue for an active service location.<br>2) System assigns a queue number and  estimated wait time or range.<br>3) Queue entry is visible in customer dashboard after submission. | High |
-| US-006 | FR-04, Use Case: View Queue Position | **As a Customer, I want to see my current queue position so that I can arrive closer to service time.** | 1) Queue position updates when earlier entries are completed or removed.<br>2) Customer can refresh and view latest position without rejoining.<br>3) Status shows whether position is waiting, in service, or completed. | Medium |
-| US-007 | FR-05 | **As a Customer, I want to receive booking and queue status notifications so that I stay informed about service progress.** | 1) Notifications are triggered for booking confirmation, queue progression, and completion.<br>2) Notification message includes booking/queue reference and status.<br>3) Customer can view recent notifications in the system. | Medium |
-| US-008 | FR-06, Use Case: Manage Services | **As a Business Owner, I want to manage service offerings so that customers always see accurate options and pricing.** | 1) Owner can create, update, activate, and deactivate services.<br>2) Changes are reflected in the customer catalog after save.<br>3) Validation prevents blank names and invalid pricing values. | High |
-| US-009 | FR-06, Use Case: Manage Bookings and Queue | **As Service Staff, I want to update booking and queue statuses so that operations reflect real-time progress.** | 1) Staff can move items through predefined statuses (e.g., waiting, in service, completed).<br>2) Status updates are timestamped and linked to acting staff account.<br>3) Invalid status transitions are blocked. | High |
-| US-010 | FR-07 | **As a Business Owner, I want to view a daily summary report so that I can monitor workload and completed services.** | 1) Report shows total bookings, queue entries, completed services, and pending items for a selected day.<br>2) Data excludes canceled entries from completed counts.<br>3) Report can be filtered by service date. | Medium |
-| US-011 | FR-06, Use Case: Manage Bookings and Queue | **As a System Administrator, I want role-based access controls so that only authorized users can manage operational data.** | 1) Customer users cannot access owner/staff/admin management pages.<br>2) Owner and staff actions require authenticated role permissions.<br>3) Unauthorized access attempts are denied and logged. | Medium |
-| US-012 | FR-05, Use Case: Create Booking | **As a Customer, I want to cancel my upcoming booking before service time so that I can adjust my plans without manual support.** | 1) Customer can cancel only future bookings they created.<br>2) Canceled booking status updates immediately in dashboard.<br>3) Cancellation triggers a notification confirming the change. | Medium |
-| US-013 | NFR-SE-01 | As the system, I want to securely store user credentials so that user data is protected from unauthorized access. | 1) Passwords are hashed before storage.<br>2) Plain-text passwords are never persisted.<br>3) Authentication uses secure comparison methods. | High |
+| Story ID | User Story | Acceptance Criteria | Status |
+| --- | --- | --- | --- |
+| US-001 | As an operator, I want to manage user records so that customer data can be referenced by bookings and vehicles. | 1) Create user records.<br>2) Retrieve users by ID or list users.<br>3) Update and delete user records.<br>4) Reject duplicate email addresses. | Implemented |
+| US-002 | As a customer or operator, I want to manage vehicle records so bookings can reference a customer's vehicle. | 1) Create vehicles for a user.<br>2) Retrieve, update, and delete vehicles.<br>3) Prevent duplicate plates for the same owner. | Implemented |
+| US-003 | As an operator, I want to manage the service catalog so available wash services are represented in the backend. | 1) Create, retrieve, update, and delete services.<br>2) Activate and deactivate services.<br>3) Store price and estimated duration. | Implemented |
+| US-004 | As an operator, I want to create and manage bookings so customer wash requests can be tracked. | 1) Create bookings for valid user, vehicle, and service records.<br>2) Retrieve and update bookings.<br>3) Confirm and cancel bookings. | Implemented |
+| US-005 | As staff, I want to manage queue entries so service progress can be tracked. | 1) Create queue entries.<br>2) Update queue positions.<br>3) Call, start, and complete queue entries.<br>4) Delete queue entries. | Implemented |
+| US-006 | As a customer or operator, I want to view notification records so booking/queue messages can be tracked in-app. | 1) Notification records can be associated with users and bookings.<br>2) Recent notifications can be listed by user. | Implemented for in-app records only |
+| US-007 | As an operator, I want a basic daily summary so I can inspect current booking and queue counts. | 1) Request a summary by date.<br>2) See basic booking and queue totals from current in-memory data. | Partially implemented |
 
-## 3. INVEST Alignment Note
+## 3. Planned Near-Term Stories
 
-These stories are written to satisfy INVEST principles for Agile planning: they are **independent** enough to schedule in different delivery cycles, **negotiable** in implementation detail, **valuable** to specific stakeholders, **estimable** at MVP scope, **small** enough for incremental delivery, and **testable** through clear acceptance criteria. This makes them suitable for prioritized backlog refinement and delivery planning.
+| Story ID | User Story | Acceptance Criteria | Status |
+| --- | --- | --- | --- |
+| US-008 | As a maintainer, I want stronger booking validation so invalid time slots and capacity conflicts are rejected consistently. | 1) Past/invalid time slots are rejected.<br>2) Capacity rules are enforced.<br>3) API tests cover invalid scenarios. | Planned |
+| US-009 | As staff, I want stricter queue transition rules so operational state remains consistent. | 1) Invalid transitions are rejected.<br>2) Queue position changes are consistent.<br>3) Tests cover transition failures. | Planned |
+| US-010 | As a maintainer, I want consistent DTO and error response documentation so API consumers can integrate reliably. | 1) Request/response shapes are documented.<br>2) Error responses are consistent.<br>3) Swagger matches implemented behavior. | Planned |
+
+## 4. Planned Security and Access-Control Stories
+
+| Story ID | User Story | Acceptance Criteria | Status |
+| --- | --- | --- | --- |
+| US-011 | As a customer, I want to authenticate securely so my booking data can be protected. | 1) Login endpoint exists.<br>2) Tokens or sessions are issued securely.<br>3) Invalid credentials are rejected safely. | Planned; not implemented |
+| US-012 | As the system, I want secure credential storage so passwords are not stored or compared unsafely. | 1) Passwords are hashed with a suitable algorithm.<br>2) Plain-text passwords are not persisted.<br>3) Tests verify credential behavior. | Planned; not implemented |
+| US-013 | As an administrator, I want role-based access control so only authorized users can perform staff/owner/admin actions. | 1) Customer, staff, owner, and admin permissions are defined.<br>2) Controllers enforce permissions.<br>3) Unauthorized requests are denied. | Planned; not implemented |
+
+## 5. Planned Persistence Stories
+
+| Story ID | User Story | Acceptance Criteria | Status |
+| --- | --- | --- | --- |
+| US-014 | As an operator, I want data to persist across restarts so production records are not lost. | 1) PostgreSQL stores core entities.<br>2) Migrations manage schema changes.<br>3) Integration tests validate persistence behavior. | Planned; not implemented |
+
+## 6. Future SaaS and Product Stories
+
+| Story ID | User Story | Acceptance Criteria | Status |
+| --- | --- | --- | --- |
+| US-015 | As a business owner, I want to register my business so my car wash can be managed independently. | Business and tenant records are created and isolated. | Future |
+| US-016 | As a platform owner, I want tenant isolation so multiple businesses can safely use the platform. | APIs, data, reports, and notifications are tenant-scoped. | Future |
+| US-017 | As a customer, I want payment options so I can pay deposits or full amounts online. | Payment provider checkout, webhook, and receipt flows exist. | Future |
+| US-018 | As a customer, I want SMS/email updates so I receive notifications outside the app. | Provider integrations deliver messages and record delivery outcomes. | Future |
+| US-019 | As a business owner, I want richer reports so I can track revenue, throughput, and queue performance. | Dashboards and analytics filters are available. | Future |
+| US-020 | As a customer, I want to rate completed services so businesses can collect feedback. | Ratings and feedback can be submitted and reviewed. | Future |
+
+## 7. INVEST Alignment Note
+
+Stories remain independent enough to schedule incrementally, negotiable in implementation detail, valuable to named stakeholders, estimable at backlog level, small enough for focused delivery, and testable through clear acceptance criteria.

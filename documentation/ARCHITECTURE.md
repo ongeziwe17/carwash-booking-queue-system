@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Car Wash Booking Queue System is a Spring Boot backend that exposes REST APIs for customer, vehicle, service catalog, booking, queue, and notification workflows. The current architecture is intentionally simple so the product can validate core workflows before adding production concerns such as durable persistence, authentication, tenant isolation, and observability.
+The Car Wash Booking Queue System is a Spring Boot backend that exposes REST APIs for customer, vehicle, service catalog, booking, queue, and notification workflows. The current architecture is intentionally simple, so the product can validate core workflows before adding production concerns such as durable persistence, authentication, tenant isolation, and observability.
 
 ## Runtime View
 
@@ -33,9 +33,17 @@ flowchart LR
 - **Queue entries**: Operational queue positions and estimated wait information.
 - **Notifications**: Customer communication records for booking and queue updates.
 
+## Current Limitations
+
+- Runtime storage is currently in-memory only; durable PostgreSQL persistence is not configured for the application.
+- Authentication, secure credential storage, Spring Security, and RBAC enforcement are not implemented.
+- Notification records are in-app data only; no external SMS/email provider delivery is implemented.
+- Daily summary reporting is basic and computed from current in-memory data.
+- Multi-tenancy, payments, observability, and production SaaS hardening are future work.
+
 ## SaaS Readiness Direction
 
-The current application is a backend foundation. Planned architecture improvements include:
+The current application is a backend foundation, not a production-ready SaaS platform. Planned architecture improvements include:
 
 1. Durable database persistence behind existing repository interfaces.
 2. Secure authentication and password handling.
