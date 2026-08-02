@@ -1,6 +1,7 @@
 package com.carwash.domain;
 
 import com.carwash.enums.AccountStatus;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -16,6 +17,7 @@ public class User {
     private String fullName;
     private String email;
     private String phone;
+    @JsonIgnore
     private String passwordHash;
     private AccountStatus accountStatus;
     private LocalDateTime createdAt;

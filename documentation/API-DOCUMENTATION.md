@@ -36,6 +36,16 @@ Base path: `/api/users`
 | PUT | `/api/users/{id}` | Implemented | Update a user record. |
 | DELETE | `/api/users/{id}` | Implemented | Delete a user record. |
 
+User endpoints use bounded API contracts rather than binding or returning the domain model:
+
+- `CreateUserRequest` accepts only `userId`, `fullName`, `email`, `phone`, and `password`.
+  Account status, creation/login timestamps, roles, permissions, vehicles, bookings, and notifications are server controlled.
+- `UpdateUserRequest` accepts only the editable `fullName`, `email`, and `phone` profile fields. The path parameter is always the authoritative user ID.
+- `UserResponse` contains `userId`, `fullName`, `email`, `phone`, `accountStatus`, `createdAt`, `lastLoginAt`, and the nullable scalar `roleName`.
+  Credentials and nested role, vehicle, booking, and notification objects are never included.
+
+Registration activates the account and sets its creation timestamp on the server. Email addresses and surrounding profile whitespace are normalized before in-memory persistence, and duplicate email addresses are rejected case-insensitively. The repository remains in-memory, so records do not survive an application restart. The registration `password` is temporarily mapped to the existing internal credential field; secure password hashing is **not yet implemented** and remains tracked separately by SEC-001 (#24).
+
 ### Vehicles
 
 Base path: `/api/vehicles`

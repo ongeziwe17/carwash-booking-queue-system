@@ -28,7 +28,7 @@ public class ApiIntegrationTest {
 
     @Test
     void userApiCreateAndGetAll() throws Exception {
-        Map<String, Object> user = Map.of("userId", "u1", "fullName", "Test User", "email", "u1@test.com", "phone", "123", "passwordHash", "x");
+        Map<String, Object> user = Map.of("userId", "u1", "fullName", "Test User", "email", "u1@test.com", "phone", "123", "password", "LocalTestPassword123!");
         mockMvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(user))).andExpect(status().isCreated());
         mockMvc.perform(get("/api/users")).andExpect(status().isOk());
     }
@@ -44,7 +44,7 @@ public class ApiIntegrationTest {
 
     @Test
     void bookingApiCreateConfirmAndInvalid() throws Exception {
-        mockMvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON).content("{\"userId\":\"u2\",\"fullName\":\"U 2\",\"email\":\"u2@test.com\",\"phone\":\"123\",\"passwordHash\":\"x\"}")).andExpect(status().isCreated());
+        mockMvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON).content("{\"userId\":\"u2\",\"fullName\":\"U 2\",\"email\":\"u2@test.com\",\"phone\":\"123\",\"password\":\"LocalTestPassword123!\"}")).andExpect(status().isCreated());
         mockMvc.perform(post("/api/vehicles").contentType(MediaType.APPLICATION_JSON).content("{\"userId\":\"u2\",\"vehicleId\":\"v2\",\"plateNumber\":\"ABC123\",\"vehicleType\":\"SUV\",\"brand\":\"Toyota\",\"model\":\"Rav4\",\"color\":\"Black\",\"notes\":\"\"}")).andExpect(status().isCreated());
         mockMvc.perform(post("/api/services").contentType(MediaType.APPLICATION_JSON).content("{\"serviceId\":\"s2\",\"serviceName\":\"Premium\",\"description\":\"premium\",\"price\":300,\"estimatedDurationMin\":45}")).andExpect(status().isCreated());
         mockMvc.perform(post("/api/services/s2/activate")).andExpect(status().isOk());
@@ -478,7 +478,7 @@ public class ApiIntegrationTest {
                 "fullName", "Workflow User",
                 "email", prefix + "@test.com",
                 "phone", "123",
-                "passwordHash", "x"
+                "password", "LocalTestPassword123!"
         );
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -743,7 +743,7 @@ public class ApiIntegrationTest {
                 "fullName", prefix + " User",
                 "email", prefix + "@test.com",
                 "phone", "123",
-                "passwordHash", "x"
+                "password", "LocalTestPassword123!"
         );
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
