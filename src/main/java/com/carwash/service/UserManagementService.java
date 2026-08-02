@@ -6,6 +6,7 @@ import com.carwash.service.exception.BusinessRuleViolationException;
 import com.carwash.service.exception.ResourceNotFoundException;
 
 import java.util.List;
+import java.util.Locale;
 
 public class UserManagementService {
 
@@ -16,9 +17,11 @@ public class UserManagementService {
     }
 
     public User createUser(User user) {
-        validateUser(user);
+        validateNewUser(user);
+        normalizeProfile(user);
         userRepository.findByEmail(user.getEmail())
                 .ifPresent(existing -> { throw new BusinessRuleViolationException("User email already exists"); });
+        user.registerAccount();
         userRepository.save(user);
         return user;
     }
@@ -33,15 +36,21 @@ public class UserManagementService {
     }
 
     public User updateUser(User user) {
-        User existing = findById(user.getUserId());
-        validateUser(user);
-        userRepository.findByEmail(user.getEmail()).ifPresent(match -> {
+        if (user == null) throw new BusinessRuleViolationException("User is required");
+        return updateUser(user.getUserId(), user.getFullName(), user.getEmail(), user.getPhone());
+    }
+
+    public User updateUser(String userId, String fullName, String email, String phone) {
+        if (isBlank(userId)) throw new BusinessRuleViolationException("User ID must not be blank");
+        User existing = findById(userId);
+        validateProfile(fullName, email, phone);
+        String normalizedEmail = normalizeEmail(email);
+        userRepository.findByEmail(normalizedEmail).ifPresent(match -> {
             if (!match.getUserId().equals(existing.getUserId())) {
                 throw new BusinessRuleViolationException("User email already exists");
             }
         });
-        existing.updateProfile(user.getFullName(), user.getEmail(), user.getPhone());
-        existing.setRole(user.getRole());
+        existing.updateProfile(fullName.trim(), normalizedEmail, phone.trim());
         userRepository.save(existing);
         return existing;
     }
@@ -51,10 +60,29 @@ public class UserManagementService {
         userRepository.delete(userId);
     }
 
-    private void validateUser(User user) {
+    private void validateNewUser(User user) {
         if (user == null) throw new BusinessRuleViolationException("User is required");
-        if (isBlank(user.getEmail())) throw new BusinessRuleViolationException("Email must not be blank");
-        if (isBlank(user.getFullName())) throw new BusinessRuleViolationException("Full name must not be blank");
+        if (isBlank(user.getUserId())) throw new BusinessRuleViolationException("User ID must not be blank");
+        validateProfile(user.getFullName(), user.getEmail(), user.getPhone());
+        if (isBlank(user.getPasswordHash())) throw new BusinessRuleViolationException("Password must not be blank");
+    }
+
+    private void validateProfile(String fullName, String email, String phone) {
+        if (isBlank(fullName)) throw new BusinessRuleViolationException("Full name must not be blank");
+        if (isBlank(email)) throw new BusinessRuleViolationException("Email must not be blank");
+        if (!email.trim().matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+            throw new BusinessRuleViolationException("Email must be valid");
+        }
+        if (isBlank(phone)) throw new BusinessRuleViolationException("Phone must not be blank");
+    }
+
+    private void normalizeProfile(User user) {
+        user.setUserId(user.getUserId().trim());
+        user.updateProfile(user.getFullName().trim(), normalizeEmail(user.getEmail()), user.getPhone().trim());
+    }
+
+    private String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 
     private boolean isBlank(String value) {

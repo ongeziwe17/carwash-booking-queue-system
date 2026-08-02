@@ -3,6 +3,7 @@ package com.carwash.service;
 import com.carwash.api.dto.DailySummaryReportResponse;
 import com.carwash.domain.*;
 import com.carwash.enums.BookingStatus;
+import com.carwash.enums.AccountStatus;
 import com.carwash.enums.QueueStatus;
 import com.carwash.repository.inmemory.*;
 import com.carwash.service.exception.BusinessRuleViolationException;
@@ -47,7 +48,45 @@ class ServiceLayerTest {
     @Test
     void userCreationSucceeds() {
         User user = new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
-        assertEquals("u1", userService.createUser(user).getUserId());
+        User created = userService.createUser(user);
+        assertEquals("u1", created.getUserId());
+        assertEquals(AccountStatus.ACTIVE, created.getAccountStatus());
+        assertNotNull(created.getCreatedAt());
+    }
+
+    @Test
+    void userCreationNormalizesProfileAndEmail() {
+        User created = userService.createUser(new User(" u1 ", " Jane Doe ", " CUSTOMER@Example.COM ", " 123 ", "hash", null));
+
+        assertEquals("u1", created.getUserId());
+        assertEquals("Jane Doe", created.getFullName());
+        assertEquals("customer@example.com", created.getEmail());
+        assertEquals("123", created.getPhone());
+    }
+
+    @Test
+    void userCreationRejectsCaseAndWhitespaceDuplicateEmail() {
+        userService.createUser(new User("u1", "Jane Doe", "customer@example.com", "123", "hash", null));
+
+        assertThrows(BusinessRuleViolationException.class, () -> userService.createUser(
+                new User("u2", "John Doe", " CUSTOMER@EXAMPLE.COM ", "456", "hash", null)));
+    }
+
+    @Test
+    void profileUpdatePreservesServerControlledAndSensitiveFields() {
+        Role originalRole = new Role("customer", "CUSTOMER", "Customer", null);
+        User created = userService.createUser(new User("u1", "Jane Doe", "jane@example.com", "123", "original-secret", originalRole));
+        LocalDateTime createdAt = created.getCreatedAt();
+
+        User updated = userService.updateUser("u1", " Janet Doe ", " JANET@EXAMPLE.COM ", " 456 ");
+
+        assertEquals("Janet Doe", updated.getFullName());
+        assertEquals("janet@example.com", updated.getEmail());
+        assertEquals("456", updated.getPhone());
+        assertEquals("original-secret", updated.getPasswordHash());
+        assertSame(originalRole, updated.getRole());
+        assertEquals(AccountStatus.ACTIVE, updated.getAccountStatus());
+        assertEquals(createdAt, updated.getCreatedAt());
     }
 
     @Test
