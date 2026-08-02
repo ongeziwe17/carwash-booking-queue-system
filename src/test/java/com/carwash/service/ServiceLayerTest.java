@@ -6,10 +6,14 @@ import com.carwash.enums.BookingStatus;
 import com.carwash.enums.AccountStatus;
 import com.carwash.enums.QueueStatus;
 import com.carwash.repository.inmemory.*;
+import com.carwash.service.command.CreateUserCommand;
 import com.carwash.service.exception.BusinessRuleViolationException;
 import com.carwash.service.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.carwash.config.PasswordSecurityProperties;
+import com.carwash.security.UserCredentialService;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -36,7 +40,8 @@ class ServiceLayerTest {
         InMemoryQueueEntryRepository queueRepository = new InMemoryQueueEntryRepository();
         InMemoryNotificationRepository notificationRepository = new InMemoryNotificationRepository();
 
-        userService = new UserManagementService(userRepository);
+        userService = new UserManagementService(userRepository, new UserCredentialService(
+                new BCryptPasswordEncoder(4), new PasswordSecurityProperties(4, 12, 200)));
         vehicleService = new VehicleManagementService(vehicleRepository, userRepository);
         catalogService = new ServiceCatalogService(serviceRepository);
         notificationService = new NotificationManagementService(notificationRepository);
@@ -47,8 +52,8 @@ class ServiceLayerTest {
 
     @Test
     void userCreationSucceeds() {
-        User user = new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
-        User created = userService.createUser(user);
+        User user = User.withEncodedPassword("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
+        User created = register(user);
         assertEquals("u1", created.getUserId());
         assertEquals(AccountStatus.ACTIVE, created.getAccountStatus());
         assertNotNull(created.getCreatedAt());
@@ -56,7 +61,7 @@ class ServiceLayerTest {
 
     @Test
     void userCreationNormalizesProfileAndEmail() {
-        User created = userService.createUser(new User(" u1 ", " Jane Doe ", " CUSTOMER@Example.COM ", " 123 ", "hash", null));
+        User created = register(User.withEncodedPassword(" u1 ", " Jane Doe ", " CUSTOMER@Example.COM ", " 123 ", "hash", null));
 
         assertEquals("u1", created.getUserId());
         assertEquals("Jane Doe", created.getFullName());
@@ -66,39 +71,40 @@ class ServiceLayerTest {
 
     @Test
     void userCreationRejectsCaseAndWhitespaceDuplicateEmail() {
-        userService.createUser(new User("u1", "Jane Doe", "customer@example.com", "123", "hash", null));
+        register(User.withEncodedPassword("u1", "Jane Doe", "customer@example.com", "123", "hash", null));
 
-        assertThrows(BusinessRuleViolationException.class, () -> userService.createUser(
-                new User("u2", "John Doe", " CUSTOMER@EXAMPLE.COM ", "456", "hash", null)));
+        assertThrows(BusinessRuleViolationException.class, () -> register(
+                User.withEncodedPassword("u2", "John Doe", " CUSTOMER@EXAMPLE.COM ", "456", "hash", null)));
     }
 
     @Test
     void profileUpdatePreservesServerControlledAndSensitiveFields() {
         Role originalRole = new Role("customer", "CUSTOMER", "Customer", null);
-        User created = userService.createUser(new User("u1", "Jane Doe", "jane@example.com", "123", "original-secret", originalRole));
+        User created = register(User.withEncodedPassword("u1", "Jane Doe", "jane@example.com", "123", "original-secret", originalRole));
         LocalDateTime createdAt = created.getCreatedAt();
+        String encodedPassword = created.getEncodedPassword();
 
         User updated = userService.updateUser("u1", " Janet Doe ", " JANET@EXAMPLE.COM ", " 456 ");
 
         assertEquals("Janet Doe", updated.getFullName());
         assertEquals("janet@example.com", updated.getEmail());
         assertEquals("456", updated.getPhone());
-        assertEquals("original-secret", updated.getPasswordHash());
-        assertSame(originalRole, updated.getRole());
+        assertEquals(encodedPassword, updated.getEncodedPassword());
+        assertNull(updated.getRole());
         assertEquals(AccountStatus.ACTIVE, updated.getAccountStatus());
         assertEquals(createdAt, updated.getCreatedAt());
     }
 
     @Test
     void userCreationFailsWithBlankEmail() {
-        User user = new User("u1", "Jane Doe", " ", "123", "hash", null);
-        assertThrows(BusinessRuleViolationException.class, () -> userService.createUser(user));
+        User user = User.withEncodedPassword("u1", "Jane Doe", " ", "123", "hash", null);
+        assertThrows(BusinessRuleViolationException.class, () -> register(user));
     }
 
     @Test
     void userCreationFailsWithBlankFullName() {
-        User user = new User("u1", " ", "jane@example.com", "123", "hash", null);
-        assertThrows(BusinessRuleViolationException.class, () -> userService.createUser(user));
+        User user = User.withEncodedPassword("u1", " ", "jane@example.com", "123", "hash", null);
+        assertThrows(BusinessRuleViolationException.class, () -> register(user));
     }
 
     @Test
@@ -108,14 +114,14 @@ class ServiceLayerTest {
 
     @Test
     void vehicleCreationSucceeds() {
-        userService.createUser(new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null));
+        register(User.withEncodedPassword("u1", "Jane Doe", "jane@example.com", "123", "hash", null));
         Vehicle vehicle = new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", "");
         assertEquals("v1", vehicleService.createVehicle(vehicle, "u1").getVehicleId());
     }
 
     @Test
     void vehicleLookupByUserReturnsSingleOwnedVehicle() {
-        userService.createUser(new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null));
+        register(User.withEncodedPassword("u1", "Jane Doe", "jane@example.com", "123", "hash", null));
         Vehicle vehicle = new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", "");
 
         vehicleService.createVehicle(vehicle, "u1");
@@ -127,7 +133,7 @@ class ServiceLayerTest {
 
     @Test
     void vehicleLookupByUserReturnsMultipleOwnedVehicles() {
-        userService.createUser(new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null));
+        register(User.withEncodedPassword("u1", "Jane Doe", "jane@example.com", "123", "hash", null));
         Vehicle first = new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", "");
         Vehicle second = new Vehicle("v2", "CA456", "SUV", "Honda", "CR-V", "Black", "");
 
@@ -144,8 +150,8 @@ class ServiceLayerTest {
 
     @Test
     void vehicleLookupByUserExcludesOtherUsersVehicles() {
-        userService.createUser(new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null));
-        userService.createUser(new User("u2", "John Doe", "john@example.com", "456", "hash2", null));
+        register(User.withEncodedPassword("u1", "Jane Doe", "jane@example.com", "123", "hash", null));
+        register(User.withEncodedPassword("u2", "John Doe", "john@example.com", "456", "hash2", null));
         vehicleService.createVehicle(new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", ""), "u1");
         vehicleService.createVehicle(new Vehicle("v2", "CA456", "SUV", "Honda", "CR-V", "Black", ""), "u2");
 
@@ -157,13 +163,13 @@ class ServiceLayerTest {
 
     @Test
     void vehicleLookupByUserWithNoVehiclesReturnsEmptyList() {
-        userService.createUser(new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null));
+        register(User.withEncodedPassword("u1", "Jane Doe", "jane@example.com", "123", "hash", null));
         assertTrue(vehicleService.findByUserId("u1").isEmpty());
     }
 
     @Test
     void vehicleCreationFailsWithBlankPlate() {
-        userService.createUser(new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null));
+        register(User.withEncodedPassword("u1", "Jane Doe", "jane@example.com", "123", "hash", null));
         Vehicle vehicle = new Vehicle("v1", " ", "Sedan", "Toyota", "Corolla", "Blue", "");
         assertThrows(BusinessRuleViolationException.class, () -> vehicleService.createVehicle(vehicle, "u1"));
     }
@@ -252,10 +258,10 @@ class ServiceLayerTest {
 
     @Test
     void bookingCreationSucceeds() {
-        User user = new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
+        User user = User.withEncodedPassword("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
         Vehicle vehicle = new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", "");
         Service service = new Service("s1", "Premium Wash", "desc", BigDecimal.TEN, 30);
-        userService.createUser(user);
+        register(user);
         vehicleService.createVehicle(vehicle, "u1");
         catalogService.createService(service);
 
@@ -265,10 +271,10 @@ class ServiceLayerTest {
 
     @Test
     void bookingCreationFailsWhenPast() {
-        User user = new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
+        User user = User.withEncodedPassword("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
         Vehicle vehicle = new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", "");
         Service service = new Service("s1", "Premium Wash", "desc", BigDecimal.TEN, 30);
-        userService.createUser(user);
+        register(user);
         vehicleService.createVehicle(vehicle, "u1");
         catalogService.createService(service);
 
@@ -282,16 +288,16 @@ class ServiceLayerTest {
         Service service = new Service("s1", "Premium Wash", "desc", BigDecimal.TEN, 30);
         catalogService.createService(service);
 
-        Booking booking = new Booking("b1", new User("missing", "Missing", "missing@example.com", "123", "hash", null), vehicle, service, LocalDateTime.now().plusDays(1), "none");
+        Booking booking = new Booking("b1", User.withEncodedPassword("missing", "Missing", "missing@example.com", "123", "hash", null), vehicle, service, LocalDateTime.now().plusDays(1), "none");
 
         assertThrows(ResourceNotFoundException.class, () -> bookingService.createBooking(booking));
     }
 
     @Test
     void createBooking_shouldRejectUnknownVehicle() {
-        User user = new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
+        User user = User.withEncodedPassword("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
         Service service = new Service("s1", "Premium Wash", "desc", BigDecimal.TEN, 30);
-        userService.createUser(user);
+        register(user);
         catalogService.createService(service);
 
         Booking booking = new Booking("b1", user, new Vehicle("missing", "CA123", "Sedan", "Toyota", "Corolla", "Blue", ""), service, LocalDateTime.now().plusDays(1), "none");
@@ -301,9 +307,9 @@ class ServiceLayerTest {
 
     @Test
     void createBooking_shouldRejectUnknownService() {
-        User user = new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
+        User user = User.withEncodedPassword("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
         Vehicle vehicle = new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", "");
-        userService.createUser(user);
+        register(user);
         vehicleService.createVehicle(vehicle, "u1");
 
         Booking booking = new Booking("b1", user, vehicle, new Service("missing", "Missing", "desc", BigDecimal.TEN, 30), LocalDateTime.now().plusDays(1), "none");
@@ -313,11 +319,11 @@ class ServiceLayerTest {
 
     @Test
     void createBooking_shouldRejectInactiveService() {
-        User user = new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
+        User user = User.withEncodedPassword("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
         Vehicle vehicle = new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", "");
         Service service = new Service("s1", "Premium Wash", "desc", BigDecimal.TEN, 30);
         service.deactivate();
-        userService.createUser(user);
+        register(user);
         vehicleService.createVehicle(vehicle, "u1");
         catalogService.createService(service);
 
@@ -328,12 +334,12 @@ class ServiceLayerTest {
 
     @Test
     void createBooking_shouldRejectVehicleOwnedByDifferentUser() {
-        User firstUser = new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
-        User secondUser = new User("u2", "John Doe", "john@example.com", "456", "hash", null);
+        User firstUser = User.withEncodedPassword("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
+        User secondUser = User.withEncodedPassword("u2", "John Doe", "john@example.com", "456", "hash", null);
         Vehicle vehicle = new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", "");
         Service service = new Service("s1", "Premium Wash", "desc", BigDecimal.TEN, 30);
-        userService.createUser(firstUser);
-        userService.createUser(secondUser);
+        register(firstUser);
+        register(secondUser);
         vehicleService.createVehicle(vehicle, "u2");
         catalogService.createService(service);
 
@@ -481,7 +487,7 @@ class ServiceLayerTest {
     void createQueueEntry_shouldRejectUnknownBooking() {
         Service service = new Service("s1", "Premium Wash", "desc", BigDecimal.TEN, 30);
         catalogService.createService(service);
-        Booking booking = new Booking("missing", new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null), new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", ""), service, LocalDateTime.now().plusDays(1), "none");
+        Booking booking = new Booking("missing", User.withEncodedPassword("u1", "Jane Doe", "jane@example.com", "123", "hash", null), new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", ""), service, LocalDateTime.now().plusDays(1), "none");
 
         assertThrows(ResourceNotFoundException.class, () -> queueService.createQueueEntry(new QueueEntry("q1", booking, service, 1)));
     }
@@ -624,10 +630,10 @@ class ServiceLayerTest {
     }
 
     private Booking createSavedBooking() {
-        User user = new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
+        User user = User.withEncodedPassword("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
         Vehicle vehicle = new Vehicle("v1", "CA123", "Sedan", "Toyota", "Corolla", "Blue", "");
         Service service = new Service("s1", "Premium Wash", "desc", BigDecimal.TEN, 30);
-        userService.createUser(user);
+        register(user);
         vehicleService.createVehicle(vehicle, "u1");
         catalogService.createService(service);
         Booking booking = new Booking("b1", user, vehicle, service, LocalDateTime.now().plusDays(1), "none");
@@ -721,10 +727,10 @@ class ServiceLayerTest {
     }
 
     private Booking newBookingWithFixture(String prefix, LocalDateTime scheduledDateTime) {
-        User user = new User(prefix + "-user", "Slot User", prefix + "@example.com", "123", "hash", null);
+        User user = User.withEncodedPassword(prefix + "-user", "Slot User", prefix + "@example.com", "123", "hash", null);
         Vehicle vehicle = new Vehicle(prefix + "-vehicle", prefix + "-plate", "Sedan", "Toyota", "Corolla", "Blue", "");
         Service service = new Service(prefix + "-service", "Slot Wash", "desc", BigDecimal.TEN, 30);
-        userService.createUser(user);
+        register(user);
         vehicleService.createVehicle(vehicle, user.getUserId());
         catalogService.createService(service);
         return new Booking(prefix + "-booking", user, vehicle, service, scheduledDateTime, "none");
@@ -737,10 +743,10 @@ class ServiceLayerTest {
     }
 
     private Booking createSavedBooking(String prefix, LocalDateTime scheduledDateTime, BookingStatus bookingStatus) {
-        User user = new User(prefix + "-user", "Report User", prefix + "@example.com", "123", "hash", null);
+        User user = User.withEncodedPassword(prefix + "-user", "Report User", prefix + "@example.com", "123", "hash", null);
         Vehicle vehicle = new Vehicle(prefix + "-vehicle", prefix + "-plate", "Sedan", "Toyota", "Corolla", "Blue", "");
         Service service = new Service(prefix + "-service", "Premium Wash", "desc", BigDecimal.TEN, 30);
-        userService.createUser(user);
+        register(user);
         vehicleService.createVehicle(vehicle, user.getUserId());
         catalogService.createService(service);
         Booking booking = new Booking(prefix + "-booking", user, vehicle, service, scheduledDateTime, "none");
@@ -754,46 +760,46 @@ class ServiceLayerTest {
     @Test
     void testCreateUser_DuplicateEmail_ThrowsException() {
         // Create first user
-        User user1 = new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
-        userService.createUser(user1);
-        
+        User user1 = User.withEncodedPassword("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
+        register(user1);
+
         // Try to create second user with same email
-        User user2 = new User("u2", "John Doe", "jane@example.com", "456", "hash2", null);
-        
-        assertThrows(BusinessRuleViolationException.class, () -> {
-            userService.createUser(user2);
-        });
+        User user2 = User.withEncodedPassword("u2", "John Doe", "jane@example.com", "456", "hash2", null);
+
+        assertThrows(BusinessRuleViolationException.class, () -> register(user2));
     }
 
     @Test
     void testUpdateUser_DuplicateEmail_ThrowsException() {
         // Create first user
-        User user1 = new User("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
-        userService.createUser(user1);
-        
+        User user1 = User.withEncodedPassword("u1", "Jane Doe", "jane@example.com", "123", "hash", null);
+        register(user1);
+
         // Create second user with different email
-        User user2 = new User("u2", "John Doe", "john@example.com", "456", "hash2", null);
-        userService.createUser(user2);
-        
+        User user2 = User.withEncodedPassword("u2", "John Doe", "john@example.com", "456", "hash2", null);
+        register(user2);
+
         // Try to update user2 to user1's email
         user2.setEmail("jane@example.com");
-        
-        assertThrows(BusinessRuleViolationException.class, () -> {
-            userService.updateUser(user2);
-        });
+
+        assertThrows(BusinessRuleViolationException.class, () -> userService.updateUser(user2));
     }
 
     @Test
     void testDuplicateEmailCaseInsensitive_ThrowsException() {
         // Create first user with mixed case email
-        User user1 = new User("u1", "Jane Doe", "Test@Example.com", "123", "hash", null);
-        userService.createUser(user1);
-        
+        User user1 = User.withEncodedPassword("u1", "Jane Doe", "Test@Example.com", "123", "hash", null);
+        register(user1);
+
         // Try to create second user with same email different case
-        User user2 = new User("u2", "John Doe", "test@example.com", "456", "hash2", null);
-        
-        assertThrows(BusinessRuleViolationException.class, () -> {
-            userService.createUser(user2);
-        });
+        User user2 = User.withEncodedPassword("u2", "John Doe", "test@example.com", "456", "hash2", null);
+
+        assertThrows(BusinessRuleViolationException.class, () -> register(user2));
     }
+
+    private User register(User user) {
+        return userService.createUser(new CreateUserCommand(user.getUserId(), user.getFullName(), user.getEmail(),
+                user.getPhone(), "LocalTestPassword123!"));
+    }
+
 }

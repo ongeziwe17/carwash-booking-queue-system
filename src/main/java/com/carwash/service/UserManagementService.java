@@ -2,6 +2,8 @@ package com.carwash.service;
 
 import com.carwash.domain.User;
 import com.carwash.repository.UserRepository;
+import com.carwash.security.UserCredentialService;
+import com.carwash.service.command.CreateUserCommand;
 import com.carwash.service.exception.BusinessRuleViolationException;
 import com.carwash.service.exception.ResourceNotFoundException;
 
@@ -11,16 +13,24 @@ import java.util.Locale;
 public class UserManagementService {
 
     private final UserRepository userRepository;
+    private final UserCredentialService credentialService;
 
-    public UserManagementService(UserRepository userRepository) {
+    public UserManagementService(UserRepository userRepository, UserCredentialService credentialService) {
         this.userRepository = userRepository;
+        this.credentialService = credentialService;
     }
 
-    public User createUser(User user) {
-        validateNewUser(user);
-        normalizeProfile(user);
-        userRepository.findByEmail(user.getEmail())
+    public User createUser(CreateUserCommand command) {
+        validateNewUser(command);
+        String userId = command.userId().trim();
+        String fullName = command.fullName().trim();
+        String email = normalizeEmail(command.email());
+        String phone = command.phone().trim();
+        credentialService.validatePolicy(command.rawPassword());
+        userRepository.findByEmail(email)
                 .ifPresent(existing -> { throw new BusinessRuleViolationException("User email already exists"); });
+        String encodedPassword = credentialService.encode(command.rawPassword());
+        User user = User.withEncodedPassword(userId, fullName, email, phone, encodedPassword, null);
         user.registerAccount();
         userRepository.save(user);
         return user;
@@ -60,11 +70,10 @@ public class UserManagementService {
         userRepository.delete(userId);
     }
 
-    private void validateNewUser(User user) {
-        if (user == null) throw new BusinessRuleViolationException("User is required");
-        if (isBlank(user.getUserId())) throw new BusinessRuleViolationException("User ID must not be blank");
-        validateProfile(user.getFullName(), user.getEmail(), user.getPhone());
-        if (isBlank(user.getPasswordHash())) throw new BusinessRuleViolationException("Password must not be blank");
+    private void validateNewUser(CreateUserCommand command) {
+        if (command == null) throw new BusinessRuleViolationException("Registration details are required");
+        if (isBlank(command.userId())) throw new BusinessRuleViolationException("User ID must not be blank");
+        validateProfile(command.fullName(), command.email(), command.phone());
     }
 
     private void validateProfile(String fullName, String email, String phone) {
@@ -74,11 +83,6 @@ public class UserManagementService {
             throw new BusinessRuleViolationException("Email must be valid");
         }
         if (isBlank(phone)) throw new BusinessRuleViolationException("Phone must not be blank");
-    }
-
-    private void normalizeProfile(User user) {
-        user.setUserId(user.getUserId().trim());
-        user.updateProfile(user.getFullName().trim(), normalizeEmail(user.getEmail()), user.getPhone().trim());
     }
 
     private String normalizeEmail(String email) {

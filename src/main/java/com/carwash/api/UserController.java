@@ -7,6 +7,7 @@ import com.carwash.api.dto.UserResponse;
 import com.carwash.api.mapper.UserMapper;
 import com.carwash.domain.User;
 import com.carwash.service.UserManagementService;
+import com.carwash.service.command.CreateUserCommand;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -58,7 +59,7 @@ public class UserController {
             @ApiResponse(responseCode = "400", description = "Invalid request or duplicate email", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public UserResponse create(@Valid @RequestBody CreateUserRequest request) {
-        User created = service.createUser(mapper.toDomain(request));
+        User created = service.createUser(new CreateUserCommand(request.userId(), request.fullName(), request.email(), request.phone(), request.password()));
         return mapper.toResponse(created);
     }
 

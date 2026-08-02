@@ -19,7 +19,7 @@ public record CreateUserRequest(
         @Schema(example = "+27 82 123 4567")
         String phone,
         @NotBlank @Size(max = 200)
-        @Schema(description = "Registration credential. Secure hashing is tracked separately in SEC-001.",
+        @Schema(description = "Registration credential; encoded with Bcrypt before storage.",
                 example = "LocalTestPassword123!", accessMode = Schema.AccessMode.WRITE_ONLY)
         String password
 ) {

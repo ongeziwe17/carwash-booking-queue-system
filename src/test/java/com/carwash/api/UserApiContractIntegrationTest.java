@@ -27,7 +27,7 @@ class UserApiContractIntegrationTest {
     @Test
     void registrationAndReadsExposeOnlySafeResponseFields() throws Exception {
         String id = unique("safe");
-        create(id, " Safe User ", " Safe.User@Example.COM ", " 123 ")
+        var registration = create(id, " Safe User ", " Safe.User@Example.COM ", " 123 ")
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.userId").value(id))
                 .andExpect(jsonPath("$.fullName").value("Safe User"))
@@ -36,6 +36,7 @@ class UserApiContractIntegrationTest {
                 .andExpect(jsonPath("$.accountStatus").value("ACTIVE"))
                 .andExpect(jsonPath("$.createdAt", notNullValue()));
 
+        assertSafe(registration);
         assertSafe(mockMvc.perform(get("/api/users/{id}", id)).andExpect(status().isOk()));
         assertSafe(mockMvc.perform(get("/api/users")).andExpect(status().isOk()), "$[?(@.userId == '" + id + "')][0]");
     }
@@ -89,6 +90,27 @@ class UserApiContractIntegrationTest {
     }
 
     @Test
+    void passwordPolicyViolationsAreSafeBadRequests() throws Exception {
+        String secret = "tiny-secret";
+        Map<String, Object> tooShort = new HashMap<>(request(unique("short"), "Short Password",
+                unique("short-email") + "@example.com", "123"));
+        tooShort.put("password", secret);
+        String response = mockMvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(tooShort)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", notNullValue()))
+                .andReturn().getResponse().getContentAsString();
+        org.junit.jupiter.api.Assertions.assertFalse(response.contains(secret));
+
+        Map<String, Object> tooLong = new HashMap<>(tooShort);
+        tooLong.put("userId", unique("long"));
+        tooLong.put("password", "x".repeat(201));
+        mockMvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(tooLong)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void duplicateEmailsAreRejectedRegardlessOfCaseOrWhitespace() throws Exception {
         String email = unique("duplicate") + "@example.com";
         create(unique("first"), "First", email, "111").andExpect(status().isCreated());
@@ -136,6 +158,8 @@ class UserApiContractIntegrationTest {
     private void assertSafe(org.springframework.test.web.servlet.ResultActions result, String root) throws Exception {
         result.andExpect(jsonPath(root + ".password").doesNotExist())
                 .andExpect(jsonPath(root + ".passwordHash").doesNotExist())
+                .andExpect(jsonPath(root + ".encodedPassword").doesNotExist())
+                .andExpect(jsonPath(root + ".credentials").doesNotExist())
                 .andExpect(jsonPath(root + ".vehicles").doesNotExist())
                 .andExpect(jsonPath(root + ".bookings").doesNotExist())
                 .andExpect(jsonPath(root + ".notifications").doesNotExist())
