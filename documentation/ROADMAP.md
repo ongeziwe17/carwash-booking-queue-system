@@ -1,72 +1,144 @@
 # Product Roadmap
 
-This roadmap separates what is implemented in the current backend foundation from planned hardening and future SaaS/platform capabilities. It should not be read as a production-readiness claim.
+## Approved Product Direction
 
-## Current Foundation
+The approved product direction is a **Marketplace-enabled multi-tenant SaaS platform**.
 
-Implemented in the current backend:
+Customers should eventually be able to discover and compare independent car wash businesses and branches based on location, service availability, queue conditions, total completion time, price, and wash type. Business owners and staff should manage only their own operational data.
 
-- Spring Boot REST API controllers for users, vehicles, services, bookings, queue entries, notifications, and daily summary reports.
-- Service-layer business rules for resource lookup, duplicate user email checks, duplicate vehicle plates per owner, booking validation, and queue status transitions.
-- Repository interfaces with in-memory implementations used by the running application and tests.
-- Basic `DatabaseUserRepository` abstraction test coverage, but no configured production database runtime.
-- Swagger/OpenAPI documentation.
-- Docker and Docker Compose support for local execution.
-- Automated service-layer, repository, and API integration tests.
+The current application remains a Spring Boot modular-monolith backend foundation. It is not yet a production-ready Marketplace or SaaS platform.
 
-## Near-Term Backend Hardening
+## Current Implemented Foundation
 
-1. Strengthen booking and queue validation around time slots, capacity, cancellation windows, and status transitions.
-2. Expand API integration tests for customer and operator workflows.
-3. Standardize request/response DTOs and API error contracts.
-4. Improve notification workflow boundaries so provider integrations can be added safely later.
-5. Keep product documentation aligned with the implemented API behavior.
+Implemented on `staging`:
 
-## Security and Access-Control Roadmap
+- User record CRUD and duplicate-email validation.
+- Vehicle CRUD, user ownership, and duplicate plate validation during creation.
+- Global service catalogue CRUD with active/inactive workflows.
+- Booking creation, update, confirmation, cancellation, future-time validation, ownership validation, inactive-service rejection, and exact-slot capacity validation.
+- Queue entry creation, manual position update, call/start/complete transitions, and deletion.
+- In-app notification creation and recent lookup by user.
+- Basic daily booking and queue summary reporting.
+- Swagger/OpenAPI, Maven tests, Docker, and Docker Compose support.
+- Positive and negative service/API workflow coverage.
 
-Not yet implemented:
+Current limitations include direct domain-object API exposure, in-memory-only storage, manually managed queue positions, incomplete booking/queue lifecycle synchronization, no business/branch model, and no authentication, RBAC, tenant isolation, payments, external notification delivery, or production observability.
 
-1. Secure authentication and session/token handling.
-2. Secure credential hashing and storage.
-3. Spring Security integration.
-4. Role-based access control for customers, staff, owners, and administrators.
-5. Audit logging for sensitive administrative actions.
+## Phase 0 — API, Data, Test, and Delivery Hardening
 
-## Persistence Roadmap
+Complete before major Marketplace domain expansion:
 
-Currently, in-memory only for the running backend. Planned work:
+1. **API-001** — Protect user registration and response contracts (#12).
+2. **SEC-001** — Store credentials securely (#24).
+3. **API-002** — Standardize request validation and error contracts (#106).
+4. **DATA-001** — Enforce aggregate and repository integrity (#107).
+5. **CI-001** — Align CI/CD and branch promotion with `staging` delivery (#109).
+6. **TEST-001** — Improve test isolation and quality gates (#110).
+7. **CONFIG-001** — Externalize runtime policy configuration (#111).
+8. **DOCS-001** — Align OpenAPI and written API contracts (#108).
 
-1. Add PostgreSQL persistence for all domain aggregates.
-2. Add schema migrations and repeatable local database setup.
-3. Define transaction boundaries for booking and queue operations.
-4. Add persistence-focused integration tests.
-5. Add backup/restore and data retention guidance for production environments.
+Expected outcome: safe bounded DTOs, predictable validation/errors, no silent ID overwrites, deterministic tests, documented configuration, and an integration pipeline that validates the active branch flow.
 
-## SaaS/Platform Roadmap
+## Phase 1 — Complete the Single-Location Booking and Queue Foundation
 
-Future SaaS hardening:
+The recommendation system must not be built before queue and availability behaviour is reliable.
 
-1. Business registration and tenant-aware data modeling.
-2. Tenant isolation across APIs, repositories, reports, and notifications.
-3. Subscription or billing-plan support.
-4. Production deployment configuration for container/cloud platforms.
-5. Monitoring, metrics, tracing, structured logging, and operational alerts.
-6. Security hardening, secrets management, and environment-specific configuration.
+1. **QUEUE-001** — Enforce queue-entry eligibility and uniqueness (#16).
+2. **QUEUE-002** — Automate queue ordering, position recalculation, and wait estimates (#17).
+3. **WORKFLOW-001** — Synchronize booking and queue lifecycles (#20).
+4. **QUEUE-003** — Implement true call-next behaviour (#112).
+5. **BOOKING-001** — Add rescheduling and configurable cancellation windows (#113).
+6. **AVAIL-001** — Add a single-location service availability API (#114).
 
-## Future Product Capabilities
+Expected outcome: confirmed bookings enter one ordered queue, positions and ETAs are server-managed, queue transitions keep booking state consistent, and customers can check availability before attempting a booking.
 
-Future product enhancements, not current backend capabilities:
+## Phase 2 — Marketplace Business, Branch, and Availability Foundation
 
-1. Payment provider workflows for deposits or full payments.
-2. External email/SMS notification delivery with retries and delivery status reconciliation.
-3. Rich reporting dashboards for revenue, throughput, utilization, and queue performance.
-4. Ratings and customer feedback.
-5. Customer-facing and operator-facing frontend applications.
-6. Advanced scheduling, capacity planning, and multi-location operations.
+1. **MKT-001** — Add Marketplace business and branch registration (#115).
+2. **MKT-002** — Add branch operating hours and temporary closures (#116).
+3. **SERVICE-001** — Add branch-specific service offerings, prices, durations, and capacity (#117).
+4. **OPS-001** — Scope bookings, queues, notifications, and reports to branches (#118).
+5. **GEO-001** — Add branch distance calculation and public discovery (#119).
+6. **AVAIL-002** — Add branch-aware availability search (#120).
+
+Expected outcome: the backend understands which business and branch is being considered, which services are offered there, whether the branch is open, what capacity is available, and how far it is from the customer.
+
+## Phase 3 — Explainable Rule-Based Recommendations
+
+1. **REC-001** — Build explainable rule-based Marketplace recommendations (#121).
+
+The first recommendation release should:
+
+- Filter out inactive, closed, unsupported, unavailable, and full branches.
+- Support `NEAREST`, `SHORTEST_QUEUE`, `FASTEST_TOTAL_TIME`, `LOWEST_PRICE`, and `BEST_OVERALL` preferences.
+- Calculate distance, estimated queue wait, service duration, estimated total completion time, price, and remaining capacity.
+- Use externalized weights and deterministic tie-breaking.
+- Return ranked options with a score breakdown and human-readable reason.
+
+Machine learning is intentionally excluded from the first recommendation release.
+
+## Phase 4 — Persistence, Security, and Tenant Isolation
+
+Required before public production use:
+
+1. **DATA-002** — Add PostgreSQL persistence, migrations, and transaction boundaries (#122).
+2. **TEST-002** — Add PostgreSQL integration tests with Testcontainers (#123).
+3. **SEC-002** — Authenticate users securely (#13).
+4. **SEC-003** — Enforce role-based access control (#22).
+5. **TENANT-001** — Enforce Marketplace tenant isolation (#124).
+6. **AUDIT-001** — Add security and operational audit logging (#125).
+
+Expected outcome: durable and transactionally safe data, protected APIs, explicit customer/staff/owner/admin roles, and verified separation between independent car wash businesses.
+
+## Phase 5 — Product and Platform Expansion
+
+- **NOTIFY-001** — Complete the in-app notification lifecycle (#126).
+- **NOTIFY-002** — Integrate external email and SMS delivery (#127).
+- **PAY-001** — Add Marketplace payment and refund workflows (#128).
+- **FEEDBACK-001** — Add verified ratings and service feedback (#129).
+- **REPORT-001** — Add tenant-aware business dashboards and analytics (#130).
+- **OBS-001** — Add production observability and health endpoints (#131).
+- **DEPLOY-001** — Harden production container and deployment configuration (#132).
+- **FRONTEND-001** — Build customer and operator Marketplace applications (#133).
+- **API-003** — Add pagination, filtering, and sorting to list APIs (#135).
+- **SAAS-001** — Add business subscription plans and platform billing (#136).
+- **REALTIME-001** — Add real-time queue and booking updates (#137).
+- **GEO-002** — Add traffic-aware travel time for recommendations (#138).
+
+## Phase 6 — Data-Driven Recommendation Evolution
+
+- **ML-001** — Evolve recommendations with historical prediction and personalization (#134).
+
+This phase should start only after sufficient clean historical data exists. The rule-based engine remains the explainable baseline and production fallback.
+
+Candidate later capabilities include:
+
+- Predicted wait and completion time.
+- Branch/service demand forecasting.
+- Recommended lower-demand visit times.
+- Privacy-controlled preference learning.
+- Queue and capacity anomaly detection.
+
+## Recommended Delivery Sequence
+
+```text
+API/data/test hardening
+    -> reliable booking and queue foundation
+    -> Marketplace business and branch model
+    -> branch services, capacity, discovery, and availability
+    -> explainable rule-based recommendations
+    -> PostgreSQL, authentication, RBAC, and tenant isolation
+    -> payments, notifications, dashboards, real-time UX, and frontends
+    -> predictive/ML optimisation after data exists
+```
 
 ## Maintenance Principles
 
-- Prefer product workflow tests over isolated examples.
-- Keep documentation practical for contributors and operators.
-- Avoid adding demo-only code that is not part of the backend product path.
-- Keep infrastructure changes incremental and verifiable.
+- Keep issues as focused top-level items unless sub-issues are explicitly adopted later.
+- Use stable area-based identifiers such as `QUEUE-001`, `REC-001`, and `SEC-001`.
+- Use `staging` as the current source of truth until the branch-promotion strategy is intentionally changed.
+- Do not describe planned functionality as implemented.
+- Prefer one shared decision service for availability and booking validation.
+- Keep recommendation eligibility deterministic and separate from ranking.
+- Preserve the modular-monolith architecture until operational evidence justifies extracting services.
+- Add ML only after the data, evaluation, privacy, monitoring, and fallback requirements are satisfied.
