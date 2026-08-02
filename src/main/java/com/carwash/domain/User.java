@@ -8,36 +8,55 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
-@Setter
 @Getter
 public class User {
+    @Setter
     private String userId;
+    @Setter
     private String fullName;
+    @Setter
     private String email;
+    @Setter
     private String phone;
     @JsonIgnore
-    private String passwordHash;
+    private String encodedPassword;
+    @Setter
     private AccountStatus accountStatus;
+    @Setter
     private LocalDateTime createdAt;
+    @Setter
     private LocalDateTime lastLoginAt;
+    @Setter
     private Role role;
+    @Setter
     private List<Vehicle> vehicles = new ArrayList<>();
+    @Setter
     private List<Booking> bookings = new ArrayList<>();
+    @Setter
     private List<Notification> notifications = new ArrayList<>();
 
     public User() {
     }
 
-    public User(String userId, String fullName, String email, String phone, String passwordHash, Role role) {
+    private User(String userId, String fullName, String email, String phone, String encodedPassword, Role role) {
         this.userId = userId;
         this.fullName = fullName;
         this.email = email;
         this.phone = phone;
-        this.passwordHash = passwordHash;
+        this.encodedPassword = encodedPassword;
         this.role = role;
         this.accountStatus = AccountStatus.PENDING;
+    }
+
+    public static User withEncodedPassword(String userId, String fullName, String email, String phone,
+                                           String encodedPassword, Role role) {
+        if (encodedPassword == null || encodedPassword.isBlank()) {
+            throw new IllegalArgumentException("Encoded password is required");
+        }
+        return new User(userId, fullName, email, phone, encodedPassword, role);
     }
 
     public void registerAccount() {
@@ -45,12 +64,8 @@ public class User {
         this.createdAt = LocalDateTime.now();
     }
 
-    public boolean authenticate(String suppliedPasswordHash) {
-        boolean authenticated = this.accountStatus == AccountStatus.ACTIVE && passwordHash != null && passwordHash.equals(suppliedPasswordHash);
-        if (authenticated) {
-            this.lastLoginAt = LocalDateTime.now();
-        }
-        return authenticated;
+    public void recordSuccessfulLogin() {
+        this.lastLoginAt = LocalDateTime.now();
     }
 
     public void updateProfile(String fullName, String email, String phone) {
@@ -74,7 +89,7 @@ public class User {
         return bookings.stream()
                 .filter(b -> b.getBookingId().equals(bookingId))
                 .map(Booking::getQueueEntry)
-                .filter(q -> q != null)
+                .filter(Objects::nonNull)
                 .map(QueueEntry::getPosition)
                 .findFirst()
                 .orElse(-1);

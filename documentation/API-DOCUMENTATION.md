@@ -44,7 +44,9 @@ User endpoints use bounded API contracts rather than binding or returning the do
 - `UserResponse` contains `userId`, `fullName`, `email`, `phone`, `accountStatus`, `createdAt`, `lastLoginAt`, and the nullable scalar `roleName`.
   Credentials and nested role, vehicle, booking, and notification objects are never included.
 
-Registration activates the account and sets its creation timestamp on the server. Email addresses and surrounding profile whitespace are normalized before in-memory persistence, and duplicate email addresses are rejected case-insensitively. The repository remains in-memory, so records do not survive an application restart. The registration `password` is temporarily mapped to the existing internal credential field; secure password hashing is **not yet implemented** and remains tracked separately by SEC-001 (#24).
+Registration accepts a raw `password` at the request boundary. The service validates it without trimming and uses BCrypt to create a salted encoded credential before constructing and storing the user. Credential data is never included in user responses. Registration also activates the account and sets its creation timestamp on the server. Email addresses and surrounding profile whitespace are normalized before in-memory persistence, and duplicate email addresses are rejected case-insensitively.
+
+The repository remains in-memory, so all users and their encoded credentials are lost when the application restarts. Authentication, token issuance, and role-based access control (RBAC) remain unimplemented.
 
 ### Vehicles
 
