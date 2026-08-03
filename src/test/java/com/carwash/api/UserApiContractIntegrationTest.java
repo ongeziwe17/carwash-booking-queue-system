@@ -1,12 +1,13 @@
 package com.carwash.api;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.HashMap;
@@ -14,17 +15,29 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.notNullValue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
-@AutoConfigureMockMvc
-@WithMockUser
 class UserApiContractIntegrationTest {
 
-    @Autowired MockMvc mockMvc;
-    @Autowired ObjectMapper objectMapper;
+    MockMvc mockMvc;
+
+    @Autowired
+    WebApplicationContext context;
+
+    @Autowired
+    ObjectMapper objectMapper;
+
+    @BeforeEach
+    void configureMockMvc() {
+        mockMvc = MockMvcBuilders.webAppContextSetup(context).defaultRequest(get("/").with(user("api-integration-user").roles("USER")))
+                .apply(springSecurity())
+                .build();
+    }
 
     @Test
     void registrationAndReadsExposeOnlySafeResponseFields() throws Exception {
