@@ -20,7 +20,7 @@ Implemented in the current backend:
 ## Important Current Limitations
 
 - Storage is currently in-memory only for the running application; data is not durable across restarts.
-- Authentication, login sessions, JWTs, RBAC enforcement, and secure credential storage are not implemented.
+- Stateless JWT authentication and secure credential storage are implemented; RBAC enforcement is not implemented.
 - Roles exist as domain data but are not enforced by Spring Security or controller authorization.
 - Notification records are stored in-app; external SMS/email delivery is not implemented.
 - Daily summary reporting is basic and in-memory; analytics dashboards and revenue reporting are future work.
@@ -102,4 +102,22 @@ See [API Documentation](documentation/API-DOCUMENTATION.md) and Swagger UI for e
 
 Planned near-term work focuses on backend hardening: stronger booking/queue rules, broader API tests, improved error contracts, persistent storage design, and clearer notification boundaries.
 
-Future SaaS hardening includes authentication, secure credential storage, RBAC enforcement, PostgreSQL persistence, migrations, tenant-aware business registration, external SMS/email providers, payment workflows, operational dashboards, monitoring/observability, and production deployment hardening.
+Future SaaS hardening includes refresh-token design, brute-force protection, RBAC enforcement, PostgreSQL persistence, migrations, tenant-aware business registration, external SMS/email providers, payment workflows, operational dashboards, monitoring/observability, and production deployment hardening.
+## Bearer Authentication
+
+Copy `.env.example` to `.env`, replace its deliberately invalid JWT placeholder with output from
+`openssl rand -base64 32`, and then start the application. The signing secret must decode to at least
+32 bytes. Access tokens use HS256, are issued by `carwash-booking-queue-system`, and expire after 20
+minutes by default (`carwash.security.jwt.access-token-ttl`).
+
+1. Register with `POST /api/users`.
+2. Login with `POST /api/auth/login` using the registered email and exact password.
+3. Copy `accessToken` from the response.
+4. Send `Authorization: Bearer <token>`.
+5. Call a protected API such as `GET /api/users`.
+
+Only registration, login, OpenAPI/Swagger, browser preflight, and error handling are public. All other
+`/api/**` routes require a valid token. Because storage is in-memory, a restart removes users and makes
+their tokens invalid; tokens also stop working when an account becomes inactive. There are no refresh
+tokens or revocation list. RBAC (SEC-003), tenant isolation, brute-force protection, and ownership rules
+remain future security work, so authenticated users temporarily share the same access level.

@@ -145,3 +145,20 @@ or:
 ```powershell
 Invoke-WebRequest -Uri "http://localhost:8080/v3/api-docs" -OutFile "docs/openapi.json"
 ```
+## Authentication (SEC-002)
+
+`POST /api/auth/login` is public and accepts `email` and `password`. Email is trimmed and normalized
+case-insensitively; passwords are never altered. A successful response contains `accessToken`, the
+literal token type `Bearer`, `expiresInSeconds`, `expiresAt`, and the bounded `UserResponse`. Invalid
+credentials and inactive accounts all return the same `401` message: `Invalid email or password`.
+Validation errors return `400` without echoing the supplied password.
+
+Send the token on protected requests as `Authorization: Bearer <accessToken>`. Registration, login,
+`/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html`, OPTIONS preflight, and `/error` are public. Every
+other `/api/**` operation is protected. Invalid, expired, malformed, incorrectly signed, missing-user,
+or inactive-user tokens receive a bounded JSON `401` response.
+
+Tokens contain only `iss`, user ID `sub`, `iat`, `exp`, and `jti`; they expire after the configured access
+token TTL. No refresh token exists. Current in-memory storage means tokens cannot survive an application
+restart. RBAC, tenant isolation, ownership enforcement, rate limiting, and brute-force protection remain
+future work.

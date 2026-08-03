@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Java JDK
         uses: actions/setup-java@v5
@@ -37,7 +37,7 @@ jobs:
           cache: maven
 
       - name: Cache Maven local repo
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.m2
           key: maven-${{ hashFiles('**/pom.xml') }}
@@ -50,6 +50,18 @@ jobs:
       ##  run: docker compose -f docker-compose.yml config
 
       - name: Run tests
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          SPRING_APPLICATION_NAME: carwash-booking-queue-system
+          SERVER_PORT: 8080
+
+          SECURE_PASSWORD_BCRYPT_STRENGTH: 10
+          SECURE_PASSWORD_MIN_LENGTH: 12
+          SECURE_PASSWORD_MAX_UTF8_BYTES: 72
+
+          SECURE_JWT_ISSUER: carwash-booking-queue-system-ci
+          SECURE_JWT_ACCESS_TOKEN_TTL: 20m
+          SECURE_JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
         run: ./mvnw clean verify
 
       - name: Upload test reports
@@ -93,7 +105,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v4

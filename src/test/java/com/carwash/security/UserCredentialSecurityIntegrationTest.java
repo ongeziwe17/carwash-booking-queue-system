@@ -40,7 +40,11 @@ class UserCredentialSecurityIntegrationTest {
         assertThrows(BusinessRuleViolationException.class, () -> credentialService.validatePolicy(null));
         assertThrows(BusinessRuleViolationException.class, () -> credentialService.validatePolicy("   "));
         assertThrows(BusinessRuleViolationException.class, () -> credentialService.validatePolicy("12345678901"));
-        assertThrows(BusinessRuleViolationException.class, () -> credentialService.validatePolicy("x".repeat(201)));
+        assertDoesNotThrow(() -> credentialService.validatePolicy("x".repeat(72)));
+        assertThrows(BusinessRuleViolationException.class, () -> credentialService.validatePolicy("x".repeat(73)));
+        assertThrows(BusinessRuleViolationException.class, () -> credentialService.validatePolicy("\u20ac".repeat(25)));
+        assertThrows(BusinessRuleViolationException.class, () -> credentialService.encode("x".repeat(72) + "first suffix"));
+        assertThrows(BusinessRuleViolationException.class, () -> credentialService.encode("x".repeat(72) + "second suffix"));
         assertDoesNotThrow(() -> credentialService.validatePolicy("x".repeat(12)));
 
         String withoutSpace = credentialService.encode("Password123!");

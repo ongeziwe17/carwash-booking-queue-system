@@ -37,3 +37,11 @@ The domain model represents the current backend foundation for user records, veh
 ## 5. Design Notes
 
 The current model is intentionally small, so backend workflows can be validated before production hardening. Future additions should preserve clear boundaries between domain behavior, service orchestration, repository persistence, and API DTOs.
+## Authentication Boundary
+
+Credentials are stored only as BCrypt encodings and raw passwords are accepted only at registration and
+login boundaries. BCrypt inputs are limited to 72 UTF-8 bytes. Authentication issues a short-lived JWT
+whose subject is the user ID; domain graphs and credentials are not token claims. JWT validation resolves
+the subject against the in-memory repository and requires an `ACTIVE` account. `lastLoginAt` is updated
+and saved after successful login. Roles remain domain data only: SEC-003 RBAC and tenant isolation are
+not implemented, and there are no refresh tokens or token revocation lists.
