@@ -1,6 +1,7 @@
 package com.carwash.api;
 
 import com.carwash.api.dto.ApiErrorResponse;
+import com.carwash.security.InvalidCredentialsException;
 import com.carwash.service.exception.BusinessRuleViolationException;
 import com.carwash.service.exception.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;
@@ -16,6 +17,14 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidCredentials(
+            InvalidCredentialsException ex, ServletWebRequest request) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ApiErrorResponse(401,
+                InvalidCredentialsException.SAFE_MESSAGE, LocalDateTime.now().toString(),
+                request.getRequest().getRequestURI()));
+    }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleNotFound(

@@ -10,11 +10,11 @@ import org.springframework.validation.annotation.Validated;
 public record PasswordSecurityProperties(
         @Min(4) @Max(31) int bcryptStrength,
         @Min(1) int minLength,
-        @Min(1) int maxLength
+        @Min(1) @Max(72) int maxUtf8Bytes
 ) {
     public PasswordSecurityProperties {
-        if (minLength > maxLength) {
-            throw new IllegalArgumentException("Password minimum length must not exceed maximum length");
+        if (minLength > maxUtf8Bytes) {
+            throw new IllegalArgumentException("Password minimum length must not exceed maximum UTF-8 bytes");
         }
     }
 }
