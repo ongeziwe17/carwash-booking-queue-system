@@ -66,7 +66,11 @@ jobs:
           fi
 
           expected_template="{{commit_date 'YYYYMMDD-HHmmss' tz='Africa/Johannesburg'}}"
-          template_count="$(grep --only-matching --fixed-strings -- "${expected_template}" .github/workflows/ci-cd.yml | wc -l)"
+          template_count="$(
+            grep --fixed-strings -- 'type=raw,value=' .github/workflows/ci-cd.yml \
+              | grep --only-matching --fixed-strings -- "${expected_template}" \
+              | wc -l
+          )"
 
           if [[ "${template_count}" -ne 3 ]]; then
             echo "Expected three valid commit_date templates, found ${template_count}."
