@@ -2,6 +2,7 @@ package com.carwash.api;
 
 import com.carwash.api.dto.ApiErrorResponse;
 import com.carwash.api.dto.CreateBookingRequest;
+import com.carwash.api.dto.UpdateBookingRequest;
 import com.carwash.domain.Booking;
 import com.carwash.service.BookingManagementService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -77,12 +78,15 @@ public class BookingController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)"
-            + " && @resourceAuthorization.canCreateFor(authentication, #req.userId())")
-    public Booking update(@PathVariable String id, @Valid @RequestBody CreateBookingRequest req) {
-        Booking booking = req.toBooking();
-        booking.setBookingId(id);
-        return service.updateBooking(booking);
+    @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
+    public Booking update(@PathVariable String id, @Valid @RequestBody UpdateBookingRequest request) {
+        return service.updateBooking(
+                id,
+                request.vehicleId(),
+                request.serviceId(),
+                request.scheduledDateTime(),
+                request.specialRequest()
+        );
     }
 
     @DeleteMapping("/{id}")

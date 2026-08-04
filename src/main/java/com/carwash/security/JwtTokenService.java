@@ -3,7 +3,10 @@ package com.carwash.security;
 import com.carwash.config.JwtSecurityProperties;
 import com.carwash.domain.User;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
-import org.springframework.security.oauth2.jwt.*;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -12,6 +15,7 @@ import java.util.UUID;
 
 @Service
 public class JwtTokenService {
+
     private final JwtEncoder encoder;
     private final JwtSecurityProperties properties;
     private final Clock clock;
@@ -26,15 +30,21 @@ public class JwtTokenService {
         RoleName role = RoleCatalog.name(user.getRole());
         Instant issuedAt = clock.instant();
         Instant expiresAt = issuedAt.plus(properties.accessTokenTtl());
-        JwtClaimsSet claims = JwtClaimsSet.builder().issuer(properties.issuer()).subject(user.getUserId())
+
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer(properties.issuer())
+                .subject(user.getUserId())
                 .claim("role", role.name())
-                .claim("permissions", RoleCatalog.permissions(role).stream()
-                        .map(Enum::name).sorted().toList())
-                .issuedAt(issuedAt).expiresAt(expiresAt).id(UUID.randomUUID().toString()).build();
+                .issuedAt(issuedAt)
+                .expiresAt(expiresAt)
+                .id(UUID.randomUUID().toString())
+                .build();
+
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).type("JWT").build();
         String value = encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
         return new IssuedToken(value, expiresAt, properties.accessTokenTtl().toSeconds());
     }
 
-    public record IssuedToken(String value, Instant expiresAt, long expiresInSeconds) {}
+    public record IssuedToken(String value, Instant expiresAt, long expiresInSeconds) {
+    }
 }

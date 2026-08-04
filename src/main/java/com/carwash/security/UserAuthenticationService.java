@@ -9,28 +9,48 @@ import java.util.Locale;
 
 @Service
 public class UserAuthenticationService {
-    private static final String DUMMY_BCRYPT = "$2a$10$7EqJtq98hPqEX7fNZaFWoO5P2byq1M1Jw.5Qy9K8K.0s4nWvWjKna";
+
     private final UserRepository users;
     private final UserCredentialService credentials;
     private final JwtTokenService tokens;
+    private final String dummyEncodedPassword;
 
-    public UserAuthenticationService(UserRepository users, UserCredentialService credentials, JwtTokenService tokens) {
+    public UserAuthenticationService(
+            UserRepository users,
+            UserCredentialService credentials,
+            JwtTokenService tokens
+    ) {
         this.users = users;
         this.credentials = credentials;
         this.tokens = tokens;
+        this.dummyEncodedPassword = credentials.createDummyEncoding();
     }
 
     public AuthenticationResult authenticate(String email, String rawPassword) {
-        String normalizedEmail = email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+        String normalizedEmail = email == null
+                ? ""
+                : email.trim().toLowerCase(Locale.ROOT);
+
         User user = users.findByEmail(normalizedEmail).orElse(null);
-        boolean credentialMatches = credentials.matches(rawPassword,
-                user == null ? DUMMY_BCRYPT : user.getEncodedPassword());
-        if (user == null || user.getAccountStatus() != AccountStatus.ACTIVE || !credentialMatches) {
+        String encodedPassword = user == null
+                ? dummyEncodedPassword
+                : user.getEncodedPassword();
+
+        boolean credentialMatches = credentials.matches(rawPassword, encodedPassword);
+        boolean activeUser = user != null && user.getAccountStatus() == AccountStatus.ACTIVE;
+
+        if (!activeUser || !credentialMatches) {
             throw new InvalidCredentialsException();
         }
+
         JwtTokenService.IssuedToken token = tokens.issue(user);
         user.recordSuccessfulLogin();
         users.save(user);
-        return new AuthenticationResult(user, token.value(), token.expiresAt(), token.expiresInSeconds());
+        return new AuthenticationResult(
+                user,
+                token.value(),
+                token.expiresAt(),
+                token.expiresInSeconds()
+        );
     }
 }
