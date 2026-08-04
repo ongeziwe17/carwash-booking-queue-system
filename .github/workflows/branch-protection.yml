@@ -11,14 +11,14 @@ permissions:
   contents: read
 
 jobs:
-  validate-promotion-source:
-    name: Validate promotion source
+  check-branch:
+    name: check-branch
     runs-on: ubuntu-latest
     env:
       BASE_REF: ${{ github.base_ref }}
       HEAD_REF: ${{ github.head_ref }}
     steps:
-      - name: Validate branch flow
+      - name: Validate promotion source
         shell: bash
         run: |
           set -euo pipefail
