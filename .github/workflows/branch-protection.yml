@@ -1,0 +1,50 @@
+name: Validate Branch Promotion
+
+on:
+  pull_request:
+    branches:
+      - staging
+      - develop
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  validate-promotion-source:
+    name: Validate promotion source
+    runs-on: ubuntu-latest
+    env:
+      BASE_REF: ${{ github.base_ref }}
+      HEAD_REF: ${{ github.head_ref }}
+    steps:
+      - name: Validate branch flow
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          case "${BASE_REF}" in
+            master)
+              if [[ "${HEAD_REF}" != "develop" ]]; then
+                echo "Only 'develop' may be promoted into 'master'."
+                exit 1
+              fi
+              ;;
+            develop)
+              if [[ "${HEAD_REF}" != "staging" ]]; then
+                echo "Only 'staging' may be promoted into 'develop'."
+                exit 1
+              fi
+              ;;
+            staging)
+              if [[ ! "${HEAD_REF}" =~ ^(feature|fix|security|ci|docs|test|refactor|chore|dependabot)/.+$ ]]; then
+                echo "PRs into 'staging' must come from an approved work branch prefix."
+                echo "Allowed prefixes: feature/, fix/, security/, ci/, docs/, test/, refactor/, chore/, dependabot/."
+                exit 1
+              fi
+              ;;
+            *)
+              echo "Unsupported promotion target: ${BASE_REF}"
+              exit 1
+              ;;
+          esac
