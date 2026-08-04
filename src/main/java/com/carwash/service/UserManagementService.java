@@ -21,10 +21,11 @@ public class UserManagementService {
     /**
      * Serializes operations that can remove an active platform administrator.
      *
-     * <p>This makes the count-and-mutate sequence atomic for the current single-JVM,
-     * in-memory implementation. When persistence is introduced, this invariant must
-     * move to a database transaction with suitable locking or another repository-level
-     * atomic operation so it also holds across application instances.</p>
+     * <p>Spring creates this service as a singleton, so this monitor makes the
+     * count-and-mutate sequence atomic for concurrent HTTP requests in the current
+     * single-JVM, in-memory implementation. When persistence or multiple application
+     * instances are introduced, this invariant must move to a database transaction
+     * with suitable locking or another repository-level atomic operation.</p>
      */
     private final Object platformAdministratorMutationMonitor = new Object();
 
