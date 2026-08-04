@@ -60,11 +60,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          if grep --fixed-strings --line-number -- 'HHmmssg tz=' .github/workflows/ci-cd.yml; then
-            echo "Malformed docker/metadata-action commit_date template detected."
-            exit 1
-          fi
-
           expected_template="{{commit_date 'YYYYMMDD-HHmmss' tz='Africa/Johannesburg'}}"
           template_count="$(
             grep --fixed-strings -- 'type=raw,value=' .github/workflows/ci-cd.yml \
