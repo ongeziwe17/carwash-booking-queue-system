@@ -1,20 +1,27 @@
 package com.carwash.api;
 
-
+import com.carwash.api.dto.ApiErrorResponse;
 import com.carwash.api.dto.CreateBookingRequest;
 import com.carwash.domain.Booking;
 import com.carwash.service.BookingManagementService;
-import org.springframework.http.HttpStatus;
-import com.carwash.api.dto.ApiErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -23,10 +30,11 @@ import java.util.List;
 @RequestMapping("/api/bookings")
 public class BookingController {
 
-
     private final BookingManagementService service;
 
-    public BookingController(BookingManagementService service) { this.service = service; }
+    public BookingController(BookingManagementService service) {
+        this.service = service;
+    }
 
     @GetMapping
     @PreAuthorize("hasAnyRole('STAFF','BUSINESS_OWNER','PLATFORM_ADMIN')")
@@ -37,7 +45,9 @@ public class BookingController {
             @ApiResponse(responseCode = "404", description = "Not found", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public List<Booking> getAll() { return service.findAll(); }
+    public List<Booking> getAll() {
+        return service.findAll();
+    }
 
     @GetMapping("/{id}")
     @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
@@ -67,9 +77,12 @@ public class BookingController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
+    @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)"
+            + " && @resourceAuthorization.canCreateFor(authentication, #req.userId())")
     public Booking update(@PathVariable String id, @Valid @RequestBody CreateBookingRequest req) {
-        Booking b = req.toBooking(); b.setBookingId(id); return service.updateBooking(b);
+        Booking booking = req.toBooking();
+        booking.setBookingId(id);
+        return service.updateBooking(booking);
     }
 
     @DeleteMapping("/{id}")
