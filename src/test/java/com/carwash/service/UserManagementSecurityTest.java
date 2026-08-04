@@ -79,6 +79,7 @@ class UserManagementSecurityTest {
         assertEquals(1, outcomes.stream().filter("succeeded"::equals).count());
         assertEquals(1, outcomes.stream().filter("rejected"::equals).count());
         assertEquals(1, activePlatformAdministratorCount());
+        assertEquals(1, repository.findAll().size());
     }
 
     @Test
