@@ -71,6 +71,12 @@ public class BookingManagementService {
         return booking;
     }
 
+    /** Authorization is performed by the controller before this mutation. */
+    public Booking cancelBooking(String bookingId) {
+        Booking booking = findById(bookingId);
+        return cancelBooking(bookingId, booking.getUser().getUserId());
+    }
+
     private void validateCancellationRequest(Booking booking, String customerId){
         if (customerId == null || customerId.isBlank()) throw new BusinessRuleViolationException("Customer ID is required to cancel booking");
         if (booking.getUser() == null || booking.getUser().getUserId() == null || !booking.getUser().getUserId().equals(customerId)) {

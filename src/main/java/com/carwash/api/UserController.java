@@ -17,6 +17,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,6 +35,7 @@ public class UserController {
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
     @Operation(summary = "List users")
     @ApiResponse(responseCode = "200", description = "Users returned",
             content = @Content(array = @ArraySchema(schema = @Schema(implementation = UserResponse.class))))
@@ -42,6 +44,7 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@resourceAuthorization.isSelf(authentication, #id)")
     @Operation(summary = "Get user by ID")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "User returned", content = @Content(schema = @Schema(implementation = UserResponse.class))),
@@ -64,6 +67,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("@resourceAuthorization.isSelf(authentication, #id)")
     @Operation(summary = "Update a user profile")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "User updated", content = @Content(schema = @Schema(implementation = UserResponse.class))),
@@ -75,6 +79,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("@resourceAuthorization.isSelf(authentication, #id)")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Delete user")
     @ApiResponses({

@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
@@ -28,6 +29,7 @@ public class BookingController {
     public BookingController(BookingManagementService service) { this.service = service; }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('STAFF','BUSINESS_OWNER','PLATFORM_ADMIN')")
     @Operation(summary = "List all")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful operation"),
@@ -38,6 +40,7 @@ public class BookingController {
     public List<Booking> getAll() { return service.findAll(); }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
     @Operation(summary = "Get by ID")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful operation"),
@@ -50,6 +53,7 @@ public class BookingController {
     }
 
     @PostMapping
+    @PreAuthorize("@resourceAuthorization.canCreateFor(authentication, #req.userId())")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create")
     @ApiResponses(value = {
@@ -63,17 +67,20 @@ public class BookingController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
     public Booking update(@PathVariable String id, @Valid @RequestBody CreateBookingRequest req) {
         Booking b = req.toBooking(); b.setBookingId(id); return service.updateBooking(b);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable String id, @RequestParam String customerId) {
-        service.cancelBooking(id, customerId);
+    @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
+    public void delete(@PathVariable String id) {
+        service.cancelBooking(id);
     }
 
     @PostMapping("/{id}/confirm")
+    @PreAuthorize("hasAnyRole('STAFF','BUSINESS_OWNER','PLATFORM_ADMIN')")
     @Operation(summary = "Confirm booking")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful operation"),
@@ -86,13 +93,14 @@ public class BookingController {
     }
 
     @PostMapping("/{id}/cancel")
+    @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful operation"),
             @ApiResponse(responseCode = "400", description = "Bad request", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "404", description = "Not found", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public Booking cancel(@PathVariable String id, @RequestParam String customerId) {
-        return service.cancelBooking(id, customerId);
+    public Booking cancel(@PathVariable String id) {
+        return service.cancelBooking(id);
     }
 }

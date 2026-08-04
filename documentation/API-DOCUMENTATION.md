@@ -28,13 +28,13 @@ The current backend exposes the endpoints below. Authentication and RBAC are not
 
 Base path: `/api/users`
 
-| Method | Path | Status | Purpose |
-| --- | --- | --- | --- |
-| GET | `/api/users` | Implemented | List user records. |
-| GET | `/api/users/{id}` | Implemented | Retrieve a user record by ID. |
-| POST | `/api/users` | Implemented | Create a user record. |
-| PUT | `/api/users/{id}` | Implemented | Update a user record. |
-| DELETE | `/api/users/{id}` | Implemented | Delete a user record. |
+| Method | Path              | Status      | Purpose                       |
+|--------|-------------------|-------------|-------------------------------|
+| GET    | `/api/users`      | Implemented | List user records.            |
+| GET    | `/api/users/{id}` | Implemented | Retrieve a user record by ID. |
+| POST   | `/api/users`      | Implemented | Create a user record.         |
+| PUT    | `/api/users/{id}` | Implemented | Update a user record.         |
+| DELETE | `/api/users/{id}` | Implemented | Delete a user record.         |
 
 User endpoints use bounded API contracts rather than binding or returning the domain model:
 
@@ -52,64 +52,64 @@ The repository remains in-memory, so all users and their encoded credentials are
 
 Base path: `/api/vehicles`
 
-| Method | Path | Status | Purpose |
-| --- | --- | --- | --- |
-| GET | `/api/vehicles` | Implemented | List vehicle records. |
-| GET | `/api/vehicles/{id}` | Implemented | Retrieve a vehicle record by ID. |
-| POST | `/api/vehicles?userId={userId}` | Implemented | Create a vehicle for a user. |
-| PUT | `/api/vehicles/{id}` | Implemented | Update a vehicle record. |
-| DELETE | `/api/vehicles/{id}` | Implemented | Delete a vehicle record. |
+| Method | Path                            | Status      | Purpose                          |
+|--------|---------------------------------|-------------|----------------------------------|
+| GET    | `/api/vehicles`                 | Implemented | List vehicle records.            |
+| GET    | `/api/vehicles/{id}`            | Implemented | Retrieve a vehicle record by ID. |
+| POST   | `/api/vehicles?userId={userId}` | Implemented | Create a vehicle for a user.     |
+| PUT    | `/api/vehicles/{id}`            | Implemented | Update a vehicle record.         |
+| DELETE | `/api/vehicles/{id}`            | Implemented | Delete a vehicle record.         |
 
 ### Services
 
 Base path: `/api/services`
 
-| Method | Path | Status | Purpose |
-| --- | --- | --- | --- |
-| GET | `/api/services` | Implemented | List service catalog records. |
-| GET | `/api/services/{id}` | Implemented | Retrieve a service by ID. |
-| POST | `/api/services` | Implemented | Create a service catalog record. |
-| PUT | `/api/services/{id}` | Implemented | Update a service catalog record. |
-| DELETE | `/api/services/{id}` | Implemented | Delete a service catalog record. |
-| POST | `/api/services/{id}/activate` | Implemented | Mark a service active. |
-| POST | `/api/services/{id}/deactivate` | Implemented | Mark a service inactive. |
+| Method | Path                            | Status      | Purpose                          |
+|--------|---------------------------------|-------------|----------------------------------|
+| GET    | `/api/services`                 | Implemented | List service catalog records.    |
+| GET    | `/api/services/{id}`            | Implemented | Retrieve a service by ID.        |
+| POST   | `/api/services`                 | Implemented | Create a service catalog record. |
+| PUT    | `/api/services/{id}`            | Implemented | Update a service catalog record. |
+| DELETE | `/api/services/{id}`            | Implemented | Delete a service catalog record. |
+| POST   | `/api/services/{id}/activate`   | Implemented | Mark a service active.           |
+| POST   | `/api/services/{id}/deactivate` | Implemented | Mark a service inactive.         |
 
 ### Bookings
 
 Base path: `/api/bookings`
 
-| Method | Path | Status | Purpose |
-| --- | --- | --- | --- |
-| GET | `/api/bookings` | Implemented | List booking records. |
-| GET | `/api/bookings/{id}` | Implemented | Retrieve a booking by ID. |
-| POST | `/api/bookings` | Implemented | Create a booking. |
-| PUT | `/api/bookings/{id}` | Implemented | Update a booking. |
-| DELETE | `/api/bookings/{id}?customerId={customerId}` | Implemented | Cancel/delete through the current cancellation workflow. |
-| POST | `/api/bookings/{id}/confirm` | Implemented | Confirm a booking. |
-| POST | `/api/bookings/{id}/cancel?customerId={customerId}` | Implemented | Cancel a booking. |
+| Method | Path                         | Status      | Purpose                                                  |
+|--------|------------------------------|-------------|----------------------------------------------------------|
+| GET    | `/api/bookings`              | Implemented | List booking records.                                    |
+| GET    | `/api/bookings/{id}`         | Implemented | Retrieve a booking by ID.                                |
+| POST   | `/api/bookings`              | Implemented | Create a booking.                                        |
+| PUT    | `/api/bookings/{id}`         | Implemented | Update a booking.                                        |
+| DELETE | `/api/bookings/{id}`         | Implemented | Cancel/delete through the current cancellation workflow. |
+| POST   | `/api/bookings/{id}/confirm` | Implemented | Confirm a booking.                                       |
+| POST   | `/api/bookings/{id}/cancel`  | Implemented | Cancel a booking.                                        |
 
 ### Queue Entries
 
 Base path: `/api/queue-entries`
 
-| Method | Path | Status | Purpose |
-| --- | --- | --- | --- |
-| GET | `/api/queue-entries` | Implemented | List queue entries. |
-| GET | `/api/queue-entries/{id}` | Implemented | Retrieve a queue entry by ID. |
-| POST | `/api/queue-entries` | Implemented | Create a queue entry. |
-| PUT | `/api/queue-entries/{id}/position` | Implemented | Update queue position. |
-| POST | `/api/queue-entries/{id}/call-next` | Implemented | Mark a waiting queue entry as called. |
-| POST | `/api/queue-entries/{id}/start` | Implemented | Mark a called queue entry as in progress. |
-| POST | `/api/queue-entries/{id}/complete` | Implemented | Mark an in-progress queue entry as completed. |
-| DELETE | `/api/queue-entries/{id}` | Implemented | Delete a queue entry. |
+| Method | Path                                | Status      | Purpose                                       |
+|--------|-------------------------------------|-------------|-----------------------------------------------|
+| GET    | `/api/queue-entries`                | Implemented | List queue entries.                           |
+| GET    | `/api/queue-entries/{id}`           | Implemented | Retrieve a queue entry by ID.                 |
+| POST   | `/api/queue-entries`                | Implemented | Create a queue entry.                         |
+| PUT    | `/api/queue-entries/{id}/position`  | Implemented | Update queue position.                        |
+| POST   | `/api/queue-entries/{id}/call-next` | Implemented | Mark a waiting queue entry as called.         |
+| POST   | `/api/queue-entries/{id}/start`     | Implemented | Mark a called queue entry as in progress.     |
+| POST   | `/api/queue-entries/{id}/complete`  | Implemented | Mark an in-progress queue entry as completed. |
+| DELETE | `/api/queue-entries/{id}`           | Implemented | Delete a queue entry.                         |
 
 ### Notifications
 
 Base path: `/api/notifications`
 
-| Method | Path | Status | Purpose |
-| --- | --- | --- | --- |
-| GET | `/api/notifications/user/{userId}` | Implemented | List recent in-app notification records for a user. |
+| Method | Path                               | Status      | Purpose                                             |
+|--------|------------------------------------|-------------|-----------------------------------------------------|
+| GET    | `/api/notifications/user/{userId}` | Implemented | List recent in-app notification records for a user. |
 
 External SMS/email delivery is not implemented.
 
@@ -117,9 +117,9 @@ External SMS/email delivery is not implemented.
 
 Base path: `/api/reports`
 
-| Method | Path | Status | Purpose |
-| --- | --- | --- | --- |
-| GET | `/api/reports/daily-summary?date={yyyy-MM-dd}` | Partially implemented | Return a basic daily summary computed from current in-memory booking and queue data. |
+| Method | Path                                           | Status                | Purpose                                                                              |
+|--------|------------------------------------------------|-----------------------|--------------------------------------------------------------------------------------|
+| GET    | `/api/reports/daily-summary?date={yyyy-MM-dd}` | Partially implemented | Return a basic daily summary computed from current in-memory booking and queue data. |
 
 ## Planned Endpoints Not Yet Implemented
 
@@ -162,3 +162,21 @@ Tokens contain only `iss`, user ID `sub`, `iat`, `exp`, and `jti`; they expire a
 token TTL. No refresh token exists. Current in-memory storage means tokens cannot survive an application
 restart. RBAC, tenant isolation, ownership enforcement, rate limiting, and brute-force protection remain
 future work.
+
+## Role-based authorization
+
+Registration, login, OpenAPI/Swagger, OPTIONS, and `/error` are public. Other APIs require a bearer JWT.
+Missing/invalid authentication returns JSON 401; authenticated callers lacking role or ownership receive
+JSON 403. Registration creates customers only.
+
+| Area                                                | CUSTOMER | STAFF | BUSINESS_OWNER | PLATFORM_ADMIN |
+|-----------------------------------------------------|----------|-------|----------------|----------------|
+| Own profile, vehicle, booking, queue, notifications | Yes      | Yes   | Yes            | Yes            |
+| All vehicles/bookings/queues and operations         | No       | Yes   | Yes            | Yes            |
+| Manage service catalogue and read reports           | No       | No    | Yes            | Yes            |
+| Manage all users and assign roles                   | No       | No    | No             | Yes            |
+| Another user's notifications                        | No       | No    | No             | Yes            |
+
+Role assignment uses `PUT /api/admin/users/{userId}/role` with a built-in role name. Ownership is resolved
+from repositories, not trusted request IDs. Role changes invalidate old tokens. Staff/owner access remains
+global until tenant isolation is implemented.

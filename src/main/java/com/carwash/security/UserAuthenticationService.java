@@ -9,6 +9,7 @@ import java.util.Locale;
 
 @Service
 public class UserAuthenticationService {
+    private static final String DUMMY_BCRYPT = "$2a$10$7EqJtq98hPqEX7fNZaFWoO5P2byq1M1Jw.5Qy9K8K.0s4nWvWjKna";
     private final UserRepository users;
     private final UserCredentialService credentials;
     private final JwtTokenService tokens;
@@ -21,9 +22,10 @@ public class UserAuthenticationService {
 
     public AuthenticationResult authenticate(String email, String rawPassword) {
         String normalizedEmail = email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
-        User user = users.findByEmail(normalizedEmail).orElseThrow(InvalidCredentialsException::new);
-        if (user.getAccountStatus() != AccountStatus.ACTIVE
-                || !credentials.matches(rawPassword, user.getEncodedPassword())) {
+        User user = users.findByEmail(normalizedEmail).orElse(null);
+        boolean credentialMatches = credentials.matches(rawPassword,
+                user == null ? DUMMY_BCRYPT : user.getEncodedPassword());
+        if (user == null || user.getAccountStatus() != AccountStatus.ACTIVE || !credentialMatches) {
             throw new InvalidCredentialsException();
         }
         JwtTokenService.IssuedToken token = tokens.issue(user);

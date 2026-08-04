@@ -2,6 +2,8 @@ package com.carwash.service;
 
 import com.carwash.domain.User;
 import com.carwash.repository.UserRepository;
+import com.carwash.security.RoleCatalog;
+import com.carwash.security.RoleName;
 import com.carwash.security.UserCredentialService;
 import com.carwash.service.command.CreateUserCommand;
 import com.carwash.service.exception.BusinessRuleViolationException;
@@ -30,7 +32,7 @@ public class UserManagementService {
         userRepository.findByEmail(email)
                 .ifPresent(existing -> { throw new BusinessRuleViolationException("User email already exists"); });
         String encodedPassword = credentialService.encode(command.rawPassword());
-        User user = User.withEncodedPassword(userId, fullName, email, phone, encodedPassword, null);
+        User user = User.withEncodedPassword(userId, fullName, email, phone, encodedPassword, RoleCatalog.role(RoleName.CUSTOMER));
         user.registerAccount();
         userRepository.save(user);
         return user;
@@ -68,6 +70,19 @@ public class UserManagementService {
     public void deleteUser(String userId) {
         findById(userId);
         userRepository.delete(userId);
+    }
+
+    public User assignRole(String userId, RoleName roleName) {
+        User user = findById(userId);
+        if (user.getRole() != null && RoleName.PLATFORM_ADMIN.name().equals(user.getRole().getRoleName())
+                && roleName != RoleName.PLATFORM_ADMIN
+                && userRepository.findAll().stream().filter(u -> u.getAccountStatus() == com.carwash.enums.AccountStatus.ACTIVE)
+                .filter(u -> u.getRole() != null && RoleName.PLATFORM_ADMIN.name().equals(u.getRole().getRoleName())).count() <= 1) {
+            throw new BusinessRuleViolationException("The last active platform administrator cannot be demoted");
+        }
+        user.setRole(RoleCatalog.role(roleName));
+        userRepository.save(user);
+        return user;
     }
 
     private void validateNewUser(CreateUserCommand command) {

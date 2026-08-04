@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 
 @Configuration
+@EnableMethodSecurity
 @EnableConfigurationProperties(JwtSecurityProperties.class)
 public class ApiSecurityConfig {
     @Bean
@@ -53,7 +54,11 @@ public class ApiSecurityConfig {
         OAuth2TokenValidator<Jwt> activeUser = jwt -> {
             String subject = jwt.getSubject();
             boolean valid = subject != null && !subject.isBlank() && jwt.getIssuedAt() != null && jwt.getExpiresAt() != null
-                    && users.findById(subject).filter(u -> u.getAccountStatus() == AccountStatus.ACTIVE).isPresent();
+                    && users.findById(subject).filter(u -> u.getAccountStatus() == AccountStatus.ACTIVE)
+                    .filter(u -> {
+                        try { return com.carwash.security.RoleCatalog.name(u.getRole()).name().equals(jwt.getClaimAsString("role")); }
+                        catch (RuntimeException ex) { return false; }
+                    }).isPresent();
             return valid ? OAuth2TokenValidatorResult.success()
                     : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Token subject is invalid", null));
         };
@@ -73,12 +78,18 @@ public class ApiSecurityConfig {
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())
-                .oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults())
+                .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(new com.carwash.security.JwtAuthorityConverter()))
                         .authenticationEntryPoint((request, response, exception) -> {
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                             objectMapper.writeValue(response.getOutputStream(), new ApiErrorResponse(401,
                                     "Authentication is required", LocalDateTime.now().toString(), request.getRequestURI()));
+                        })
+                        .accessDeniedHandler((request, response, exception) -> {
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                            objectMapper.writeValue(response.getOutputStream(), new ApiErrorResponse(403,
+                                    "Access denied", LocalDateTime.now().toString(), request.getRequestURI()));
                         }))
                 .build();
     }

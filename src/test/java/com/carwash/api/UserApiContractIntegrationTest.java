@@ -15,7 +15,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.notNullValue;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -34,7 +34,11 @@ class UserApiContractIntegrationTest {
 
     @BeforeEach
     void configureMockMvc() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context).defaultRequest(get("/").with(user("api-integration-user").roles("USER")))
+        mockMvc = MockMvcBuilders.webAppContextSetup(context).defaultRequest(get("/").with(jwt().jwt(j -> j.subject("api-integration-user").claim("role", "PLATFORM_ADMIN"))
+                        .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN"),
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERM_SERVICE_READ"),
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERM_SERVICE_MANAGE"),
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERM_QUEUE_OPERATE"))))
                 .apply(springSecurity())
                 .build();
     }

@@ -4,6 +4,8 @@
 .vscode
 target
 *.log
-!.env
+.env
 .env.*
+!.env
+!.env.example
 .DS_Store
