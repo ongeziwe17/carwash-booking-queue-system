@@ -1,93 +1,181 @@
 # Car Wash Booking Queue System
 
-Spring Boot backend foundation for car wash booking and queue management. The current codebase exposes local-development APIs for user records, vehicles, service catalog items, bookings, queue entries, in-app notification records, and daily summary reporting over in-memory repositories.
+Spring Boot backend foundation for car wash booking and queue management. The current codebase exposes APIs for users, vehicles, services, bookings, queues, notifications, and daily reporting over in-memory repositories.
 
-## Current Backend Foundation
+## Current backend foundation
 
-Implemented in the current backend:
+- User registration and safe profile-management APIs.
+- Stateless JWT authentication and role-based authorization.
+- Vehicle management with ownership and duplicate-plate validation.
+- Service catalogue management with activation workflows.
+- Booking management with ownership, lifecycle, time, capacity, and vehicle validation.
+- Queue lifecycle operations.
+- In-app notification lookup.
+- Daily summary reporting.
+- Swagger/OpenAPI documentation.
+- Java 21 Maven, Docker, Docker Compose, and GitHub Actions delivery support.
 
-- User record CRUD APIs.
-- Vehicle CRUD APIs with owner lookup and duplicate plate validation per owner.
-- Service catalog CRUD APIs with activate/deactivate workflows.
-- Booking CRUD APIs with confirm/cancel workflows and service-layer validation.
-- Queue entry APIs for creation, position updates, call/start/complete transitions, and deletion.
-- In-app notification record lookup for users.
-- Daily summary report API computed from current in-memory booking and queue data.
-- Swagger/OpenAPI documentation for local API exploration.
-- Docker/local development setup.
-- Service-layer, repository, and API integration tests.
+## Important current limitations
 
-## Important Current Limitations
+- Storage is in-memory and is lost when the application restarts.
+- Staff and business-owner operational access remains global until tenant isolation is implemented.
+- External SMS/email delivery is not implemented.
+- Payments, business registration, PostgreSQL, production observability, and deployment hardening remain future work.
+- The application does not yet expose dedicated Actuator liveness or readiness endpoints.
 
-- Storage is currently in-memory only for the running application; data is not durable across restarts.
-- Stateless JWT authentication, secure credential storage, RBAC, and repository-verified ownership are implemented.
-- Staff and business-owner operational access is global until tenant isolation is implemented.
-- Notification records are stored in-app; external SMS/email delivery is not implemented.
-- Daily summary reporting is basic and in-memory; analytics dashboards and revenue reporting are future work.
-- Payments, business registration, multi-tenancy, production observability, and production SaaS hardening are planned/future work.
-
-## Tech Stack
+## Tech stack
 
 - Java 21
-- Spring Boot 3
-- Maven
-- Spring Web
-- Spring Validation
+- Spring Boot 4
+- Maven Wrapper
+- Spring Web MVC and Validation
+- Spring Security OAuth2 Resource Server
 - Springdoc OpenAPI / Swagger UI
-- JUnit 5
+- JUnit 5 and JaCoCo
 - Docker / Docker Compose
+- GitHub Actions
 
-## Run Locally
+## Local application setup
+
+Create your local environment file:
 
 ```bash
+cp .env.example .env
+```
+
+Generate a JWT signing secret:
+
+```bash
+openssl rand -base64 32
+```
+
+Replace `REPLACE_WITH_BASE64_ENCODED_32_BYTE_SECRET` in `.env`. The decoded secret must contain at least 32 random bytes. Never commit `.env`.
+
+Load the variables into Bash and run the application:
+
+```bash
+set -a
+source .env
+set +a
 ./mvnw spring-boot:run
 ```
 
 The API starts on `http://localhost:8080`.
 
-Swagger UI is available at `http://localhost:8080/swagger-ui.html` or `http://localhost:8080/swagger-ui/index.html`.
+- Swagger UI: `http://localhost:8080/swagger-ui/index.html`
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
 
-The raw OpenAPI document is available at `http://localhost:8080/v3/api-docs`.
+## Docker Compose
 
-## Run with Docker Compose
-
-```bash
-docker compose up --build
-```
-
-Validate the Compose file without starting containers:
+Validate the resolved Compose configuration before starting containers:
 
 ```bash
-docker compose -f docker-compose.yml config
+docker compose config
 ```
+
+Build the local image:
+
+```bash
+docker compose build
+```
+
+Start in the foreground:
+
+```bash
+docker compose up
+```
+
+Start or rebuild in the background:
+
+```bash
+docker compose up --build -d
+```
+
+Follow application logs:
+
+```bash
+docker compose logs -f carwash-api
+```
+
+Stop the application:
+
+```bash
+docker compose down
+```
+
+Remove stopped services and orphan containers without deleting persistent data:
+
+```bash
+docker compose down --remove-orphans
+```
+
+The Compose file intentionally contains only the API. PostgreSQL remains tracked under DATA-002.
 
 ## Testing
 
-Run the unit and integration test suite:
+Run tests:
 
 ```bash
 ./mvnw clean test
 ```
 
-Run the full Maven verification lifecycle:
+Run the full verification lifecycle, including the JaCoCo report and coverage gate:
 
 ```bash
 ./mvnw clean verify
 ```
 
-## API Areas
+Generated outputs include:
 
-- `/api/users` - user record management.
-- `/api/vehicles` - vehicle registration, lookup, update, and deletion.
-- `/api/services` - service catalog management and activation state.
-- `/api/bookings` - booking creation, lookup, update, confirmation, cancellation, and deletion-as-cancel.
-- `/api/queue-entries` - queue entry creation, position updates, status transitions, and deletion.
-- `/api/notifications` - in-app notification record lookup by user.
-- `/api/reports/daily-summary` - basic daily summary from current in-memory data.
+- `target/surefire-reports/`
+- `target/failsafe-reports/` when integration-test executions are added
+- `target/site/jacoco/`
+- `target/carwash-api.jar`
 
-See [API Documentation](documentation/API-DOCUMENTATION.md) and Swagger UI for endpoint details.
+## Branch and delivery workflow
 
-## Product Documentation
+`staging` is the active integration branch:
+
+```text
+feature/fix/security/ci branch
+        ↓ pull request
+staging
+        ↓ controlled promotion
+develop
+        ↓ release promotion
+master
+        ↓
+v* release tag
+```
+
+Pull requests into `staging`, `develop`, and `master` run Maven, workflow, Docker Compose, Docker image, smoke-test, and vulnerability validation. Registry login and publishing run only for approved branch or tag pushes.
+
+See [Delivery and Docker Workflow](documentation/DELIVERY-AND-DOCKER.md) for branch protection recommendations, image tags, required secrets, CI jobs, artifacts, and local Docker guidance.
+
+## Authentication and authorization
+
+1. Register through `POST /api/users`.
+2. Login through `POST /api/auth/login`.
+3. Copy the returned `accessToken`.
+4. Send `Authorization: Bearer <token>` to protected endpoints.
+
+Public registration always creates a `CUSTOMER`. `STAFF`, `BUSINESS_OWNER`, and `PLATFORM_ADMIN` roles are server-assigned through the platform-admin-only role endpoint. Role changes invalidate older tokens.
+
+Bootstrap administration is disabled by default. Configure all `SECURE_BOOTSTRAP_ADMIN_*` values in the uncommitted `.env` file before enabling it.
+
+## API areas
+
+- `/api/users`
+- `/api/auth`
+- `/api/admin/users`
+- `/api/vehicles`
+- `/api/services`
+- `/api/bookings`
+- `/api/queue-entries`
+- `/api/notifications`
+- `/api/reports/daily-summary`
+
+## Product documentation
 
 - [Architecture](documentation/ARCHITECTURE.md)
 - [Product Specification](documentation/SPECIFICATION.md)
@@ -97,39 +185,4 @@ See [API Documentation](documentation/API-DOCUMENTATION.md) and Swagger UI for e
 - [System Requirements](documentation/SYSTEM-REQUIREMENTS.md)
 - [User Stories](documentation/USER-STORIES.md)
 - [Product Backlog](documentation/PRODUCT-BACKLOG.md)
-
-## Planned and Future Capabilities
-
-Planned near-term work focuses on backend hardening: stronger booking/queue rules, broader API tests, improved error contracts, persistent storage design, and clearer notification boundaries.
-
-Future SaaS hardening includes refresh-token design, brute-force protection, PostgreSQL persistence, migrations, tenant-aware business registration, external SMS/email providers, payment workflows, operational dashboards, monitoring/observability, and production deployment hardening.
-
-## Bearer Authentication
-
-Copy `.env.example` to `.env`, replace its deliberately invalid JWT placeholder with output from
-`openssl rand -base64 32`, and then start the application. The signing secret must decode to at least
-32 bytes. Access tokens use HS256, are issued by `carwash-booking-queue-system`, and expire after 20
-minutes by default (`carwash.security.jwt.access-token-ttl`).
-
-1. Register with `POST /api/users`.
-2. Login with `POST /api/auth/login` using the registered email and exact password.
-3. Copy `accessToken` from the response.
-4. Send `Authorization: Bearer <token>`.
-5. Call a protected API such as `GET /api/users`.
-
-Only registration, login, OpenAPI/Swagger, browser preflight, and error handling are public. All other
-`/api/**` routes require a valid token. Because storage is in-memory, a restart removes users and makes
-their tokens invalid; tokens also stop working when an account becomes inactive. There are no refresh
-tokens or revocation list. Tenant isolation and brute-force protection remain future security work.
-
-## Authorization and administrator bootstrap
-
-Public registration always creates a `CUSTOMER`; request JSON cannot select a role. `STAFF`,
-`BUSINESS_OWNER`, and `PLATFORM_ADMIN` are server assigned through the platform-admin-only
-`PUT /api/admin/users/{userId}/role`. Role changes invalidate old tokens and require login again.
-Customers access only their own private resources; staff operate vehicles, bookings and queues; owners
-also manage services and reports; platform administrators manage users and roles.
-
-Bootstrap is disabled by default. Configure every `SECURE_BOOTSTRAP_ADMIN_*` value in the uncommitted
-`.env` file to enable it. Never commit `.env` or passwords. In-memory data, including bootstrap data, is
-recreated after restart. Staff and owner access is not tenant-scoped; TENANT-001 remains separate work.
+- [Delivery and Docker Workflow](documentation/DELIVERY-AND-DOCKER.md)
