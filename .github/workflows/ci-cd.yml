@@ -55,6 +55,24 @@ jobs:
           -w /repo
           rhysd/actionlint:1.7.12
 
+      - name: Validate publishing metadata templates
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if grep --fixed-strings --line-number -- 'HHmmssg tz=' .github/workflows/ci-cd.yml; then
+            echo "Malformed docker/metadata-action commit_date template detected."
+            exit 1
+          fi
+
+          expected_template="{{commit_date 'YYYYMMDD-HHmmss' tz='Africa/Johannesburg'}}"
+          template_count="$(grep --only-matching --fixed-strings -- "${expected_template}" .github/workflows/ci-cd.yml | wc -l)"
+
+          if [[ "${template_count}" -ne 3 ]]; then
+            echo "Expected three valid commit_date templates, found ${template_count}."
+            exit 1
+          fi
+
   maven-verification:
     name: Maven verification
     runs-on: ubuntu-latest
@@ -375,6 +393,35 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify release tag provenance
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch --no-tags origin master:refs/remotes/origin/master
+          tag_commit="$(git rev-parse "${GITHUB_SHA}^{commit}")"
+
+          if ! git merge-base --is-ancestor "${tag_commit}" refs/remotes/origin/master; then
+            echo "Release tag '${GITHUB_REF_NAME}' must point to a commit reachable from master."
+            exit 1
+          fi
+
+          echo "Release tag '${GITHUB_REF_NAME}' points to master-reachable commit ${tag_commit}."
+
+      - name: Validate Docker Hub publishing secrets
+        shell: bash
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${DOCKER_USERNAME}" || -z "${DOCKER_PASSWORD}" ]]; then
+            echo "DOCKER_USERNAME and DOCKER_PASSWORD must be configured for publishing."
+            exit 1
+          fi
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -403,11 +450,11 @@ jobs:
             type=raw,value=staging,enable=${{ github.ref == 'refs/heads/staging' }}
             type=raw,value=staging-{{commit_date 'YYYYMMDD-HHmmss' tz='Africa/Johannesburg'}},enable=${{ github.ref == 'refs/heads/staging' }}
             type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
-            type=raw,value=develop-{{commit_date 'YYYYMMDD-HHmmssg tz='Africa/Johannesburg'}},enable=${{ github.ref == 'refs/heads/develop' }}
+            type=raw,value=develop-{{commit_date 'YYYYMMDD-HHmmss' tz='Africa/Johannesburg'}},enable=${{ github.ref == 'refs/heads/develop' }}
             type=raw,value=master,enable=${{ github.ref == 'refs/heads/master' }}
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
             type=ref,event=tag,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=raw,value=${{ github.ref_name }}-{{commit_date 'YYYYMMDD-HHmmssg tz='Africa/Johannesburg'}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=${{ github.ref_name }}-{{commit_date 'YYYYMMDD-HHmmss' tz='Africa/Johannesburg'}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=sha,prefix=sha-,format=short
 
       - name: Review generated image tags
