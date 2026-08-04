@@ -1,6 +1,8 @@
 package com.carwash.service;
 
 import com.carwash.config.PasswordSecurityProperties;
+import com.carwash.domain.User;
+import com.carwash.enums.AccountStatus;
 import com.carwash.repository.inmemory.InMemoryUserRepository;
 import com.carwash.security.RoleName;
 import com.carwash.security.UserCredentialService;
@@ -9,6 +11,14 @@ import com.carwash.service.exception.BusinessRuleViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -54,6 +64,83 @@ class UserManagementSecurityTest {
 
         assertFalse(repository.findById("first-admin").isPresent());
         assertTrue(repository.findById("second-admin").isPresent());
+    }
+
+    @Test
+    void concurrentAdministratorDeletionsPreserveOneActiveAdministrator() throws Exception {
+        createPlatformAdministrator("concurrent-delete-first", "concurrent-delete-first@example.com");
+        createPlatformAdministrator("concurrent-delete-second", "concurrent-delete-second@example.com");
+
+        List<String> outcomes = runConcurrently(
+                () -> users.deleteUser("concurrent-delete-first"),
+                () -> users.deleteUser("concurrent-delete-second")
+        );
+
+        assertEquals(1, outcomes.stream().filter("succeeded"::equals).count());
+        assertEquals(1, outcomes.stream().filter("rejected"::equals).count());
+        assertEquals(1, activePlatformAdministratorCount());
+    }
+
+    @Test
+    void concurrentAdministratorDeletionAndDemotionPreserveOneActiveAdministrator() throws Exception {
+        createPlatformAdministrator("concurrent-mixed-first", "concurrent-mixed-first@example.com");
+        createPlatformAdministrator("concurrent-mixed-second", "concurrent-mixed-second@example.com");
+
+        List<String> outcomes = runConcurrently(
+                () -> users.deleteUser("concurrent-mixed-first"),
+                () -> users.assignRole("concurrent-mixed-second", RoleName.CUSTOMER)
+        );
+
+        assertEquals(1, outcomes.stream().filter("succeeded"::equals).count());
+        assertEquals(1, outcomes.stream().filter("rejected"::equals).count());
+        assertEquals(1, activePlatformAdministratorCount());
+    }
+
+    private List<String> runConcurrently(Runnable firstAction, Runnable secondAction) throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+
+        try {
+            Future<String> first = executor.submit(concurrentAttempt(firstAction, ready, start));
+            Future<String> second = executor.submit(concurrentAttempt(secondAction, ready, start));
+
+            assertTrue(ready.await(5, TimeUnit.SECONDS), "Concurrent operations did not become ready");
+            start.countDown();
+
+            return List.of(
+                    first.get(5, TimeUnit.SECONDS),
+                    second.get(5, TimeUnit.SECONDS)
+            );
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    private Callable<String> concurrentAttempt(
+            Runnable action,
+            CountDownLatch ready,
+            CountDownLatch start
+    ) {
+        return () -> {
+            ready.countDown();
+            start.await(5, TimeUnit.SECONDS);
+            try {
+                action.run();
+                return "succeeded";
+            } catch (BusinessRuleViolationException exception) {
+                return "rejected";
+            }
+        };
+    }
+
+    private long activePlatformAdministratorCount() {
+        return repository.findAll().stream()
+                .filter(user -> user.getAccountStatus() == AccountStatus.ACTIVE)
+                .map(User::getRole)
+                .filter(role -> role != null && RoleName.PLATFORM_ADMIN.name().equals(role.getRoleName()))
+                .count();
     }
 
     private void createPlatformAdministrator(String userId, String email) {
