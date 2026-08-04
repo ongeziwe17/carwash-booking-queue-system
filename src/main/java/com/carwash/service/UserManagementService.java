@@ -18,6 +18,16 @@ public class UserManagementService {
     private final UserRepository userRepository;
     private final UserCredentialService credentialService;
 
+    /**
+     * Serializes operations that can remove an active platform administrator.
+     *
+     * <p>This makes the count-and-mutate sequence atomic for the current single-JVM,
+     * in-memory implementation. When persistence is introduced, this invariant must
+     * move to a database transaction with suitable locking or another repository-level
+     * atomic operation so it also holds across application instances.</p>
+     */
+    private final Object platformAdministratorMutationMonitor = new Object();
+
     public UserManagementService(UserRepository userRepository, UserCredentialService credentialService) {
         this.userRepository = userRepository;
         this.credentialService = credentialService;
@@ -76,21 +86,25 @@ public class UserManagementService {
     }
 
     public void deleteUser(String userId) {
-        User user = findById(userId);
-        if (isLastActivePlatformAdministrator(user)) {
-            throw new BusinessRuleViolationException("The last active platform administrator cannot be deleted");
+        synchronized (platformAdministratorMutationMonitor) {
+            User user = findById(userId);
+            if (isLastActivePlatformAdministrator(user)) {
+                throw new BusinessRuleViolationException("The last active platform administrator cannot be deleted");
+            }
+            userRepository.delete(userId);
         }
-        userRepository.delete(userId);
     }
 
     public User assignRole(String userId, RoleName roleName) {
-        User user = findById(userId);
-        if (isLastActivePlatformAdministrator(user) && roleName != RoleName.PLATFORM_ADMIN) {
-            throw new BusinessRuleViolationException("The last active platform administrator cannot be demoted");
+        synchronized (platformAdministratorMutationMonitor) {
+            User user = findById(userId);
+            if (isLastActivePlatformAdministrator(user) && roleName != RoleName.PLATFORM_ADMIN) {
+                throw new BusinessRuleViolationException("The last active platform administrator cannot be demoted");
+            }
+            user.setRole(RoleCatalog.role(roleName));
+            userRepository.save(user);
+            return user;
         }
-        user.setRole(RoleCatalog.role(roleName));
-        userRepository.save(user);
-        return user;
     }
 
     private boolean isLastActivePlatformAdministrator(User user) {
