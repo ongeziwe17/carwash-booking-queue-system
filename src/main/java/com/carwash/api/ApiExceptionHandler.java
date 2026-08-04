@@ -6,6 +6,7 @@ import com.carwash.service.exception.BusinessRuleViolationException;
 import com.carwash.service.exception.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -21,16 +22,25 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiErrorResponse> handleAccessDenied(AccessDeniedException ex, ServletWebRequest request) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ApiErrorResponse(403, "Access denied",
-                LocalDateTime.now().toString(), request.getRequest().getRequestURI()));
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ApiErrorResponse(
+                403,
+                "Access denied",
+                LocalDateTime.now().toString(),
+                request.getRequest().getRequestURI()
+        ));
     }
 
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ApiErrorResponse> handleInvalidCredentials(
-            InvalidCredentialsException ex, ServletWebRequest request) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ApiErrorResponse(401,
-                InvalidCredentialsException.SAFE_MESSAGE, LocalDateTime.now().toString(),
-                request.getRequest().getRequestURI()));
+            InvalidCredentialsException ex,
+            ServletWebRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ApiErrorResponse(
+                401,
+                InvalidCredentialsException.SAFE_MESSAGE,
+                LocalDateTime.now().toString(),
+                request.getRequest().getRequestURI()
+        ));
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -63,6 +73,20 @@ public class ApiExceptionHandler {
                 .body(new ApiErrorResponse(
                         400,
                         "Validation failed: " + message,
+                        LocalDateTime.now().toString(),
+                        request.getRequest().getRequestURI()
+                ));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiErrorResponse> handleMalformedRequestBody(
+            HttpMessageNotReadableException ex,
+            ServletWebRequest request
+    ) {
+        return ResponseEntity.badRequest()
+                .body(new ApiErrorResponse(
+                        400,
+                        "Malformed request body",
                         LocalDateTime.now().toString(),
                         request.getRequest().getRequestURI()
                 ));
@@ -104,7 +128,7 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ApiErrorResponse(
                         500,
-                        ex.getMessage(),
+                        "An unexpected error occurred",
                         LocalDateTime.now().toString(),
                         request.getRequest().getRequestURI()
                 ));
