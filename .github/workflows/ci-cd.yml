@@ -101,35 +101,89 @@ jobs:
     name: Build & Push Docker Image
     runs-on: ubuntu-latest
     needs: build_test
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop')
+
+    if: >
+      github.event_name == 'push' &&
+      (
+        github.ref == 'refs/heads/master' ||
+        github.ref == 'refs/heads/staging' ||
+        startsWith(github.ref, 'refs/tags/v')
+      )
+
+    permissions:
+      contents: read
+      packages: write
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
-      - name: Setup Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Login DockerHub
+      - name: Log in to Docker Hub
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Docker metadata
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Docker image tags
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ secrets.DOCKER_USERNAME }}/carwash-booking-queue-system
+          images: |
+            ${{ secrets.DOCKER_USERNAME }}/carwash-booking-queue-system
+            ghcr.io/${{ github.repository_owner }}/carwash-booking-queue-system
+
+          # Prevent semantic-version tags from automatically producing latest.
+          flavor: |
+            latest=false
+
           tags: |
-            type=sha
+            # Branch name:
+            # staging
+            # master
             type=ref,event=branch
+
+            # Branch + commit date:
+            # staging-20260804-021900
+            type=raw,value={{branch}}-{{commit_date 'YYYYMMDD-HHmmss' tz='Africa/Johannesburg'}},enable=${{ startsWith(github.ref, 'refs/heads/') }}
+
+            # Semantic version from a Git tag:
+            # v0.1.0
+            type=semver,pattern={{raw}}
+
+            # Version + commit date:
+            # v0.1.0-20260804-021900
+            type=raw,value={{tag}}-{{commit_date 'YYYYMMDD-HHmmss' tz='Africa/Johannesburg'}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+            # Immutable commit tag:
+            # sha-a1b2c3d
+            type=sha,prefix=sha-
+
+            # Only the default branch receives latest.
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build & Push
+      - name: Display generated image tags
+        run: |
+          echo "Generated Docker tags:"
+          echo "${{ steps.meta.outputs.tags }}"
+
+      - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
+          file: ./Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

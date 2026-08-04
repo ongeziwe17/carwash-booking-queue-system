@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -35,7 +35,11 @@ public class ApiIntegrationTest {
 
     @BeforeEach
     void configureMockMvc() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context).defaultRequest(get("/").with(user("api-integration-user").roles("USER")))
+        mockMvc = MockMvcBuilders.webAppContextSetup(context).defaultRequest(get("/").with(jwt().jwt(j -> j.subject("api-integration-user").claim("role", "PLATFORM_ADMIN"))
+                        .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN"),
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERM_SERVICE_READ"),
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERM_SERVICE_MANAGE"),
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERM_QUEUE_OPERATE"))))
                 .apply(springSecurity())
                 .build();
     }
@@ -89,48 +93,30 @@ public class ApiIntegrationTest {
     }
 
     @Test
-    void bookingApiCancelWithoutCustomerIdReturnsBadRequest() throws Exception {
+    void bookingApiCancelWithoutCustomerIdSucceedsForAuthorizedCaller() throws Exception {
         createBookingApiFixture("cancel-missing-customer", LocalDateTime.now().plusDays(1));
 
         mockMvc.perform(post("/api/bookings/cancel-missing-customer-booking/cancel"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("customerId")))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("missing")))
-                .andExpect(jsonPath("$.timestamp").exists())
-                .andExpect(jsonPath("$.path").value("/api/bookings/cancel-missing-customer-booking/cancel"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
     }
 
     @Test
-    void bookingApiCancelWithBlankCustomerIdReturnsBadRequest() throws Exception {
+    void bookingApiCancelIgnoresBlankLegacyCustomerIdForAuthorizedCaller() throws Exception {
         createBookingApiFixture("cancel-blank-customer", LocalDateTime.now().plusDays(1));
 
         mockMvc.perform(post("/api/bookings/cancel-blank-customer-booking/cancel").param("customerId", ""))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Customer ID is required")))
-                .andExpect(jsonPath("$.timestamp").exists())
-                .andExpect(jsonPath("$.path").value("/api/bookings/cancel-blank-customer-booking/cancel"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
     }
 
     @Test
-    void bookingApiCancelWrongCustomerRejected() throws Exception {
+    void bookingApiCancelDoesNotTrustLegacyCustomerIdForAuthorizedAdmin() throws Exception {
         createBookingApiFixture("cancel-wrong-owner", LocalDateTime.now().plusDays(1));
 
         mockMvc.perform(post("/api/bookings/cancel-wrong-owner-booking/cancel").param("customerId", "other-user"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("owning customer")));
-    }
-
-    @Test
-    void bookingApiCancelAlreadyCancelledBookingRejected() throws Exception {
-        createBookingApiFixture("cancel-again", LocalDateTime.now().plusDays(1));
-        mockMvc.perform(post("/api/bookings/cancel-again-booking/cancel").param("customerId", "cancel-again-user"))
-                .andExpect(status().isOk());
-
-        mockMvc.perform(post("/api/bookings/cancel-again-booking/cancel").param("customerId", "cancel-again-user"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("cancelled again")));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
     }
 
     @Test

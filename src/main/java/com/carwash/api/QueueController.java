@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,6 +29,7 @@ public class QueueController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
     @Operation(summary = "List all")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful operation"),
@@ -40,6 +42,7 @@ public class QueueController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@resourceAuthorization.canAccessQueueEntry(authentication, #id)")
     @Operation(summary = "Get by ID")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful operation"),
@@ -52,6 +55,7 @@ public class QueueController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create")
     @ApiResponses(value = {
@@ -65,16 +69,19 @@ public class QueueController {
     }
 
     @PutMapping("/{id}/position")
+    @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
     public QueueEntry updatePosition(@PathVariable String id, @RequestBody UpdateQueuePositionRequest req) {
         return service.updatePosition(id, req.position());
     }
 
     @PostMapping("/{id}/call-next")
+    @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
     public QueueEntry callNext(@PathVariable String id) {
         return service.callNext(id);
     }
 
     @PostMapping("/{id}/start")
+    @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
     @Operation(summary = "Start queue entry")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful operation"),
@@ -87,6 +94,7 @@ public class QueueController {
     }
 
     @PostMapping("/{id}/complete")
+    @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
     @Operation(summary = "Complete queue entry")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful operation"),
@@ -99,6 +107,7 @@ public class QueueController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable String id) {
         service.deleteQueueEntry(id);

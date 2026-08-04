@@ -20,8 +20,8 @@ Implemented in the current backend:
 ## Important Current Limitations
 
 - Storage is currently in-memory only for the running application; data is not durable across restarts.
-- Stateless JWT authentication and secure credential storage are implemented; RBAC enforcement is not implemented.
-- Roles exist as domain data but are not enforced by Spring Security or controller authorization.
+- Stateless JWT authentication, secure credential storage, RBAC, and repository-verified ownership are implemented.
+- Staff and business-owner operational access is global until tenant isolation is implemented.
 - Notification records are stored in-app; external SMS/email delivery is not implemented.
 - Daily summary reporting is basic and in-memory; analytics dashboards and revenue reporting are future work.
 - Payments, business registration, multi-tenancy, production observability, and production SaaS hardening are planned/future work.
@@ -102,7 +102,8 @@ See [API Documentation](documentation/API-DOCUMENTATION.md) and Swagger UI for e
 
 Planned near-term work focuses on backend hardening: stronger booking/queue rules, broader API tests, improved error contracts, persistent storage design, and clearer notification boundaries.
 
-Future SaaS hardening includes refresh-token design, brute-force protection, RBAC enforcement, PostgreSQL persistence, migrations, tenant-aware business registration, external SMS/email providers, payment workflows, operational dashboards, monitoring/observability, and production deployment hardening.
+Future SaaS hardening includes refresh-token design, brute-force protection, PostgreSQL persistence, migrations, tenant-aware business registration, external SMS/email providers, payment workflows, operational dashboards, monitoring/observability, and production deployment hardening.
+
 ## Bearer Authentication
 
 Copy `.env.example` to `.env`, replace its deliberately invalid JWT placeholder with output from
@@ -119,5 +120,16 @@ minutes by default (`carwash.security.jwt.access-token-ttl`).
 Only registration, login, OpenAPI/Swagger, browser preflight, and error handling are public. All other
 `/api/**` routes require a valid token. Because storage is in-memory, a restart removes users and makes
 their tokens invalid; tokens also stop working when an account becomes inactive. There are no refresh
-tokens or revocation list. RBAC (SEC-003), tenant isolation, brute-force protection, and ownership rules
-remain future security work, so authenticated users temporarily share the same access level.
+tokens or revocation list. Tenant isolation and brute-force protection remain future security work.
+
+## Authorization and administrator bootstrap
+
+Public registration always creates a `CUSTOMER`; request JSON cannot select a role. `STAFF`,
+`BUSINESS_OWNER`, and `PLATFORM_ADMIN` are server assigned through the platform-admin-only
+`PUT /api/admin/users/{userId}/role`. Role changes invalidate old tokens and require login again.
+Customers access only their own private resources; staff operate vehicles, bookings and queues; owners
+also manage services and reports; platform administrators manage users and roles.
+
+Bootstrap is disabled by default. Configure every `SECURE_BOOTSTRAP_ADMIN_*` value in the uncommitted
+`.env` file to enable it. Never commit `.env` or passwords. In-memory data, including bootstrap data, is
+recreated after restart. Staff and owner access is not tenant-scoped; TENANT-001 remains separate work.

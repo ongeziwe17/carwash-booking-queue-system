@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,6 +27,7 @@ public class ServiceCatalogController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('PERM_SERVICE_READ')")
     @Operation(summary = "List all")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful operation"),
@@ -41,6 +43,7 @@ public class ServiceCatalogController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('PERM_SERVICE_READ')")
     @Operation(summary = "Get by ID")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful operation"),
@@ -53,6 +56,7 @@ public class ServiceCatalogController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('PERM_SERVICE_MANAGE')")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Activate service")
     @ApiResponses(value = {
@@ -66,18 +70,21 @@ public class ServiceCatalogController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('PERM_SERVICE_MANAGE')")
     public Service update(@PathVariable String id, @RequestBody Service s) {
         s.setServiceId(id);
         return service.updateService(s);
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('PERM_SERVICE_MANAGE')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable String id) {
         service.deleteService(id);
     }
 
     @PostMapping("/{id}/activate")
+    @PreAuthorize("hasAuthority('PERM_SERVICE_MANAGE')")
     @Operation(summary = "Activate service")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful operation"),
@@ -90,6 +97,7 @@ public class ServiceCatalogController {
     }
 
     @PostMapping("/{id}/deactivate")
+    @PreAuthorize("hasAuthority('PERM_SERVICE_MANAGE')")
     @Operation(summary = "Deactivate service")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful operation"),

@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,6 +28,7 @@ public class VehicleController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('STAFF','BUSINESS_OWNER','PLATFORM_ADMIN')")
     @Operation(summary = "List all")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful operation"),
@@ -39,6 +41,7 @@ public class VehicleController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@resourceAuthorization.canAccessVehicle(authentication, #id)")
     @Operation(summary = "Create")
     public Vehicle getById(@PathVariable String id) {
         return service.findById(id);
@@ -46,6 +49,7 @@ public class VehicleController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("@resourceAuthorization.canCreateFor(authentication, #req.userId())")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Resource created"),
             @ApiResponse(responseCode = "400", description = "Bad request", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
@@ -57,12 +61,14 @@ public class VehicleController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("@resourceAuthorization.canAccessVehicle(authentication, #id)")
     public Vehicle update(@PathVariable String id, @RequestBody Vehicle vehicle) {
         vehicle.setVehicleId(id);
         return service.updateVehicle(vehicle);
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("@resourceAuthorization.canAccessVehicle(authentication, #id)")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable String id) {
         service.deleteVehicle(id);
