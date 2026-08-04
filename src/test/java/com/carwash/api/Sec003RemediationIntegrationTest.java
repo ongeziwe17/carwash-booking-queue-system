@@ -21,6 +21,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -73,7 +74,6 @@ class Sec003RemediationIntegrationTest {
                 "Honda", "CR-V", "White", ""), otherId);
         services.createService(new Service(serviceId, "Transfer Test Wash", "security regression",
                 BigDecimal.valueOf(150), 30));
-        services.activateService(serviceId);
 
         Booking booking = new CreateBookingRequest(
                 bookingId,
@@ -85,22 +85,24 @@ class Sec003RemediationIntegrationTest {
         ).toBooking();
         bookings.createBooking(booking);
 
-        Map<String, Object> transferRequest = Map.of(
-                "bookingId", bookingId,
-                "userId", otherId,
-                "vehicleId", otherVehicleId,
-                "serviceId", serviceId,
-                "scheduledDateTime", LocalDateTime.now().plusDays(3).toString(),
-                "specialRequest", "attempted transfer"
-        );
+        Map<String, Object> transferRequest = new LinkedHashMap<>();
+        transferRequest.put("bookingId", "replacement-booking-id");
+        transferRequest.put("userId", otherId);
+        transferRequest.put("vehicleId", otherVehicleId);
+        transferRequest.put("serviceId", serviceId);
+        transferRequest.put("scheduledDateTime", LocalDateTime.now().plusDays(3).toString());
+        transferRequest.put("specialRequest", "attempted transfer");
+        transferRequest.put("status", "COMPLETED");
+        transferRequest.put("createdAt", LocalDateTime.now().minusDays(2).toString());
+        transferRequest.put("queueEntry", Map.of("queueEntryId", "injected"));
 
         mockMvc.perform(put("/api/bookings/{id}", bookingId)
                         .with(customerJwt(ownerId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(transferRequest)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.status").value(403))
-                .andExpect(jsonPath("$.message").value("Access denied"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Vehicle does not belong to booking owner"));
 
         Booking unchanged = bookings.findById(bookingId);
         assertEquals(ownerId, unchanged.getUser().getUserId());
