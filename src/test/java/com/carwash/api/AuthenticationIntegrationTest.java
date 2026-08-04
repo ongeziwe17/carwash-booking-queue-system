@@ -36,7 +36,10 @@ class AuthenticationIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         JsonNode json = objectMapper.readTree(response);
         String token = json.get("accessToken").asString();
-        mockMvc.perform(get("/api/users").header("Authorization", "Bearer " + token)).andExpect(status().isOk());
+        mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value("auth-success"))
+                .andExpect(jsonPath("$.roleName").value("CUSTOMER"));
         org.junit.jupiter.api.Assertions.assertNotNull(users.findById("auth-success").orElseThrow().getLastLoginAt());
     }
 

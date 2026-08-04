@@ -90,7 +90,9 @@ class ServiceLayerTest {
         assertEquals("janet@example.com", updated.getEmail());
         assertEquals("456", updated.getPhone());
         assertEquals(encodedPassword, updated.getEncodedPassword());
-        assertNull(updated.getRole());
+        assertNotNull(updated.getRole());
+        assertEquals("CUSTOMER", updated.getRole().getRoleName());
+        assertNotSame(originalRole, updated.getRole());
         assertEquals(AccountStatus.ACTIVE, updated.getAccountStatus());
         assertEquals(createdAt, updated.getCreatedAt());
     }
