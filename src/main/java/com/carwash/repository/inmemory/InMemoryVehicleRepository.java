@@ -10,9 +10,7 @@ public class InMemoryVehicleRepository extends InMemoryRepository<Vehicle, Strin
 
     @Override
     public List<Vehicle> findByUserId(String userId) {
-        return immutableSorted(storage.values().stream()
-                .filter(vehicle -> vehicle.getUserId() != null && vehicle.getUserId().equals(userId))
-                .toList());
+        return findMatching(vehicle -> vehicle.getUserId() != null && vehicle.getUserId().equals(userId));
     }
 
     @Override
@@ -25,12 +23,11 @@ public class InMemoryVehicleRepository extends InMemoryRepository<Vehicle, Strin
             return false;
         }
         String normalizedPlate = plateNumber.trim();
-        return storage.values().stream()
-                .filter(vehicle -> excludedVehicleId == null
-                        || !excludedVehicleId.equals(vehicle.getVehicleId()))
-                .anyMatch(vehicle -> userId.equals(vehicle.getUserId())
-                        && vehicle.getPlateNumber() != null
-                        && vehicle.getPlateNumber().trim().equalsIgnoreCase(normalizedPlate));
+        return anyMatch(vehicle -> vehicle.getUserId() != null
+                && vehicle.getUserId().equals(userId)
+                && vehicle.getPlateNumber() != null
+                && vehicle.getPlateNumber().trim().equalsIgnoreCase(normalizedPlate)
+                && (excludedVehicleId == null || !excludedVehicleId.equals(vehicle.getVehicleId())));
     }
 
     @Override

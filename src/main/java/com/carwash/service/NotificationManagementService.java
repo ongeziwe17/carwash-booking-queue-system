@@ -26,9 +26,6 @@ public class NotificationManagementService {
     private final BookingRepository bookingRepository;
     private final InMemoryDataCoordinator coordinator;
 
-    public NotificationManagementService(NotificationRepository notificationRepository) {
-        this(notificationRepository, null, null, new InMemoryDataCoordinator());
-    }
 
     public NotificationManagementService(NotificationRepository notificationRepository,
                                          UserRepository userRepository,

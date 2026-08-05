@@ -10,32 +10,26 @@ public class InMemoryQueueEntryRepository extends InMemoryRepository<QueueEntry,
 
     @Override
     public List<QueueEntry> findByBookingId(String bookingId) {
-        return immutableSorted(storage.values().stream()
-                .filter(queueEntry -> queueEntry.getBooking() != null
-                        && bookingId.equals(queueEntry.getBooking().getBookingId()))
-                .toList());
+        return findMatching(queueEntry -> queueEntry.getBooking() != null
+                && bookingId.equals(queueEntry.getBooking().getBookingId()));
     }
 
     @Override
     public List<QueueEntry> findByServiceId(String serviceId) {
-        return immutableSorted(storage.values().stream()
-                .filter(queueEntry -> queueEntry.getService() != null
-                        && serviceId.equals(queueEntry.getService().getServiceId()))
-                .toList());
+        return findMatching(queueEntry -> queueEntry.getService() != null
+                && serviceId.equals(queueEntry.getService().getServiceId()));
     }
 
     @Override
     public boolean existsByBookingId(String bookingId) {
-        return storage.values().stream()
-                .anyMatch(queueEntry -> queueEntry.getBooking() != null
-                        && bookingId.equals(queueEntry.getBooking().getBookingId()));
+        return anyMatch(queueEntry -> queueEntry.getBooking() != null
+                && bookingId.equals(queueEntry.getBooking().getBookingId()));
     }
 
     @Override
     public boolean existsByServiceId(String serviceId) {
-        return storage.values().stream()
-                .anyMatch(queueEntry -> queueEntry.getService() != null
-                        && serviceId.equals(queueEntry.getService().getServiceId()));
+        return anyMatch(queueEntry -> queueEntry.getService() != null
+                && serviceId.equals(queueEntry.getService().getServiceId()));
     }
 
     @Override

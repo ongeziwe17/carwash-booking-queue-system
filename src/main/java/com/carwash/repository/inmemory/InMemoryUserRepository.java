@@ -9,11 +9,11 @@ public class InMemoryUserRepository extends InMemoryRepository<User, String> imp
 
     @Override
     public Optional<User> findByEmail(String email) {
-        if (email == null) {
+        if (email == null || email.isBlank()) {
             return Optional.empty();
         }
-        return storage.values().stream()
-                .filter(user -> user.getEmail() != null && user.getEmail().equalsIgnoreCase(email))
+        return findMatching(user -> user.getEmail() != null && user.getEmail().equalsIgnoreCase(email))
+                .stream()
                 .findFirst();
     }
 

@@ -10,38 +10,26 @@ public class InMemoryNotificationRepository extends InMemoryRepository<Notificat
 
     @Override
     public List<Notification> findByUserId(String userId) {
-        return immutableSorted(storage.values().stream()
-                .filter(notification -> notification.getUser() != null
-                        && userId.equals(notification.getUser().getUserId()))
-                .toList());
+        return findMatching(notification -> notification.getUser() != null
+                && userId.equals(notification.getUser().getUserId()));
     }
 
     @Override
     public List<Notification> findByBookingId(String bookingId) {
-        return immutableSorted(storage.values().stream()
-                .filter(notification -> notification.getBooking() != null
-                        && bookingId.equals(notification.getBooking().getBookingId()))
-                .toList());
+        return findMatching(notification -> notification.getBooking() != null
+                && bookingId.equals(notification.getBooking().getBookingId()));
     }
 
     @Override
-    public synchronized int deleteByUserId(String userId) {
-        return deleteMatching(findByUserId(userId));
+    public int deleteByUserId(String userId) {
+        return deleteMatching(notification -> notification.getUser() != null
+                && userId.equals(notification.getUser().getUserId()));
     }
 
     @Override
-    public synchronized int deleteByBookingId(String bookingId) {
-        return deleteMatching(findByBookingId(bookingId));
-    }
-
-    private int deleteMatching(List<Notification> notifications) {
-        int deleted = 0;
-        for (Notification notification : notifications) {
-            if (deleteById(notification.getNotificationId())) {
-                deleted++;
-            }
-        }
-        return deleted;
+    public int deleteByBookingId(String bookingId) {
+        return deleteMatching(notification -> notification.getBooking() != null
+                && bookingId.equals(notification.getBooking().getBookingId()));
     }
 
     @Override

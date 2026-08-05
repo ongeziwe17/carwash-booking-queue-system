@@ -22,19 +22,6 @@ public class QueueManagementService {
     private final NotificationManagementService notificationManagementService;
     private final InMemoryDataCoordinator coordinator;
 
-    public QueueManagementService(QueueEntryRepository queueEntryRepository,
-                                  BookingRepository bookingRepository,
-                                  ServiceRepository serviceRepository) {
-        this(queueEntryRepository, bookingRepository, serviceRepository, null, new InMemoryDataCoordinator());
-    }
-
-    public QueueManagementService(QueueEntryRepository queueEntryRepository,
-                                  BookingRepository bookingRepository,
-                                  ServiceRepository serviceRepository,
-                                  NotificationManagementService notificationManagementService) {
-        this(queueEntryRepository, bookingRepository, serviceRepository, notificationManagementService,
-                new InMemoryDataCoordinator());
-    }
 
     public QueueManagementService(QueueEntryRepository queueEntryRepository,
                                   BookingRepository bookingRepository,

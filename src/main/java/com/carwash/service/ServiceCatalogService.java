@@ -19,9 +19,6 @@ public class ServiceCatalogService {
     private final QueueEntryRepository queueEntryRepository;
     private final InMemoryDataCoordinator coordinator;
 
-    public ServiceCatalogService(ServiceRepository serviceRepository) {
-        this(serviceRepository, null, null, new InMemoryDataCoordinator());
-    }
 
     public ServiceCatalogService(
             ServiceRepository serviceRepository,

@@ -19,10 +19,6 @@ public class DailySummaryReportService {
     private final QueueEntryRepository queueEntryRepository;
     private final InMemoryDataCoordinator coordinator;
 
-    public DailySummaryReportService(BookingRepository bookingRepository,
-                                     QueueEntryRepository queueEntryRepository) {
-        this(bookingRepository, queueEntryRepository, new InMemoryDataCoordinator());
-    }
 
     public DailySummaryReportService(BookingRepository bookingRepository,
                                      QueueEntryRepository queueEntryRepository,

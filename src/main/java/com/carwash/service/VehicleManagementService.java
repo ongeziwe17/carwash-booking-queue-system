@@ -19,9 +19,6 @@ public class VehicleManagementService {
     private final BookingRepository bookingRepository;
     private final InMemoryDataCoordinator coordinator;
 
-    public VehicleManagementService(VehicleRepository vehicleRepository, UserRepository userRepository) {
-        this(vehicleRepository, userRepository, null, new InMemoryDataCoordinator());
-    }
 
     public VehicleManagementService(
             VehicleRepository vehicleRepository,

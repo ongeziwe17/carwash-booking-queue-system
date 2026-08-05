@@ -3,6 +3,7 @@ package com.carwash.security;
 import com.carwash.domain.User;
 import com.carwash.enums.AccountStatus;
 import com.carwash.repository.UserRepository;
+import com.carwash.repository.inmemory.InMemoryDataCoordinator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,7 +35,7 @@ class UserAuthenticationServiceTest {
     @BeforeEach
     void setUp() {
         when(credentials.createDummyEncoding()).thenReturn(DUMMY_ENCODING);
-        authentication = new UserAuthenticationService(users, credentials, tokens);
+        authentication = new UserAuthenticationService(users, credentials, tokens, new InMemoryDataCoordinator());
     }
 
     @Test

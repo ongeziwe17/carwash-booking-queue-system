@@ -11,55 +11,44 @@ public class InMemoryBookingRepository extends InMemoryRepository<Booking, Strin
 
     @Override
     public List<Booking> findByUserId(String userId) {
-        return immutableSorted(storage.values().stream()
-                .filter(booking -> booking.getUser() != null
-                        && userId.equals(booking.getUser().getUserId()))
-                .toList());
+        return findMatching(booking -> booking.getUser() != null
+                && userId.equals(booking.getUser().getUserId()));
     }
 
     @Override
     public List<Booking> findByVehicleId(String vehicleId) {
-        return immutableSorted(storage.values().stream()
-                .filter(booking -> booking.getVehicle() != null
-                        && vehicleId.equals(booking.getVehicle().getVehicleId()))
-                .toList());
+        return findMatching(booking -> booking.getVehicle() != null
+                && vehicleId.equals(booking.getVehicle().getVehicleId()));
     }
 
     @Override
     public List<Booking> findByServiceId(String serviceId) {
-        return immutableSorted(storage.values().stream()
-                .filter(booking -> booking.getService() != null
-                        && serviceId.equals(booking.getService().getServiceId()))
-                .toList());
+        return findMatching(booking -> booking.getService() != null
+                && serviceId.equals(booking.getService().getServiceId()));
     }
 
     @Override
     public List<Booking> findByScheduledDateTime(LocalDateTime scheduledDateTime) {
-        return immutableSorted(storage.values().stream()
-                .filter(booking -> booking.getScheduledDateTime() != null
-                        && booking.getScheduledDateTime().equals(scheduledDateTime))
-                .toList());
+        return findMatching(booking -> booking.getScheduledDateTime() != null
+                && booking.getScheduledDateTime().equals(scheduledDateTime));
     }
 
     @Override
     public boolean existsByUserId(String userId) {
-        return storage.values().stream()
-                .anyMatch(booking -> booking.getUser() != null
-                        && userId.equals(booking.getUser().getUserId()));
+        return anyMatch(booking -> booking.getUser() != null
+                && userId.equals(booking.getUser().getUserId()));
     }
 
     @Override
     public boolean existsByVehicleId(String vehicleId) {
-        return storage.values().stream()
-                .anyMatch(booking -> booking.getVehicle() != null
-                        && vehicleId.equals(booking.getVehicle().getVehicleId()));
+        return anyMatch(booking -> booking.getVehicle() != null
+                && vehicleId.equals(booking.getVehicle().getVehicleId()));
     }
 
     @Override
     public boolean existsByServiceId(String serviceId) {
-        return storage.values().stream()
-                .anyMatch(booking -> booking.getService() != null
-                        && serviceId.equals(booking.getService().getServiceId()));
+        return anyMatch(booking -> booking.getService() != null
+                && serviceId.equals(booking.getService().getServiceId()));
     }
 
     @Override

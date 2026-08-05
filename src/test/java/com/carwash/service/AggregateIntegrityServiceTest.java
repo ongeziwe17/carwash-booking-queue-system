@@ -19,6 +19,13 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
@@ -98,6 +105,42 @@ class AggregateIntegrityServiceTest {
         userManagement.deleteUser("u-1");
         assertTrue(users.findById("u-1").isEmpty());
         assertTrue(notifications.findByUserId("u-1").isEmpty());
+    }
+
+    @Test
+    void concurrentVehicleCreationKeepsRepositoryAndOwnerAggregateAligned() throws Exception {
+        User user = activeUser("u-concurrent", "concurrent@example.com");
+        assertTrue(users.insert(user));
+        int count = 16;
+        ExecutorService executor = Executors.newFixedThreadPool(8);
+        CountDownLatch ready = new CountDownLatch(count);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<Vehicle>> futures = java.util.stream.IntStream.range(0, count)
+                    .mapToObj(index -> executor.submit(() -> {
+                        ready.countDown();
+                        assertTrue(start.await(5, TimeUnit.SECONDS));
+                        return vehicleManagement.createVehicle(
+                                user.getUserId(), "v-concurrent-" + index, "CONC" + index,
+                                "SEDAN", "Brand", "Model", "White", "");
+                    }))
+                    .toList();
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            start.countDown();
+            for (Future<Vehicle> future : futures) {
+                assertNotNull(future.get(5, TimeUnit.SECONDS));
+            }
+            assertEquals(count, vehicles.findByUserId(user.getUserId()).size());
+            assertEquals(count, user.getVehicles().size());
+            assertEquals(
+                    new HashSet<>(vehicles.findByUserId(user.getUserId()).stream()
+                            .map(Vehicle::getVehicleId).toList()),
+                    new HashSet<>(user.getVehicles().stream().map(Vehicle::getVehicleId).toList())
+            );
+        } finally {
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+        }
     }
 
     @Test

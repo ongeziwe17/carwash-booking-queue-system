@@ -117,6 +117,16 @@ class InMemoryRepositoryIntegrityTest {
     }
 
     @Test
+    void repositoriesRejectNullEntitiesAndInvalidIds() {
+        InMemoryUserRepository repository = new InMemoryUserRepository();
+        assertThrows(IllegalArgumentException.class, () -> repository.insert(null));
+        assertThrows(IllegalArgumentException.class,
+                () -> repository.insert(user(" ", "blank@example.com")));
+        assertThrows(IllegalArgumentException.class, () -> repository.findById(null));
+        assertThrows(IllegalArgumentException.class, () -> repository.findById(" "));
+    }
+
+    @Test
     void snapshotsDoNotExposeInternalStorage() {
         InMemoryServiceRepository repository = new InMemoryServiceRepository();
         repository.insert(service("s-1", "One"));

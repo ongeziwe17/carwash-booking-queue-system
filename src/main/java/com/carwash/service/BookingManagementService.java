@@ -32,18 +32,6 @@ public class BookingManagementService {
     private final NotificationManagementService notificationManagementService;
     private final InMemoryDataCoordinator coordinator;
 
-    public BookingManagementService(BookingRepository bookingRepository, UserRepository userRepository,
-                                    VehicleRepository vehicleRepository, ServiceRepository serviceRepository) {
-        this(bookingRepository, userRepository, vehicleRepository, serviceRepository, null, null, null,
-                new InMemoryDataCoordinator());
-    }
-
-    public BookingManagementService(BookingRepository bookingRepository, UserRepository userRepository,
-                                    VehicleRepository vehicleRepository, ServiceRepository serviceRepository,
-                                    NotificationManagementService notificationManagementService) {
-        this(bookingRepository, userRepository, vehicleRepository, serviceRepository, null, null,
-                notificationManagementService, new InMemoryDataCoordinator());
-    }
 
     public BookingManagementService(BookingRepository bookingRepository, UserRepository userRepository,
                                     VehicleRepository vehicleRepository, ServiceRepository serviceRepository,

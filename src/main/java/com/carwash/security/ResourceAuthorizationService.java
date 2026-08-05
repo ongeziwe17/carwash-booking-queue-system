@@ -4,7 +4,6 @@ import com.carwash.repository.BookingRepository;
 import com.carwash.repository.QueueEntryRepository;
 import com.carwash.repository.VehicleRepository;
 import com.carwash.repository.inmemory.InMemoryDataCoordinator;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
@@ -16,12 +15,6 @@ public class ResourceAuthorizationService {
     private final QueueEntryRepository queues;
     private final InMemoryDataCoordinator coordinator;
 
-    public ResourceAuthorizationService(VehicleRepository vehicles, BookingRepository bookings,
-                                        QueueEntryRepository queues) {
-        this(vehicles, bookings, queues, new InMemoryDataCoordinator());
-    }
-
-    @Autowired
     public ResourceAuthorizationService(VehicleRepository vehicles, BookingRepository bookings,
                                         QueueEntryRepository queues, InMemoryDataCoordinator coordinator) {
         this.vehicles = vehicles;

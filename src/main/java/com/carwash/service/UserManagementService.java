@@ -27,9 +27,6 @@ public class UserManagementService {
     private final NotificationRepository notificationRepository;
     private final InMemoryDataCoordinator coordinator;
 
-    public UserManagementService(UserRepository userRepository, UserCredentialService credentialService) {
-        this(userRepository, credentialService, null, null, null, new InMemoryDataCoordinator());
-    }
 
     public UserManagementService(
             UserRepository userRepository,
