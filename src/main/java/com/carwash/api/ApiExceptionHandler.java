@@ -10,6 +10,7 @@ import com.carwash.service.exception.ResourceNotFoundException;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -157,8 +158,17 @@ public class ApiExceptionHandler {
             HttpRequestMethodNotSupportedException ex,
             ServletWebRequest request
     ) {
-        return response(HttpStatus.METHOD_NOT_ALLOWED, ApiErrorCode.METHOD_NOT_ALLOWED,
-                "HTTP method is not supported", request);
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
+        String[] supportedMethods = ex.getSupportedMethods();
+        if (supportedMethods != null && supportedMethods.length > 0) {
+            response.header(HttpHeaders.ALLOW, String.join(", ", supportedMethods));
+        }
+        return response.body(errors.create(
+                HttpStatus.METHOD_NOT_ALLOWED,
+                ApiErrorCode.METHOD_NOT_ALLOWED,
+                "HTTP method is not supported",
+                request.getRequest()
+        ));
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
