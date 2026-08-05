@@ -120,7 +120,7 @@ class InMemoryRepositoryCrudTest {
     }
 
     private static User user(String id, String email) {
-        return new User(id, "Test User", email, "01234", "hash", new Role("r-1", "CUSTOMER", "desc", null));
+        return User.withEncodedPassword(id, "Test User", email, "01234", "hash", new Role("r-1", "CUSTOMER", "desc", null));
     }
 
     private static Service service(String id, String name) {

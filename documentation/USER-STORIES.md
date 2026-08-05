@@ -1,27 +1,104 @@
 # Agile User Stories
 
-## 1. Introduction
+## 1. Product Direction
 
-These user stories are derived from the functional requirements defined in Assignment 4 and the use cases defined in Assignment 5. They provide an MVP-focused Agile breakdown of the car wash booking and queue system so the backlog can be prioritized and implemented incrementally while remaining consistent with earlier project deliverables.
+The approved direction is a **Marketplace-enabled multi-tenant SaaS platform**. Customers should eventually be able to discover and compare independent car wash branches, receive explainable recommendations, book an available service, follow the queue, pay, and provide feedback. Business users should operate only their own branches and data.
 
-## 2. User Stories Table
+Stories are grouped by delivery phase so planned capabilities are not confused with the current implementation.
 
-| Story ID | Source (FR / Use Case) | User Story | Acceptance Criteria | Priority |
-|----------|-------------------------|------------|---------------------|----------|
-| US-001 | FR-01, Use Case: Register Account | **As a Customer, I want to create an account so that I can manage my bookings and queue activity online.** | 1) Customer can submit name, email, and password.<br>2) System validates required fields and unique email.<br>3) Account is created and confirmation message is shown. | High |
-| US-002 | FR-01, Use Case: Authenticate User | **As a Customer, I want to log in securely so that I can access my booking and queue information.** | 1) Customer can log in with registered credentials.<br>2) Invalid credentials display an error without exposing sensitive details.<br>3) Successful login generates a secure authenticated session/token. | High |
-| US-003 | FR-02, Use Case: Browse Service Catalog | **As a Customer, I want to view available car wash services and prices so that I can choose a suitable option.** | 1) Service list shows service name, description, and price.<br>2) Only active services are visible to customers.<br>3) Catalog loads within acceptable response time for normal usage. | High |
-| US-004 | FR-03, Use Case: Create Booking | **As a Customer, I want to create a booking for a selected service and time so that I can plan my visit.** | 1) Customer can select service and preferred booking slot.<br>2) System prevents booking in unavailable or past slots.<br>3) Booking confirmation includes booking reference details. | High |
-| US-005 | FR-04, Use Case: Join Virtual Queue | **As a Customer, I want to join a virtual queue so that I can avoid waiting physically at the car wash.** | 1) Customer can join queue for an active service location.<br>2) System assigns a queue number and  estimated wait time or range.<br>3) Queue entry is visible in customer dashboard after submission. | High |
-| US-006 | FR-04, Use Case: View Queue Position | **As a Customer, I want to see my current queue position so that I can arrive closer to service time.** | 1) Queue position updates when earlier entries are completed or removed.<br>2) Customer can refresh and view latest position without rejoining.<br>3) Status shows whether position is waiting, in service, or completed. | Medium |
-| US-007 | FR-05 | **As a Customer, I want to receive booking and queue status notifications so that I stay informed about service progress.** | 1) Notifications are triggered for booking confirmation, queue progression, and completion.<br>2) Notification message includes booking/queue reference and status.<br>3) Customer can view recent notifications in the system. | Medium |
-| US-008 | FR-06, Use Case: Manage Services | **As a Business Owner, I want to manage service offerings so that customers always see accurate options and pricing.** | 1) Owner can create, update, activate, and deactivate services.<br>2) Changes are reflected in the customer catalog after save.<br>3) Validation prevents blank names and invalid pricing values. | High |
-| US-009 | FR-06, Use Case: Manage Bookings and Queue | **As Service Staff, I want to update booking and queue statuses so that operations reflect real-time progress.** | 1) Staff can move items through predefined statuses (e.g., waiting, in service, completed).<br>2) Status updates are timestamped and linked to acting staff account.<br>3) Invalid status transitions are blocked. | High |
-| US-010 | FR-07 | **As a Business Owner, I want to view a daily summary report so that I can monitor workload and completed services.** | 1) Report shows total bookings, queue entries, completed services, and pending items for a selected day.<br>2) Data excludes canceled entries from completed counts.<br>3) Report can be filtered by service date. | Medium |
-| US-011 | FR-06, Use Case: Manage Bookings and Queue | **As a System Administrator, I want role-based access controls so that only authorized users can manage operational data.** | 1) Customer users cannot access owner/staff/admin management pages.<br>2) Owner and staff actions require authenticated role permissions.<br>3) Unauthorized access attempts are denied and logged. | Medium |
-| US-012 | FR-05, Use Case: Create Booking | **As a Customer, I want to cancel my upcoming booking before service time so that I can adjust my plans without manual support.** | 1) Customer can cancel only future bookings they created.<br>2) Canceled booking status updates immediately in dashboard.<br>3) Cancellation triggers a notification confirming the change. | Medium |
-| US-013 | NFR-SE-01 | As the system, I want to securely store user credentials so that user data is protected from unauthorized access. | 1) Passwords are hashed before storage.<br>2) Plain-text passwords are never persisted.<br>3) Authentication uses secure comparison methods. | High |
+## 2. Implemented Current Foundation
 
-## 3. INVEST Alignment Note
+| Story ID | User Story | Current Acceptance Criteria | Status |
+| --- | --- | --- | --- |
+| US-CUR-001 | As an operator, I want to manage user records so vehicles and bookings can reference customers. | Create, retrieve, update, delete, and reject duplicate email records. | Implemented foundation; unsafe response contracts remain. |
+| US-CUR-002 | As a customer or operator, I want to manage vehicle records for a user. | Create, retrieve, update, delete, associate with an owner, and reject duplicate plates during creation. | Implemented foundation. |
+| US-CUR-003 | As an operator, I want to manage a wash-service catalogue. | Create, retrieve, update, delete, activate, deactivate, and filter services. | Implemented as a global catalogue only. |
+| US-CUR-004 | As an operator, I want to manage bookings. | Create future bookings for valid user/vehicle/service records, confirm, update, and cancel. | Implemented foundation with exact-slot capacity. |
+| US-CUR-005 | As staff, I want to manage queue entries. | Create, retrieve, manually position, call, start, complete, and delete entries. | Implemented foundation; ordering is not yet server-managed. |
+| US-CUR-006 | As a customer, I want to see recent in-app notifications. | Booking/queue events create records that can be listed by user. | Partially implemented. |
+| US-CUR-007 | As an operator, I want a daily operational summary. | Return booking and queue counts for a supplied date. | Partially implemented and in-memory only. |
 
-These stories are written to satisfy INVEST principles for Agile planning: they are **independent** enough to schedule in different sprints, **negotiable** in implementation detail, **valuable** to specific stakeholders, **estimable** at MVP scope, **small** enough for incremental delivery, and **testable** through clear acceptance criteria. This makes them suitable for prioritized backlog refinement and sprint planning.
+## 3. Phase 0 — API, Data, Security, Test, and Delivery Hardening
+
+| Story ID | GitHub | User Story | Acceptance Summary |
+| --- | ---: | --- | --- |
+| US-API-001 | #12 | As an API consumer, I want safe user request and response DTOs so credentials and nested domain graphs are not exposed. | No password fields in responses; validated registration; bounded DTOs. |
+| US-SEC-001 | #24 | As the system, I want credentials hashed securely so plaintext passwords are never stored or compared directly. | Password encoder, no credential serialization/logging, tests for hashing and matching. |
+| US-API-002 | #106 | As an API consumer, I want consistent validation and error contracts so failures are predictable. | Stable 400/404/500 handling, safe internal-error response, validation on all requests. |
+| US-DATA-001 | #107 | As a maintainer, I want integrity rules so duplicate IDs and deletions do not corrupt relationships. | No silent overwrite, documented dependency rules, deterministic in-memory behaviour. |
+| US-CI-001 | #109 | As a maintainer, I want CI aligned with the active integration branch so every change is verified. | Tests, Docker validation, artifacts, branch protection, and publishing rules match the workflow. |
+| US-TEST-001 | #110 | As a maintainer, I want isolated deterministic tests and quality gates. | No shared-state leakage, coverage baseline/gate, reusable fixtures. |
+| US-CONFIG-001 | #111 | As an operator, I want runtime policies externalized so environments can configure capacity, cutoffs, and timezones safely. | Typed validated properties and environment overrides. |
+| US-DOCS-001 | #108 | As an API consumer, I want Swagger and written documentation to match the implemented API. | Correct methods, parameters, bodies, statuses, schemas, and examples. |
+
+## 4. Phase 1 — Reliable Booking and Queue Foundation
+
+| Story ID | GitHub | User Story | Acceptance Summary |
+| --- | ---: | --- | --- |
+| US-QUEUE-001 | #16 | As a customer, I want only an eligible confirmed booking to enter one active queue. | Confirmed booking, active matching service, one active entry, validated IDs. |
+| US-QUEUE-002 | #17 | As a customer, I want the server to assign and recalculate my queue position and wait estimate. | Unique consecutive positions and ETA based on active work ahead. |
+| US-WORKFLOW-001 | #20 | As staff, I want booking and queue states synchronized so operational data and reports agree. | Queue start/completion updates booking state; cancellation cannot leave active queue work. |
+| US-QUEUE-003 | #112 | As staff, I want a true call-next action so the first waiting entry is selected automatically. | Deterministic selection, empty-queue handling, accurate endpoint semantics. |
+| US-BOOKING-001 | #113 | As a customer, I want to reschedule or cancel within allowed policy windows. | Revalidate availability/conflicts; reject late or in-service changes; notify on success. |
+| US-AVAIL-001 | #114 | As a customer, I want to view available service slots before booking. | Available/full/past/inactive slots agree with booking validation. |
+
+## 5. Phase 2 — Marketplace Business and Branch Foundation
+
+| Story ID | GitHub | User Story | Acceptance Summary |
+| --- | ---: | --- | --- |
+| US-MKT-001 | #115 | As a business owner, I want to register a business and its branches on the Marketplace. | Valid business/branch data, coordinates, timezone, status, and ownership. |
+| US-MKT-002 | #116 | As a business owner, I want to configure branch operating hours and closures. | Weekly schedules, temporary closures, timezone-aware open/closed decisions. |
+| US-SERVICE-001 | #117 | As a business owner, I want each branch to define its own service offerings, prices, durations, and capacity. | Branch-specific offering lifecycle and validated capacity. |
+| US-OPS-001 | #118 | As an operator, I want bookings, queues, notifications, and reports scoped to the correct branch. | No cross-branch mismatch; branch-specific operational views and reports. |
+| US-GEO-001 | #119 | As a customer, I want to discover active branches near my location. | Valid coordinates, distance in kilometres, radius/service filters, deterministic sorting. |
+| US-AVAIL-002 | #120 | As a customer, I want branch-aware availability so I see branches that are open, capable, and not full. | Hours, closures, offerings, capacity, bookings, queue, and distance are considered. |
+
+## 6. Phase 3 — Smart Marketplace Recommendations
+
+| Story ID | GitHub | User Story | Acceptance Summary |
+| --- | ---: | --- | --- |
+| US-REC-001 | #121 | As a customer, I want ranked car wash recommendations based on my location, service need, time, queue, availability, and price. | Support nearest, shortest queue, fastest total time, lowest price, and best overall; exclude ineligible branches; return score breakdown and reason. |
+
+The first recommendation implementation must remain rule-based, deterministic, and explainable. Machine learning is not part of this phase.
+
+## 7. Phase 4 — Persistence, Security, and Tenant Isolation
+
+| Story ID | GitHub | User Story | Acceptance Summary |
+| --- | ---: | --- | --- |
+| US-DATA-002 | #122 | As an operator, I want data persisted in PostgreSQL so records survive restarts and workflows are transactionally safe. | Migrations, constraints, indexes, transactions, concurrency handling, Docker profile. |
+| US-TEST-002 | #123 | As a maintainer, I want PostgreSQL integration tests so migrations and persistence behaviour are verified. | Testcontainers, real constraints, rollback and concurrency tests. |
+| US-SEC-002 | #13 | As a user, I want to authenticate securely so protected functionality can identify me. | Safe login, credential verification, token/session expiry, HTTP 401 paths. |
+| US-SEC-003 | #22 | As a platform administrator, I want RBAC so customer, staff, owner, and admin actions are protected. | Explicit role matrix and 401/403 coverage. |
+| US-TENANT-001 | #124 | As a business owner, I want strict tenant isolation so no other business can access my private operational data. | Tenant-scoped APIs/repositories/reports; cross-tenant access denied and tested. |
+| US-AUDIT-001 | #125 | As a business/platform administrator, I want an audit trail for sensitive actions. | Append-only actor/action/resource/outcome records with privacy and tenant controls. |
+
+## 8. Phase 5 — Product and Platform Expansion
+
+| Story ID | GitHub | User Story | Acceptance Summary |
+| --- | ---: | --- | --- |
+| US-NOTIFY-001 | #126 | As a customer, I want a complete in-app notification centre. | Pagination, unread filtering/count, mark-read, bounded privacy-safe responses. |
+| US-NOTIFY-002 | #127 | As a customer, I want reliable email/SMS updates. | Provider-neutral delivery, retries, idempotency, status tracking, preferences. |
+| US-PAY-001 | #128 | As a customer, I want secure booking deposits/payments and refunds. | Checkout, verified webhooks, reconciliation, idempotent refunds, no card storage. |
+| US-FEEDBACK-001 | #129 | As a customer, I want to rate a completed service. | Verified completed booking, one review policy, public aggregates, moderation state. |
+| US-REPORT-001 | #130 | As a business owner, I want dashboards for throughput, waits, utilisation, services, and revenue. | Tenant/branch/date filtering and reconciled metrics. |
+| US-OBS-001 | #131 | As an operator, I want health, logs, metrics, traces, and alerts so the platform can be supported. | Actuator, structured logs, correlation IDs, Prometheus metrics, OTel traces, redaction. |
+| US-DEPLOY-001 | #132 | As a platform engineer, I want hardened deployment configuration so releases are secure and reversible. | Non-root image, probes, resources, profiles, secrets, smoke tests, rollback guidance. |
+| US-FRONTEND-001 | #133 | As a customer/operator, I want web applications for discovery, booking, queue tracking, and business operations. | Secure responsive customer and operator workflows with frontend tests. |
+| US-API-003 | #135 | As an API consumer, I want pagination, filtering, and sorting so large collections remain usable. | Deterministic bounded collection APIs with tenant-safe queries. |
+| US-SAAS-001 | #136 | As a platform owner, I want business subscription plans and entitlements so the SaaS can be commercialized. | Trials/subscriptions, plan limits, idempotent billing events, centralized entitlement checks. |
+| US-REALTIME-001 | #137 | As a customer/operator, I want real-time queue and booking updates. | Authorized WebSocket/SSE events, reconnect/reconciliation behaviour, REST source of truth. |
+| US-GEO-002 | #138 | As a customer, I want traffic-aware travel estimates so fastest recommendations include journey time. | Provider-neutral routing, caching/timeouts, Haversine fallback, explanation of source. |
+
+## 9. Phase 6 — Data-Driven Recommendation Evolution
+
+| Story ID | GitHub | User Story | Acceptance Summary |
+| --- | ---: | --- | --- |
+| US-ML-001 | #134 | As a customer/operator, I want recommendations and forecasts improved using historical outcomes. | Wait-time prediction, demand forecasting, privacy controls, offline evaluation, versioning, monitoring, rollback, and rule-based fallback. |
+
+## 10. Story Principles
+
+- Eligibility and availability rules remain deterministic even when recommendation ranking evolves.
+- Stories should be implemented in dependency order rather than issue-number order.
+- Security, tenant isolation, persistence, and observability are required before production Marketplace use.
+- The modular monolith remains the default architecture until scaling or team boundaries justify extraction.
+- No story should describe a planned capability as already implemented.

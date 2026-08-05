@@ -52,7 +52,7 @@ public class QueueEntry {
     }
 
     public boolean startService() {
-        if (queueStatus != QueueStatus.CALLED && queueStatus != QueueStatus.WAITING) return false;
+        if (queueStatus != QueueStatus.CALLED) return false;
         this.queueStatus = QueueStatus.IN_PROGRESS;
         this.startedAt = LocalDateTime.now();
         return true;

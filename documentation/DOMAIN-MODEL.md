@@ -2,33 +2,54 @@
 
 ## 1. Overview
 
-The domain model defines the core business entities, behaviors, and relationships for the MVP of the Web-Based Car Wash Booking and Queue Management System. It supports object-oriented design by identifying the main classes, their responsibilities, and the rules that govern interactions across booking, queue, and notification workflows.
+The domain model represents the current backend foundation for user records, vehicles, services, bookings, queue entries, roles, and notification records. Some fields support future security or SaaS work, but their presence in domain classes does not mean authentication, RBAC, durable persistence, external notifications, payments, or multi-tenancy are implemented.
 
-This model aligns with:
+## 2. Current Domain Entities
 
-- **Functional requirements** (authentication, service catalog, booking, queue, notifications, admin support)
-- **Use Cases** (register, authenticate, browse services, create booking, join/view queue, manage operations)
-- **Behavioral Models** (state transitions and workflow activities for booking and queue operations)
+| Entity           | Current Attributes / Responsibilities                                                                                                                                                           | Current Status                                              | Notes                                                                                       |
+|------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------|---------------------------------------------------------------------------------------------|
+| **User**         | `userId`, `fullName`, `email`, `phone`, internal `encodedPassword`, account status, timestamps, role reference, vehicles, bookings, notifications. Supports profile updates and helper methods. | Implemented as domain record with BCrypt credential storage | JWT login and RBAC are implemented; storage remains in-memory.                              |
+| **Role**         | `roleId`, `roleName`, `description`, `permissions`. Supports permission checks in the domain object.                                                                                            | Partially implemented                                       | Role data exists, but RBAC is not enforced at controllers/services through Spring Security. |
+| **Vehicle**      | Vehicle identity, plate, type, brand, model, color, notes, user ID. Supports detail updates.                                                                                                    | Implemented                                                 | Service layer associates vehicles with users and checks duplicate plates per owner.         |
+| **Service**      | Service identity, name, description, price, estimated duration, active flag, creation timestamp.                                                                                                | Implemented                                                 | Supports catalog CRUD and activate/deactivate workflows.                                    |
+| **Booking**      | Booking identity, user, vehicle, service, scheduled date/time, status, special request, queue entry.                                                                                            | Implemented                                                 | Supports create, confirm, cancel, start, and complete status helper behavior.               |
+| **QueueEntry**   | Queue identity, booking, service, position, status timestamps, estimated wait.                                                                                                                  | Implemented                                                 | Supports position updates and waiting/called/in-progress/completed transitions.             |
+| **Notification** | Notification identity, user, booking, type, message, channel, sent/read timestamps, delivery status.                                                                                            | Implemented as in-app record                                | No external SMS/email delivery provider is implemented.                                     |                                                                                            | Implemented as in-app record                                | No external SMS/email delivery provider is implemented.                                     |
 
-## 2. Domain Entities
+## 3. Implemented Relationships
 
-| Entity | Attributes | Methods / Responsibilities | Relationships | Business Rules / Notes |
-|---|---|---|---|---|
-| **User** | `userId`, `fullName`, `email`, `phone`, `passwordHash`, `accountStatus`, `createdAt`, `lastLoginAt` | Register account, authenticate, manage profile, create/cancel bookings, view queue position, receive notifications | Many-to-one with **Role**; one-to-many with **Vehicle**, **Booking**, **Notification** | Email must be unique. Only active users can create bookings or join queue. |
-| **Role** | `roleId`, `roleName` (Customer/Admin/Staff), `description`, `permissions` | Define access level, authorize actions in dashboard and operations | One-to-many with **User** | Role controls visibility and permissions for FR-06 administrative functions. |
-| **Vehicle** | `vehicleId`, `ownerUserId`, `plateNumber`, `vehicleType`, `brand`, `model`, `color`, `notes` | Store customer vehicle profile for booking reuse and service eligibility checks | Many-to-one with **User**; one-to-many with **Booking** | Plate number should be unique per owner. Vehicle must belong to booking user. |
-| **Service** | `serviceId`, `serviceName`, `description`, `price`, `estimatedDurationMin`, `isActive`, `createdAt` | Expose service catalog, support browsing and admin management, provide booking duration basis | One-to-many with **Booking** and **QueueEntry** | Inactive services cannot be selected for new bookings. Estimated duration drives queue ETA. |
-| **Booking** | `bookingId`, `userId`, `vehicleId`, `serviceId`, `scheduledDateTime`, `status`, `createdAt`, `specialRequest` | Create booking, validate slot, update/cancel booking, trigger queue entry and notification events | Many-to-one with **User**, **Vehicle**, **Service**; one-to-one or one-to-many lifecycle link with **QueueEntry**; one-to-many with **Notification** (event-driven) | Booking status transitions should follow Assignment 8 state flow (e.g., Pending → Confirmed → InService → Completed / Cancelled). |
-| **QueueEntry** | `queueEntryId`, `bookingId`, `serviceId`, `position`, `queueStatus`, `joinedAt`, `calledAt`, `startedAt`, `completedAt`, `estimatedWaitMin` | Join virtual queue, update queue order, track service progress, expose live queue position | Many-to-one with **Booking** and **Service** | Active queue positions must be unique and sequential. Queue status transitions map to Assignment 8 activity/state models. |
-| **Notification** | `notificationId`, `userId`, `bookingId`, `type`, `message`, `channel`, `sentAt`, `readAt`, `deliveryStatus` | Send booking/queue updates, remind users of schedule changes, record delivery/read states | Many-to-one with **User**; optional many-to-one with **Booking** | Notifications should be generated for key events: booking confirmation/cancellation, queue call, and completion updates. |
+- Users can own vehicles.
+- Bookings reference a user, vehicle, and service.
+- Queue entries reference booking and service context.
+- Notifications can reference a user and booking.
+- Roles can be attached to users as domain data.
 
-## 3. Design Notes
+## 4. Partially Implemented or Planned Model Areas
 
-These seven entities were selected because they represent the minimum cohesive object model needed to deliver the MVP scope without introducing out-of-scope enterprise concepts:
+- **Identity and access**: `User` and `Role` provide a model foundation, but authentication and RBAC enforcement are planned work.
+- **Persistence**: Repository interfaces and in-memory repositories exist. PostgreSQL-backed persistence for the running application is planned to work.
+- **Notifications**: Notification records exist. Provider delivery, retries, and webhook reconciliation are future work.
+- **Reporting**: Daily summary response data exists. Rich reporting models are future work.
+- **SaaS tenancy**: No tenant, business registration, location, subscription, or tenant-isolation model is currently implemented.
+- **Payments**: No payment, invoice, receipt, refund, or webhook domain model is currently implemented.
+- **Ratings/feedback**: No rating or feedback entity is currently implemented.
 
-- **Identity and access** are handled by `User` + `Role`.
-- **Operational context** is captured by `Vehicle` + `Service`.
-- **Core transactional flow** is implemented through `Booking` + `QueueEntry`.
-- **Communication flow** is handled by `Notification`.
+## 5. Design Notes
 
-Together, these entities cover the end-to-end lifecycle from account creation and service discovery to booking execution, queue tracking, and customer updates, directly reflecting the project’s prior requirements and behavioral artifacts.
+The current model is intentionally small, so backend workflows can be validated before production hardening. Future additions should preserve clear boundaries between domain behavior, service orchestration, repository persistence, and API DTOs.
+## Authentication Boundary
+
+Credentials are stored only as BCrypt encodings, and raw passwords are accepted only at registration and
+login boundaries. BCrypt inputs are limited to 72 UTF-8 bytes. Authentication issues a short-lived JWT
+whose subject is the user ID; domain graphs and credentials are not token claims. JWT validation resolves
+the subject against the in-memory repository and requires an `ACTIVE` account. `lastLoginAt` is updated
+and saved after successful login. Roles remain domain data only: SEC-003 RBAC and tenant isolation are
+not implemented, and there are no refresh tokens or token revocation lists.
+
+## Built-in authorization model
+
+Every user has one server-controlled role: `CUSTOMER`, `STAFF`, `BUSINESS_OWNER`, or `PLATFORM_ADMIN`.
+Permissions are derived from the centralized role catalogue, following customer < staff < owner < admin.
+Stored vehicle ownership and booking/queue relationships drive customer authorization. Storage remains
+in-memory. No tenant relationship exists, so elevated operational access is global and TENANT-001 remains
+outstanding.

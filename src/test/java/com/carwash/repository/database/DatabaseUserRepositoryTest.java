@@ -11,7 +11,7 @@ class DatabaseUserRepositoryTest {
 
     @Test
     void saveThrowsUnsupportedOperationException() {
-        User user = new User("U-001", "Test User", "test@example.com", "01234", "hash", null);
+        User user = User.withEncodedPassword("U-001", "Test User", "test@example.com", "01234", "hash", null);
 
         assertThrows(UnsupportedOperationException.class, () -> repository.save(user));
     }

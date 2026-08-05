@@ -30,6 +30,14 @@ public class QueueManagementService {
         this.notificationManagementService = notificationManagementService;
     }
 
+    public QueueEntry createQueueEntry(String queueEntryId, String bookingId, String serviceId, int position) {
+        Booking booking = new Booking();
+        booking.setBookingId(bookingId);
+        Service service = new Service();
+        service.setServiceId(serviceId);
+        return createQueueEntry(new QueueEntry(queueEntryId, booking, service, position));
+    }
+
     public QueueEntry createQueueEntry(QueueEntry queueEntry) {
         validateQueueEntry(queueEntry);
         queueEntryRepository.save(queueEntry);
@@ -97,6 +105,9 @@ public class QueueManagementService {
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found: " + queueEntry.getBooking().getBookingId()));
         Service service = serviceRepository.findById(queueEntry.getService().getServiceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Service not found: " + queueEntry.getService().getServiceId()));
+        if (booking.getService() == null || booking.getService().getServiceId() == null || !booking.getService().getServiceId().equals(service.getServiceId())) {
+            throw new BusinessRuleViolationException("Queue entry service must match booking service");
+        }
         queueEntry.setBooking(booking);
         queueEntry.setService(service);
     }

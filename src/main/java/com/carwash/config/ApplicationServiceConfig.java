@@ -4,6 +4,7 @@ import com.carwash.factory.RepositoryFactory;
 import com.carwash.factory.StorageType;
 import com.carwash.repository.*;
 import com.carwash.service.*;
+import com.carwash.security.UserCredentialService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -37,27 +38,37 @@ public class ApplicationServiceConfig {
     }
 
     @Bean
-    public UserManagementService userManagementService(UserRepository userRepository) {
-        return new UserManagementService(userRepository);
+    public UserManagementService userManagementService(UserRepository userRepository, UserCredentialService credentialService) {
+        return new UserManagementService(userRepository, credentialService);
     }
+
     @Bean
     public VehicleManagementService vehicleManagementService(VehicleRepository vehicleRepository, UserRepository userRepository) {
         return new VehicleManagementService(vehicleRepository, userRepository);
     }
+
     @Bean
     public ServiceCatalogService serviceCatalogService(ServiceRepository serviceRepository) {
         return new ServiceCatalogService(serviceRepository);
     }
+
     @Bean
     public NotificationManagementService notificationManagementService(NotificationRepository notificationRepository) {
         return new NotificationManagementService(notificationRepository);
     }
+
     @Bean
     public BookingManagementService bookingManagementService(BookingRepository bookingRepository, UserRepository userRepository, VehicleRepository vehicleRepository, ServiceRepository serviceRepository, NotificationManagementService notificationManagementService) {
         return new BookingManagementService(bookingRepository, userRepository, vehicleRepository, serviceRepository, notificationManagementService);
     }
+
     @Bean
     public QueueManagementService queueManagementService(QueueEntryRepository queueEntryRepository, BookingRepository bookingRepository, ServiceRepository serviceRepository, NotificationManagementService notificationManagementService) {
         return new QueueManagementService(queueEntryRepository, bookingRepository, serviceRepository, notificationManagementService);
+    }
+
+    @Bean
+    public DailySummaryReportService dailySummaryReportService(BookingRepository bookingRepository, QueueEntryRepository queueEntryRepository) {
+        return new DailySummaryReportService(bookingRepository, queueEntryRepository);
     }
 }

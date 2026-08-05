@@ -2,11 +2,19 @@ package com.carwash.api.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-@Schema(description = "Standard API error response")
+import java.time.Instant;
+import java.util.List;
 
+@Schema(description = "Stable, client-safe API error response.")
 public record ApiErrorResponse(
-        @Schema(example = "404") int status,
-        @Schema(example = "Resource not found") String message,
-        @Schema(example = "2026-05-16T10:15:30") String timestamp,
-        @Schema(example = "/api/users/u1") String path
-) {}
+        @Schema(example = "400") int status,
+        @Schema(example = "VALIDATION_FAILED") String code,
+        @Schema(example = "Request validation failed") String message,
+        @Schema(example = "2026-08-05T08:30:00Z") Instant timestamp,
+        @Schema(example = "/api/vehicles") String path,
+        List<ApiFieldError> fieldErrors
+) {
+    public ApiErrorResponse {
+        fieldErrors = fieldErrors == null ? List.of() : List.copyOf(fieldErrors);
+    }
+}

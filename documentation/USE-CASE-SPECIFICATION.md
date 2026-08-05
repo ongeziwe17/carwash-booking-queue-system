@@ -16,7 +16,7 @@ This use case allows a new customer to create an account on the platform using p
 
 - The customer is not currently authenticated.
 - The customer has access to the registration page.
-- The customer has not already registered with the same email address.
+- The customer has not yet registered with the same email address.
 
 **Postconditions:**
 
@@ -42,7 +42,7 @@ This use case allows a new customer to create an account on the platform using p
   3. The customer updates values and resubmits.
 - **A2: Duplicate email detected**
   1. At Step 5, the email is already registered.
-  2. The system rejects account creation and prompts the customer to log in or reset password.
+  2. The system rejects account creation and prompts the customer to log in or reset the password.
 - **A3: User cancels action**
   1. Before Step 3, the customer selects **Cancel**.
   2. The system returns the customer to the landing page without creating an account.
@@ -55,7 +55,7 @@ This use case allows a new customer to create an account on the platform using p
 Registered User (Customer, Business Owner, Service Staff, or Administrator)
 
 **Description:**
-This use case enables a registered user to securely log in and access authorized system functions based on role. It enforces access control and protects operational data.
+This use case enables a registered user to securely log in and access authorized system functions based on a role. It enforces access control and protects operational data.
 
 **Preconditions:**
 
@@ -73,7 +73,7 @@ This use case enables a registered user to securely log in and access authorized
 1. The user opens the login page.
 2. The system displays fields for email/username and password.
 3. The user enters credentials and submits.
-4. The system validates input format and required fields.
+4. The system validates the input format and required fields.
 5. The system verifies credentials against stored encrypted records.
 6. The system identifies the user role and grants access permissions.
 7. The system logs the login event and redirects to the relevant dashboard.
@@ -114,7 +114,7 @@ This use case allows a customer to view available car wash services, prices, and
 
 1. The customer opens the **Service Catalog** page.
 2. The system retrieves active services from the catalog database.
-3. The system displays each service with name, description, estimated duration, and price.
+3. The system displays each service with a name, description, estimated duration, and price.
 4. The customer filters or sorts services (e.g., by price or duration).
 5. The system refreshes the list based on selected criteria.
 6. The customer selects a service to view details.

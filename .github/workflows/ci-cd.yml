@@ -1,125 +1,473 @@
-name: CI-CD Pipeline
+name: CI/CD Pipeline
 
 on:
-  push:
-    branches:
-      - '**'
   pull_request:
     branches:
-      - master
+      - staging
       - develop
-
-env:
-  JDK_VERSION: 21
+      - master
+  push:
+    branches:
+      - staging
+      - develop
+      - master
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  JDK_VERSION: '21'
+  LOCAL_IMAGE: carwash-booking-queue-system:ci-${{ github.sha }}
+
 jobs:
-
-  build_test:
-    name: Build & Test
+  workflow-lint:
+    name: Workflow syntax validation
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Repo
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate committed whitespace
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            git diff --check "${BASE_SHA}" "${HEAD_SHA}"
+          else
+            git diff-tree --check --root -r "${GITHUB_SHA}"
+          fi
+
+      - name: Run actionlint
+        run: >-
+          docker run --rm
+          -v "${PWD}:/repo"
+          -w /repo
+          rhysd/actionlint:1.7.12
+
+      - name: Validate publishing metadata templates
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          expected_template="{{commit_date 'YYYYMMDD-HHmmss' tz='Africa/Johannesburg'}}"
+          template_count="$(
+            grep --fixed-strings -- 'type=raw,value=' .github/workflows/ci-cd.yml \
+              | grep --only-matching --fixed-strings -- "${expected_template}" \
+              | wc -l
+          )"
+
+          if [[ "${template_count}" -ne 3 ]]; then
+            echo "Expected three valid commit_date templates, found ${template_count}."
+            exit 1
+          fi
+
+  maven-verification:
+    name: Maven verification
+    runs-on: ubuntu-latest
+    env:
+      SPRING_PROFILES_ACTIVE: test
+      SPRING_APP_NAME: carwash-booking-queue-system
+      SERVER_PORT: '8080'
+      SECURE_PASSWORD_BCRYPT_STRENGTH: '4'
+      SECURE_PASSWORD_MIN_LENGTH: '12'
+      SECURE_PASSWORD_MAX_UTF8_BYTES: '72'
+      SECURE_JWT_ISSUER: carwash-booking-queue-system-ci
+      SECURE_JWT_ACCESS_TOKEN_TTL: 20m
+      SECURE_JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
+      SECURE_BOOTSTRAP_ADMIN_ENABLED: 'false'
+    steps:
+      - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Setup Java JDK
+      - name: Set up Java 21
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: ${{ env.JDK_VERSION }}
           cache: maven
 
-      - name: Cache Maven local repo
-        uses: actions/cache@v5
-        with:
-          path: ~/.m2
-          key: maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: maven-
-
-      - name: Make mvnw executable
+      - name: Make Maven wrapper executable
         run: chmod +x mvnw
 
-      ## - name: Validate Docker Compose config
-      ##  run: docker compose -f docker-compose.yml config
+      - name: Validate required CI secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${SECURE_JWT_SECRET}" ]]; then
+            echo "CI_JWT_SECRET is not configured."
+            exit 1
+          fi
 
-      - name: Run tests
-        run: ./mvnw clean verify
+      - name: Run Maven verification
+        run: ./mvnw --batch-mode clean verify
 
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-reports
-          path: '**/target/surefire-reports/**'
+          name: test-reports-${{ github.run_number }}-${{ github.sha }}
+          path: |
+            target/surefire-reports/**
+            target/failsafe-reports/**
+          if-no-files-found: ignore
+          retention-days: 14
 
-      - name: Upload build artifact
+      - name: Upload JaCoCo coverage report
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: app-jar
-          path: target/*.jar
+          name: jacoco-coverage-${{ github.run_number }}-${{ github.sha }}
+          path: target/site/jacoco/**
+          if-no-files-found: ignore
+          retention-days: 14
 
-
-  publish:
-    name: Publish JAR
-    runs-on: ubuntu-latest
-    needs: build_test
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop')
-
-    steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: app-jar
-
-      - name: Upload Release Artifact
+      - name: Upload verified JAR
+        if: success()
         uses: actions/upload-artifact@v7
         with:
-          name: release-jar
-          path: '*.jar'
+          name: app-jar-${{ github.run_number }}-${{ github.sha }}
+          path: target/carwash-api.jar
+          if-no-files-found: error
+          retention-days: 14
 
+      - name: Export OpenAPI document
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
 
-  containerize:
-    name: Build & Push Docker Image
+          log_file="target/openapi-export.log"
+          java -jar target/carwash-api.jar >"${log_file}" 2>&1 &
+          app_pid=$!
+
+          trap 'kill "${app_pid}" 2>/dev/null || true; wait "${app_pid}" 2>/dev/null || true' EXIT
+
+          for _ in {1..30}; do
+            if curl --silent --show-error --fail \
+              http://127.0.0.1:8080/v3/api-docs \
+              --output openapi.json; then
+              exit 0
+            fi
+
+            if ! kill -0 "${app_pid}" 2>/dev/null; then
+              echo "Application stopped before OpenAPI export completed."
+              tail -n 100 "${log_file}" || true
+              exit 1
+            fi
+
+            sleep 2
+          done
+
+          echo "Timed out waiting for the OpenAPI endpoint."
+          tail -n 100 "${log_file}" || true
+          exit 1
+
+      - name: Upload OpenAPI artifact
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: openapi-${{ github.run_number }}-${{ github.sha }}
+          path: openapi.json
+          if-no-files-found: error
+          retention-days: 14
+
+  docker-validation:
+    name: Docker validation
     runs-on: ubuntu-latest
-    needs: build_test
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop')
-
+    needs:
+      - workflow-lint
+      - maven-verification
+    env:
+      CI_JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Setup Buildx
+      - name: Validate Dockerfile with Hadolint
+        uses: hadolint/hadolint-action@v3.3.0
+        with:
+          dockerfile: Dockerfile
+
+      - name: Validate Docker ignore rules
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for required_rule in '.env' '.env.*' '!.env.example'; do
+            if ! grep --fixed-strings --line-regexp --quiet -- "${required_rule}" .dockerignore; then
+              echo "Missing required .dockerignore rule: ${required_rule}"
+              exit 1
+            fi
+          done
+
+          if grep --fixed-strings --line-regexp --quiet -- '!.env' .dockerignore; then
+            echo "The real .env file must not be re-included in the Docker context."
+            exit 1
+          fi
+
+      - name: Create temporary Compose environment
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${CI_JWT_SECRET}" ]]; then
+            echo "CI_JWT_SECRET is not configured."
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          template = Path('.env.example').read_text(encoding='utf-8')
+          placeholder = 'REPLACE_WITH_BASE64_ENCODED_32_BYTE_SECRET'
+          secret = os.environ['CI_JWT_SECRET']
+
+          if placeholder not in template:
+              raise SystemExit('JWT placeholder was not found in .env.example')
+
+          Path('.env').write_text(
+              template.replace(placeholder, secret, 1),
+              encoding='utf-8',
+          )
+          PY
+
+      - name: Verify .env is ignored by Git
+        run: git check-ignore -v .env
+
+      - name: Validate Docker Compose configuration
+        run: docker compose config --quiet
+
+      - name: Remove temporary Compose environment
+        if: always()
+        run: rm -f .env
+
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Login DockerHub
+      - name: Build Docker image without publishing
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          push: false
+          tags: ${{ env.LOCAL_IMAGE }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify non-root runtime user
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_user="$(docker image inspect "${LOCAL_IMAGE}" --format '{{.Config.User}}')"
+
+          case "${image_user}" in
+            ''|root|0|0:0)
+              echo "Docker image must run as a non-root user. Found: '${image_user}'"
+              exit 1
+              ;;
+            *)
+              echo "Runtime user: ${image_user}"
+              ;;
+          esac
+
+      - name: Inspect Docker image history
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_history="$(docker history --no-trunc "${LOCAL_IMAGE}")"
+          printf '%s\n' "${image_history}"
+
+          if grep --extended-regexp --ignore-case \
+            'SECURE_JWT_SECRET|SECURE_BOOTSTRAP_ADMIN_PASSWORD|COPY[[:space:]]+\.env' \
+            <<<"${image_history}"; then
+            echo "Docker image history contains a forbidden secret or .env reference."
+            exit 1
+          fi
+
+      - name: Smoke test Docker image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          container_name="carwash-api-smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          trap 'docker logs "${container_name}" || true; docker rm --force "${container_name}" || true' EXIT
+
+          docker run --detach \
+            --name "${container_name}" \
+            --publish 18080:8080 \
+            --env SPRING_PROFILES_ACTIVE=test \
+            --env SPRING_APP_NAME=carwash-booking-queue-system \
+            --env SERVER_PORT=8080 \
+            --env SECURE_PASSWORD_BCRYPT_STRENGTH=4 \
+            --env SECURE_PASSWORD_MIN_LENGTH=12 \
+            --env SECURE_PASSWORD_MAX_UTF8_BYTES=72 \
+            --env SECURE_JWT_ISSUER=carwash-booking-queue-system-ci \
+            --env SECURE_JWT_ACCESS_TOKEN_TTL=20m \
+            --env SECURE_JWT_SECRET="${CI_JWT_SECRET}" \
+            --env SECURE_BOOTSTRAP_ADMIN_ENABLED=false \
+            "${LOCAL_IMAGE}"
+
+          for _ in {1..30}; do
+            if curl --silent --show-error --fail \
+              http://127.0.0.1:18080/v3/api-docs \
+              --output /dev/null; then
+              exit 0
+            fi
+
+            if ! docker inspect --format '{{.State.Running}}' "${container_name}" \
+              | grep --quiet true; then
+              echo "Smoke-test container stopped before becoming ready."
+              exit 1
+            fi
+
+            sleep 2
+          done
+
+          echo "Timed out waiting for the smoke-test container."
+          exit 1
+
+      - name: Generate vulnerability baseline
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.LOCAL_IMAGE }}
+          format: json
+          output: trivy-results.json
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: Enforce fixed critical vulnerability gate
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.LOCAL_IMAGE }}
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Upload vulnerability report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-report-${{ github.run_number }}-${{ github.sha }}
+          path: trivy-results.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  publish-container:
+    name: Publish container image
+    runs-on: ubuntu-latest
+    needs:
+      - workflow-lint
+      - maven-verification
+      - docker-validation
+    if: >-
+      github.event_name == 'push' &&
+      (
+        github.ref == 'refs/heads/staging' ||
+        github.ref == 'refs/heads/develop' ||
+        github.ref == 'refs/heads/master' ||
+        startsWith(github.ref, 'refs/tags/v')
+      )
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Verify release tag provenance
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch --no-tags origin master:refs/remotes/origin/master
+          tag_commit="$(git rev-parse "${GITHUB_SHA}^{commit}")"
+
+          if ! git merge-base --is-ancestor "${tag_commit}" refs/remotes/origin/master; then
+            echo "Release tag '${GITHUB_REF_NAME}' must point to a commit reachable from master."
+            exit 1
+          fi
+
+          echo "Release tag '${GITHUB_REF_NAME}' points to master-reachable commit ${tag_commit}."
+
+      - name: Validate Docker Hub publishing secrets
+        shell: bash
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${DOCKER_USERNAME}" || -z "${DOCKER_PASSWORD}" ]]; then
+            echo "DOCKER_USERNAME and DOCKER_PASSWORD must be configured for publishing."
+            exit 1
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to Docker Hub
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Docker metadata
-        id: meta
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image metadata
+        id: metadata
         uses: docker/metadata-action@v6
         with:
-          images: ${{ secrets.DOCKER_USERNAME }}/carwash-booking-queue-system
+          images: |
+            ${{ secrets.DOCKER_USERNAME }}/carwash-booking-queue-system
+            ghcr.io/${{ github.repository_owner }}/carwash-booking-queue-system
+          flavor: latest=false
           tags: |
-            type=sha
-            type=ref,event=branch
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=staging,enable=${{ github.ref == 'refs/heads/staging' }}
+            type=raw,value=staging-{{commit_date 'YYYYMMDD-HHmmss' tz='Africa/Johannesburg'}},enable=${{ github.ref == 'refs/heads/staging' }}
+            type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
+            type=raw,value=develop-{{commit_date 'YYYYMMDD-HHmmss' tz='Africa/Johannesburg'}},enable=${{ github.ref == 'refs/heads/develop' }}
+            type=raw,value=master,enable=${{ github.ref == 'refs/heads/master' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
+            type=ref,event=tag,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=${{ github.ref_name }}-{{commit_date 'YYYYMMDD-HHmmss' tz='Africa/Johannesburg'}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=sha,prefix=sha-,format=short
 
-      - name: Build & Push
+      - name: Review generated image tags
+        env:
+          GENERATED_TAGS: ${{ steps.metadata.outputs.tags }}
+        run: printf '%s\n' "${GENERATED_TAGS}"
+
+      - name: Build and publish Docker image
         uses: docker/build-push-action@v7
         with:
           context: .
+          file: ./Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

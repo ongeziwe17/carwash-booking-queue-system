@@ -47,7 +47,7 @@ flowchart LR
 - Major decisions: input validation and token confirmation-before-expiry control whether the process loops or succeeds.
 - Parallel concern: account creation and verification token dispatch are system-side sequential actions that enable asynchronous customer completion.
 - Stakeholder concerns: customer usability (clear error feedback) and business security (verified accounts only).
-- Traceability: aligns with **FR-01 User Registration and Authentication** and Assignment 5 **Register Account** use case; supports Assignment 6 stories/sprint work on onboarding and account setup.
+- Traceability: aligns with **FR-01 User Registration and Authentication** and the product use cases **Register Account** use case; supports the product backlog stories/delivery cycle work on onboarding and account setup.
 
 ## 3. Authenticate User Activity Diagram
 
@@ -102,7 +102,7 @@ flowchart LR
 - Major decisions: credential validity, failed-attempt threshold, and MFA verification branch the path.
 - Parallel action intent: successful login triggers both session creation and audit logging as independent system outcomes.
 - Stakeholder concerns: security (lockout and MFA), traceability (login event logging), and customer access continuity.
-- Traceability: maps directly to **FR-01** and Assignment 5 **Authenticate User**; reinforces Assignment 6 sprint scope around secure authentication.
+- Traceability: maps directly to **FR-01** and the product use cases **Authenticate User**; reinforces the product backlog delivery cycle scope around secure authentication.
 
 ## 4. Browse Service Catalog Activity Diagram
 
@@ -145,7 +145,7 @@ flowchart LR
 - Major decisions: whether filters return matching services determines continue/refine behavior.
 - Parallel concern: catalog responses can include computed availability hints while showing static service metadata.
 - Stakeholder concerns: customer transparency (pricing and duration) and business merchandising (service discoverability).
-- Traceability: supports **FR-02 Service Catalog** and Assignment 5 **Browse Service Catalog**; aligns with Assignment 6 stories for service visibility in MVP.
+- Traceability: supports **FR-02 Service Catalog** and the product use cases **Browse Service Catalog**; aligns with the product backlog stories for service visibility in MVP.
 
 ## 5. Create Booking Activity Diagram
 
@@ -192,7 +192,7 @@ flowchart LR
 - Major decision: slot availability determines retry loop or progression to confirmation.
 - Parallel actions: after booking persistence, system can send notifications and render confirmation concurrently.
 - Stakeholder concerns: avoiding double-booking, fast customer feedback, and reliable booking records.
-- Traceability: corresponds to **FR-03 Booking System** and Assignment 5 **Create Booking**; aligns with Assignment 6 sprint/backlog focus on booking capability.
+- Traceability: corresponds to **FR-03 Booking System** and the product use cases **Create Booking**; aligns with the product backlog delivery cycle/backlog focus on booking capability.
 
 ## 6. Join Virtual Queue Activity Diagram
 
@@ -238,7 +238,7 @@ flowchart LR
 - Major decisions: eligibility checks and queue capacity control whether entry is accepted.
 - Parallel actions: queue creation updates staff dashboard while sending customer confirmation notifications.
 - Stakeholder concerns: queue fairness, capacity control, and real-time operational visibility for staff.
-- Traceability: implements **FR-04 Queue Management** and Assignment 5 **Join Virtual Queue**; supports Assignment 6 queue-related stories.
+- Traceability: implements **FR-04 Queue Management** and the product use cases **Join Virtual Queue**; supports the product backlog queue-related stories.
 
 ## 7. View Queue Position Activity Diagram
 
@@ -278,7 +278,7 @@ flowchart LR
 - Major decisions: ticket-active validation and readiness detection determine loop continuation or completion.
 - Parallel concern: periodic ETA recalculation can occur alongside client refresh behavior.
 - Stakeholder concerns: customer predictability and reduced physical waiting uncertainty.
-- Traceability: linked to **FR-04 Queue Management** and Assignment 5 **View Queue Position**; fits Assignment 6 user stories around queue transparency.
+- Traceability: linked to **FR-04 Queue Management** and the product use cases **View Queue Position**; fits the product backlog user stories around queue transparency.
 
 ## 8. Manage Services Activity Diagram
 
@@ -317,7 +317,7 @@ flowchart LR
 - Major decisions: authorization and data validation decide save or correction loop.
 - Parallel actions: after persistence, catalog publication and audit logging can run independently.
 - Stakeholder concerns: operational control, pricing accuracy, and governance through audit trails.
-- Traceability: maps to **FR-02 Service Catalog** and **FR-06 Administrative Dashboard**, with direct relation to Assignment 5 **Manage Services** use case.
+- Traceability: maps to **FR-02 Service Catalog** and **FR-06 Administrative Dashboard**, with direct relation to the product use cases **Manage Services** use case.
 
 ## 9. Manage Bookings and Queue Activity Diagram
 
@@ -363,4 +363,4 @@ flowchart LR
 - Major decisions: transition legality and whether recalculation is needed before updates are finalized.
 - Parallel actions: after record updates, notifications and event logging proceed concurrently.
 - Stakeholder concerns: operational continuity, customer communication, and auditable management actions.
-- Traceability: aligns with **FR-04 Queue Management**, **FR-06 Administrative Dashboard**, and supports **FR-07 Basic Reporting** through event logging; maps to Assignment 5 **Manage Bookings and Queue**.
+- Traceability: aligns with **FR-04 Queue Management**, **FR-06 Administrative Dashboard**, and supports **FR-07 Basic Reporting** through event logging; maps to the product use cases **Manage Bookings and Queue**.
