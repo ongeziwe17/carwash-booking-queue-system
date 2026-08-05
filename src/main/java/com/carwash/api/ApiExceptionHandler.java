@@ -176,8 +176,14 @@ public class ApiExceptionHandler {
             HttpMediaTypeNotSupportedException ex,
             ServletWebRequest request
     ) {
-        return response(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ApiErrorCode.UNSUPPORTED_MEDIA_TYPE,
-                "Content type is not supported", request);
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .headers(ex.getHeaders())
+                .body(errors.create(
+                        HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+                        ApiErrorCode.UNSUPPORTED_MEDIA_TYPE,
+                        "Content type is not supported",
+                        request.getRequest()
+                ));
     }
 
     @ExceptionHandler(Exception.class)
