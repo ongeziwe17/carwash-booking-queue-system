@@ -1,6 +1,5 @@
 package com.carwash.api;
 
-import com.carwash.api.dto.CreateBookingRequest;
 import com.carwash.domain.Booking;
 import com.carwash.domain.Service;
 import com.carwash.domain.Vehicle;
@@ -75,15 +74,14 @@ class Sec003RemediationIntegrationTest {
         services.createService(new Service(serviceId, "Transfer Test Wash", "security regression",
                 BigDecimal.valueOf(150), 30));
 
-        Booking booking = new CreateBookingRequest(
+        bookings.createBooking(
                 bookingId,
                 ownerId,
                 ownerVehicleId,
                 serviceId,
                 LocalDateTime.now().plusDays(2),
                 "original request"
-        ).toBooking();
-        bookings.createBooking(booking);
+        );
 
         Map<String, Object> transferRequest = new LinkedHashMap<>();
         transferRequest.put("bookingId", "replacement-booking-id");
