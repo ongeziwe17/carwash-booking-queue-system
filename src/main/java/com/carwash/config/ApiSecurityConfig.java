@@ -1,6 +1,7 @@
 package com.carwash.config;
 
-import com.carwash.api.dto.ApiErrorResponse;
+import com.carwash.api.error.ApiErrorCode;
+import com.carwash.api.error.ApiErrorResponseFactory;
 import com.carwash.enums.AccountStatus;
 import com.carwash.repository.UserRepository;
 import jakarta.servlet.http.HttpServletResponse;
@@ -22,7 +23,6 @@ import tools.jackson.databind.ObjectMapper;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.time.Clock;
-import java.time.LocalDateTime;
 import java.util.Base64;
 
 @Configuration
@@ -67,7 +67,7 @@ public class ApiSecurityConfig {
     }
 
     @Bean
-    SecurityFilterChain apiSecurity(HttpSecurity http, ObjectMapper objectMapper) throws Exception {
+    SecurityFilterChain apiSecurity(HttpSecurity http, ObjectMapper objectMapper, ApiErrorResponseFactory errors) throws Exception {
         return http.csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .formLogin(AbstractHttpConfigurer::disable).httpBasic(AbstractHttpConfigurer::disable)
@@ -82,14 +82,16 @@ public class ApiSecurityConfig {
                         .authenticationEntryPoint((request, response, exception) -> {
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                            objectMapper.writeValue(response.getOutputStream(), new ApiErrorResponse(401,
-                                    "Authentication is required", LocalDateTime.now().toString(), request.getRequestURI()));
+                            objectMapper.writeValue(response.getOutputStream(), errors.create(
+                                    org.springframework.http.HttpStatus.UNAUTHORIZED, ApiErrorCode.AUTHENTICATION_REQUIRED,
+                                    "Authentication is required", request));
                         })
                         .accessDeniedHandler((request, response, exception) -> {
                             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                            objectMapper.writeValue(response.getOutputStream(), new ApiErrorResponse(403,
-                                    "Access denied", LocalDateTime.now().toString(), request.getRequestURI()));
+                            objectMapper.writeValue(response.getOutputStream(), errors.create(
+                                    org.springframework.http.HttpStatus.FORBIDDEN, ApiErrorCode.ACCESS_DENIED,
+                                    "Access denied", request));
                         }))
                 .build();
     }

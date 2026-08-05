@@ -16,13 +16,17 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
+@Validated
 @Tag(name = "Users", description = "Operations for registering and managing safe user profiles.")
 @RequestMapping("/api/users")
 public class UserController {
@@ -50,7 +54,7 @@ public class UserController {
             @ApiResponse(responseCode = "200", description = "User returned", content = @Content(schema = @Schema(implementation = UserResponse.class))),
             @ApiResponse(responseCode = "404", description = "User not found", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public UserResponse getById(@PathVariable String id) {
+    public UserResponse getById(@PathVariable @NotBlank @Size(max = 64) String id) {
         return mapper.toResponse(service.findById(id));
     }
 
@@ -74,7 +78,7 @@ public class UserController {
             @ApiResponse(responseCode = "400", description = "Invalid request or duplicate email", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "404", description = "User not found", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public UserResponse update(@PathVariable String id, @Valid @RequestBody UpdateUserRequest request) {
+    public UserResponse update(@PathVariable @NotBlank @Size(max = 64) String id, @Valid @RequestBody UpdateUserRequest request) {
         return mapper.toResponse(service.updateUser(id, request.fullName(), request.email(), request.phone()));
     }
 
@@ -86,7 +90,7 @@ public class UserController {
             @ApiResponse(responseCode = "204", description = "User deleted"),
             @ApiResponse(responseCode = "404", description = "User not found", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public void delete(@PathVariable String id) {
+    public void delete(@PathVariable @NotBlank @Size(max = 64) String id) {
         service.deleteUser(id);
     }
 }

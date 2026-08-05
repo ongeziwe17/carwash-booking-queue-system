@@ -12,21 +12,17 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
+@Validated
 @Tag(name = "Bookings", description = "Operations for managing bookings.")
 @RequestMapping("/api/bookings")
 public class BookingController {
@@ -39,11 +35,11 @@ public class BookingController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('STAFF','BUSINESS_OWNER','PLATFORM_ADMIN')")
-    @Operation(summary = "List all")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successful operation"),
-            @ApiResponse(responseCode = "400", description = "Bad request", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Not found", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+    @Operation(summary = "List bookings")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Bookings returned"),
+            @ApiResponse(responseCode = "401", description = "Authentication required", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Access denied", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public List<Booking> getAll() {
@@ -52,72 +48,59 @@ public class BookingController {
 
     @GetMapping("/{id}")
     @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
-    @Operation(summary = "Get by ID")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successful operation"),
-            @ApiResponse(responseCode = "400", description = "Bad request", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Not found", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
-            @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
-    })
-    public Booking getById(@PathVariable String id) {
+    @Operation(summary = "Get booking by ID")
+    public Booking getById(@PathVariable @NotBlank @Size(max = 64) String id) {
         return service.findById(id);
     }
 
     @PostMapping
     @PreAuthorize("@resourceAuthorization.canCreateFor(authentication, #req.userId())")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "Resource created"),
-            @ApiResponse(responseCode = "400", description = "Bad request", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Not found", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+    @Operation(summary = "Create booking")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Booking created"),
+            @ApiResponse(responseCode = "400", description = "Invalid request or booking rule violation", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Authentication required", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Access denied", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Referenced resource not found", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "415", description = "Unsupported media type", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public Booking create(@Valid @RequestBody CreateBookingRequest req) {
-        return service.createBooking(req.toBooking());
+        return service.createBooking(req.bookingId(), req.userId(), req.vehicleId(), req.serviceId(),
+                req.scheduledDateTime(), req.specialRequest());
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
-    public Booking update(@PathVariable String id, @Valid @RequestBody UpdateBookingRequest request) {
-        return service.updateBooking(
-                id,
-                request.vehicleId(),
-                request.serviceId(),
-                request.scheduledDateTime(),
-                request.specialRequest()
-        );
+    @Operation(summary = "Update booking")
+    public Booking update(
+            @PathVariable @NotBlank @Size(max = 64) String id,
+            @Valid @RequestBody UpdateBookingRequest request
+    ) {
+        return service.updateBooking(id, request.vehicleId(), request.serviceId(),
+                request.scheduledDateTime(), request.specialRequest());
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
-    public void delete(@PathVariable String id) {
+    @Operation(summary = "Cancel booking and return no content")
+    public void delete(@PathVariable @NotBlank @Size(max = 64) String id) {
         service.cancelBooking(id);
     }
 
     @PostMapping("/{id}/confirm")
     @PreAuthorize("hasAnyRole('STAFF','BUSINESS_OWNER','PLATFORM_ADMIN')")
     @Operation(summary = "Confirm booking")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successful operation"),
-            @ApiResponse(responseCode = "400", description = "Bad request", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Not found", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
-            @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
-    })
-    public Booking confirm(@PathVariable String id) {
+    public Booking confirm(@PathVariable @NotBlank @Size(max = 64) String id) {
         return service.confirmBooking(id);
     }
 
     @PostMapping("/{id}/cancel")
     @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successful operation"),
-            @ApiResponse(responseCode = "400", description = "Bad request", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Not found", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
-            @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
-    })
-    public Booking cancel(@PathVariable String id) {
+    @Operation(summary = "Cancel booking")
+    public Booking cancel(@PathVariable @NotBlank @Size(max = 64) String id) {
         return service.cancelBooking(id);
     }
 }

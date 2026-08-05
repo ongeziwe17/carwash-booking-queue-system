@@ -291,7 +291,9 @@ public class ApiIntegrationTest {
                         .content(objectMapper.writeValueAsString(queueEntry)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Queue position")))
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Request validation failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("position"))
                 .andExpect(jsonPath("$.path").value("/api/queue-entries"));
     }
 
@@ -577,9 +579,11 @@ public class ApiIntegrationTest {
                         .content(invalidBooking))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("bookingId")))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("userId")))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("scheduledDateTime")))
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Request validation failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("bookingId"))
+                .andExpect(jsonPath("$.fieldErrors[1].field").value("scheduledDateTime"))
+                .andExpect(jsonPath("$.fieldErrors[2].field").value("userId"))
                 .andExpect(jsonPath("$.path").value("/api/bookings"));
     }
 

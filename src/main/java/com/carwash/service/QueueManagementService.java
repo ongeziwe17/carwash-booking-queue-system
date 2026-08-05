@@ -30,6 +30,14 @@ public class QueueManagementService {
         this.notificationManagementService = notificationManagementService;
     }
 
+    public QueueEntry createQueueEntry(String queueEntryId, String bookingId, String serviceId, int position) {
+        Booking booking = new Booking();
+        booking.setBookingId(bookingId);
+        Service service = new Service();
+        service.setServiceId(serviceId);
+        return createQueueEntry(new QueueEntry(queueEntryId, booking, service, position));
+    }
+
     public QueueEntry createQueueEntry(QueueEntry queueEntry) {
         validateQueueEntry(queueEntry);
         queueEntryRepository.save(queueEntry);

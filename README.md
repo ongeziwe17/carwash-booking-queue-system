@@ -175,6 +175,22 @@ Bootstrap administration is disabled by default. Configure all `SECURE_BOOTSTRAP
 - `/api/notifications`
 - `/api/reports/daily-summary`
 
+
+## API validation and errors
+
+All JSON request bodies use explicit request DTOs and Bean Validation. Unknown JSON properties are rejected,
+including attempts to submit server-controlled fields. Query and path parameters use typed binding and safe
+validation; report dates use ISO `yyyy-MM-dd` format.
+
+Every error response contains `status`, a stable application `code`, a safe `message`, an ISO-8601 UTC
+`timestamp`, the request `path`, and a `fieldErrors` array. Validation errors use `VALIDATION_FAILED` and
+sorted field entries. Malformed JSON uses `MALFORMED_REQUEST`; missing resources use `RESOURCE_NOT_FOUND`;
+missing or invalid authentication remains 401; authenticated authorization failures remain 403; unexpected
+failures use `INTERNAL_ERROR` with the generic message `An unexpected error occurred`.
+
+See [API Documentation](documentation/API-DOCUMENTATION.md#standard-error-contract) for the full code table
+and representative 400, 401, 403, 404, and 500 responses.
+
 ## Product documentation
 
 - [Architecture](documentation/ARCHITECTURE.md)

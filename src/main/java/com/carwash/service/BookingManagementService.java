@@ -48,6 +48,23 @@ public class BookingManagementService {
         this.notificationManagementService = notificationManagementService;
     }
 
+    public Booking createBooking(
+            String bookingId,
+            String userId,
+            String vehicleId,
+            String serviceId,
+            LocalDateTime scheduledDateTime,
+            String specialRequest
+    ) {
+        User user = new User();
+        user.setUserId(userId);
+        Vehicle vehicle = new Vehicle();
+        vehicle.setVehicleId(vehicleId);
+        Service service = new Service();
+        service.setServiceId(serviceId);
+        return createBooking(new Booking(bookingId, user, vehicle, service, scheduledDateTime, specialRequest));
+    }
+
     public Booking createBooking(Booking booking) {
         validateAndResolveNewBooking(booking);
         bookingRepository.save(booking);

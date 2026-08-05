@@ -17,6 +17,16 @@ public class ServiceCatalogService {
         this.serviceRepository = serviceRepository;
     }
 
+    public Service createService(
+            String serviceId,
+            String serviceName,
+            String description,
+            BigDecimal price,
+            int estimatedDurationMin
+    ) {
+        return createService(new Service(serviceId, serviceName, description, price, estimatedDurationMin));
+    }
+
     public Service createService(Service service) {
         validateService(service);
         serviceRepository.save(service);
@@ -35,6 +45,26 @@ public class ServiceCatalogService {
     public List<Service> findByActive(boolean active) {
         return serviceRepository.findAll().stream()
                 .filter(service -> service.isActive() == active).toList();
+    }
+
+    public Service updateService(
+            String serviceId,
+            String serviceName,
+            String description,
+            BigDecimal price,
+            int estimatedDurationMin
+    ) {
+        Service existing = findById(serviceId);
+        Service updated = new Service();
+        updated.setServiceId(serviceId);
+        updated.setServiceName(serviceName);
+        updated.setDescription(description);
+        updated.setPrice(price);
+        updated.setEstimatedDurationMin(estimatedDurationMin);
+        validateService(updated);
+        existing.updateDetails(serviceName, description, price, estimatedDurationMin);
+        serviceRepository.save(existing);
+        return existing;
     }
 
     public Service updateService(Service service) {

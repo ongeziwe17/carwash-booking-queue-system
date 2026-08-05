@@ -1,14 +1,23 @@
 package com.carwash.api.dto;
 
-import com.carwash.domain.Booking;
-import com.carwash.domain.QueueEntry;
-import com.carwash.domain.Service;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 
-public record CreateQueueEntryRequest(String queueEntryId, String bookingId, String serviceId, int position) {
+public record CreateQueueEntryRequest(
+        @NotBlank @Size(max = 64) String queueEntryId,
+        @NotBlank @Size(max = 64) String bookingId,
+        @NotBlank @Size(max = 64) String serviceId,
+        @NotNull @Positive Integer position
+) {
+    public CreateQueueEntryRequest {
+        queueEntryId = trim(queueEntryId);
+        bookingId = trim(bookingId);
+        serviceId = trim(serviceId);
+    }
 
-    public QueueEntry toQueueEntry() {
-        Booking booking = new Booking(); booking.setBookingId(bookingId);
-        Service service = new Service(); service.setServiceId(serviceId);
-        return new QueueEntry(queueEntryId, booking, service, position);
+    private static String trim(String value) {
+        return value == null ? null : value.trim();
     }
 }

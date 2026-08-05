@@ -119,7 +119,8 @@ class Sec003RemediationIntegrationTest {
                         .content("{\"roleName\":\"ADMIN\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value("Malformed request body"))
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
+                .andExpect(jsonPath("$.message").value("Malformed or invalid request body"))
                 .andExpect(jsonPath("$.path").value("/api/admin/users/" + targetUserId + "/role"))
                 .andExpect(content().string(not(containsString("HttpMessageNotReadableException"))))
                 .andExpect(content().string(not(containsString("RoleName"))));
