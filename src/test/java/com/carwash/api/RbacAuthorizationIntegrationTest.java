@@ -383,25 +383,31 @@ class RbacAuthorizationIntegrationTest {
             String attemptedOwnerId,
             String label
     ) throws Exception {
-        Map<String, Object> request = new LinkedHashMap<>(updateBookingRequest(
+        Map<String, Object> allowedRequest = updateBookingRequest(
                 resources.alternateVehicleId(),
                 resources.serviceId(),
                 nextScheduledTime(),
                 label + " operational update"
-        ));
-        request.put("bookingId", "replacement-booking-id");
-        request.put("userId", attemptedOwnerId);
-        request.put("status", "COMPLETED");
-        request.put("createdAt", LocalDateTime.now().minusDays(5).toString());
-        request.put("queueEntry", Map.of("queueEntryId", "injected"));
+        );
 
         mockMvc.perform(put("/api/bookings/{id}", resources.bookingId())
                         .header(HttpHeaders.AUTHORIZATION, operator.bearer())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(objectMapper.writeValueAsString(allowedRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.bookingId").value(resources.bookingId()))
                 .andExpect(jsonPath("$.user.userId").value(resources.ownerId()));
+
+        Map<String, Object> ownershipTransferRequest = new LinkedHashMap<>(allowedRequest);
+        ownershipTransferRequest.put("userId", attemptedOwnerId);
+
+        mockMvc.perform(put("/api/bookings/{id}", resources.bookingId())
+                        .header(HttpHeaders.AUTHORIZATION, operator.bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(ownershipTransferRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
+                .andExpect(jsonPath("$.message").value("Malformed or invalid request body"));
 
         assertEquals(resources.ownerId(), bookings.findById(resources.bookingId()).getUser().getUserId());
     }
@@ -448,7 +454,7 @@ class RbacAuthorizationIntegrationTest {
     }
 
     private ResourceSet createResourceSet(String ownerId, String label) {
-        String suffix = UUID.randomUUID().toString();
+        String suffix = UUID.randomUUID().toString().substring(0, 12);
         String primaryVehicleId = label + "-vehicle-primary-" + suffix;
         String alternateVehicleId = label + "-vehicle-alternate-" + suffix;
         String serviceId = label + "-service-" + suffix;

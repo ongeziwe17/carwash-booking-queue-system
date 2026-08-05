@@ -84,15 +84,10 @@ class Sec003RemediationIntegrationTest {
         );
 
         Map<String, Object> transferRequest = new LinkedHashMap<>();
-        transferRequest.put("bookingId", "replacement-booking-id");
-        transferRequest.put("userId", otherId);
         transferRequest.put("vehicleId", otherVehicleId);
         transferRequest.put("serviceId", serviceId);
         transferRequest.put("scheduledDateTime", LocalDateTime.now().plusDays(3).toString());
         transferRequest.put("specialRequest", "attempted transfer");
-        transferRequest.put("status", "COMPLETED");
-        transferRequest.put("createdAt", LocalDateTime.now().minusDays(2).toString());
-        transferRequest.put("queueEntry", Map.of("queueEntryId", "injected"));
 
         mockMvc.perform(put("/api/bookings/{id}", bookingId)
                         .with(customerJwt(ownerId))
@@ -100,6 +95,7 @@ class Sec003RemediationIntegrationTest {
                         .content(objectMapper.writeValueAsString(transferRequest)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
                 .andExpect(jsonPath("$.message").value("Vehicle does not belong to booking owner"));
 
         Booking unchanged = bookings.findById(bookingId);

@@ -491,7 +491,7 @@ public class ApiIntegrationTest {
         Map<String, Object> vehicle = Map.of(
                 "userId", prefix + "-user",
                 "vehicleId", prefix + "-vehicle",
-                "plateNumber", prefix + "-plate",
+                "plateNumber", "PLATE-" + UUID.randomUUID().toString().substring(0, 8),
                 "vehicleType", "SUV",
                 "brand", "Toyota",
                 "model", "Rav4",
@@ -757,7 +757,7 @@ public class ApiIntegrationTest {
         Map<String, Object> vehicle = Map.of(
                 "userId", prefix + "-user",
                 "vehicleId", prefix + "-vehicle",
-                "plateNumber", prefix + "-plate",
+                "plateNumber", "PLATE-" + UUID.randomUUID().toString().substring(0, 8),
                 "vehicleType", "SUV",
                 "brand", "Toyota",
                 "model", "Rav4",

@@ -77,7 +77,7 @@ class RequestValidationIntegrationTest {
         invalidVehicle.put("notes", "x".repeat(501));
         assertValidation(post("/api/vehicles"), invalidVehicle, "notes");
 
-        createVehicle(userId, vehicleId, prefix + "-plate");
+        createVehicle(userId, vehicleId, "VAL-" + UUID.randomUUID().toString().substring(0, 8));
         assertValidation(put("/api/vehicles/{id}", vehicleId), Map.of(
                 "plateNumber", prefix + "-plate", "vehicleType", "SUV", "brand", "Toyota",
                 "model", " ", "color", "Black", "notes", "ok"), "model");
