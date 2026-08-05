@@ -1,6 +1,5 @@
 package com.carwash.api;
 
-import com.carwash.api.dto.CreateBookingRequest;
 import com.carwash.domain.Booking;
 import com.carwash.domain.Service;
 import com.carwash.domain.Vehicle;
@@ -75,26 +74,20 @@ class Sec003RemediationIntegrationTest {
         services.createService(new Service(serviceId, "Transfer Test Wash", "security regression",
                 BigDecimal.valueOf(150), 30));
 
-        Booking booking = new CreateBookingRequest(
+        bookings.createBooking(
                 bookingId,
                 ownerId,
                 ownerVehicleId,
                 serviceId,
                 LocalDateTime.now().plusDays(2),
                 "original request"
-        ).toBooking();
-        bookings.createBooking(booking);
+        );
 
         Map<String, Object> transferRequest = new LinkedHashMap<>();
-        transferRequest.put("bookingId", "replacement-booking-id");
-        transferRequest.put("userId", otherId);
         transferRequest.put("vehicleId", otherVehicleId);
         transferRequest.put("serviceId", serviceId);
         transferRequest.put("scheduledDateTime", LocalDateTime.now().plusDays(3).toString());
         transferRequest.put("specialRequest", "attempted transfer");
-        transferRequest.put("status", "COMPLETED");
-        transferRequest.put("createdAt", LocalDateTime.now().minusDays(2).toString());
-        transferRequest.put("queueEntry", Map.of("queueEntryId", "injected"));
 
         mockMvc.perform(put("/api/bookings/{id}", bookingId)
                         .with(customerJwt(ownerId))
@@ -102,6 +95,7 @@ class Sec003RemediationIntegrationTest {
                         .content(objectMapper.writeValueAsString(transferRequest)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
                 .andExpect(jsonPath("$.message").value("Vehicle does not belong to booking owner"));
 
         Booking unchanged = bookings.findById(bookingId);
@@ -119,7 +113,8 @@ class Sec003RemediationIntegrationTest {
                         .content("{\"roleName\":\"ADMIN\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value("Malformed request body"))
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
+                .andExpect(jsonPath("$.message").value("Malformed or invalid request body"))
                 .andExpect(jsonPath("$.path").value("/api/admin/users/" + targetUserId + "/role"))
                 .andExpect(content().string(not(containsString("HttpMessageNotReadableException"))))
                 .andExpect(content().string(not(containsString("RoleName"))));

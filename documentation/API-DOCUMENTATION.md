@@ -22,7 +22,7 @@ http://localhost:8080/v3/api-docs
 
 ## Current API Areas
 
-The current backend exposes the endpoints below. Authentication and RBAC are not enforced by these endpoints yet.
+The current backend exposes the endpoints below. Bearer-token authentication, RBAC, ownership checks, request validation, and the standard error contract are enforced where applicable.
 
 ### Users
 
@@ -46,7 +46,7 @@ User endpoints use bounded API contracts rather than binding or returning the do
 
 Registration accepts a raw `password` at the request boundary. The service validates it without trimming and uses BCrypt to create a salted encoded credential before constructing and storing the user. Credential data is never included in user responses. Registration also activates the account and sets its creation timestamp on the server. Email addresses and surrounding profile whitespace are normalized before in-memory persistence, and duplicate email addresses are rejected case-insensitively.
 
-The repository remains in-memory, so all users and their encoded credentials are lost when the application restarts. Authentication, token issuance, and role-based access control (RBAC) remain unimplemented.
+The repository remains in-memory, so all users and their encoded credentials are lost when the application restarts. JWT authentication, token issuance, role-based authorization, and ownership enforcement are implemented for the current API.
 
 ### Vehicles
 
@@ -56,7 +56,7 @@ Base path: `/api/vehicles`
 |--------|---------------------------------|-------------|----------------------------------|
 | GET    | `/api/vehicles`                 | Implemented | List vehicle records.            |
 | GET    | `/api/vehicles/{id}`            | Implemented | Retrieve a vehicle record by ID. |
-| POST   | `/api/vehicles?userId={userId}` | Implemented | Create a vehicle for a user.     |
+| POST   | `/api/vehicles`                 | Implemented | Create a vehicle for a user using `CreateVehicleRequest`. |
 | PUT    | `/api/vehicles/{id}`            | Implemented | Update a vehicle record.         |
 | DELETE | `/api/vehicles/{id}`            | Implemented | Delete a vehicle record.         |
 
@@ -119,20 +119,104 @@ Base path: `/api/reports`
 
 | Method | Path                                           | Status                | Purpose                                                                              |
 |--------|------------------------------------------------|-----------------------|--------------------------------------------------------------------------------------|
-| GET    | `/api/reports/daily-summary?date={yyyy-MM-dd}` | Partially implemented | Return a basic daily summary computed from current in-memory booking and queue data. |
+| GET    | `/api/reports/daily-summary?date={yyyy-MM-dd}` | Implemented | Return a basic daily summary computed from current in-memory booking and queue data. |
 
 ## Planned Endpoints Not Yet Implemented
 
 The following API areas are planned/future and should not be treated as current functionality:
 
-- Authentication/login/logout/token refresh endpoints.
-- RBAC or permission-management endpoints.
+- Logout and refresh-token endpoints.
+- Additional permission-management endpoints beyond platform-admin role assignment.
 - Business registration and tenant-management endpoints.
 - PostgreSQL-backed administrative persistence endpoints beyond current CRUD behavior.
 - Payment checkout, webhook, refund, or receipt endpoints.
 - External notification provider webhook or retry endpoints.
 - Ratings and feedback endpoints.
 - Rich analytics/dashboard endpoints beyond the basic daily summary.
+
+
+## Standard Error Contract
+
+Every API error is returned as JSON with the same shape:
+
+```json
+{
+  "status": 400,
+  "code": "VALIDATION_FAILED",
+  "message": "Request validation failed",
+  "timestamp": "2026-08-05T08:30:00Z",
+  "path": "/api/vehicles",
+  "fieldErrors": [
+    {
+      "field": "plateNumber",
+      "message": "must not be blank"
+    }
+  ]
+}
+```
+
+`timestamp` is an ISO-8601 UTC instant. `fieldErrors` is always present, is sorted by field name, and is
+empty for non-validation errors. Responses never contain rejected values, request bodies, Java exception
+class names, stack traces, passwords, encoded credentials, JWTs, authorization headers, or signing secrets.
+
+Stable error codes are:
+
+| Code | HTTP status | Meaning |
+|------|-------------|---------|
+| `VALIDATION_FAILED` | 400 | Bean Validation failed for a request body, path variable, or method parameter. |
+| `MALFORMED_REQUEST` | 400 | JSON is missing, syntactically invalid, contains an invalid type/enum/date, or contains an unknown property. |
+| `INVALID_PARAMETER` | 400 | A query or path parameter cannot be converted to its declared type. |
+| `MISSING_PARAMETER` | 400 | A required request parameter is absent. |
+| `BUSINESS_RULE_VIOLATION` | 400 | A safe, deliberate domain rule rejected the operation. |
+| `RESOURCE_NOT_FOUND` | 404 | A requested resource or `/api/**` route does not exist. |
+| `INVALID_CREDENTIALS` | 401 | Login credentials are invalid. |
+| `AUTHENTICATION_REQUIRED` | 401 | A bearer token is missing or invalid. |
+| `ACCESS_DENIED` | 403 | The authenticated caller is not authorized. |
+| `METHOD_NOT_ALLOWED` | 405 | The HTTP method is not supported for the route. |
+| `UNSUPPORTED_MEDIA_TYPE` | 415 | The request content type is unsupported. |
+| `INTERNAL_ERROR` | 500 | An unexpected server failure occurred; details are logged internally only. |
+
+Unknown JSON properties are rejected. This prevents clients from silently attempting to set
+server-controlled fields such as roles, permissions, account status, timestamps, encoded passwords,
+activation state, or queue relationships.
+
+### Representative errors
+
+Validation failure:
+
+```json
+{"status":400,"code":"VALIDATION_FAILED","message":"Request validation failed","timestamp":"2026-08-05T08:30:00Z","path":"/api/vehicles","fieldErrors":[{"field":"plateNumber","message":"must not be blank"}]}
+```
+
+Malformed body:
+
+```json
+{"status":400,"code":"MALFORMED_REQUEST","message":"Malformed or invalid request body","timestamp":"2026-08-05T08:30:00Z","path":"/api/services","fieldErrors":[]}
+```
+
+Unauthenticated request:
+
+```json
+{"status":401,"code":"AUTHENTICATION_REQUIRED","message":"Authentication is required","timestamp":"2026-08-05T08:30:00Z","path":"/api/bookings","fieldErrors":[]}
+```
+
+Forbidden request:
+
+```json
+{"status":403,"code":"ACCESS_DENIED","message":"Access denied","timestamp":"2026-08-05T08:30:00Z","path":"/api/admin/users/u1/role","fieldErrors":[]}
+```
+
+Missing resource:
+
+```json
+{"status":404,"code":"RESOURCE_NOT_FOUND","message":"Vehicle not found: v-404","timestamp":"2026-08-05T08:30:00Z","path":"/api/vehicles/v-404","fieldErrors":[]}
+```
+
+Unexpected failure:
+
+```json
+{"status":500,"code":"INTERNAL_ERROR","message":"An unexpected error occurred","timestamp":"2026-08-05T08:30:00Z","path":"/api/example","fieldErrors":[]}
+```
 
 ## Export OpenAPI JSON
 

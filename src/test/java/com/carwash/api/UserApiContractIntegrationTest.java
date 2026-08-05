@@ -61,34 +61,24 @@ class UserApiContractIntegrationTest {
     }
 
     @Test
-    void updateUsesPathIdAndCannotChangeServerControlledFields() throws Exception {
+    void updateRejectsUnknownServerControlledFields() throws Exception {
         String id = unique("update");
         create(id, "Original", id + "@example.com", "111").andExpect(status().isCreated());
-        String createdAt = objectMapper.readTree(mockMvc.perform(get("/api/users/{id}", id)).andReturn()
-                .getResponse().getContentAsString()).get("createdAt").asString();
 
         Map<String, Object> body = new HashMap<>();
-        body.put("userId", "body-id");
-        body.put("fullName", " Updated User ");
-        body.put("email", " UPDATED." + id + "@Example.COM ");
-        body.put("phone", " 222 ");
-        body.put("password", "replacement");
-        body.put("passwordHash", "replacement-hash");
-        body.put("accountStatus", "SUSPENDED");
-        body.put("createdAt", "2000-01-01T00:00:00");
-        body.put("role", Map.of("roleName", "ADMIN"));
+        body.put("fullName", "Updated User");
+        body.put("email", "updated." + id + "@example.com");
+        body.put("phone", "222");
+        body.put("passwordHash", "must-not-be-returned");
 
-        var result = mockMvc.perform(put("/api/users/{id}", id).contentType(MediaType.APPLICATION_JSON)
+        String response = mockMvc.perform(put("/api/users/{id}", id).contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userId").value(id))
-                .andExpect(jsonPath("$.fullName").value("Updated User"))
-                .andExpect(jsonPath("$.email").value(("updated." + id + "@example.com").toLowerCase()))
-                .andExpect(jsonPath("$.phone").value("222"))
-                .andExpect(jsonPath("$.accountStatus").value("ACTIVE"))
-                .andExpect(jsonPath("$.createdAt").value(createdAt));
-        assertSafe(result);
-        mockMvc.perform(get("/api/users/body-id")).andExpect(status().isNotFound());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
+                .andExpect(jsonPath("$.message").value("Malformed or invalid request body"))
+                .andExpect(jsonPath("$.fieldErrors").isArray())
+                .andReturn().getResponse().getContentAsString();
+        org.junit.jupiter.api.Assertions.assertFalse(response.contains("must-not-be-returned"));
     }
 
     @Test
@@ -165,9 +155,11 @@ class UserApiContractIntegrationTest {
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message", notNullValue()))
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("Request validation failed"))
                 .andExpect(jsonPath("$.timestamp", notNullValue()))
-                .andExpect(jsonPath("$.path").value("/api/users"));
+                .andExpect(jsonPath("$.path").value("/api/users"))
+                .andExpect(jsonPath("$.fieldErrors").isArray());
     }
 
     private void assertSafe(org.springframework.test.web.servlet.ResultActions result) throws Exception {

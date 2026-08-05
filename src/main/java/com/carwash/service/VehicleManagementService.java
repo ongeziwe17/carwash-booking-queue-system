@@ -20,6 +20,19 @@ public class VehicleManagementService {
         this.userRepository = userRepository;
     }
 
+    public Vehicle createVehicle(
+            String userId,
+            String vehicleId,
+            String plateNumber,
+            String vehicleType,
+            String brand,
+            String model,
+            String color,
+            String notes
+    ) {
+        return createVehicle(new Vehicle(vehicleId, plateNumber, vehicleType, brand, model, color, notes), userId);
+    }
+
     public Vehicle createVehicle(Vehicle vehicle, String userId) {
         validateVehicle(vehicle);
         User owner = requireUser(userId);
@@ -43,6 +56,18 @@ public class VehicleManagementService {
     public List<Vehicle> findByUserId(String userId) {
         requireUser(userId);
         return vehicleRepository.findByUserId(userId);
+    }
+
+    public Vehicle updateVehicle(
+            String vehicleId,
+            String plateNumber,
+            String vehicleType,
+            String brand,
+            String model,
+            String color,
+            String notes
+    ) {
+        return updateVehicle(new Vehicle(vehicleId, plateNumber, vehicleType, brand, model, color, notes));
     }
 
     public Vehicle updateVehicle(Vehicle vehicle) {

@@ -3,20 +3,24 @@ package com.carwash.api.dto;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
 
 public record UpdateBookingRequest(
-        @NotBlank(message = "vehicleId is required")
-        String vehicleId,
-
-        @NotBlank(message = "serviceId is required")
-        String serviceId,
-
+        @NotBlank(message = "vehicleId is required") @Size(max = 64) String vehicleId,
+        @NotBlank(message = "serviceId is required") @Size(max = 64) String serviceId,
         @NotNull(message = "scheduledDateTime is required")
-        @Future(message = "scheduledDateTime must be in the future")
-        LocalDateTime scheduledDateTime,
-
-        String specialRequest
+        @Future(message = "scheduledDateTime must be in the future") LocalDateTime scheduledDateTime,
+        @Size(max = 1000) String specialRequest
 ) {
+    public UpdateBookingRequest {
+        vehicleId = trim(vehicleId);
+        serviceId = trim(serviceId);
+        specialRequest = trim(specialRequest);
+    }
+
+    private static String trim(String value) {
+        return value == null ? null : value.trim();
+    }
 }
