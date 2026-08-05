@@ -18,13 +18,17 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -158,6 +162,110 @@ class ApiErrorContractIntegrationTest {
     }
 
     @Test
+    void openApiDocumentsActualRequestAndErrorContracts() throws Exception {
+        MvcResult result = mockMvc.perform(get("/v3/api-docs").with(anonymous()))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode openApi = objectMapper.readTree(result.getResponse().getContentAsString());
+
+        assertOperation(openApi, "/api/admin/users/{userId}/role", "put",
+                "200", "400", "401", "403", "404", "405", "415", "500");
+        assertOperation(openApi, "/api/auth/login", "post",
+                "200", "400", "401", "405", "415", "500");
+        assertOperation(openApi, "/api/auth/me", "get",
+                "200", "401", "404", "405", "500");
+
+        assertOperation(openApi, "/api/bookings", "get",
+                "200", "401", "403", "405", "500");
+        assertOperation(openApi, "/api/bookings", "post",
+                "201", "400", "401", "403", "404", "405", "415", "500");
+        assertOperation(openApi, "/api/bookings/{id}", "get",
+                "200", "400", "401", "403", "404", "405", "500");
+        assertOperation(openApi, "/api/bookings/{id}", "put",
+                "200", "400", "401", "403", "404", "405", "415", "500");
+        assertOperation(openApi, "/api/bookings/{id}", "delete",
+                "204", "400", "401", "403", "404", "405", "500");
+        assertOperation(openApi, "/api/bookings/{id}/confirm", "post",
+                "200", "400", "401", "403", "404", "405", "500");
+        assertOperation(openApi, "/api/bookings/{id}/cancel", "post",
+                "200", "400", "401", "403", "404", "405", "500");
+
+        assertOperation(openApi, "/api/notifications/user/{userId}", "get",
+                "200", "400", "401", "403", "405", "500");
+
+        assertOperation(openApi, "/api/queue-entries", "get",
+                "200", "401", "403", "405", "500");
+        assertOperation(openApi, "/api/queue-entries", "post",
+                "201", "400", "401", "403", "404", "405", "415", "500");
+        assertOperation(openApi, "/api/queue-entries/{id}", "get",
+                "200", "400", "401", "403", "404", "405", "500");
+        assertOperation(openApi, "/api/queue-entries/{id}", "delete",
+                "204", "400", "401", "403", "404", "405", "500");
+        assertOperation(openApi, "/api/queue-entries/{id}/position", "put",
+                "200", "400", "401", "403", "404", "405", "415", "500");
+        assertOperation(openApi, "/api/queue-entries/{id}/call-next", "post",
+                "200", "400", "401", "403", "404", "405", "500");
+        assertOperation(openApi, "/api/queue-entries/{id}/start", "post",
+                "200", "400", "401", "403", "404", "405", "500");
+        assertOperation(openApi, "/api/queue-entries/{id}/complete", "post",
+                "200", "400", "401", "403", "404", "405", "500");
+
+        assertOperation(openApi, "/api/reports/daily-summary", "get",
+                "200", "400", "401", "403", "405", "500");
+
+        assertOperation(openApi, "/api/services", "get",
+                "200", "400", "401", "403", "405", "500");
+        assertOperation(openApi, "/api/services", "post",
+                "201", "400", "401", "403", "405", "415", "500");
+        assertOperation(openApi, "/api/services/{id}", "get",
+                "200", "400", "401", "403", "404", "405", "500");
+        assertOperation(openApi, "/api/services/{id}", "put",
+                "200", "400", "401", "403", "404", "405", "415", "500");
+        assertOperation(openApi, "/api/services/{id}", "delete",
+                "204", "400", "401", "403", "404", "405", "500");
+        assertOperation(openApi, "/api/services/{id}/activate", "post",
+                "200", "400", "401", "403", "404", "405", "500");
+        assertOperation(openApi, "/api/services/{id}/deactivate", "post",
+                "200", "400", "401", "403", "404", "405", "500");
+
+        assertOperation(openApi, "/api/users", "get",
+                "200", "401", "403", "405", "500");
+        assertOperation(openApi, "/api/users", "post",
+                "201", "400", "405", "415", "500");
+        assertOperation(openApi, "/api/users/{id}", "get",
+                "200", "400", "401", "403", "404", "405", "500");
+        assertOperation(openApi, "/api/users/{id}", "put",
+                "200", "400", "401", "403", "404", "405", "415", "500");
+        assertOperation(openApi, "/api/users/{id}", "delete",
+                "204", "400", "401", "403", "404", "405", "500");
+
+        assertOperation(openApi, "/api/vehicles", "get",
+                "200", "401", "403", "405", "500");
+        assertOperation(openApi, "/api/vehicles", "post",
+                "201", "400", "401", "403", "404", "405", "415", "500");
+        assertOperation(openApi, "/api/vehicles/{id}", "get",
+                "200", "400", "401", "403", "404", "405", "500");
+        assertOperation(openApi, "/api/vehicles/{id}", "put",
+                "200", "400", "401", "403", "404", "405", "415", "500");
+        assertOperation(openApi, "/api/vehicles/{id}", "delete",
+                "204", "400", "401", "403", "404", "405", "500");
+
+        assertRequestSchema(openApi, "/api/admin/users/{userId}/role", "put", "AssignRoleRequest");
+        assertRequestSchema(openApi, "/api/auth/login", "post", "LoginRequest");
+        assertRequestSchema(openApi, "/api/bookings", "post", "CreateBookingRequest");
+        assertRequestSchema(openApi, "/api/bookings/{id}", "put", "UpdateBookingRequest");
+        assertRequestSchema(openApi, "/api/queue-entries", "post", "CreateQueueEntryRequest");
+        assertRequestSchema(openApi, "/api/queue-entries/{id}/position", "put",
+                "UpdateQueuePositionRequest");
+        assertRequestSchema(openApi, "/api/services", "post", "CreateServiceRequest");
+        assertRequestSchema(openApi, "/api/services/{id}", "put", "UpdateServiceRequest");
+        assertRequestSchema(openApi, "/api/users", "post", "CreateUserRequest");
+        assertRequestSchema(openApi, "/api/users/{id}", "put", "UpdateUserRequest");
+        assertRequestSchema(openApi, "/api/vehicles", "post", "CreateVehicleRequest");
+        assertRequestSchema(openApi, "/api/vehicles/{id}", "put", "UpdateVehicleRequest");
+    }
+
+    @Test
     void unexpectedFailuresReturnGenericSafeResponse() throws Exception {
         String internalSecret = "jwt-or-password-secret-value";
         MvcResult result = mockMvc.perform(get("/api/test/unexpected"))
@@ -168,6 +276,45 @@ class ApiErrorContractIntegrationTest {
                 .andExpect(jsonPath("$.message", not(containsString(internalSecret))))
                 .andReturn();
         assertSafeAndComplete(result, List.of(internalSecret, "RuntimeException", "stackTrace", "Authorization"));
+    }
+
+    private void assertOperation(
+            JsonNode openApi,
+            String path,
+            String method,
+            String... expectedResponseCodes
+    ) {
+        JsonNode operation = openApi.path("paths").path(path).path(method);
+        assertFalse(operation.isMissingNode(), () -> "Missing OpenAPI operation: " + method + " " + path);
+
+        JsonNode responses = operation.path("responses");
+        assertEquals(
+                new TreeSet<>(Set.of(expectedResponseCodes)),
+                new TreeSet<>(responses.propertyNames()),
+                () -> "Unexpected OpenAPI responses for " + method + " " + path
+        );
+
+        for (String responseCode : expectedResponseCodes) {
+            if (!responseCode.startsWith("4") && !responseCode.startsWith("5")) {
+                continue;
+            }
+            JsonNode response = responses.path(responseCode);
+            boolean usesStandardError = response.path("content").properties().stream()
+                    .map(entry -> entry.getValue().path("schema").path("$ref").asString())
+                    .anyMatch("#/components/schemas/ApiErrorResponse"::equals);
+            assertTrue(usesStandardError,
+                    () -> "Response " + responseCode + " must use ApiErrorResponse for " + method + " " + path);
+        }
+    }
+
+    private void assertRequestSchema(JsonNode openApi, String path, String method, String schemaName) {
+        JsonNode requestBody = openApi.path("paths").path(path).path(method).path("requestBody");
+        assertFalse(requestBody.isMissingNode(), () -> "Missing request body for " + method + " " + path);
+        boolean usesExpectedSchema = requestBody.path("content").properties().stream()
+                .map(entry -> entry.getValue().path("schema").path("$ref").asString())
+                .anyMatch(("#/components/schemas/" + schemaName)::equals);
+        assertTrue(usesExpectedSchema,
+                () -> "Expected request schema " + schemaName + " for " + method + " " + path);
     }
 
     private void assertMalformed(org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder request)
