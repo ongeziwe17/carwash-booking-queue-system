@@ -107,7 +107,7 @@ class DataIntegrityIntegrationTest {
         assertBusinessRule(delete("/api/users/" + userId), "/api/users/" + userId,
                 "User cannot be deleted while vehicles or bookings still reference it");
         assertBusinessRule(delete("/api/vehicles/" + vehicleId), "/api/vehicles/" + vehicleId,
-                "Vehicle cannot be deleted while bookings reference it");
+                "Vehicle cannot be deleted while bookings still reference it");
         assertBusinessRule(delete("/api/services/" + serviceId), "/api/services/" + serviceId,
                 "Referenced service cannot be deleted; deactivate it instead");
     }

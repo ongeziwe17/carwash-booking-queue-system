@@ -112,8 +112,9 @@ class AggregateIntegrityServiceTest {
         User user = activeUser("u-concurrent", "concurrent@example.com");
         assertTrue(users.insert(user));
         int count = 16;
-        ExecutorService executor = Executors.newFixedThreadPool(8);
-        CountDownLatch ready = new CountDownLatch(count);
+        int workers = 8;
+        ExecutorService executor = Executors.newFixedThreadPool(workers);
+        CountDownLatch ready = new CountDownLatch(workers);
         CountDownLatch start = new CountDownLatch(1);
         try {
             List<Future<Vehicle>> futures = java.util.stream.IntStream.range(0, count)
