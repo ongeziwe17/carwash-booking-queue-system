@@ -6,9 +6,15 @@ import com.carwash.repository.UserRepository;
 import java.util.Optional;
 
 public class InMemoryUserRepository extends InMemoryRepository<User, String> implements UserRepository {
+
     @Override
     public Optional<User> findByEmail(String email) {
-        return storage.values().stream().filter(user -> user.getEmail() != null && user.getEmail().equalsIgnoreCase(email)).findFirst();
+        if (email == null) {
+            return Optional.empty();
+        }
+        return storage.values().stream()
+                .filter(user -> user.getEmail() != null && user.getEmail().equalsIgnoreCase(email))
+                .findFirst();
     }
 
     @Override

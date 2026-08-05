@@ -8,14 +8,6 @@ import java.util.Optional;
 
 public class DatabaseUserRepository implements UserRepository {
 
-    /**
-     * Future database-backed UserRepository implementation stub.
-     * -----------------------------------------------------------------------------
-     * This class intentionally throws UnsupportedOperationException for all methods
-     * until a real database persistence mechanism is introduced.
-     * -----------------------------------------------------------------------------
-     */
-
     private static final String NOT_IMPLEMENTED = "Database repository is not implemented yet";
 
     @Override
@@ -24,12 +16,17 @@ public class DatabaseUserRepository implements UserRepository {
     }
 
     @Override
-    public void save(User entity) {
+    public boolean insert(User entity) {
         throw new UnsupportedOperationException(NOT_IMPLEMENTED);
     }
 
     @Override
-    public Optional<User> findById(String s) {
+    public boolean update(User entity) {
+        throw new UnsupportedOperationException(NOT_IMPLEMENTED);
+    }
+
+    @Override
+    public Optional<User> findById(String id) {
         throw new UnsupportedOperationException(NOT_IMPLEMENTED);
     }
 
@@ -39,7 +36,12 @@ public class DatabaseUserRepository implements UserRepository {
     }
 
     @Override
-    public void delete(String s) {
+    public boolean deleteById(String id) {
+        throw new UnsupportedOperationException(NOT_IMPLEMENTED);
+    }
+
+    @Override
+    public boolean existsById(String id) {
         throw new UnsupportedOperationException(NOT_IMPLEMENTED);
     }
 }

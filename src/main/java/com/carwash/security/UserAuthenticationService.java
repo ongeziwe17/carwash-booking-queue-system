@@ -15,11 +15,7 @@ public class UserAuthenticationService {
     private final JwtTokenService tokens;
     private final String dummyEncodedPassword;
 
-    public UserAuthenticationService(
-            UserRepository users,
-            UserCredentialService credentials,
-            JwtTokenService tokens
-    ) {
+    public UserAuthenticationService(UserRepository users, UserCredentialService credentials, JwtTokenService tokens) {
         this.users = users;
         this.credentials = credentials;
         this.tokens = tokens;
@@ -27,30 +23,15 @@ public class UserAuthenticationService {
     }
 
     public AuthenticationResult authenticate(String email, String rawPassword) {
-        String normalizedEmail = email == null
-                ? ""
-                : email.trim().toLowerCase(Locale.ROOT);
-
+        String normalizedEmail = email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
         User user = users.findByEmail(normalizedEmail).orElse(null);
-        String encodedPassword = user == null
-                ? dummyEncodedPassword
-                : user.getEncodedPassword();
-
+        String encodedPassword = user == null ? dummyEncodedPassword : user.getEncodedPassword();
         boolean credentialMatches = credentials.matches(rawPassword, encodedPassword);
         boolean activeUser = user != null && user.getAccountStatus() == AccountStatus.ACTIVE;
-
-        if (!activeUser || !credentialMatches) {
-            throw new InvalidCredentialsException();
-        }
-
+        if (!activeUser || !credentialMatches) throw new InvalidCredentialsException();
         JwtTokenService.IssuedToken token = tokens.issue(user);
         user.recordSuccessfulLogin();
-        users.save(user);
-        return new AuthenticationResult(
-                user,
-                token.value(),
-                token.expiresAt(),
-                token.expiresInSeconds()
-        );
+        if (!users.update(user)) throw new IllegalStateException("Authenticated user no longer exists");
+        return new AuthenticationResult(user, token.value(), token.expiresAt(), token.expiresInSeconds());
     }
 }
