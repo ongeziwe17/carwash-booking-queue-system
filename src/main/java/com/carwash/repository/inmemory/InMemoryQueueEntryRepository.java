@@ -2,14 +2,34 @@ package com.carwash.repository.inmemory;
 
 import com.carwash.domain.QueueEntry;
 import com.carwash.repository.QueueEntryRepository;
-import org.springframework.boot.context.properties.bind.handler.NoUnboundElementsBindHandler;
 
 import java.util.List;
 
-public class InMemoryQueueEntryRepository extends InMemoryRepository<QueueEntry, String> implements QueueEntryRepository {
+public class InMemoryQueueEntryRepository extends InMemoryRepository<QueueEntry, String>
+        implements QueueEntryRepository {
+
+    @Override
+    public List<QueueEntry> findByBookingId(String bookingId) {
+        return findMatching(queueEntry -> queueEntry.getBooking() != null
+                && bookingId.equals(queueEntry.getBooking().getBookingId()));
+    }
+
     @Override
     public List<QueueEntry> findByServiceId(String serviceId) {
-        return storage.values().stream().filter(queueEntry -> queueEntry.getService() != null && queueEntry.getService().getServiceId().equals(serviceId)).toList();
+        return findMatching(queueEntry -> queueEntry.getService() != null
+                && serviceId.equals(queueEntry.getService().getServiceId()));
+    }
+
+    @Override
+    public boolean existsByBookingId(String bookingId) {
+        return anyMatch(queueEntry -> queueEntry.getBooking() != null
+                && bookingId.equals(queueEntry.getBooking().getBookingId()));
+    }
+
+    @Override
+    public boolean existsByServiceId(String serviceId) {
+        return anyMatch(queueEntry -> queueEntry.getService() != null
+                && serviceId.equals(queueEntry.getService().getServiceId()));
     }
 
     @Override
