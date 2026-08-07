@@ -12,18 +12,14 @@ import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 class AuthenticationIntegrationTest {
-
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
     @Autowired UserRepository users;
@@ -31,15 +27,11 @@ class AuthenticationIntegrationTest {
     @Test
     void loginNormalizesEmailReturnsSafeBearerTokenAndPersistsLogin() throws Exception {
         register("auth-success", "customer@example.com");
-        String response = mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
+        String response = mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\" CUSTOMER@EXAMPLE.COM \",\"password\":\"LocalTestPassword123!\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tokenType").value("Bearer"))
-                .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.expiresAt").exists())
-                .andExpect(jsonPath("$.expiresInSeconds").value(1200))
-                .andExpect(jsonPath("$.user.userId").value("auth-success"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.accessToken").isNotEmpty()).andExpect(jsonPath("$.expiresAt").exists())
+                .andExpect(jsonPath("$.expiresInSeconds").value(1200)).andExpect(jsonPath("$.user.userId").value("auth-success"))
                 .andExpect(content().string(not(containsString("encodedPassword"))))
                 .andReturn().getResponse().getContentAsString();
         JsonNode json = objectMapper.readTree(response);
@@ -48,8 +40,7 @@ class AuthenticationIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value("auth-success"))
                 .andExpect(jsonPath("$.roleName").value("CUSTOMER"));
-        org.junit.jupiter.api.Assertions.assertNotNull(
-                users.findById("auth-success").orElseThrow().getLastLoginAt());
+        org.junit.jupiter.api.Assertions.assertNotNull(users.findById("auth-success").orElseThrow().getLastLoginAt());
     }
 
     @Test
@@ -59,7 +50,7 @@ class AuthenticationIntegrationTest {
         assertInvalid("valid@example.com", "WrongPassword123!");
         User user = users.findById("auth-invalid").orElseThrow();
         user.setAccountStatus(AccountStatus.SUSPENDED);
-        org.junit.jupiter.api.Assertions.assertTrue(users.update(user));
+        users.save(user);
         assertInvalid("valid@example.com", "LocalTestPassword123!");
     }
 
@@ -67,10 +58,8 @@ class AuthenticationIntegrationTest {
     void validationAndBearerProtectionUseJsonErrors() throws Exception {
         mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"bad\",\"password\":\" \"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string(not(containsString("secret-value"))));
-        mockMvc.perform(get("/api/users"))
-                .andExpect(status().isUnauthorized())
+                .andExpect(status().isBadRequest()).andExpect(content().string(not(containsString("secret-value"))));
+        mockMvc.perform(get("/api/users")).andExpect(status().isUnauthorized())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(401));
         mockMvc.perform(get("/api/users").header("Authorization", "Bearer malformed"))
@@ -85,18 +74,16 @@ class AuthenticationIntegrationTest {
     }
 
     private void register(String id, String email) throws Exception {
-        mockMvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"userId\":\"" + id + "\",\"fullName\":\"Test User\","
-                                + "\"email\":\"" + email + "\",\"phone\":\"0821234567\","
-                                + "\"password\":\"LocalTestPassword123!\"}"))
+        mockMvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON).content("{\"userId\":\"" + id
+                        + "\",\"fullName\":\"Test User\",\"email\":\"" + email
+                        + "\",\"phone\":\"0821234567\",\"password\":\"LocalTestPassword123!\"}"))
                 .andExpect(status().isCreated());
     }
 
     private void assertInvalid(String email, String password) throws Exception {
         mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.message").value("Invalid email or password"))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.message").value("Invalid email or password"))
                 .andExpect(jsonPath("$.path").value("/api/auth/login"));
     }
 }

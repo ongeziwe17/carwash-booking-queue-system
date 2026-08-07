@@ -39,21 +39,15 @@ class ServiceLayerTest {
         InMemoryBookingRepository bookingRepository = new InMemoryBookingRepository();
         InMemoryQueueEntryRepository queueRepository = new InMemoryQueueEntryRepository();
         InMemoryNotificationRepository notificationRepository = new InMemoryNotificationRepository();
-        InMemoryDataCoordinator coordinator = new InMemoryDataCoordinator();
 
         userService = new UserManagementService(userRepository, new UserCredentialService(
-                new BCryptPasswordEncoder(4), new PasswordSecurityProperties(4, 12, 200)),
-                vehicleRepository, bookingRepository, notificationRepository, coordinator);
-        vehicleService = new VehicleManagementService(vehicleRepository, userRepository, bookingRepository, coordinator);
-        catalogService = new ServiceCatalogService(serviceRepository, bookingRepository, queueRepository, coordinator);
-        notificationService = new NotificationManagementService(
-                notificationRepository, userRepository, bookingRepository, coordinator);
-        bookingService = new BookingManagementService(
-                bookingRepository, userRepository, vehicleRepository, serviceRepository,
-                queueRepository, notificationRepository, notificationService, coordinator);
-        queueService = new QueueManagementService(
-                queueRepository, bookingRepository, serviceRepository, notificationService, coordinator);
-        dailySummaryReportService = new DailySummaryReportService(bookingRepository, queueRepository, coordinator);
+                new BCryptPasswordEncoder(4), new PasswordSecurityProperties(4, 12, 200)));
+        vehicleService = new VehicleManagementService(vehicleRepository, userRepository);
+        catalogService = new ServiceCatalogService(serviceRepository);
+        notificationService = new NotificationManagementService(notificationRepository);
+        bookingService = new BookingManagementService(bookingRepository, userRepository, vehicleRepository, serviceRepository, notificationService);
+        queueService = new QueueManagementService(queueRepository, bookingRepository, serviceRepository, notificationService);
+        dailySummaryReportService = new DailySummaryReportService(bookingRepository, queueRepository);
     }
 
     @Test
