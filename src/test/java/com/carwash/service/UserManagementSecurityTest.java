@@ -3,6 +3,7 @@ package com.carwash.service;
 import com.carwash.config.PasswordSecurityProperties;
 import com.carwash.domain.User;
 import com.carwash.enums.AccountStatus;
+import com.carwash.repository.inmemory.InMemoryDataCoordinator;
 import com.carwash.repository.inmemory.InMemoryUserRepository;
 import com.carwash.security.RoleName;
 import com.carwash.security.UserCredentialService;
@@ -38,7 +39,11 @@ class UserManagementSecurityTest {
                 new UserCredentialService(
                         new BCryptPasswordEncoder(4),
                         new PasswordSecurityProperties(4, 12, 72)
-                )
+                ),
+                null,
+                null,
+                null,
+                new InMemoryDataCoordinator()
         );
     }
 

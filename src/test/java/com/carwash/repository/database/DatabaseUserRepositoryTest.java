@@ -3,17 +3,22 @@ package com.carwash.repository.database;
 import com.carwash.domain.User;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class DatabaseUserRepositoryTest {
 
     private final DatabaseUserRepository repository = new DatabaseUserRepository();
 
     @Test
-    void saveThrowsUnsupportedOperationException() {
+    void insertThrowsUnsupportedOperationException() {
         User user = User.withEncodedPassword("U-001", "Test User", "test@example.com", "01234", "hash", null);
+        assertThrows(UnsupportedOperationException.class, () -> repository.insert(user));
+    }
 
-        assertThrows(UnsupportedOperationException.class, () -> repository.save(user));
+    @Test
+    void updateThrowsUnsupportedOperationException() {
+        User user = User.withEncodedPassword("U-001", "Test User", "test@example.com", "01234", "hash", null);
+        assertThrows(UnsupportedOperationException.class, () -> repository.update(user));
     }
 
     @Test
@@ -28,7 +33,12 @@ class DatabaseUserRepositoryTest {
 
     @Test
     void deleteThrowsUnsupportedOperationException() {
-        assertThrows(UnsupportedOperationException.class, () -> repository.delete("U-001"));
+        assertThrows(UnsupportedOperationException.class, () -> repository.deleteById("U-001"));
+    }
+
+    @Test
+    void existsThrowsUnsupportedOperationException() {
+        assertThrows(UnsupportedOperationException.class, () -> repository.existsById("U-001"));
     }
 
     @Test
