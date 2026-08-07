@@ -72,6 +72,27 @@ jobs:
             exit 1
           fi
 
+      - name: Audit test isolation patterns
+        shell: bash
+        run: |
+          set -u
+          echo '--- fixed short IDs ---'
+          grep -R '"u1"\|"u2"\|"s1"\|"s2"\|"v1"\|"v2"\|"b1"\|"b2"' -n src/test || true
+          echo '--- static repositories ---'
+          grep -R "static.*Repository" -n src/test || true
+          echo '--- static AtomicLong ---'
+          grep -R "static.*AtomicLong" -n src/main src/test || true
+          echo '--- explicit test ordering ---'
+          grep -R "@Order" -n src/test || true
+          echo '--- sleeps ---'
+          grep -R "Thread.sleep" -n src/test || true
+          echo '--- context resets ---'
+          grep -R "@DirtiesContext" -n src/test || true
+          echo '--- HashMap fixtures ---'
+          grep -R "new HashMap" -n src/test || true
+          echo '--- misplaced configuration reference ---'
+          grep -R "api.dto.ApplicationServiceConfig" -n src || true
+
   maven-verification:
     name: Maven verification
     runs-on: ubuntu-latest
@@ -180,6 +201,120 @@ jobs:
           name: openapi-${{ github.run_number }}-${{ github.sha }}
           path: openapi.json
           if-no-files-found: error
+          retention-days: 14
+
+  test-repeatability:
+    name: Test repeatability (seed ${{ matrix.seed }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        seed:
+          - 11001
+          - 11002
+    env:
+      SPRING_PROFILES_ACTIVE: test
+      SPRING_APP_NAME: carwash-booking-queue-system
+      SERVER_PORT: '8080'
+      SECURE_PASSWORD_BCRYPT_STRENGTH: '4'
+      SECURE_PASSWORD_MIN_LENGTH: '12'
+      SECURE_PASSWORD_MAX_UTF8_BYTES: '72'
+      SECURE_JWT_ISSUER: carwash-booking-queue-system-ci
+      SECURE_JWT_ACCESS_TOKEN_TTL: 20m
+      SECURE_JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
+      SECURE_BOOTSTRAP_ADMIN_ENABLED: 'false'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JDK_VERSION }}
+          cache: maven
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Validate required CI secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${SECURE_JWT_SECRET}" ]]; then
+            echo "CI_JWT_SECRET is not configured."
+            exit 1
+          fi
+
+      - name: Run complete verification with recorded seed
+        run: ./mvnw --batch-mode -Dtest.order.seed=${{ matrix.seed }} clean verify
+
+      - name: Upload failing seed reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-repeatability-seed-${{ matrix.seed }}-${{ github.run_number }}-${{ github.sha }}
+          path: |
+            target/surefire-reports/**
+            target/failsafe-reports/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+  isolated-test-selection:
+    name: Selected test isolation
+    runs-on: ubuntu-latest
+    env:
+      SPRING_PROFILES_ACTIVE: test
+      SPRING_APP_NAME: carwash-booking-queue-system
+      SERVER_PORT: '8080'
+      SECURE_PASSWORD_BCRYPT_STRENGTH: '4'
+      SECURE_PASSWORD_MIN_LENGTH: '12'
+      SECURE_PASSWORD_MAX_UTF8_BYTES: '72'
+      SECURE_JWT_ISSUER: carwash-booking-queue-system-ci
+      SECURE_JWT_ACCESS_TOKEN_TTL: 20m
+      SECURE_JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
+      SECURE_BOOTSTRAP_ADMIN_ENABLED: 'false'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JDK_VERSION }}
+          cache: maven
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Validate required CI secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${SECURE_JWT_SECRET}" ]]; then
+            echo "CI_JWT_SECRET is not configured."
+            exit 1
+          fi
+
+      - name: Run focused service test
+        run: ./mvnw --batch-mode -Dtest=UserManagementServiceTest test
+
+      - name: Run booking integration test independently
+        run: ./mvnw --batch-mode -Djacoco.skip=true -Dit.test=BookingWorkflowIntegrationTest verify
+
+      - name: Run RBAC integration test independently
+        run: ./mvnw --batch-mode -Djacoco.skip=true -Dit.test=RbacAuthorizationIntegrationTest verify
+
+      - name: Upload selected-test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: selected-test-reports-${{ github.run_number }}-${{ github.sha }}
+          path: |
+            target/surefire-reports/**
+            target/failsafe-reports/**
+          if-no-files-found: ignore
           retention-days: 14
 
   docker-validation:
@@ -374,6 +509,8 @@ jobs:
     needs:
       - workflow-lint
       - maven-verification
+      - test-repeatability
+      - isolated-test-selection
       - docker-validation
     if: >-
       github.event_name == 'push' &&
