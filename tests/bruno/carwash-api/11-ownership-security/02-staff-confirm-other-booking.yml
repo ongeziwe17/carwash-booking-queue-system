@@ -5,6 +5,7 @@ info:
   tags:
     - ownership
     - staff
+    - security
 
 http:
   method: POST
