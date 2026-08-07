@@ -5,28 +5,24 @@ import com.carwash.repository.UserRepository;
 import com.carwash.service.UserManagementService;
 import com.carwash.service.command.CreateUserCommand;
 import com.carwash.service.exception.BusinessRuleViolationException;
+import com.carwash.testsupport.ApiIntegrationTestSupport;
+import com.carwash.testsupport.UserFixtureBuilder;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import tools.jackson.databind.ObjectMapper;
-
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
-class UserCredentialSecurityIntegrationTest {
+class UserCredentialSecurityIntegrationTest extends ApiIntegrationTestSupport {
+
     @Autowired UserManagementService userManagementService;
     @Autowired UserCredentialService credentialService;
     @Autowired UserRepository userRepository;
-    @Autowired ObjectMapper objectMapper;
 
     @Test
     void registrationStoresSaltedEncodedCredentialsThatCanBeVerified() {
-        String raw = "LocalTestPassword123!";
-        User first = register("encoded-first", raw);
-        User second = register("encoded-second", raw);
-
+        String raw = UserFixtureBuilder.DEFAULT_PASSWORD;
+        User first = register(raw);
+        User second = register(raw);
         assertNotEquals(raw, first.getEncodedPassword());
         assertNotEquals(first.getEncodedPassword(), second.getEncodedPassword());
         assertTrue(credentialService.matches(raw, first.getEncodedPassword()));
@@ -36,7 +32,7 @@ class UserCredentialSecurityIntegrationTest {
     }
 
     @Test
-    void policyChecksNullBlankAndConfiguredLengthBoundariesWithoutTrimming() {
+    void policyChecksNullBlankAndConfiguredUtf8BoundariesWithoutTrimming() {
         assertThrows(BusinessRuleViolationException.class, () -> credentialService.validatePolicy(null));
         assertThrows(BusinessRuleViolationException.class, () -> credentialService.validatePolicy("   "));
         assertThrows(BusinessRuleViolationException.class, () -> credentialService.validatePolicy("12345678901"));
@@ -46,23 +42,21 @@ class UserCredentialSecurityIntegrationTest {
         assertThrows(BusinessRuleViolationException.class, () -> credentialService.encode("x".repeat(72) + "first suffix"));
         assertThrows(BusinessRuleViolationException.class, () -> credentialService.encode("x".repeat(72) + "second suffix"));
         assertDoesNotThrow(() -> credentialService.validatePolicy("x".repeat(12)));
-
         String withoutSpace = credentialService.encode("Password123!");
         assertFalse(credentialService.matches("Password123! ", withoutSpace));
     }
 
     @Test
     void domainSerializationOmitsEncodedCredential() throws Exception {
-        User user = register("serialized", "LocalTestPassword123!");
+        User user = register(UserFixtureBuilder.DEFAULT_PASSWORD);
         String json = objectMapper.writeValueAsString(user);
-
         assertFalse(json.contains("encodedPassword"));
         assertFalse(json.contains(user.getEncodedPassword()));
     }
 
-    private User register(String prefix, String rawPassword) {
-        String id = prefix + "-" + UUID.randomUUID();
-        return userManagementService.createUser(new CreateUserCommand(id, "Security User", id + "@example.com",
+    private User register(String rawPassword) {
+        String id = ids.user();
+        return userManagementService.createUser(new CreateUserCommand(id, "Security User", ids.emailFor(id),
                 "0821234567", rawPassword));
     }
 }
