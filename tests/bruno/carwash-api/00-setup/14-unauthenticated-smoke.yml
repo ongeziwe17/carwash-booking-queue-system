@@ -19,7 +19,7 @@ runtime:
       code: |-
         test("returns HTTP 401", function() { expect(res.status).to.equal(401); });
         test("uses AUTHENTICATION_REQUIRED", function() { expect(res.body.code).to.equal("AUTHENTICATION_REQUIRED"); expect(res.body.status).to.equal(401); });
-        test("reports request path", function() { expect(res.body.path).to.equal(new URL(req.getUrl()).pathname); });
+        test("reports request path", function() { expect(res.body.path).to.equal(String(req.getUrl()).replace(/^https?:\/\/[^/]+/, "").split("?")[0]); });
         test("has ISO timestamp and fieldErrors", function() { expect(Number.isNaN(Date.parse(res.body.timestamp))).to.equal(false); expect(Array.isArray(res.body.fieldErrors)).to.equal(true); });
         test("uses safe message", function() { expect(res.body.message).to.equal("Authentication is required"); });
         const payload = JSON.stringify(res.body ?? {});

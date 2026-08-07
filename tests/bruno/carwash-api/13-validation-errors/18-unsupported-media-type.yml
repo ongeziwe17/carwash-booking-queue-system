@@ -28,7 +28,7 @@ runtime:
       code: |-
         test("returns HTTP 415", function() { expect(res.status).to.equal(415); });
         test("uses UNSUPPORTED_MEDIA_TYPE", function() { expect(res.body.code).to.equal("UNSUPPORTED_MEDIA_TYPE"); expect(res.body.status).to.equal(415); });
-        test("reports request path", function() { expect(res.body.path).to.equal(new URL(req.getUrl()).pathname); });
+        test("reports request path", function() { expect(res.body.path).to.equal(String(req.getUrl()).replace(/^https?:\/\/[^/]+/, "").split("?")[0]); });
         test("has ISO timestamp and fieldErrors", function() { expect(Number.isNaN(Date.parse(res.body.timestamp))).to.equal(false); expect(Array.isArray(res.body.fieldErrors)).to.equal(true); });
         test("uses safe message", function() { expect(res.body.message).to.equal("Content type is not supported"); });
         const payload = JSON.stringify(res.body ?? {});

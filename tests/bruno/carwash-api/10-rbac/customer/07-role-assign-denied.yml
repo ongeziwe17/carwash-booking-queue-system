@@ -28,7 +28,7 @@ runtime:
       code: |-
         test("returns HTTP 403", function() { expect(res.status).to.equal(403); });
         test("uses ACCESS_DENIED", function() { expect(res.body.code).to.equal("ACCESS_DENIED"); expect(res.body.status).to.equal(403); });
-        test("reports request path", function() { expect(res.body.path).to.equal(new URL(req.getUrl()).pathname); });
+        test("reports request path", function() { expect(res.body.path).to.equal(String(req.getUrl()).replace(/^https?:\/\/[^/]+/, "").split("?")[0]); });
         test("has ISO timestamp and fieldErrors", function() { expect(Number.isNaN(Date.parse(res.body.timestamp))).to.equal(false); expect(Array.isArray(res.body.fieldErrors)).to.equal(true); });
         test("uses safe message", function() { expect(res.body.message).to.equal("Access denied"); });
         const payload = JSON.stringify(res.body ?? {});

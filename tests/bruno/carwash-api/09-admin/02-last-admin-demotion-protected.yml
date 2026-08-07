@@ -29,7 +29,7 @@ runtime:
       code: |-
         test("returns HTTP 400", function() { expect(res.status).to.equal(400); });
         test("uses BUSINESS_RULE_VIOLATION", function() { expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); expect(res.body.status).to.equal(400); });
-        test("reports request path", function() { expect(res.body.path).to.equal(new URL(req.getUrl()).pathname); });
+        test("reports request path", function() { expect(res.body.path).to.equal(String(req.getUrl()).replace(/^https?:\/\/[^/]+/, "").split("?")[0]); });
         test("has ISO timestamp and fieldErrors", function() { expect(Number.isNaN(Date.parse(res.body.timestamp))).to.equal(false); expect(Array.isArray(res.body.fieldErrors)).to.equal(true); });
         test("uses safe business message", function() { expect(res.body.message).to.include("last active platform administrator"); });
         const payload = JSON.stringify(res.body ?? {});

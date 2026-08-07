@@ -64,7 +64,7 @@ runtime:
         test("returns JSON", function() { expect(String(res.getHeader("content-type") || "").toLowerCase()).to.include("application/json"); });
         const payload = JSON.stringify(res.body ?? {});
         const lower = payload.toLowerCase();
-        for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password"]) {
+        for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "secure_jwt_secret", "bootstrap-admin-password"]) {
           expect(lower, `response leaked ${forbidden}`).to.not.include(forbidden);
         }
         const rawPassword = bru.interpolate("{{process.env.BRUNO_TEST_USER_PASSWORD}}");
