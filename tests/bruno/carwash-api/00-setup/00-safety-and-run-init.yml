@@ -5,6 +5,7 @@ info:
   tags:
     - smoke
     - security
+    - rbac
 
 http:
   method: GET
