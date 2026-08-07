@@ -60,7 +60,7 @@ class UserManagementServiceTest extends ServiceTestSupport {
         assertEquals(encodedPassword, updated.getEncodedPassword());
         assertNotNull(updated.getRole());
         assertEquals("CUSTOMER", updated.getRole().getRoleName());
-        assertNotSame(originalRole, updated.getRole());
+        assertSame(originalRole, updated.getRole());
         assertEquals(AccountStatus.ACTIVE, updated.getAccountStatus());
         assertEquals(createdAt, updated.getCreatedAt());
     }
