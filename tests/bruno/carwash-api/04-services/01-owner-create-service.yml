@@ -5,6 +5,8 @@ info:
   tags:
     - owner
     - workflow
+    - rbac
+    - security
 
 http:
   method: POST
