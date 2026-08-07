@@ -4,6 +4,8 @@ info:
   seq: 5
   tags:
     - auth
+    - rbac
+    - security
 
 http:
   method: POST
