@@ -33,3 +33,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Bruno generated reports ###
+tests/bruno/carwash-api/results/

@@ -1,0 +1,35 @@
+info:
+  name: Admin deletes unreferenced service
+  type: http
+  seq: 7
+  tags:
+    - rbac
+    - admin
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/services/{{adminRbacServiceId}}"
+  auth:
+    type: bearer
+    token: "{{adminToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 204", function() { expect(res.status).to.equal(204); });
+        const payload = JSON.stringify(res.body ?? {});
+        const lower = payload.toLowerCase();
+        for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password"]) {
+          expect(lower, `response leaked ${forbidden}`).to.not.include(forbidden);
+        }
+        const rawPassword = bru.interpolate("{{process.env.BRUNO_TEST_USER_PASSWORD}}");
+        if (rawPassword && !rawPassword.includes("process.env")) expect(payload).to.not.include(rawPassword);
+        const bootstrapPassword = bru.interpolate("{{process.env.BRUNO_BOOTSTRAP_ADMIN_PASSWORD}}");
+        if (bootstrapPassword && !bootstrapPassword.includes("process.env")) expect(payload).to.not.include(bootstrapPassword);
+        test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

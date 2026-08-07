@@ -1,0 +1,47 @@
+info:
+  name: Completed queue cannot be repositioned
+  type: http
+  seq: 25
+  tags:
+    - integrity
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/queue-entries/{{queueEntryId}}/position"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "position": 1
+      }
+  auth:
+    type: bearer
+    token: "{{staffToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns HTTP 400", function() { expect(res.status).to.equal(400); });
+        test("uses BUSINESS_RULE_VIOLATION", function() { expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); expect(res.body.status).to.equal(400); });
+        test("reports request path", function() { expect(res.body.path).to.equal(new URL(req.getUrl()).pathname); });
+        test("has ISO timestamp and fieldErrors", function() { expect(Number.isNaN(Date.parse(res.body.timestamp))).to.equal(false); expect(Array.isArray(res.body.fieldErrors)).to.equal(true); });
+        test("uses safe business message", function() { expect(res.body.message).to.include("waiting"); });
+        const payload = JSON.stringify(res.body ?? {});
+        const lower = payload.toLowerCase();
+        for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password"]) {
+          expect(lower, `response leaked ${forbidden}`).to.not.include(forbidden);
+        }
+        const rawPassword = bru.interpolate("{{process.env.BRUNO_TEST_USER_PASSWORD}}");
+        if (rawPassword && !rawPassword.includes("process.env")) expect(payload).to.not.include(rawPassword);
+        const bootstrapPassword = bru.interpolate("{{process.env.BRUNO_BOOTSTRAP_ADMIN_PASSWORD}}");
+        if (bootstrapPassword && !bootstrapPassword.includes("process.env")) expect(payload).to.not.include(bootstrapPassword);
+        test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

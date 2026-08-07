@@ -1,0 +1,48 @@
+info:
+  name: Login Customer B
+  type: http
+  seq: 10
+  tags:
+    - auth
+    - rbac
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/auth/login"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "{{otherCustomerEmail}}",
+        "password": "{{process.env.BRUNO_TEST_USER_PASSWORD}}"
+      }
+  auth:
+    type: none
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.status === 200 && res.body.accessToken) bru.setVar("otherCustomerToken", res.body.accessToken);
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("returns JSON", function() { expect(String(res.getHeader("content-type") || "").toLowerCase()).to.include("application/json"); });
+        const payload = JSON.stringify(res.body ?? {});
+        const lower = payload.toLowerCase();
+        for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password"]) {
+          expect(lower, `response leaked ${forbidden}`).to.not.include(forbidden);
+        }
+        const rawPassword = bru.interpolate("{{process.env.BRUNO_TEST_USER_PASSWORD}}");
+        if (rawPassword && !rawPassword.includes("process.env")) expect(payload).to.not.include(rawPassword);
+        const bootstrapPassword = bru.interpolate("{{process.env.BRUNO_BOOTSTRAP_ADMIN_PASSWORD}}");
+        if (bootstrapPassword && !bootstrapPassword.includes("process.env")) expect(payload).to.not.include(bootstrapPassword);
+        test("role is CUSTOMER", function() { expect(res.body.user.roleName).to.equal("CUSTOMER"); expect(res.body.accessToken).to.be.a("string").and.not.empty; });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

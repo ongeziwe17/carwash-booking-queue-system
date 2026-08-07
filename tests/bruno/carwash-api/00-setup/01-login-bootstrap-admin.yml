@@ -1,0 +1,48 @@
+info:
+  name: Login bootstrap administrator
+  type: http
+  seq: 2
+  tags:
+    - auth
+    - admin
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/auth/login"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "{{process.env.BRUNO_BOOTSTRAP_ADMIN_EMAIL}}",
+        "password": "{{process.env.BRUNO_BOOTSTRAP_ADMIN_PASSWORD}}"
+      }
+  auth:
+    type: none
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.status === 200 && res.body.accessToken) { bru.setVar("adminToken", res.body.accessToken); bru.setVar("bootstrapAdminUserId", res.body.user.userId); } else { bru.runner.stopExecution(); }
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("returns JSON", function() { expect(String(res.getHeader("content-type") || "").toLowerCase()).to.include("application/json"); });
+        const payload = JSON.stringify(res.body ?? {});
+        const lower = payload.toLowerCase();
+        for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password"]) {
+          expect(lower, `response leaked ${forbidden}`).to.not.include(forbidden);
+        }
+        const rawPassword = bru.interpolate("{{process.env.BRUNO_TEST_USER_PASSWORD}}");
+        if (rawPassword && !rawPassword.includes("process.env")) expect(payload).to.not.include(rawPassword);
+        const bootstrapPassword = bru.interpolate("{{process.env.BRUNO_BOOTSTRAP_ADMIN_PASSWORD}}");
+        if (bootstrapPassword && !bootstrapPassword.includes("process.env")) expect(payload).to.not.include(bootstrapPassword);
+        test("admin token and expiry returned", function() { expect(res.body.accessToken).to.be.a("string").and.not.empty; expect(res.body.expiresAt).to.be.a("string"); expect(res.body.user.roleName).to.equal("PLATFORM_ADMIN"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

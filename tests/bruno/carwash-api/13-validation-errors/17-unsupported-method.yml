@@ -1,0 +1,40 @@
+info:
+  name: Unsupported method returns 405 with Allow
+  type: http
+  seq: 17
+  tags:
+    - validation
+    - security
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/auth/me"
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns HTTP 405", function() { expect(res.status).to.equal(405); });
+        test("uses METHOD_NOT_ALLOWED", function() { expect(res.body.code).to.equal("METHOD_NOT_ALLOWED"); expect(res.body.status).to.equal(405); });
+        test("reports request path", function() { expect(res.body.path).to.equal(new URL(req.getUrl()).pathname); });
+        test("has ISO timestamp and fieldErrors", function() { expect(Number.isNaN(Date.parse(res.body.timestamp))).to.equal(false); expect(Array.isArray(res.body.fieldErrors)).to.equal(true); });
+        test("uses safe message", function() { expect(res.body.message).to.equal("HTTP method is not supported"); });
+        const payload = JSON.stringify(res.body ?? {});
+        const lower = payload.toLowerCase();
+        for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password"]) {
+          expect(lower, `response leaked ${forbidden}`).to.not.include(forbidden);
+        }
+        const rawPassword = bru.interpolate("{{process.env.BRUNO_TEST_USER_PASSWORD}}");
+        if (rawPassword && !rawPassword.includes("process.env")) expect(payload).to.not.include(rawPassword);
+        const bootstrapPassword = bru.interpolate("{{process.env.BRUNO_BOOTSTRAP_ADMIN_PASSWORD}}");
+        if (bootstrapPassword && !bootstrapPassword.includes("process.env")) expect(payload).to.not.include(bootstrapPassword);
+        test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
+        test("Allow header is present", function() { expect(String(res.getHeader("allow") || "")).to.include("GET"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false
