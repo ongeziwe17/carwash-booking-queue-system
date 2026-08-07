@@ -15,6 +15,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class JwtAuthorityConverterTest {
 
+    private static final Instant TEST_ISSUED_AT = Instant.parse("2030-01-01T00:00:00Z");
+    private static final Instant TEST_EXPIRES_AT = TEST_ISSUED_AT.plusSeconds(300);
+
     private final JwtAuthorityConverter converter = new JwtAuthorityConverter();
 
     @ParameterizedTest
@@ -62,8 +65,8 @@ class JwtAuthorityConverterTest {
         Jwt jwt = Jwt.withTokenValue("test-token")
                 .header("alg", "none")
                 .subject("test-user")
-                .issuedAt(Instant.now())
-                .expiresAt(Instant.now().plusSeconds(300))
+                .issuedAt(TEST_ISSUED_AT)
+                .expiresAt(TEST_EXPIRES_AT)
                 .build();
 
         AbstractAuthenticationToken authentication = converter.convert(jwt);
@@ -77,8 +80,8 @@ class JwtAuthorityConverterTest {
                 .subject("test-user")
                 .claim("role", roleName)
                 .claim("permissions", injectedPermissions)
-                .issuedAt(Instant.now())
-                .expiresAt(Instant.now().plusSeconds(300))
+                .issuedAt(TEST_ISSUED_AT)
+                .expiresAt(TEST_EXPIRES_AT)
                 .build();
     }
 
