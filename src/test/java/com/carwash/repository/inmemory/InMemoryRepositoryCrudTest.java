@@ -6,10 +6,10 @@ import com.carwash.domain.Role;
 import com.carwash.domain.Service;
 import com.carwash.domain.User;
 import com.carwash.domain.Vehicle;
+import com.carwash.testsupport.TestDates;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -92,6 +92,6 @@ class InMemoryRepositoryCrudTest {
     private static Booking booking(String id, User user, Service service) {
         Vehicle vehicle = new Vehicle("v-1", "CA 123", "SEDAN", "Toyota", "Corolla", "White", "");
         vehicle.setUserId(user.getUserId());
-        return new Booking(id, user, vehicle, service, LocalDateTime.now().plusDays(1), "none");
+        return new Booking(id, user, vehicle, service, TestDates.future(), "none");
     }
 }

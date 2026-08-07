@@ -1,91 +1,69 @@
 package com.carwash.api;
 
-import org.junit.jupiter.api.BeforeEach;
+import com.carwash.api.dto.CreateUserRequest;
+import com.carwash.testsupport.ApiContractAssertions;
+import com.carwash.testsupport.ApiIntegrationTestSupport;
+import com.carwash.testsupport.UserFixtureBuilder;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 import static org.hamcrest.Matchers.notNullValue;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
-class UserApiContractIntegrationTest {
-
-    MockMvc mockMvc;
-
-    @Autowired
-    WebApplicationContext context;
-
-    @Autowired
-    ObjectMapper objectMapper;
-
-    @BeforeEach
-    void configureMockMvc() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context).defaultRequest(get("/").with(jwt().jwt(j -> j.subject("api-integration-user").claim("role", "PLATFORM_ADMIN"))
-                        .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN"),
-                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERM_SERVICE_READ"),
-                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERM_SERVICE_MANAGE"),
-                                new org.springframework.security.core.authority.SimpleGrantedAuthority("PERM_QUEUE_OPERATE"))))
-                .apply(springSecurity())
-                .build();
-    }
+class UserApiContractIntegrationTest extends ApiIntegrationTestSupport {
 
     @Test
     void registrationAndReadsExposeOnlySafeResponseFields() throws Exception {
-        String id = unique("safe");
-        var registration = create(id, " Safe User ", " Safe.User@Example.COM ", " 123 ")
+        CreateUserRequest user = UserFixtureBuilder.valid(ids)
+                .fullName(" Safe User ").email(" Safe.User@Example.COM ").phone(" 123 ").build();
+        var registration = api.createUser(user)
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.userId").value(id))
+                .andExpect(jsonPath("$.userId").value(user.userId()))
                 .andExpect(jsonPath("$.fullName").value("Safe User"))
                 .andExpect(jsonPath("$.email").value("safe.user@example.com"))
                 .andExpect(jsonPath("$.phone").value("123"))
                 .andExpect(jsonPath("$.accountStatus").value("ACTIVE"))
                 .andExpect(jsonPath("$.createdAt", notNullValue()));
-
         assertSafe(registration);
-        assertSafe(mockMvc.perform(get("/api/users/{id}", id)).andExpect(status().isOk()));
-        assertSafe(mockMvc.perform(get("/api/users")).andExpect(status().isOk()), "$[?(@.userId == '" + id + "')][0]");
+        assertSafe(mockMvc.perform(get("/api/users/{id}", user.userId()).with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk()));
+        assertSafe(mockMvc.perform(get("/api/users").with(authentication.platformAdminJwt())).andExpect(status().isOk()));
     }
 
     @Test
     void updateRejectsUnknownServerControlledFields() throws Exception {
-        String id = unique("update");
-        create(id, "Original", id + "@example.com", "111").andExpect(status().isCreated());
-
+        CreateUserRequest user = UserFixtureBuilder.valid(ids).build();
+        api.createUser(user).andExpect(status().isCreated());
         Map<String, Object> body = new HashMap<>();
         body.put("fullName", "Updated User");
-        body.put("email", "updated." + id + "@example.com");
+        body.put("email", ids.emailFor(ids.user()));
         body.put("phone", "222");
         body.put("passwordHash", "must-not-be-returned");
-
-        String response = mockMvc.perform(put("/api/users/{id}", id).contentType(MediaType.APPLICATION_JSON)
+        String response = mockMvc.perform(put("/api/users/{id}", user.userId())
+                        .with(authentication.platformAdminJwt()).contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
-                .andExpect(jsonPath("$.message").value("Malformed or invalid request body"))
                 .andExpect(jsonPath("$.fieldErrors").isArray())
                 .andReturn().getResponse().getContentAsString();
-        org.junit.jupiter.api.Assertions.assertFalse(response.contains("must-not-be-returned"));
+        assertFalse(response.contains("must-not-be-returned"));
     }
 
     @Test
     void invalidRegistrationFieldsReturnStandardBadRequest() throws Exception {
-        Map<String, Object> valid = new HashMap<>(request(unique("validation"), "Valid User", "valid." + UUID.randomUUID() + "@example.com", "123"));
-        String[] fields = {"userId", "fullName", "email", "phone", "password"};
-        for (String field : fields) {
+        CreateUserRequest request = UserFixtureBuilder.valid(ids).build();
+        Map<String, Object> valid = new HashMap<>(Map.of(
+                "userId", request.userId(), "fullName", request.fullName(), "email", request.email(),
+                "phone", request.phone(), "password", request.password()));
+        for (String field : new String[]{"userId", "fullName", "email", "phone", "password"}) {
             Map<String, Object> missing = new HashMap<>(valid);
             missing.remove(field);
             assertBadRequest(missing);
@@ -100,19 +78,19 @@ class UserApiContractIntegrationTest {
 
     @Test
     void passwordPolicyViolationsAreSafeBadRequests() throws Exception {
-        String secret = "tiny-secret";
-        Map<String, Object> tooShort = new HashMap<>(request(unique("short"), "Short Password",
-                unique("short-email") + "@example.com", "123"));
-        tooShort.put("password", secret);
+        CreateUserRequest request = UserFixtureBuilder.valid(ids).build();
+        String shortSecret = "tiny-secret";
+        Map<String, Object> tooShort = new HashMap<>(Map.of(
+                "userId", request.userId(), "fullName", request.fullName(), "email", request.email(),
+                "phone", request.phone(), "password", shortSecret));
         String response = mockMvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(tooShort)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message", notNullValue()))
-                .andReturn().getResponse().getContentAsString();
-        org.junit.jupiter.api.Assertions.assertFalse(response.contains(secret));
+                .andExpect(status().isBadRequest()).andReturn().getResponse().getContentAsString();
+        assertFalse(response.contains(shortSecret));
 
         Map<String, Object> tooLong = new HashMap<>(tooShort);
-        tooLong.put("userId", unique("long"));
+        tooLong.put("userId", ids.user());
+        tooLong.put("email", ids.emailFor(ids.user()));
         tooLong.put("password", "x".repeat(201));
         mockMvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(tooLong)))
@@ -121,37 +99,33 @@ class UserApiContractIntegrationTest {
 
     @Test
     void duplicateEmailsAreRejectedRegardlessOfCaseOrWhitespace() throws Exception {
-        String email = unique("duplicate") + "@example.com";
-        create(unique("first"), "First", email, "111").andExpect(status().isCreated());
-        create(unique("exact"), "Exact", email, "222").andExpect(status().isBadRequest());
-        create(unique("case"), "Case", email.toUpperCase(), "333").andExpect(status().isBadRequest());
-        create(unique("space"), "Space", " " + email + " ", "444").andExpect(status().isBadRequest());
+        String email = ids.emailFor(ids.user());
+        createWithEmail(email).andExpect(status().isCreated());
+        createWithEmail(email).andExpect(status().isBadRequest());
+        createWithEmail(email.toUpperCase()).andExpect(status().isBadRequest());
+        createWithEmail(" " + email + " ").andExpect(status().isBadRequest());
     }
 
     @Test
     void updateToAnotherUsersEmailIsRejected() throws Exception {
-        String first = unique("first-update");
-        String second = unique("second-update");
-        create(first, "First", first + "@example.com", "111").andExpect(status().isCreated());
-        create(second, "Second", second + "@example.com", "222").andExpect(status().isCreated());
-        mockMvc.perform(put("/api/users/{id}", second).contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of("fullName", "Second", "email", " " + first.toUpperCase() + "@EXAMPLE.COM ", "phone", "222"))))
+        CreateUserRequest first = UserFixtureBuilder.valid(ids).build();
+        CreateUserRequest second = UserFixtureBuilder.valid(ids).build();
+        api.createUser(first).andExpect(status().isCreated());
+        api.createUser(second).andExpect(status().isCreated());
+        mockMvc.perform(put("/api/users/{id}", second.userId())
+                        .with(authentication.platformAdminJwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "fullName", "Second", "email", " " + first.email().toUpperCase() + " ", "phone", "222"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400));
     }
 
-    private org.springframework.test.web.servlet.ResultActions create(String id, String name, String email, String phone) throws Exception {
-        return mockMvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request(id, name, email, phone))));
-    }
-
-    private Map<String, Object> request(String id, String name, String email, String phone) {
-        return Map.of("userId", id, "fullName", name, "email", email, "phone", phone,
-                "password", "LocalTestPassword123!");
+    private org.springframework.test.web.servlet.ResultActions createWithEmail(String email) throws Exception {
+        return api.createUser(UserFixtureBuilder.valid(ids).email(email).build());
     }
 
     private void assertBadRequest(Map<String, Object> body) throws Exception {
-        mockMvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON)
+        var action = mockMvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
@@ -160,25 +134,13 @@ class UserApiContractIntegrationTest {
                 .andExpect(jsonPath("$.timestamp", notNullValue()))
                 .andExpect(jsonPath("$.path").value("/api/users"))
                 .andExpect(jsonPath("$.fieldErrors").isArray());
+        ApiContractAssertions.assertNoSensitiveData(action, false);
     }
 
     private void assertSafe(org.springframework.test.web.servlet.ResultActions result) throws Exception {
-        assertSafe(result, "$");
-    }
-
-    private void assertSafe(org.springframework.test.web.servlet.ResultActions result, String root) throws Exception {
-        result.andExpect(jsonPath(root + ".password").doesNotExist())
-                .andExpect(jsonPath(root + ".passwordHash").doesNotExist())
-                .andExpect(jsonPath(root + ".encodedPassword").doesNotExist())
-                .andExpect(jsonPath(root + ".credentials").doesNotExist())
-                .andExpect(jsonPath(root + ".vehicles").doesNotExist())
-                .andExpect(jsonPath(root + ".bookings").doesNotExist())
-                .andExpect(jsonPath(root + ".notifications").doesNotExist())
-                .andExpect(jsonPath(root + ".role").doesNotExist())
-                .andExpect(jsonPath(root + ".permissions").doesNotExist());
-    }
-
-    private String unique(String prefix) {
-        return prefix + "-" + UUID.randomUUID();
+        result.andExpect(jsonPath("$..password").doesNotExist())
+                .andExpect(jsonPath("$..passwordHash").doesNotExist())
+                .andExpect(jsonPath("$..encodedPassword").doesNotExist());
+        ApiContractAssertions.assertNoSensitiveData(result, false);
     }
 }

@@ -14,8 +14,10 @@ import com.carwash.repository.inmemory.InMemoryServiceRepository;
 import com.carwash.repository.inmemory.InMemoryUserRepository;
 import com.carwash.repository.inmemory.InMemoryVehicleRepository;
 import com.carwash.security.UserCredentialService;
+import com.carwash.service.AtomicNotificationIdGenerator;
 import com.carwash.service.BookingManagementService;
 import com.carwash.service.DailySummaryReportService;
+import com.carwash.service.NotificationIdGenerator;
 import com.carwash.service.NotificationManagementService;
 import com.carwash.service.QueueManagementService;
 import com.carwash.service.ServiceCatalogService;
@@ -60,6 +62,11 @@ public class ApplicationServiceConfig {
     @Bean
     public NotificationRepository notificationRepository() {
         return new InMemoryNotificationRepository();
+    }
+
+    @Bean
+    public NotificationIdGenerator notificationIdGenerator() {
+        return new AtomicNotificationIdGenerator();
     }
 
     @Bean
@@ -116,13 +123,15 @@ public class ApplicationServiceConfig {
             NotificationRepository notificationRepository,
             UserRepository userRepository,
             BookingRepository bookingRepository,
-            InMemoryDataCoordinator coordinator
+            InMemoryDataCoordinator coordinator,
+            NotificationIdGenerator notificationIdGenerator
     ) {
         return new NotificationManagementService(
                 notificationRepository,
                 userRepository,
                 bookingRepository,
-                coordinator
+                coordinator,
+                notificationIdGenerator
         );
     }
 

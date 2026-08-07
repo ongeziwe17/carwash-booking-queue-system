@@ -31,7 +31,7 @@ Spring Boot backend foundation for car wash booking and queue management. The cu
 - Spring Web MVC and Validation
 - Spring Security OAuth2 Resource Server
 - Springdoc OpenAPI / Swagger UI
-- JUnit 5 and JaCoCo
+- JUnit Jupiter and JaCoCo
 - Docker / Docker Compose
 - GitHub Actions
 
@@ -113,24 +113,59 @@ The Compose file intentionally contains only the API. PostgreSQL remains tracked
 
 ## Testing
 
-Run tests:
+The test suite has two Maven responsibilities:
+
+- **Surefire** runs unit, repository, security, and service tests named `*Test` or `*Tests`.
+- **Failsafe** runs Spring/API integration tests named `*IntegrationTest` during `integration-test` and `verify`.
+
+Run only the Surefire test category:
 
 ```bash
-./mvnw clean test
+./mvnw test
 ```
 
-Run the full verification lifecycle, including the JaCoCo report and coverage gate:
+Run unit tests followed by all integration tests, the JaCoCo report, and the 80% line-coverage gate:
+
+```bash
+./mvnw verify
+```
+
+Start from a clean build directory and run the complete release-gate verification:
 
 ```bash
 ./mvnw clean verify
 ```
 
+Tests use the dedicated `test` Spring profile from `src/test/resources/application-test.properties`. It contains only deterministic test-safe configuration, disables bootstrap administration, lowers BCrypt cost for test execution, and uses a clearly test-only signing key. Tests do **not** require a developer `.env` file.
+
+Every Spring API integration test inherits the shared test foundation and begins with empty in-memory application data. Cleanup happens inside one `InMemoryDataCoordinator` write operation in dependency order: notifications, queue entries, bookings, vehicles, services, then users. The Spring application context is reused; `@DirtiesContext` is not the default isolation mechanism.
+
+Integration fixtures use a fresh `TestIdFactory` per test method. IDs are readable and local to that test, for example `bookingworkflowintegrationtest-create-user-001`, rather than global IDs such as `u1` or timestamp-only values. Notification IDs are generated through an injectable abstraction; integration tests reset only the test implementation before each method while production exposes no reset operation.
+
+JUnit class and method order are randomized deterministically. CI verifies the full suite with seeds `11001` and `11002`. Reproduce an order-specific failure with the recorded seed:
+
+```bash
+./mvnw --batch-mode -Dtest.order.seed=11001 clean verify
+```
+
+Selected tests can be executed independently with Maven selectors:
+
+```bash
+./mvnw --batch-mode -Dtest=UserManagementServiceTest test
+./mvnw --batch-mode -Djacoco.skip=true -Dit.test=BookingWorkflowIntegrationTest verify
+./mvnw --batch-mode -Djacoco.skip=true -Dit.test=RbacAuthorizationIntegrationTest verify
+```
+
+The JaCoCo HTML report is generated at `target/site/jacoco/index.html`. The current measured TEST-001 baseline is **1,262 covered lines, 215 missed lines, 1,477 total lines, or 85.44%**, with the enforced minimum remaining **80%**.
+
 Generated outputs include:
 
 - `target/surefire-reports/`
-- `target/failsafe-reports/` when integration-test executions are added
+- `target/failsafe-reports/`
 - `target/site/jacoco/`
 - `target/carwash-api.jar`
+
+GitHub Actions uploads Surefire/Failsafe reports, JaCoCo coverage, the verified application JAR, OpenAPI JSON, and Docker vulnerability results from the main verification path. The repeatability matrix uploads seed-labelled test reports when a seed fails, making the failing order reproducible without rerunning Docker validation for each seed.
 
 ## Branch and delivery workflow
 
@@ -148,7 +183,7 @@ master
 v* release tag
 ```
 
-Pull requests into `staging`, `develop`, and `master` run Maven, workflow, Docker Compose, Docker image, smoke-test, and vulnerability validation. Registry login and publishing run only for approved branch or tag pushes.
+Pull requests into `staging`, `develop`, and `master` run Maven, workflow, test-repeatability, Docker Compose, Docker image, smoke-test, and vulnerability validation. Registry login and publishing run only for approved branch or tag pushes.
 
 See [Delivery and Docker Workflow](documentation/DELIVERY-AND-DOCKER.md) for branch protection recommendations, image tags, required secrets, CI jobs, artifacts, and local Docker guidance.
 
@@ -174,7 +209,6 @@ Bootstrap administration is disabled by default. Configure all `SECURE_BOOTSTRAP
 - `/api/queue-entries`
 - `/api/notifications`
 - `/api/reports/daily-summary`
-
 
 ## API validation and errors
 
@@ -202,3 +236,4 @@ and representative 400, 401, 403, 404, and 500 responses.
 - [User Stories](documentation/USER-STORIES.md)
 - [Product Backlog](documentation/PRODUCT-BACKLOG.md)
 - [Delivery and Docker Workflow](documentation/DELIVERY-AND-DOCKER.md)
+- [Coverage Baseline](documentation/COVERAGE.md)

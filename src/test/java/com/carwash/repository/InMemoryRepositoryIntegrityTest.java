@@ -13,10 +13,10 @@ import com.carwash.repository.inmemory.InMemoryQueueEntryRepository;
 import com.carwash.repository.inmemory.InMemoryServiceRepository;
 import com.carwash.repository.inmemory.InMemoryUserRepository;
 import com.carwash.repository.inmemory.InMemoryVehicleRepository;
+import com.carwash.testsupport.TestDates;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -155,6 +155,6 @@ class InMemoryRepositoryIntegrityTest {
     }
 
     private static Booking booking(String id, User user, Vehicle vehicle, Service service) {
-        return new Booking(id, user, vehicle, service, LocalDateTime.now().plusDays(1), "");
+        return new Booking(id, user, vehicle, service, TestDates.future(), "");
     }
 }

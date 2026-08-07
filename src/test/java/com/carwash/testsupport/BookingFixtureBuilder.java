@@ -1,0 +1,43 @@
+package com.carwash.testsupport;
+
+import com.carwash.api.dto.CreateBookingRequest;
+
+import java.time.LocalDateTime;
+
+public final class BookingFixtureBuilder {
+
+    private String bookingId;
+    private String userId;
+    private String vehicleId;
+    private String serviceId;
+    private LocalDateTime scheduledDateTime = TestDates.future();
+    private String specialRequest = "integration test";
+
+    private BookingFixtureBuilder() {
+    }
+
+    public static BookingFixtureBuilder valid(
+            TestIdFactory ids,
+            String userId,
+            String vehicleId,
+            String serviceId
+    ) {
+        BookingFixtureBuilder builder = new BookingFixtureBuilder();
+        builder.bookingId = ids.booking();
+        builder.userId = userId;
+        builder.vehicleId = vehicleId;
+        builder.serviceId = serviceId;
+        return builder;
+    }
+
+    public BookingFixtureBuilder bookingId(String value) { this.bookingId = value; return this; }
+    public BookingFixtureBuilder userId(String value) { this.userId = value; return this; }
+    public BookingFixtureBuilder vehicleId(String value) { this.vehicleId = value; return this; }
+    public BookingFixtureBuilder serviceId(String value) { this.serviceId = value; return this; }
+    public BookingFixtureBuilder scheduledDateTime(LocalDateTime value) { this.scheduledDateTime = value; return this; }
+    public BookingFixtureBuilder specialRequest(String value) { this.specialRequest = value; return this; }
+
+    public CreateBookingRequest build() {
+        return new CreateBookingRequest(bookingId, userId, vehicleId, serviceId, scheduledDateTime, specialRequest);
+    }
+}
