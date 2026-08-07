@@ -167,6 +167,12 @@ Generated outputs include:
 
 GitHub Actions uploads Surefire/Failsafe reports, JaCoCo coverage, the verified application JAR, OpenAPI JSON, and Docker vulnerability results from the main verification path. The repeatability matrix uploads seed-labelled test reports when a seed fails, making the failing order reproducible without rerunning Docker validation for each seed.
 
+## API Acceptance Testing with Bruno
+
+The repository includes a Git-versioned Bruno OpenCollection suite for external HTTP acceptance, RBAC, ownership, validation, security, data-integrity, and end-to-end workflow testing. It complements the Java unit and Spring integration tests and runs against a real application process.
+
+See [Bruno API Acceptance Suite](tests/bruno/carwash-api/README.md) for local setup, secret handling, targeted tags, reports, endpoint coverage, and the RBAC matrix.
+
 ## Branch and delivery workflow
 
 `staging` is the active integration branch:

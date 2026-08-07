@@ -1,0 +1,80 @@
+info:
+  name: Safety check and initialize run
+  type: http
+  seq: 1
+  tags:
+    - smoke
+    - security
+    - rbac
+
+http:
+  method: GET
+  url: "{{baseUrl}}/v3/api-docs"
+  auth:
+    type: none
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        const baseUrl = String(bru.getEnvVar("baseUrl") || "");
+        const allowRemote = String(bru.getEnvVar("allowRemoteDestructiveTests") || "false").toLowerCase() === "true";
+        const localTarget = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(?:\/|$)/i.test(baseUrl);
+        if (!localTarget && !allowRemote) {
+          bru.runner.stopExecution();
+          throw new Error("Destructive Bruno suite blocked: remote targets require allowRemoteDestructiveTests=true");
+        }
+        const testPassword = bru.interpolate("{{process.env.BRUNO_TEST_USER_PASSWORD}}");
+        if (!testPassword || testPassword.includes("process.env")) {
+          bru.runner.stopExecution();
+          throw new Error("BRUNO_TEST_USER_PASSWORD is required");
+        }
+        const now = new Date();
+        const stamp = now.toISOString().replace(/[-:]/g, "").slice(0, 13).replace("T", "-");
+        const suffix = Math.random().toString(16).slice(2, 6).padEnd(4, "0");
+        const runId = `${stamp}-${suffix}`;
+        bru.setVar("runId", runId);
+        const vars = {
+          customerUserId: `customer-${runId}`, otherCustomerUserId: `other-${runId}`,
+          staffUserId: `staff-${runId}`, ownerUserId: `owner-${runId}`, disposableUserId: `delete-user-${runId}`,
+          customerEmail: `customer-${runId}@example.test`, otherCustomerEmail: `other-${runId}@example.test`,
+          staffEmail: `staff-${runId}@example.test`, ownerEmail: `owner-${runId}@example.test`, disposableEmail: `delete-user-${runId}@example.test`,
+          customerVehicleId: `vehicle-customer-${runId}`, otherCustomerVehicleId: `vehicle-other-${runId}`,
+          disposableVehicleId: `vehicle-delete-${runId}`, plateConflictVehicleId: `vehicle-plate-${runId}`,
+          serviceId: `service-${runId}`, toggleServiceId: `service-toggle-${runId}`, inactiveServiceId: `service-inactive-${runId}`,
+          bookingId: `booking-${runId}`, otherBookingId: `booking-other-${runId}`, cancelBookingId: `booking-cancel-${runId}`,
+          deleteRouteBookingId: `booking-delete-route-${runId}`, fullSlotBookingId: `booking-full-a-${runId}`,
+          conflictBookingId: `booking-conflict-a-${runId}`, queueEntryId: `queue-${runId}`, otherQueueEntryId: `queue-other-${runId}`,
+          deleteQueueEntryId: `queue-delete-${runId}`, activeDeleteQueueEntryId: `queue-active-delete-${runId}`,
+          e2eCustomerUserId: `e2e-customer-${runId}`, e2eCustomerEmail: `e2e-customer-${runId}@example.test`,
+          e2eVehicleId: `e2e-vehicle-${runId}`, e2eBookingId: `e2e-booking-${runId}`,
+          opsBookingId: `ops-booking-${runId}`, opsQueueId: `ops-queue-${runId}`,
+          ownerJourneyServiceId: `owner-journey-service-${runId}`, adminRbacServiceId: `admin-rbac-service-${runId}`, adminJourneyUserId: `admin-journey-${runId}`,
+          adminJourneyEmail: `admin-journey-${runId}@example.test`
+        };
+        for (const [key,value] of Object.entries(vars)) bru.setVar(key,value);
+        for (let i=1;i<=30;i++) {
+          const d = new Date(Date.now() + (7+i)*24*60*60*1000 + i*37*60*1000);
+          bru.setVar(`future${i}`, d.toISOString().slice(0,19));
+          if (i === 1) bru.setVar("testDate", d.toISOString().slice(0,10));
+        }
+        bru.setVar("pastDateTime", "2020-01-01T10:00:00");
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("returns JSON", function() { expect(String(res.getHeader("content-type") || "").toLowerCase()).to.include("application/json"); });
+        const payload = JSON.stringify(res.body ?? {});
+        const lower = payload.toLowerCase();
+        for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "secure_jwt_secret", "bootstrap-admin-password"]) {
+          expect(lower, `response leaked ${forbidden}`).to.not.include(forbidden);
+        }
+        const rawPassword = bru.interpolate("{{process.env.BRUNO_TEST_USER_PASSWORD}}");
+        if (rawPassword && !rawPassword.includes("process.env")) expect(payload).to.not.include(rawPassword);
+        const bootstrapPassword = bru.interpolate("{{process.env.BRUNO_BOOTSTRAP_ADMIN_PASSWORD}}");
+        if (bootstrapPassword && !bootstrapPassword.includes("process.env")) expect(payload).to.not.include(bootstrapPassword);
+        test("runId is initialized", function() { expect(bru.getVar("runId")).to.match(/^\d{8}-\d{4}-[0-9a-f]{4}$/); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

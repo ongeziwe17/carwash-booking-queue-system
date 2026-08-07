@@ -1,0 +1,12 @@
+name: local
+variables:
+  - name: baseUrl
+    value: http://localhost:8080
+    enabled: true
+    secret: false
+    type: text
+  - name: allowRemoteDestructiveTests
+    value: "false"
+    enabled: true
+    secret: false
+    type: text

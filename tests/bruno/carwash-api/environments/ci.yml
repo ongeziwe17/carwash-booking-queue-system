@@ -1,0 +1,12 @@
+name: ci
+variables:
+  - name: baseUrl
+    value: http://127.0.0.1:8080
+    enabled: true
+    secret: false
+    type: text
+  - name: allowRemoteDestructiveTests
+    value: "false"
+    enabled: true
+    secret: false
+    type: text
