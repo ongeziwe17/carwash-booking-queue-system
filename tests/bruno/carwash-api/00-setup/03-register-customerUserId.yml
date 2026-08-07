@@ -6,6 +6,8 @@ info:
     - auth
     - smoke
     - customer
+    - rbac
+    - security
 
 http:
   method: POST
