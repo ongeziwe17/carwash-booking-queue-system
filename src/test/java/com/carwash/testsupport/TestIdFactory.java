@@ -18,7 +18,7 @@ public final class TestIdFactory {
     private int plateSequence;
 
     public TestIdFactory(String testName) {
-        this.prefix = sanitize(testName);
+        this.prefix = sanitizePrefix(testName);
     }
 
     public String user() {
@@ -46,7 +46,7 @@ public final class TestIdFactory {
     }
 
     public String emailFor(String id) {
-        return sanitize(Objects.requireNonNull(id, "ID is required")) + "@example.test";
+        return sanitizeIdentifier(Objects.requireNonNull(id, "ID is required")) + "@example.test";
     }
 
     public String plate() {
@@ -59,16 +59,18 @@ public final class TestIdFactory {
         return prefix + "-" + type + "-" + String.format("%03d", sequence);
     }
 
-    private static String sanitize(String value) {
+    private static String sanitizePrefix(String value) {
+        String sanitized = sanitizeIdentifier(value);
+        return sanitized.length() > MAX_PREFIX_LENGTH
+                ? sanitized.substring(0, MAX_PREFIX_LENGTH).replaceAll("-+$", "")
+                : sanitized;
+    }
+
+    private static String sanitizeIdentifier(String value) {
         String sanitized = Objects.requireNonNullElse(value, "test")
                 .toLowerCase(Locale.ROOT)
                 .replaceAll("[^a-z0-9]+", "-")
                 .replaceAll("^-+|-+$", "");
-        if (sanitized.isBlank()) {
-            sanitized = "test";
-        }
-        return sanitized.length() > MAX_PREFIX_LENGTH
-                ? sanitized.substring(0, MAX_PREFIX_LENGTH).replaceAll("-+$", "")
-                : sanitized;
+        return sanitized.isBlank() ? "test" : sanitized;
     }
 }
