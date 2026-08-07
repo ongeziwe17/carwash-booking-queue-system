@@ -5,6 +5,8 @@ info:
   tags:
     - customer
     - ownership
+    - rbac
+    - security
 
 http:
   method: POST
