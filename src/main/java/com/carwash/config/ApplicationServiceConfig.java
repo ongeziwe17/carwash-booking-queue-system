@@ -1,26 +1,10 @@
 package com.carwash.config;
 
-import com.carwash.repository.BookingRepository;
-import com.carwash.repository.NotificationRepository;
-import com.carwash.repository.QueueEntryRepository;
-import com.carwash.repository.ServiceRepository;
-import com.carwash.repository.UserRepository;
-import com.carwash.repository.VehicleRepository;
-import com.carwash.repository.inmemory.InMemoryBookingRepository;
-import com.carwash.repository.inmemory.InMemoryDataCoordinator;
-import com.carwash.repository.inmemory.InMemoryNotificationRepository;
-import com.carwash.repository.inmemory.InMemoryQueueEntryRepository;
-import com.carwash.repository.inmemory.InMemoryServiceRepository;
-import com.carwash.repository.inmemory.InMemoryUserRepository;
-import com.carwash.repository.inmemory.InMemoryVehicleRepository;
+import com.carwash.factory.RepositoryFactory;
+import com.carwash.factory.StorageType;
+import com.carwash.repository.*;
+import com.carwash.service.*;
 import com.carwash.security.UserCredentialService;
-import com.carwash.service.BookingManagementService;
-import com.carwash.service.DailySummaryReportService;
-import com.carwash.service.NotificationManagementService;
-import com.carwash.service.QueueManagementService;
-import com.carwash.service.ServiceCatalogService;
-import com.carwash.service.UserManagementService;
-import com.carwash.service.VehicleManagementService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -28,154 +12,63 @@ import org.springframework.context.annotation.Configuration;
 public class ApplicationServiceConfig {
 
     @Bean
-    public InMemoryDataCoordinator inMemoryDataCoordinator() {
-        return new InMemoryDataCoordinator();
-    }
-
-    @Bean
     public UserRepository userRepository() {
-        return new InMemoryUserRepository();
+        return RepositoryFactory.getUserRepository(StorageType.MEMORY);
     }
-
     @Bean
     public VehicleRepository vehicleRepository() {
-        return new InMemoryVehicleRepository();
+        return RepositoryFactory.getVehicleRepository(StorageType.MEMORY);
     }
-
     @Bean
     public ServiceRepository serviceRepository() {
-        return new InMemoryServiceRepository();
+        return RepositoryFactory.getServiceRepository(StorageType.MEMORY);
     }
-
     @Bean
     public BookingRepository bookingRepository() {
-        return new InMemoryBookingRepository();
+        return RepositoryFactory.getBookingRepository(StorageType.MEMORY);
     }
-
     @Bean
     public QueueEntryRepository queueEntryRepository() {
-        return new InMemoryQueueEntryRepository();
+        return RepositoryFactory.getQueueEntryRepository(StorageType.MEMORY);
     }
 
     @Bean
     public NotificationRepository notificationRepository() {
-        return new InMemoryNotificationRepository();
+        return RepositoryFactory.getNotificationRepository(StorageType.MEMORY);
     }
 
     @Bean
-    public UserManagementService userManagementService(
-            UserRepository userRepository,
-            UserCredentialService credentialService,
-            VehicleRepository vehicleRepository,
-            BookingRepository bookingRepository,
-            NotificationRepository notificationRepository,
-            InMemoryDataCoordinator coordinator
-    ) {
-        return new UserManagementService(
-                userRepository,
-                credentialService,
-                vehicleRepository,
-                bookingRepository,
-                notificationRepository,
-                coordinator
-        );
+    public UserManagementService userManagementService(UserRepository userRepository, UserCredentialService credentialService) {
+        return new UserManagementService(userRepository, credentialService);
     }
 
     @Bean
-    public VehicleManagementService vehicleManagementService(
-            VehicleRepository vehicleRepository,
-            UserRepository userRepository,
-            BookingRepository bookingRepository,
-            InMemoryDataCoordinator coordinator
-    ) {
-        return new VehicleManagementService(
-                vehicleRepository,
-                userRepository,
-                bookingRepository,
-                coordinator
-        );
+    public VehicleManagementService vehicleManagementService(VehicleRepository vehicleRepository, UserRepository userRepository) {
+        return new VehicleManagementService(vehicleRepository, userRepository);
     }
 
     @Bean
-    public ServiceCatalogService serviceCatalogService(
-            ServiceRepository serviceRepository,
-            BookingRepository bookingRepository,
-            QueueEntryRepository queueEntryRepository,
-            InMemoryDataCoordinator coordinator
-    ) {
-        return new ServiceCatalogService(
-                serviceRepository,
-                bookingRepository,
-                queueEntryRepository,
-                coordinator
-        );
+    public ServiceCatalogService serviceCatalogService(ServiceRepository serviceRepository) {
+        return new ServiceCatalogService(serviceRepository);
     }
 
     @Bean
-    public NotificationManagementService notificationManagementService(
-            NotificationRepository notificationRepository,
-            UserRepository userRepository,
-            BookingRepository bookingRepository,
-            InMemoryDataCoordinator coordinator
-    ) {
-        return new NotificationManagementService(
-                notificationRepository,
-                userRepository,
-                bookingRepository,
-                coordinator
-        );
+    public NotificationManagementService notificationManagementService(NotificationRepository notificationRepository) {
+        return new NotificationManagementService(notificationRepository);
     }
 
     @Bean
-    public BookingManagementService bookingManagementService(
-            BookingRepository bookingRepository,
-            UserRepository userRepository,
-            VehicleRepository vehicleRepository,
-            ServiceRepository serviceRepository,
-            QueueEntryRepository queueEntryRepository,
-            NotificationRepository notificationRepository,
-            NotificationManagementService notificationManagementService,
-            InMemoryDataCoordinator coordinator
-    ) {
-        return new BookingManagementService(
-                bookingRepository,
-                userRepository,
-                vehicleRepository,
-                serviceRepository,
-                queueEntryRepository,
-                notificationRepository,
-                notificationManagementService,
-                coordinator
-        );
+    public BookingManagementService bookingManagementService(BookingRepository bookingRepository, UserRepository userRepository, VehicleRepository vehicleRepository, ServiceRepository serviceRepository, NotificationManagementService notificationManagementService) {
+        return new BookingManagementService(bookingRepository, userRepository, vehicleRepository, serviceRepository, notificationManagementService);
     }
 
     @Bean
-    public QueueManagementService queueManagementService(
-            QueueEntryRepository queueEntryRepository,
-            BookingRepository bookingRepository,
-            ServiceRepository serviceRepository,
-            NotificationManagementService notificationManagementService,
-            InMemoryDataCoordinator coordinator
-    ) {
-        return new QueueManagementService(
-                queueEntryRepository,
-                bookingRepository,
-                serviceRepository,
-                notificationManagementService,
-                coordinator
-        );
+    public QueueManagementService queueManagementService(QueueEntryRepository queueEntryRepository, BookingRepository bookingRepository, ServiceRepository serviceRepository, NotificationManagementService notificationManagementService) {
+        return new QueueManagementService(queueEntryRepository, bookingRepository, serviceRepository, notificationManagementService);
     }
 
     @Bean
-    public DailySummaryReportService dailySummaryReportService(
-            BookingRepository bookingRepository,
-            QueueEntryRepository queueEntryRepository,
-            InMemoryDataCoordinator coordinator
-    ) {
-        return new DailySummaryReportService(
-                bookingRepository,
-                queueEntryRepository,
-                coordinator
-        );
+    public DailySummaryReportService dailySummaryReportService(BookingRepository bookingRepository, QueueEntryRepository queueEntryRepository) {
+        return new DailySummaryReportService(bookingRepository, queueEntryRepository);
     }
 }
