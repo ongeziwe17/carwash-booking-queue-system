@@ -5,6 +5,7 @@ info:
   tags:
     - auth
     - rbac
+    - security
 
 http:
   method: POST
