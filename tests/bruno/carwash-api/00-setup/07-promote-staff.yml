@@ -5,6 +5,7 @@ info:
   tags:
     - admin
     - rbac
+    - security
 
 http:
   method: PUT
