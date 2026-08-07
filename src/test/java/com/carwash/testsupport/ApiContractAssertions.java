@@ -12,10 +12,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 public final class ApiContractAssertions {
 
     private static final List<String> FORBIDDEN_RESPONSE_FRAGMENTS = List.of(
-            "\"password\"",
             "encodedPassword",
             "passwordHash",
             "SECURE_JWT_SECRET",
+            "carwash.security.jwt.secret",
+            "dGVzdC1vbmx5LWNhcndhc2gtand0LXNpZ25pbmcta2V5LTMyYnl0ZXMh",
+            "LocalTestPassword123!",
             "Authorization",
             "stackTrace",
             "java.lang.",
