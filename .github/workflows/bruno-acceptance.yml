@@ -1,0 +1,169 @@
+name: Bruno API Acceptance
+
+on:
+  pull_request:
+    branches:
+      - staging
+      - develop
+      - master
+  push:
+    branches:
+      - staging
+      - develop
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  JDK_VERSION: '21'
+  SPRING_PROFILES_ACTIVE: test
+  SPRING_APP_NAME: carwash-booking-queue-system
+  SERVER_PORT: '8080'
+  SECURE_PASSWORD_BCRYPT_STRENGTH: '4'
+  SECURE_PASSWORD_MIN_LENGTH: '12'
+  SECURE_PASSWORD_MAX_UTF8_BYTES: '72'
+  SECURE_JWT_ISSUER: carwash-booking-queue-system-bruno-ci
+  SECURE_JWT_ACCESS_TOKEN_TTL: 20m
+  SECURE_BOOTSTRAP_ADMIN_ENABLED: 'false'
+
+jobs:
+  bruno-acceptance:
+    name: Bruno API acceptance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JDK_VERSION }}
+          cache: maven
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Prepare ephemeral JWT signing secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          jwt_secret="$(openssl rand -base64 32 | tr -d '\n')"
+          echo "::add-mask::${jwt_secret}"
+          echo "SECURE_JWT_SECRET=${jwt_secret}" >> "${GITHUB_ENV}"
+
+      - name: Run Java verification before Bruno
+        run: ./mvnw --batch-mode clean verify
+
+      - name: Prepare ephemeral Bruno identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          bootstrap_password="$(openssl rand -base64 36 | tr -d '\n')"
+          test_user_password="$(openssl rand -base64 36 | tr -d '\n')"
+          bootstrap_email="bruno-admin-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@example.test"
+          bootstrap_user_id="bruno-admin-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          echo "::add-mask::${bootstrap_password}"
+          echo "::add-mask::${test_user_password}"
+
+          {
+            echo "SECURE_BOOTSTRAP_ADMIN_ENABLED=true"
+            echo "SECURE_BOOTSTRAP_ADMIN_USER_ID=${bootstrap_user_id}"
+            echo "SECURE_BOOTSTRAP_ADMIN_FULL_NAME=Bruno CI Administrator"
+            echo "SECURE_BOOTSTRAP_ADMIN_EMAIL=${bootstrap_email}"
+            echo "SECURE_BOOTSTRAP_ADMIN_PHONE=0800000000"
+            echo "SECURE_BOOTSTRAP_ADMIN_PASSWORD=${bootstrap_password}"
+            echo "BRUNO_BOOTSTRAP_ADMIN_EMAIL=${bootstrap_email}"
+            echo "BRUNO_BOOTSTRAP_ADMIN_PASSWORD=${bootstrap_password}"
+            echo "BRUNO_TEST_USER_PASSWORD=${test_user_password}"
+          } >> "${GITHUB_ENV}"
+
+      - name: Start verified API for Bruno
+        shell: bash
+        run: |
+          set -euo pipefail
+          java -jar target/carwash-api.jar > target/bruno-application.log 2>&1 &
+          echo "$!" > target/bruno-application.pid
+
+      - name: Wait for API readiness and capture OpenAPI
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_pid="$(cat target/bruno-application.pid)"
+
+          for _ in {1..30}; do
+            if curl --silent --show-error --fail \
+              http://127.0.0.1:8080/v3/api-docs \
+              --output target/bruno-openapi.json; then
+              exit 0
+            fi
+
+            if ! kill -0 "${app_pid}" 2>/dev/null; then
+              echo "Application stopped before Bruno readiness completed."
+              tail -n 100 target/bruno-application.log || true
+              exit 1
+            fi
+
+            sleep 2
+          done
+
+          echo "Timed out waiting for the Bruno test application."
+          tail -n 100 target/bruno-application.log || true
+          exit 1
+
+      - name: Verify OpenAPI operation coverage
+        run: >-
+          python3 tests/bruno/carwash-api/validate_openapi_coverage.py
+          target/bruno-openapi.json
+          --collection tests/bruno/carwash-api
+
+      - name: Install pinned Bruno CLI
+        run: npm install --global @usebruno/cli@4.0.0
+
+      - name: Report Bruno CLI version
+        run: bru --version
+
+      - name: Run complete Bruno acceptance suite
+        working-directory: tests/bruno/carwash-api
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          bru run --env ci \
+            --reporter-html results/bruno-report.html \
+            --reporter-json results/bruno-report.json \
+            --reporter-junit results/bruno-junit.xml \
+            --reporter-skip-all-headers \
+            --reporter-skip-body
+
+      - name: Upload Bruno reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bruno-reports-${{ github.run_number }}-${{ github.sha }}
+          path: |
+            tests/bruno/carwash-api/results/bruno-report.html
+            tests/bruno/carwash-api/results/bruno-report.json
+            tests/bruno/carwash-api/results/bruno-junit.xml
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Stop Bruno test application
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f target/bruno-application.pid ]]; then
+            app_pid="$(cat target/bruno-application.pid)"
+            kill "${app_pid}" 2>/dev/null || true
+            wait "${app_pid}" 2>/dev/null || true
+          fi
