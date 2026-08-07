@@ -13,6 +13,7 @@ import tools.jackson.databind.JsonNode;
 
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -131,9 +132,9 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         if (!json.isMissingNode()) {
             return json.path("schema").path("$ref").asText();
         }
-        Iterator<JsonNode> mediaTypes = content.elements();
+        Iterator<Map.Entry<String, JsonNode>> mediaTypes = content.properties().iterator();
         return mediaTypes.hasNext()
-                ? mediaTypes.next().path("schema").path("$ref").asText()
+                ? mediaTypes.next().getValue().path("schema").path("$ref").asText()
                 : "";
     }
 
