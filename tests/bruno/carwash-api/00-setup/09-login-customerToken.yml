@@ -6,6 +6,8 @@ info:
     - auth
     - smoke
     - customer
+    - rbac
+    - security
 
 http:
   method: POST
@@ -29,9 +31,14 @@ runtime:
       code: |-
         if (res.status === 200 && res.body.accessToken) {
           bru.setVar("customerToken", res.body.accessToken);
-          const token = res.body.accessToken;
-          const last = token.slice(-1);
-          bru.setVar("tamperedToken", token.slice(0, -1) + (last === "a" ? "b" : "a"));
+          const token = String(res.body.accessToken);
+          const parts = token.split(".");
+          if (parts.length === 3 && parts[2].length > 0) {
+            const signature = parts[2];
+            const first = signature.charAt(0);
+            const replacement = first === "a" ? "b" : "a";
+            bru.setVar("tamperedToken", `${parts[0]}.${parts[1]}.${replacement}${signature.slice(1)}`);
+          }
         }
     - type: tests
       code: |-
