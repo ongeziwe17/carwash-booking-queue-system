@@ -13,29 +13,30 @@ import com.carwash.service.exception.ResourceNotFoundException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class NotificationManagementService {
 
     private static final String DEFAULT_CHANNEL = "IN_APP";
     private static final int DEFAULT_RECENT_LIMIT = 10;
-    private static final AtomicLong NOTIFICATION_SEQUENCE = new AtomicLong();
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final BookingRepository bookingRepository;
     private final InMemoryDataCoordinator coordinator;
-
+    private final NotificationIdGenerator notificationIdGenerator;
 
     public NotificationManagementService(NotificationRepository notificationRepository,
                                          UserRepository userRepository,
                                          BookingRepository bookingRepository,
-                                         InMemoryDataCoordinator coordinator) {
+                                         InMemoryDataCoordinator coordinator,
+                                         NotificationIdGenerator notificationIdGenerator) {
         this.notificationRepository = Objects.requireNonNull(notificationRepository,
                 "Notification repository is required");
         this.userRepository = userRepository;
         this.bookingRepository = bookingRepository;
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
+        this.notificationIdGenerator = Objects.requireNonNull(notificationIdGenerator,
+                "Notification ID generator is required");
     }
 
     public Notification createNotification(User user, Booking booking, String type, String message) {
@@ -45,7 +46,7 @@ public class NotificationManagementService {
             if (message == null || message.isBlank()) {
                 throw new BusinessRuleViolationException("Notification message is required");
             }
-            Notification notification = new Notification(nextNotificationId(), canonicalUser,
+            Notification notification = new Notification(notificationIdGenerator.nextId(), canonicalUser,
                     canonicalBooking, type, message, DEFAULT_CHANNEL);
             notification.send();
             if (!notificationRepository.insert(notification)) {
@@ -116,10 +117,6 @@ public class NotificationManagementService {
         }
         return bookingRepository.findById(booking.getBookingId())
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found: " + booking.getBookingId()));
-    }
-
-    private String nextNotificationId() {
-        return "notification-" + String.format("%020d", NOTIFICATION_SEQUENCE.incrementAndGet());
     }
 
     private void validateUserId(String userId) {
