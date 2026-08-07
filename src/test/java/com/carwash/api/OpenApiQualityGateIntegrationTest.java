@@ -74,8 +74,7 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
                 .forEach(entry -> {
                     String code = entry.getKey();
                     if (code.startsWith("4") || code.startsWith("5")) {
-                        String ref = entry.getValue().path("content").path("application/json")
-                                .path("schema").path("$ref").asText();
+                        String ref = responseSchemaRef(entry.getValue());
                         assertEquals("#/components/schemas/ApiErrorResponse", ref,
                                 method + " " + path + " response " + code);
                     }
@@ -124,6 +123,18 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         return objectMapper.readTree(body);
+    }
+
+    private String responseSchemaRef(JsonNode response) {
+        JsonNode content = response.path("content");
+        JsonNode json = content.path("application/json");
+        if (!json.isMissingNode()) {
+            return json.path("schema").path("$ref").asText();
+        }
+        Iterator<JsonNode> mediaTypes = content.elements();
+        return mediaTypes.hasNext()
+                ? mediaTypes.next().path("schema").path("$ref").asText()
+                : "";
     }
 
     private void forEachOperation(JsonNode document, OperationConsumer consumer) {
