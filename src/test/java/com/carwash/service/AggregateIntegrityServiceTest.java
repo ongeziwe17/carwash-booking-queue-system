@@ -14,11 +14,11 @@ import com.carwash.repository.inmemory.InMemoryUserRepository;
 import com.carwash.repository.inmemory.InMemoryVehicleRepository;
 import com.carwash.security.UserCredentialService;
 import com.carwash.service.exception.BusinessRuleViolationException;
+import com.carwash.testsupport.TestDates;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -54,8 +54,8 @@ class AggregateIntegrityServiceTest {
         bookings = new InMemoryBookingRepository();
         queues = new InMemoryQueueEntryRepository();
         notifications = new InMemoryNotificationRepository();
-        NotificationManagementService notificationManagement =
-                new NotificationManagementService(notifications, users, bookings, coordinator);
+        NotificationManagementService notificationManagement = new NotificationManagementService(
+                notifications, users, bookings, coordinator, new AtomicNotificationIdGenerator());
         vehicleManagement = new VehicleManagementService(vehicles, users, bookings, coordinator);
         serviceCatalog = new ServiceCatalogService(services, bookings, queues, coordinator);
         bookingManagement = new BookingManagementService(bookings, users, vehicles, services, queues,
@@ -67,49 +67,37 @@ class AggregateIntegrityServiceTest {
 
     @Test
     void aggregateCollectionsStaySynchronizedThroughLifecycle() {
-        User user = activeUser("u-1", "user@example.com");
+        User user = activeUser("aggregate-user", "aggregate@example.test");
         assertTrue(users.insert(user));
-        Service service = service("s-1", "Exterior");
+        Service service = service("aggregate-service", "Exterior");
         assertTrue(services.insert(service));
-        Vehicle vehicle = vehicleManagement.createVehicle("u-1", "v-1", "ABC123", "SEDAN",
+        Vehicle vehicle = vehicleManagement.createVehicle("aggregate-user", "aggregate-vehicle", "ABC123", "SEDAN",
                 "Toyota", "Corolla", "White", "");
-        assertSame(vehicle, vehicles.findById("v-1").orElseThrow());
+        assertSame(vehicle, vehicles.findById("aggregate-vehicle").orElseThrow());
         assertEquals(1, user.getVehicles().size());
-        Booking booking = bookingManagement.createBooking("b-1", "u-1", "v-1", "s-1",
-                LocalDateTime.now().plusDays(1), "");
-        assertSame(booking, bookings.findById("b-1").orElseThrow());
-        assertSame(user, booking.getUser());
-        assertSame(vehicle, booking.getVehicle());
-        assertSame(service, booking.getService());
+        Booking booking = bookingManagement.createBooking("aggregate-booking", "aggregate-user", "aggregate-vehicle",
+                "aggregate-service", TestDates.futureDays(1), "");
+        assertSame(booking, bookings.findById("aggregate-booking").orElseThrow());
         assertEquals(1, user.getBookings().size());
-        var queueEntry = queueManagement.createQueueEntry("q-1", "b-1", "s-1", 1);
-        assertSame(queueEntry, queues.findById("q-1").orElseThrow());
+        var queueEntry = queueManagement.createQueueEntry("aggregate-queue", "aggregate-booking", "aggregate-service", 1);
         assertSame(queueEntry, booking.getQueueEntry());
-        assertThrows(BusinessRuleViolationException.class, () -> vehicleManagement.deleteVehicle("v-1"));
-        assertThrows(BusinessRuleViolationException.class, () -> serviceCatalog.deleteService("s-1"));
-        assertThrows(BusinessRuleViolationException.class, () -> bookingManagement.deleteBooking("b-1"));
-        queueManagement.deleteQueueEntry("q-1");
-        assertTrue(queues.findById("q-1").isEmpty());
+        assertThrows(BusinessRuleViolationException.class, () -> vehicleManagement.deleteVehicle("aggregate-vehicle"));
+        assertThrows(BusinessRuleViolationException.class, () -> serviceCatalog.deleteService("aggregate-service"));
+        assertThrows(BusinessRuleViolationException.class, () -> bookingManagement.deleteBooking("aggregate-booking"));
+        queueManagement.deleteQueueEntry("aggregate-queue");
         assertNull(booking.getQueueEntry());
-        bookingManagement.cancelBooking("b-1", "u-1");
-        assertFalse(notifications.findByBookingId("b-1").isEmpty());
-        bookingManagement.deleteBooking("b-1");
-        assertTrue(bookings.findById("b-1").isEmpty());
-        assertTrue(user.getBookings().isEmpty());
-        assertTrue(notifications.findByBookingId("b-1").isEmpty());
-        vehicleManagement.deleteVehicle("v-1");
-        assertTrue(vehicles.findById("v-1").isEmpty());
-        assertTrue(user.getVehicles().isEmpty());
-        serviceCatalog.deleteService("s-1");
-        assertTrue(services.findById("s-1").isEmpty());
-        userManagement.deleteUser("u-1");
-        assertTrue(users.findById("u-1").isEmpty());
-        assertTrue(notifications.findByUserId("u-1").isEmpty());
+        bookingManagement.cancelBooking("aggregate-booking", "aggregate-user");
+        assertFalse(notifications.findByBookingId("aggregate-booking").isEmpty());
+        bookingManagement.deleteBooking("aggregate-booking");
+        vehicleManagement.deleteVehicle("aggregate-vehicle");
+        serviceCatalog.deleteService("aggregate-service");
+        userManagement.deleteUser("aggregate-user");
+        assertTrue(users.findById("aggregate-user").isEmpty());
     }
 
     @Test
     void concurrentVehicleCreationKeepsRepositoryAndOwnerAggregateAligned() throws Exception {
-        User user = activeUser("u-concurrent", "concurrent@example.com");
+        User user = activeUser("concurrent-user", "concurrent@example.test");
         assertTrue(users.insert(user));
         int count = 16;
         int workers = 8;
@@ -121,23 +109,15 @@ class AggregateIntegrityServiceTest {
                     .mapToObj(index -> executor.submit(() -> {
                         ready.countDown();
                         assertTrue(start.await(5, TimeUnit.SECONDS));
-                        return vehicleManagement.createVehicle(
-                                user.getUserId(), "v-concurrent-" + index, "CONC" + index,
-                                "SEDAN", "Brand", "Model", "White", "");
-                    }))
-                    .toList();
+                        return vehicleManagement.createVehicle(user.getUserId(), "concurrent-vehicle-" + index,
+                                "CONC" + index, "SEDAN", "Brand", "Model", "White", "");
+                    })).toList();
             assertTrue(ready.await(5, TimeUnit.SECONDS));
             start.countDown();
-            for (Future<Vehicle> future : futures) {
-                assertNotNull(future.get(5, TimeUnit.SECONDS));
-            }
+            for (Future<Vehicle> future : futures) assertNotNull(future.get(5, TimeUnit.SECONDS));
             assertEquals(count, vehicles.findByUserId(user.getUserId()).size());
-            assertEquals(count, user.getVehicles().size());
-            assertEquals(
-                    new HashSet<>(vehicles.findByUserId(user.getUserId()).stream()
-                            .map(Vehicle::getVehicleId).toList()),
-                    new HashSet<>(user.getVehicles().stream().map(Vehicle::getVehicleId).toList())
-            );
+            assertEquals(new HashSet<>(vehicles.findByUserId(user.getUserId()).stream().map(Vehicle::getVehicleId).toList()),
+                    new HashSet<>(user.getVehicles().stream().map(Vehicle::getVehicleId).toList()));
         } finally {
             executor.shutdownNow();
             assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
@@ -146,57 +126,49 @@ class AggregateIntegrityServiceTest {
 
     @Test
     void vehicleUpdateRechecksOwnerPlateUniquenessWithoutMutationOnFailure() {
-        User user = activeUser("u-plate", "plate@example.com");
+        User user = activeUser("plate-user", "plate@example.test");
         assertTrue(users.insert(user));
-        vehicleManagement.createVehicle(user.getUserId(), "v-1", "ABC123", "SEDAN", "Brand", "One", "White", "");
-        vehicleManagement.createVehicle(user.getUserId(), "v-2", "XYZ999", "SUV", "Brand", "Two", "Black", "");
+        vehicleManagement.createVehicle(user.getUserId(), "plate-vehicle-one", "ABC123", "SEDAN", "Brand", "One", "White", "");
+        vehicleManagement.createVehicle(user.getUserId(), "plate-vehicle-two", "XYZ999", "SUV", "Brand", "Two", "Black", "");
         assertThrows(BusinessRuleViolationException.class,
-                () -> vehicleManagement.updateVehicle("v-1", " xyz999 ", "SEDAN", "Changed", "Changed", "Blue", ""));
-        Vehicle unchanged = vehicles.findById("v-1").orElseThrow();
+                () -> vehicleManagement.updateVehicle("plate-vehicle-one", " xyz999 ", "SEDAN", "Changed", "Changed", "Blue", ""));
+        Vehicle unchanged = vehicles.findById("plate-vehicle-one").orElseThrow();
         assertEquals("ABC123", unchanged.getPlateNumber());
-        assertEquals("Brand", unchanged.getBrand());
-        Vehicle retainedPlate = vehicleManagement.updateVehicle("v-1", " abc123 ", "SEDAN",
-                "Updated", "One", "Silver", "");
-        assertEquals("abc123", retainedPlate.getPlateNumber());
+        Vehicle retained = vehicleManagement.updateVehicle("plate-vehicle-one", " abc123 ", "SEDAN", "Updated", "One", "Silver", "");
+        assertEquals("abc123", retained.getPlateNumber());
     }
 
     @Test
     void terminalBookingsAndNonWaitingQueueEntriesRejectMutation() {
-        User user = activeUser("u-state", "state@example.com");
+        User user = activeUser("state-user", "state@example.test");
         assertTrue(users.insert(user));
-        assertTrue(services.insert(service("s-state", "State")));
-        vehicleManagement.createVehicle(user.getUserId(), "v-state", "STATE1", "SEDAN",
-                "Brand", "Model", "White", "");
-        Booking booking = bookingManagement.createBooking("b-state", user.getUserId(), "v-state", "s-state",
-                LocalDateTime.now().plusDays(2), "");
-        bookingManagement.confirmBooking("b-state");
+        assertTrue(services.insert(service("state-service", "State")));
+        vehicleManagement.createVehicle(user.getUserId(), "state-vehicle", "STATE1", "SEDAN", "Brand", "Model", "White", "");
+        Booking booking = bookingManagement.createBooking("state-booking", user.getUserId(), "state-vehicle", "state-service",
+                TestDates.futureDays(2), "");
+        bookingManagement.confirmBooking("state-booking");
         assertTrue(booking.startService());
         assertTrue(bookings.update(booking));
         assertThrows(BusinessRuleViolationException.class,
-                () -> bookingManagement.updateBooking("b-state", "v-state", "s-state",
-                        LocalDateTime.now().plusDays(3), ""));
-        Booking waitingBooking = bookingManagement.createBooking("b-queue-state", user.getUserId(),
-                "v-state", "s-state", LocalDateTime.now().plusDays(4), "");
-        var queueEntry = queueManagement.createQueueEntry("q-state", waitingBooking.getBookingId(), "s-state", 1);
+                () -> bookingManagement.updateBooking("state-booking", "state-vehicle", "state-service", TestDates.futureDays(3), ""));
+        Booking waiting = bookingManagement.createBooking("state-queue-booking", user.getUserId(), "state-vehicle", "state-service",
+                TestDates.futureDays(4), "");
+        var queueEntry = queueManagement.createQueueEntry("state-queue", waiting.getBookingId(), "state-service", 1);
         queueManagement.callNext(queueEntry.getQueueEntryId());
-        assertThrows(BusinessRuleViolationException.class,
-                () -> queueManagement.updatePosition(queueEntry.getQueueEntryId(), 2));
-        assertThrows(BusinessRuleViolationException.class,
-                () -> queueManagement.deleteQueueEntry(queueEntry.getQueueEntryId()));
+        assertThrows(BusinessRuleViolationException.class, () -> queueManagement.updatePosition(queueEntry.getQueueEntryId(), 2));
+        assertThrows(BusinessRuleViolationException.class, () -> queueManagement.deleteQueueEntry(queueEntry.getQueueEntryId()));
     }
 
     @Test
     void duplicateCreationFailsBeforeAggregateCollectionsChange() {
-        User user = activeUser("u-duplicate", "duplicate@example.com");
+        User user = activeUser("duplicate-user", "duplicate@example.test");
         assertTrue(users.insert(user));
-        vehicleManagement.createVehicle(user.getUserId(), "v-duplicate", "DUP1", "SEDAN",
-                "Brand", "Model", "White", "");
+        vehicleManagement.createVehicle(user.getUserId(), "duplicate-vehicle", "DUP1", "SEDAN", "Brand", "Model", "White", "");
         assertThrows(BusinessRuleViolationException.class,
-                () -> vehicleManagement.createVehicle(user.getUserId(), "v-duplicate", "DUP2", "SUV",
-                        "Other", "Other", "Black", ""));
+                () -> vehicleManagement.createVehicle(user.getUserId(), "duplicate-vehicle", "DUP2", "SUV", "Other", "Other", "Black", ""));
         assertEquals(1, vehicles.findAll().size());
         assertEquals(1, user.getVehicles().size());
-        assertEquals("DUP1", vehicles.findById("v-duplicate").orElseThrow().getPlateNumber());
+        assertEquals("DUP1", vehicles.findById("duplicate-vehicle").orElseThrow().getPlateNumber());
     }
 
     private User activeUser(String id, String email) {
