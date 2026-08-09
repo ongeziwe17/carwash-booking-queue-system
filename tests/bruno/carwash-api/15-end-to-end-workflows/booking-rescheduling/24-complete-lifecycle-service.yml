@@ -1,0 +1,14 @@
+info:
+  name: Complete lifecycle reschedule service
+  type: http
+  seq: 24
+  tags: [workflow, staff]
+http:
+  method: POST
+  url: "{{baseUrl}}/api/queue-entries/{{rescheduleLifecycleQueueId}}/complete"
+  auth: { type: bearer, token: "{{staffToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("returns COMPLETED", function() { expect(res.status).to.equal(200); expect(res.body.queueStatus).to.equal("COMPLETED"); expect(res.body.booking.status).to.equal("COMPLETED"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

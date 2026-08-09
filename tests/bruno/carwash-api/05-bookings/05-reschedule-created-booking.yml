@@ -1,0 +1,41 @@
+info:
+  name: Customer reschedules CREATED booking
+  type: http
+  seq: 5
+  tags:
+    - customer
+    - workflow
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings/{{bookingId}}/reschedule"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "scheduledDateTime": "{{future2}}"
+      }
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("CREATED status is preserved", function() { expect(res.body.status).to.equal("CREATED"); });
+        test("only the schedule changes", function() {
+          expect(res.body.scheduledDateTime).to.equal(bru.getVar("future2"));
+          expect(res.body.user.userId).to.equal(bru.getVar("customerUserId"));
+          expect(res.body.vehicle.vehicleId).to.equal(bru.getVar("customerVehicleId"));
+          expect(res.body.service.serviceId).to.equal(bru.getVar("serviceId"));
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

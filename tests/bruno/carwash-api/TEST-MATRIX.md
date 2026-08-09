@@ -12,6 +12,7 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 | `DELETE` | `/api/bookings/{id}` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | ✅ | ✅ | N/A — not needed in multi-step journey |
 | `GET` | `/api/bookings/{id}` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | ✅ | N/A — no state/dependency mutation | ✅ |
 | `PUT` | `/api/bookings/{id}` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `POST` | `/api/bookings/{id}/reschedule` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `POST` | `/api/bookings/{id}/cancel` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `POST` | `/api/bookings/{id}/confirm` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
 | `GET` | `/api/notifications/user/{userId}` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | ✅ | N/A — no state/dependency mutation | ✅ |
@@ -45,13 +46,13 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 
 ## Totals
 
-- API operations: **38**
-- Happy-path functional coverage: **38/38**
-- 401 coverage: **36/36 protected operations** (2 public operations are N/A)
-- RBAC/403 applicability covered: **33 operations/capabilities**
-- Ownership applicability covered: **14 operations**
-- Validation applicability covered: **14 operations**
-- HTTP-visible integrity applicability covered: **22 operations**
-- Operations used in multi-step workflows: **23**
+- API operations: **39**
+- Happy-path functional coverage: **39/39**
+- 401 coverage: **37/37 protected operations** (2 public operations are N/A)
+- RBAC/403 applicability covered: **34 operations/capabilities**
+- Ownership applicability covered: **15 operations**
+- Validation applicability covered: **15 operations**
+- HTTP-visible integrity applicability covered: **23 operations**
+- Operations used in multi-step workflows: **24**
 
 The full authorization suite also exercises each significant role/capability allow/deny cell rather than relying only on per-operation counts.

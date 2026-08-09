@@ -1,13 +1,16 @@
 package com.carwash.service;
 
 import com.carwash.config.BookingPolicyProperties;
+import com.carwash.config.NotificationPolicyProperties;
 import com.carwash.domain.Booking;
+import com.carwash.domain.Notification;
 import com.carwash.domain.QueueEntry;
 import com.carwash.domain.Service;
 import com.carwash.domain.User;
 import com.carwash.domain.Vehicle;
 import com.carwash.enums.BookingStatus;
 import com.carwash.enums.QueueStatus;
+import com.carwash.repository.BookingRepository;
 import com.carwash.service.exception.BusinessRuleViolationException;
 import com.carwash.service.exception.ResourceNotFoundException;
 import com.carwash.testsupport.TestDates;
@@ -17,6 +20,12 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -234,13 +243,320 @@ class BookingManagementServiceTest extends ServiceTestSupport {
 
         BusinessRuleViolationException exception = assertThrows(BusinessRuleViolationException.class,
                 () -> bookingService.updateBooking(booking.getBookingId(), originalVehicle.getVehicleId(),
-                        originalService.getServiceId(), TestDates.futureDays(25), "changed"));
+                        originalService.getServiceId(), "changed"));
 
         assertEquals("Booking cannot be updated while it has an active queue entry", exception.getMessage());
         assertSame(originalVehicle, booking.getVehicle());
         assertSame(originalService, booking.getService());
         assertEquals(originalSchedule, booking.getScheduledDateTime());
         assertSame(queueEntry, booking.getQueueEntry());
+    }
+
+    @Test
+    void createdBookingRescheduleChangesOnlyScheduleAndCreatesUpdatedNotification() {
+        Booking booking = createSavedBooking(TestDates.futureDays(40), BookingStatus.CREATED);
+        User owner = booking.getUser();
+        Vehicle vehicle = booking.getVehicle();
+        Service service = booking.getService();
+        LocalDateTime target = TestDates.futureDays(41);
+
+        Booking rescheduled = bookingService.rescheduleBooking(booking.getBookingId(), target);
+
+        assertEquals(target, rescheduled.getScheduledDateTime());
+        assertEquals(BookingStatus.CREATED, rescheduled.getStatus());
+        assertSame(owner, rescheduled.getUser());
+        assertSame(vehicle, rescheduled.getVehicle());
+        assertSame(service, rescheduled.getService());
+        assertEquals(target, bookingRepository.findById(booking.getBookingId()).orElseThrow().getScheduledDateTime());
+        Notification notification = notificationRepository.findByBookingId(booking.getBookingId()).getFirst();
+        assertEquals("BOOKING_RESCHEDULED", notification.getType());
+        assertEquals(target, notification.getBooking().getScheduledDateTime());
+        assertTrue(notification.getMessage().contains(target.toString()));
+    }
+
+    @Test
+    void confirmedBookingReschedulePreservesConfirmationAndNotificationOrder() {
+        Booking booking = createConfirmedBooking(TestDates.futureDays(42));
+        LocalDateTime target = TestDates.futureDays(43);
+
+        Booking rescheduled = bookingService.rescheduleBooking(booking.getBookingId(), target);
+
+        assertEquals(target, rescheduled.getScheduledDateTime());
+        assertEquals(BookingStatus.CONFIRMED, rescheduled.getStatus());
+        assertEquals(List.of("BOOKING_CONFIRMED", "BOOKING_RESCHEDULED"),
+                notificationRepository.findByBookingId(booking.getBookingId()).stream()
+                        .map(Notification::getType).toList());
+    }
+
+    @Test
+    void rescheduleRejectsPastNewTimeWithoutMutationOrNotification() {
+        Booking booking = createSavedBooking(TestDates.futureDays(44), BookingStatus.CREATED);
+        LocalDateTime original = booking.getScheduledDateTime();
+
+        assertThrows(BusinessRuleViolationException.class,
+                () -> bookingService.rescheduleBooking(booking.getBookingId(), LocalDateTime.now(clock).minusMinutes(1)));
+
+        assertEquals(original, booking.getScheduledDateTime());
+        assertTrue(notificationRepository.findByBookingId(booking.getBookingId()).isEmpty());
+    }
+
+    @Test
+    void rescheduleRejectsBookingWhoseCurrentScheduleIsNotFuture() {
+        Booking booking = createSavedBooking(TestDates.futureDays(45), BookingStatus.CREATED);
+        booking.setScheduledDateTime(LocalDateTime.now(clock));
+
+        BusinessRuleViolationException exception = assertThrows(BusinessRuleViolationException.class,
+                () -> bookingService.rescheduleBooking(booking.getBookingId(), TestDates.futureDays(46)));
+
+        assertEquals("Only future bookings can be rescheduled", exception.getMessage());
+        assertEquals(LocalDateTime.now(clock), booking.getScheduledDateTime());
+    }
+
+    @Test
+    void rescheduleUsesConfiguredCutoffBeforeInsideAndAtBoundary() {
+        BookingManagementService twoHourWindow = bookingServiceWithPolicy(1, Duration.ofHours(2));
+        LocalDateTime now = LocalDateTime.now(clock);
+        Booking beforeCutoff = twoHourWindow.createBooking(newBookingWithFixture(now.plusHours(3)));
+        Booking insideCutoff = twoHourWindow.createBooking(newBookingWithFixture(now.plusHours(1)));
+        Booking atCutoff = twoHourWindow.createBooking(newBookingWithFixture(now.plusHours(2)));
+
+        assertEquals(now.plusHours(4),
+                twoHourWindow.rescheduleBooking(beforeCutoff.getBookingId(), now.plusHours(4)).getScheduledDateTime());
+        assertEquals("Booking rescheduling window has closed", assertThrows(BusinessRuleViolationException.class,
+                () -> twoHourWindow.rescheduleBooking(insideCutoff.getBookingId(), now.plusHours(5))).getMessage());
+        assertEquals("Booking rescheduling window has closed", assertThrows(BusinessRuleViolationException.class,
+                () -> twoHourWindow.rescheduleBooking(atCutoff.getBookingId(), now.plusHours(6))).getMessage());
+    }
+
+    @Test
+    void rescheduleCutoffDoesNotImposeMinimumLeadTimeOnNewSchedule() {
+        BookingManagementService twoHourWindow = bookingServiceWithPolicy(1, Duration.ofHours(2));
+        LocalDateTime now = LocalDateTime.now(clock);
+        Booking booking = twoHourWindow.createBooking(newBookingWithFixture(now.plusDays(4)));
+
+        assertEquals(now.plusHours(1),
+                twoHourWindow.rescheduleBooking(booking.getBookingId(), now.plusHours(1)).getScheduledDateTime());
+    }
+
+    @Test
+    void rescheduleRejectsFullTargetSlotAndPreservesBothBookings() {
+        LocalDateTime original = TestDates.futureDays(47);
+        LocalDateTime target = TestDates.futureDays(48);
+        Booking moving = bookingService.createBooking(newBookingWithFixture(original));
+        Booking occupying = bookingService.createBooking(newBookingWithFixture(target));
+
+        BusinessRuleViolationException exception = assertThrows(BusinessRuleViolationException.class,
+                () -> bookingService.rescheduleBooking(moving.getBookingId(), target));
+
+        assertEquals("Booking time slot is already full", exception.getMessage());
+        assertEquals(original, moving.getScheduledDateTime());
+        assertEquals(target, occupying.getScheduledDateTime());
+    }
+
+    @Test
+    void rescheduleRejectsSameCustomerVehicleConflictAndPreservesOriginalSchedule() {
+        LocalDateTime original = TestDates.futureDays(49);
+        LocalDateTime target = TestDates.futureDays(50);
+        Booking moving = bookingService.createBooking(newBookingWithFixture(original));
+        Booking conflicting = new Booking(ids.booking(), moving.getUser(), moving.getVehicle(), moving.getService(),
+                target, "conflict");
+        bookingService.createBooking(conflicting);
+
+        BusinessRuleViolationException exception = assertThrows(BusinessRuleViolationException.class,
+                () -> bookingService.rescheduleBooking(moving.getBookingId(), target));
+
+        assertTrue(exception.getMessage().contains("Customer vehicle"));
+        assertEquals(original, moving.getScheduledDateTime());
+    }
+
+    @Test
+    void rescheduleExcludesTheBookingItselfFromTargetCapacity() {
+        Booking booking = createSavedBooking(TestDates.futureDays(51), BookingStatus.CREATED);
+
+        assertEquals(booking.getScheduledDateTime(),
+                bookingService.rescheduleBooking(booking.getBookingId(), booking.getScheduledDateTime())
+                        .getScheduledDateTime());
+    }
+
+    @Test
+    void rescheduleRejectsInactiveCurrentService() {
+        Booking booking = createSavedBooking(TestDates.futureDays(52), BookingStatus.CREATED);
+        LocalDateTime original = booking.getScheduledDateTime();
+        catalogService.deactivateService(booking.getService().getServiceId());
+
+        assertThrows(BusinessRuleViolationException.class,
+                () -> bookingService.rescheduleBooking(booking.getBookingId(), TestDates.futureDays(53)));
+
+        assertEquals(original, booking.getScheduledDateTime());
+    }
+
+    @Test
+    void rescheduleRevalidatesCanonicalVehicleOwnership() {
+        Booking booking = createSavedBooking(TestDates.futureDays(54), BookingStatus.CREATED);
+        LocalDateTime original = booking.getScheduledDateTime();
+        User other = registerUser();
+        booking.getVehicle().setUserId(other.getUserId());
+        assertTrue(vehicleRepository.update(booking.getVehicle()));
+
+        assertThrows(BusinessRuleViolationException.class,
+                () -> bookingService.rescheduleBooking(booking.getBookingId(), TestDates.futureDays(55)));
+
+        assertEquals(original, booking.getScheduledDateTime());
+    }
+
+    @Test
+    void rescheduleRejectsWaitingQueueWithoutChangingQueueMetrics() {
+        Booking booking = createConfirmedBooking(TestDates.futureDays(56));
+        QueueEntry queue = canonicalQueue(queueService.createQueueEntry(
+                ids.queueEntry(), booking.getBookingId(), booking.getService().getServiceId()));
+        LocalDateTime original = booking.getScheduledDateTime();
+        int position = queue.getPosition();
+        int eta = queue.getEstimatedWaitMin();
+
+        assertThrows(BusinessRuleViolationException.class,
+                () -> bookingService.rescheduleBooking(booking.getBookingId(), TestDates.futureDays(57)));
+
+        assertEquals(original, booking.getScheduledDateTime());
+        assertEquals(QueueStatus.WAITING, queue.getQueueStatus());
+        assertEquals(position, queue.getPosition());
+        assertEquals(eta, queue.getEstimatedWaitMin());
+    }
+
+    @Test
+    void rescheduleRejectsCalledQueueAndPreservesConfirmedBooking() {
+        Booking booking = createConfirmedBooking(TestDates.futureDays(58));
+        QueueEntry queue = canonicalQueue(queueService.createQueueEntry(
+                ids.queueEntry(), booking.getBookingId(), booking.getService().getServiceId()));
+        queueService.callQueueEntry(queue.getQueueEntryId());
+        LocalDateTime original = booking.getScheduledDateTime();
+
+        assertThrows(BusinessRuleViolationException.class,
+                () -> bookingService.rescheduleBooking(booking.getBookingId(), TestDates.futureDays(59)));
+
+        assertEquals(original, booking.getScheduledDateTime());
+        assertEquals(BookingStatus.CONFIRMED, booking.getStatus());
+        assertEquals(QueueStatus.CALLED, queue.getQueueStatus());
+    }
+
+    @Test
+    void rescheduleRejectsInServiceBookingAndInProgressQueue() {
+        Booking booking = createConfirmedBooking(TestDates.futureDays(60));
+        QueueEntry queue = canonicalQueue(queueService.createQueueEntry(
+                ids.queueEntry(), booking.getBookingId(), booking.getService().getServiceId()));
+        queueService.callQueueEntry(queue.getQueueEntryId());
+        queueService.startService(queue.getQueueEntryId());
+        LocalDateTime original = booking.getScheduledDateTime();
+
+        assertThrows(BusinessRuleViolationException.class,
+                () -> bookingService.rescheduleBooking(booking.getBookingId(), TestDates.futureDays(61)));
+
+        assertEquals(original, booking.getScheduledDateTime());
+        assertEquals(BookingStatus.IN_SERVICE, booking.getStatus());
+        assertEquals(QueueStatus.IN_PROGRESS, queue.getQueueStatus());
+    }
+
+    @Test
+    void rescheduleRejectsCompletedAndCancelledBookingsWithoutNotification() {
+        Booking completed = createSavedBooking(TestDates.futureDays(62), BookingStatus.COMPLETED);
+        Booking cancelled = createSavedBooking(TestDates.futureDays(63), BookingStatus.CANCELLED);
+
+        assertThrows(BusinessRuleViolationException.class,
+                () -> bookingService.rescheduleBooking(completed.getBookingId(), TestDates.futureDays(64)));
+        assertThrows(BusinessRuleViolationException.class,
+                () -> bookingService.rescheduleBooking(cancelled.getBookingId(), TestDates.futureDays(65)));
+        assertTrue(notificationRepository.findByBookingId(completed.getBookingId()).isEmpty());
+        assertTrue(notificationRepository.findByBookingId(cancelled.getBookingId()).isEmpty());
+    }
+
+    @Test
+    void repositoryFailureRestoresOriginalScheduleAndCreatesNoNotification() {
+        Booking booking = createSavedBooking(TestDates.futureDays(66), BookingStatus.CREATED);
+        LocalDateTime original = booking.getScheduledDateTime();
+        User owner = booking.getUser();
+        Vehicle vehicle = booking.getVehicle();
+        Service service = booking.getService();
+        FailingUpdateBookingRepository failingRepository = new FailingUpdateBookingRepository(bookingRepository);
+        BookingManagementService failingService = bookingServiceWithRepositories(
+                failingRepository, notificationService, new BookingPolicyProperties(1, Duration.ZERO));
+        failingRepository.failNextUpdate();
+
+        assertThrows(IllegalStateException.class,
+                () -> failingService.rescheduleBooking(booking.getBookingId(), TestDates.futureDays(67)));
+
+        assertEquals(original, bookingRepository.findById(booking.getBookingId()).orElseThrow().getScheduledDateTime());
+        assertEquals(BookingStatus.CREATED, booking.getStatus());
+        assertSame(owner, booking.getUser());
+        assertSame(vehicle, booking.getVehicle());
+        assertSame(service, booking.getService());
+        assertTrue(notificationRepository.findByBookingId(booking.getBookingId()).isEmpty());
+    }
+
+    @Test
+    void notificationFailureDoesNotFailOrRollBackCommittedReschedule() {
+        Booking booking = createSavedBooking(TestDates.futureDays(68), BookingStatus.CREATED);
+        NotificationManagementService failingNotifications = new NotificationManagementService(
+                notificationRepository, userRepository, bookingRepository, coordinator, notificationIds,
+                new NotificationPolicyProperties(10), clock) {
+            @Override
+            public Notification createNotification(User user, Booking notificationBooking, String type, String message) {
+                throw new IllegalStateException("notification unavailable");
+            }
+        };
+        BookingManagementService service = bookingServiceWithRepositories(
+                bookingRepository, failingNotifications, new BookingPolicyProperties(1, Duration.ZERO));
+        LocalDateTime target = TestDates.futureDays(69);
+
+        assertEquals(target, service.rescheduleBooking(booking.getBookingId(), target).getScheduledDateTime());
+        assertEquals(target, bookingRepository.findById(booking.getBookingId()).orElseThrow().getScheduledDateTime());
+        assertTrue(notificationRepository.findByBookingId(booking.getBookingId()).isEmpty());
+    }
+
+    @Test
+    void concurrentReschedulesToFinalSlotAllowExactlyOneBooking() throws Exception {
+        LocalDateTime firstOriginal = TestDates.futureDays(70);
+        LocalDateTime secondOriginal = TestDates.futureDays(71);
+        LocalDateTime target = TestDates.futureDays(72);
+        Booking first = bookingService.createBooking(newBookingWithFixture(firstOriginal));
+        Booking second = bookingService.createBooking(newBookingWithFixture(secondOriginal));
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Boolean> firstResult = executor.submit(
+                    () -> attemptConcurrentReschedule(first.getBookingId(), target, ready, start));
+            Future<Boolean> secondResult = executor.submit(
+                    () -> attemptConcurrentReschedule(second.getBookingId(), target, ready, start));
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            start.countDown();
+
+            long successes = List.of(firstResult.get(5, TimeUnit.SECONDS), secondResult.get(5, TimeUnit.SECONDS))
+                    .stream().filter(Boolean::booleanValue).count();
+
+            assertEquals(1, successes);
+            assertEquals(1, bookingRepository.findByScheduledDateTime(target).size());
+            assertTrue(first.getScheduledDateTime().equals(target)
+                    ^ second.getScheduledDateTime().equals(target));
+            assertTrue(first.getScheduledDateTime().equals(firstOriginal)
+                    || second.getScheduledDateTime().equals(secondOriginal));
+        } finally {
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void genericUpdateChangesAllowedFieldsButPreservesSchedule() {
+        Booking booking = createSavedBooking(TestDates.futureDays(73), BookingStatus.CREATED);
+        LocalDateTime original = booking.getScheduledDateTime();
+        Vehicle alternate = createVehicle(booking.getUser());
+
+        Booking updated = bookingService.updateBooking(
+                booking.getBookingId(), alternate.getVehicleId(), booking.getService().getServiceId(), "updated");
+
+        assertEquals(original, updated.getScheduledDateTime());
+        assertEquals(alternate.getVehicleId(), updated.getVehicle().getVehicleId());
+        assertEquals("updated", updated.getSpecialRequest());
+        assertEquals(BookingStatus.CREATED, updated.getStatus());
     }
 
     @Test
@@ -322,13 +638,122 @@ class BookingManagementServiceTest extends ServiceTestSupport {
     }
 
     private BookingManagementService bookingServiceWithPolicy(int capacity, Duration cancellationWindow) {
+        return bookingServiceWithRepositories(
+                bookingRepository, notificationService,
+                new BookingPolicyProperties(capacity, cancellationWindow));
+    }
+
+    private BookingManagementService bookingServiceWithRepositories(
+            BookingRepository bookings,
+            NotificationManagementService notifications,
+            BookingPolicyProperties policy
+    ) {
         return new BookingManagementService(
-                bookingRepository, userRepository, vehicleRepository, serviceRepository,
-                queueRepository, notificationRepository, notificationService, queueOrdering, coordinator,
-                new BookingPolicyProperties(capacity, cancellationWindow), clock);
+                bookings, userRepository, vehicleRepository, serviceRepository,
+                queueRepository, notificationRepository, notifications, queueOrdering, coordinator, policy, clock);
+    }
+
+    private boolean attemptConcurrentReschedule(
+            String bookingId,
+            LocalDateTime target,
+            CountDownLatch ready,
+            CountDownLatch start
+    ) throws InterruptedException {
+        ready.countDown();
+        assertTrue(start.await(5, TimeUnit.SECONDS));
+        try {
+            bookingService.rescheduleBooking(bookingId, target);
+            return true;
+        } catch (BusinessRuleViolationException exception) {
+            assertEquals("Booking time slot is already full", exception.getMessage());
+            return false;
+        }
     }
 
     private QueueEntry canonicalQueue(QueueEntry response) {
         return queueRepository.findById(response.getQueueEntryId()).orElseThrow();
+    }
+
+    private static final class FailingUpdateBookingRepository implements BookingRepository {
+
+        private final BookingRepository delegate;
+        private boolean failNextUpdate;
+
+        private FailingUpdateBookingRepository(BookingRepository delegate) {
+            this.delegate = delegate;
+        }
+
+        void failNextUpdate() {
+            failNextUpdate = true;
+        }
+
+        @Override
+        public boolean insert(Booking entity) {
+            return delegate.insert(entity);
+        }
+
+        @Override
+        public boolean update(Booking entity) {
+            if (failNextUpdate) {
+                failNextUpdate = false;
+                throw new IllegalStateException("booking update unavailable");
+            }
+            return delegate.update(entity);
+        }
+
+        @Override
+        public Optional<Booking> findById(String id) {
+            return delegate.findById(id);
+        }
+
+        @Override
+        public List<Booking> findAll() {
+            return delegate.findAll();
+        }
+
+        @Override
+        public boolean deleteById(String id) {
+            return delegate.deleteById(id);
+        }
+
+        @Override
+        public boolean existsById(String id) {
+            return delegate.existsById(id);
+        }
+
+        @Override
+        public List<Booking> findByUserId(String userId) {
+            return delegate.findByUserId(userId);
+        }
+
+        @Override
+        public List<Booking> findByVehicleId(String vehicleId) {
+            return delegate.findByVehicleId(vehicleId);
+        }
+
+        @Override
+        public List<Booking> findByServiceId(String serviceId) {
+            return delegate.findByServiceId(serviceId);
+        }
+
+        @Override
+        public List<Booking> findByScheduledDateTime(LocalDateTime scheduledDateTime) {
+            return delegate.findByScheduledDateTime(scheduledDateTime);
+        }
+
+        @Override
+        public boolean existsByUserId(String userId) {
+            return delegate.existsByUserId(userId);
+        }
+
+        @Override
+        public boolean existsByVehicleId(String vehicleId) {
+            return delegate.existsByVehicleId(vehicleId);
+        }
+
+        @Override
+        public boolean existsByServiceId(String serviceId) {
+            return delegate.existsByServiceId(serviceId);
+        }
     }
 }

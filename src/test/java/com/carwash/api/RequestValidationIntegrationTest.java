@@ -79,10 +79,11 @@ class RequestValidationIntegrationTest extends ApiIntegrationTestSupport {
         Map<String, Object> invalidBookingUpdate = new HashMap<>();
         invalidBookingUpdate.put("vehicleId", vehicle.vehicleId());
         invalidBookingUpdate.put("serviceId", " ");
-        invalidBookingUpdate.put("scheduledDateTime", TestDates.futureDays(31).toString());
         invalidBookingUpdate.put("specialRequest", "ok");
         assertValidation(put("/api/bookings/{id}", booking.bookingId()).with(authentication.platformAdminJwt()),
                 invalidBookingUpdate, "serviceId");
+        assertValidation(post("/api/bookings/{id}/reschedule", booking.bookingId())
+                .with(authentication.platformAdminJwt()), Map.of(), "scheduledDateTime");
 
         assertValidation(post("/api/queue-entries").with(authentication.platformAdminJwt()), Map.of(
                 "queueEntryId", " ", "bookingId", booking.bookingId(),

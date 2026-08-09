@@ -1,7 +1,7 @@
 info:
   name: DELETE booking executes cancellation workflow
   type: http
-  seq: 10
+  seq: 14
   tags:
     - customer
     - workflow

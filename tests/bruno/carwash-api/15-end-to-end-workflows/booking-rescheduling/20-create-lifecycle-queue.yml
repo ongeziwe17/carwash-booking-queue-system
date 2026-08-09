@@ -1,0 +1,23 @@
+info:
+  name: Create lifecycle reschedule queue
+  type: http
+  seq: 20
+  tags: [workflow, staff]
+http:
+  method: POST
+  url: "{{baseUrl}}/api/queue-entries"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body:
+    type: json
+    data: |-
+      {
+        "queueEntryId": "{{rescheduleLifecycleQueueId}}",
+        "bookingId": "{{rescheduleLifecycleBookingId}}",
+        "serviceId": "{{rescheduleServiceId}}"
+      }
+  auth: { type: bearer, token: "{{staffToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("returns 201", function() { expect(res.status).to.equal(201); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -7,7 +7,7 @@ Runtime policy values are bound to validated Spring `@ConfigurationProperties` r
 | Property | Environment variable | Type | Default | Validation | Meaning |
 |---|---|---|---|---|---|
 | `carwash.policy.booking.max-active-bookings-per-slot` | `CARWASH_BOOKING_MAX_ACTIVE_PER_SLOT` | integer | `1` | `>= 1` | Maximum number of non-cancelled bookings allowed at the same scheduled date/time. |
-| `carwash.policy.booking.cancellation-window` | `CARWASH_BOOKING_CANCELLATION_WINDOW` | `Duration` | `PT0S` | non-negative | Minimum lead time required before a booking's scheduled date/time for customer cancellation. |
+| `carwash.policy.booking.cancellation-window` | `CARWASH_BOOKING_CANCELLATION_WINDOW` | `Duration` | `PT0S` | non-negative | Minimum lead time before the current scheduled date/time for cancellation or rescheduling. |
 | `carwash.policy.notification.recent-limit` | `CARWASH_NOTIFICATION_RECENT_LIMIT` | integer | `10` | `>= 1` | Default maximum returned by the recent-notification lookup. Explicit internal caller limits still take precedence. |
 | `carwash.policy.queue.default-service-duration` | `CARWASH_QUEUE_DEFAULT_SERVICE_DURATION` | `Duration` | `PT10M` | greater than zero | Defensive ETA duration used when a queue calculation has no positive service duration. Queue estimates are exposed in whole minutes, so a positive sub-minute fallback rounds up to one minute. |
 | `carwash.runtime.time-zone` | `CARWASH_TIME_ZONE` | `ZoneId` | `UTC` | valid Java/IANA zone ID | Zone used by the application `Clock` for local date/time policy decisions plus queue and notification lifecycle timestamps. |
@@ -24,7 +24,7 @@ Spring accepts ISO-8601 duration syntax. Common examples are:
 
 Negative booking cancellation windows and zero or negative queue fallback durations are rejected at startup.
 
-## Cancellation boundary
+## Booking-change boundary
 
 For a scheduled booking time and configured cancellation window:
 
@@ -32,7 +32,7 @@ For a scheduled booking time and configured cancellation window:
 cutoff = scheduledDateTime - cancellationWindow
 ```
 
-Cancellation is allowed only when `now < cutoff`. At `now == cutoff`, or any time after the cutoff, cancellation is rejected. The default `PT0S` therefore preserves the existing behaviour for valid future bookings: they remain cancellable until their scheduled time.
+Cancellation and rescheduling are allowed only when `now < cutoff`. At `now == cutoff`, or any time after the cutoff, the change is rejected. For rescheduling, this cutoff applies to the existing appointment and is not a minimum lead time for the requested new slot. The default `PT0S` therefore preserves the existing cancellation behaviour for valid future bookings while providing the same boundary for schedule changes. CONFIG-001 introduced this setting; BOOKING-001 reuses it rather than adding a duplicate property.
 
 ## Overrides
 

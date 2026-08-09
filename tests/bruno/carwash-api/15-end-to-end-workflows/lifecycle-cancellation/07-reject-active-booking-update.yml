@@ -19,7 +19,6 @@ http:
       {
         "vehicleId": "{{customerVehicleId}}",
         "serviceId": "{{serviceId}}",
-        "scheduledDateTime": "{{future30}}",
         "specialRequest": "must not update"
       }
   auth:

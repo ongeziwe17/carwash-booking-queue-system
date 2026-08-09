@@ -1,0 +1,36 @@
+info:
+  name: Customer reschedules CONFIRMED booking
+  type: http
+  seq: 8
+  tags:
+    - customer
+    - workflow
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings/{{bookingId}}/reschedule"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "scheduledDateTime": "{{future3}}"
+      }
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("CONFIRMED status is preserved", function() { expect(res.body.status).to.equal("CONFIRMED"); });
+        test("new schedule is returned", function() { expect(res.body.scheduledDateTime).to.equal(bru.getVar("future3")); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

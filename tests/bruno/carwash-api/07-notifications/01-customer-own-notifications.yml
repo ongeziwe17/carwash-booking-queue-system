@@ -30,7 +30,6 @@ runtime:
         if (bootstrapPassword && !bootstrapPassword.includes("process.env")) expect(payload).to.not.include(bootstrapPassword);
         test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
         test("workflow generated notifications", function() { expect(res.body).to.be.an("array"); expect(res.body.length).to.be.greaterThan(0); expect(res.body.every(n => n.user.userId === bru.getVar("customerUserId"))).to.equal(true); });
-
 settings:
   encodeUrl: true
   timeout: 15000

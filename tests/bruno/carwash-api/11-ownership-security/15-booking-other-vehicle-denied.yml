@@ -18,7 +18,6 @@ http:
       {
         "vehicleId": "{{otherCustomerVehicleId}}",
         "serviceId": "{{serviceId}}",
-        "scheduledDateTime": "{{future32}}",
         "specialRequest": "ownership attack"
       }
   auth:

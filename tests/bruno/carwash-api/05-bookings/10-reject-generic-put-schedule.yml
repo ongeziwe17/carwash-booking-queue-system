@@ -1,0 +1,40 @@
+info:
+  name: Generic booking update rejects schedule mutation
+  type: http
+  seq: 10
+  tags:
+    - customer
+    - integrity
+    - validation
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/bookings/{{bookingId}}"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "vehicleId": "{{customerVehicleId}}",
+        "serviceId": "{{serviceId}}",
+        "scheduledDateTime": "{{future4}}",
+        "specialRequest": "schedule bypass attempt"
+      }
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns HTTP 400", function() { expect(res.status).to.equal(400); });
+        test("uses MALFORMED_REQUEST", function() { expect(res.body.code).to.equal("MALFORMED_REQUEST"); });
+        test("generic update does not accept scheduledDateTime", function() { expect(res.body.message).to.equal("Malformed or invalid request body"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

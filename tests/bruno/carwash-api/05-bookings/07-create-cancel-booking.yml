@@ -1,7 +1,7 @@
 info:
   name: Create booking for POST cancellation
   type: http
-  seq: 7
+  seq: 11
   tags:
     - customer
 

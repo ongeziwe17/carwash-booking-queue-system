@@ -1,7 +1,7 @@
 info:
   name: Customer cancels booking with POST
   type: http
-  seq: 8
+  seq: 12
   tags:
     - customer
     - workflow

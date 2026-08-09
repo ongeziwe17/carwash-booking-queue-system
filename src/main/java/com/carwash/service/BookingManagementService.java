@@ -97,8 +97,7 @@ public class BookingManagementService {
         return coordinator.read(bookingRepository::findAll);
     }
 
-    public Booking updateBooking(String bookingId, String vehicleId, String serviceId,
-                                 LocalDateTime scheduledDateTime, String specialRequest) {
+    public Booking updateBooking(String bookingId, String vehicleId, String serviceId, String specialRequest) {
         return coordinator.write(() -> {
             Booking existing = requireBooking(bookingId);
             requireModifiableBooking(existing);
@@ -110,16 +109,54 @@ public class BookingManagementService {
             requireVehicleOwnedBy(vehicle, owner, "Vehicle does not belong to booking owner");
             Service service = resolveService(serviceId);
             requireActiveService(service);
-            requireFutureSchedule(scheduledDateTime);
-            validateSlotAvailability(bookingId, scheduledDateTime, owner, vehicle);
+            requireFutureSchedule(existing.getScheduledDateTime());
+            validateSlotAvailability(bookingId, existing.getScheduledDateTime(), owner, vehicle);
             existing.setVehicle(vehicle);
             existing.setService(service);
-            existing.setScheduledDateTime(scheduledDateTime);
             existing.setSpecialRequest(specialRequest);
             if (!bookingRepository.update(existing)) {
                 throw new ResourceNotFoundException("Booking not found: " + bookingId);
             }
             return existing;
+        });
+    }
+
+    public Booking rescheduleBooking(String bookingId, LocalDateTime scheduledDateTime) {
+        return coordinator.write(() -> {
+            Booking booking = requireBooking(bookingId);
+            requireReschedulableBooking(booking);
+            LocalDateTime now = LocalDateTime.now(clock);
+            requireCurrentFutureSchedule(booking, now);
+            requireOpenReschedulingWindow(booking, now);
+            if (queueEntryRepository.existsActiveByBookingId(bookingId)) {
+                throw new BusinessRuleViolationException(
+                        "Booking cannot be rescheduled while it has an active queue entry");
+            }
+            User owner = requireExistingOwner(booking);
+            Vehicle vehicle = resolveCurrentVehicle(booking);
+            requireVehicleOwnedBy(vehicle, owner, "Vehicle does not belong to booking owner");
+            Service service = resolveCurrentService(booking);
+            requireActiveService(service);
+            requireFutureReschedule(scheduledDateTime, now);
+            validateSlotAvailability(bookingId, scheduledDateTime, owner, vehicle);
+
+            LocalDateTime originalScheduledDateTime = booking.getScheduledDateTime();
+            try {
+                booking.setScheduledDateTime(scheduledDateTime);
+                if (!bookingRepository.update(booking)) {
+                    throw new ResourceNotFoundException("Booking not found: " + bookingId);
+                }
+            } catch (RuntimeException exception) {
+                booking.setScheduledDateTime(originalScheduledDateTime);
+                throw exception;
+            }
+
+            notifyCustomerBestEffort(
+                    booking,
+                    "BOOKING_RESCHEDULED",
+                    "Your booking has been rescheduled to " + scheduledDateTime + "."
+            );
+            return booking;
         });
     }
 
@@ -252,6 +289,25 @@ public class BookingManagementService {
         }
     }
 
+    private void requireReschedulableBooking(Booking booking) {
+        if (booking.getStatus() != BookingStatus.CREATED && booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new BusinessRuleViolationException("Booking cannot be rescheduled in its current state");
+        }
+    }
+
+    private void requireCurrentFutureSchedule(Booking booking, LocalDateTime now) {
+        if (booking.getScheduledDateTime() == null || !booking.getScheduledDateTime().isAfter(now)) {
+            throw new BusinessRuleViolationException("Only future bookings can be rescheduled");
+        }
+    }
+
+    private void requireOpenReschedulingWindow(Booking booking, LocalDateTime now) {
+        LocalDateTime cutoff = booking.getScheduledDateTime().minus(bookingPolicy.cancellationWindow());
+        if (!now.isBefore(cutoff)) {
+            throw new BusinessRuleViolationException("Booking rescheduling window has closed");
+        }
+    }
+
     private User requireExistingOwner(Booking booking) {
         if (booking.getUser() == null || isBlank(booking.getUser().getUserId())) {
             throw new BusinessRuleViolationException("Booking owner is required");
@@ -270,10 +326,24 @@ public class BookingManagementService {
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + vehicleId));
     }
 
+    private Vehicle resolveCurrentVehicle(Booking booking) {
+        if (booking.getVehicle() == null || isBlank(booking.getVehicle().getVehicleId())) {
+            throw new BusinessRuleViolationException("Booking vehicle is required");
+        }
+        return resolveVehicle(booking.getVehicle().getVehicleId());
+    }
+
     private Service resolveService(String serviceId) {
         if (isBlank(serviceId)) throw new BusinessRuleViolationException("Service ID is required");
         return serviceRepository.findById(serviceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Service not found: " + serviceId));
+    }
+
+    private Service resolveCurrentService(Booking booking) {
+        if (booking.getService() == null || isBlank(booking.getService().getServiceId())) {
+            throw new BusinessRuleViolationException("Booking service is required");
+        }
+        return resolveService(booking.getService().getServiceId());
     }
 
     private void requireVehicleOwnedBy(Vehicle vehicle, User owner, String message) {
@@ -289,6 +359,12 @@ public class BookingManagementService {
     private void requireFutureSchedule(LocalDateTime scheduledDateTime) {
         if (scheduledDateTime == null || scheduledDateTime.isBefore(LocalDateTime.now(clock))) {
             throw new BusinessRuleViolationException("Scheduled date/time cannot be in the past");
+        }
+    }
+
+    private void requireFutureReschedule(LocalDateTime scheduledDateTime, LocalDateTime now) {
+        if (scheduledDateTime == null || !scheduledDateTime.isAfter(now)) {
+            throw new BusinessRuleViolationException("Scheduled date/time must be in the future");
         }
     }
 

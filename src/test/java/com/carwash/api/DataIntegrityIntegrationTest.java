@@ -115,7 +115,7 @@ class DataIntegrityIntegrationTest extends ApiIntegrationTestSupport {
                         .with(authentication.platformAdminJwt()).contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "vehicleId", fixture.vehicle.vehicleId(), "serviceId", fixture.service.serviceId(),
-                                "scheduledDateTime", TestDates.futureDays(43).toString(), "specialRequest", "Updated")))),
+                                "specialRequest", "Updated")))),
                 "/api/bookings/" + fixture.booking.bookingId(), "Booking cannot be updated in its current state");
     }
 

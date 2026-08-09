@@ -12,7 +12,7 @@ The application is a Spring Boot modular monolith using in-memory repositories. 
 | `Role` | Built-in role identity and permission catalogue | Runtime authorization derives permissions from the server-side role catalogue. |
 | `Vehicle` | Customer-owned vehicle details | Ownership cannot change through an ordinary update; plate uniqueness is enforced per owner on create and update. |
 | `Service` | Global service-catalogue entry | Referenced services must be deactivated rather than physically deleted. |
-| `Booking` | Customer, vehicle, service, schedule, status, and optional queue link | Owner is preserved; only `CREATED` and unqueued `CONFIRMED` bookings are editable. |
+| `Booking` | Customer, vehicle, service, schedule, status, and optional queue link | Owner is preserved; only future `CREATED` and unqueued `CONFIRMED` bookings are editable or reschedulable. |
 | `QueueEntry` | Booking queue state, global active position, and estimated wait | Requires a confirmed booking and active matching service; one active entry is allowed per booking and active metrics are server managed. |
 | `Notification` | In-app notification record for a user and optional booking | User and booking references are resolved to canonical repository objects before insertion. |
 
@@ -67,6 +67,8 @@ Vehicle deletion removes both references and is rejected while a booking referen
 Successful booking creation resolves the canonical user, vehicle, and service before insertion. The booking is inserted once and added once to `User.bookings`.
 
 A booking may be physically deleted only when it is cancelled and has no queue entry. Deletion removes it from the repository, removes it from the owning user, and removes associated notifications.
+
+Focused rescheduling changes only `Booking.scheduledDateTime` and preserves its canonical owner, vehicle, service, and `CREATED`/`CONFIRMED` status. The current booking must still be future work and its configured booking-change cutoff must remain open. Canonical ownership and active-service eligibility plus customer/vehicle conflicts and exact-slot capacity are revalidated under the coordinator write lock before mutation. Active queue work blocks the operation, so successful rescheduling never changes queue order or metrics. A repository update failure restores the original schedule despite mutable in-memory references; the post-commit `BOOKING_RESCHEDULED` notification is best-effort.
 
 ### Booking and queue entry
 
@@ -129,7 +131,7 @@ COMPLETED
 
 Queue position updates are allowed only while the entry is `WAITING`. The requested target must be within the current active queue size; movement reorders the full active list and recalculates all affected positions and waits. Called, in-progress, completed, or exited entries cannot be repositioned or physically deleted.
 
-Queue entry eligibility, active uniqueness, global ordering, recalculation, cumulative wait estimates, true server-selected call-next, and booking/queue lifecycle synchronization are implemented. Queue creation and call keep the booking `CONFIRMED`; start and completion synchronize both aggregates. Valid booking cancellation removes `WAITING`/`CALLED` queue work, while in-service cancellation is rejected. Generic booking updates are blocked whenever an active queue entry exists. Dedicated booking rescheduling remains roadmap work. Booking cancellation continues to honor the deployment-configurable cancellation window documented in [CONFIGURATION.md](CONFIGURATION.md).
+Queue entry eligibility, active uniqueness, global ordering, recalculation, cumulative wait estimates, true server-selected call-next, focused booking rescheduling, and booking/queue lifecycle synchronization are implemented. Queue creation and call keep the booking `CONFIRMED`; start and completion synchronize both aggregates. Valid booking cancellation removes `WAITING`/`CALLED` queue work, while in-service cancellation is rejected. Generic booking updates and rescheduling are blocked whenever an active queue entry exists. Cancellation and rescheduling share the deployment-configurable booking-change cutoff documented in [CONFIGURATION.md](CONFIGURATION.md).
 
 ## 8. Mutable Reference Limitation
 
