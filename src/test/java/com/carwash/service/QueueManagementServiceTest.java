@@ -28,6 +28,16 @@ class QueueManagementServiceTest extends ServiceTestSupport {
     }
 
     @Test
+    void queueEntryCreationRecalculatesWaitAfterResolvingCanonicalService() {
+        Booking booking = createSavedBooking();
+
+        QueueEntry queueEntry = queueService.createQueueEntry(
+                booking.getBookingId() + "-queue", booking.getBookingId(), booking.getService().getServiceId(), 2);
+
+        assertEquals(booking.getService().getEstimatedDurationMin(), queueEntry.getEstimatedWaitMin());
+    }
+
+    @Test
     void configuredFallbackDurationIsUsedWhenServiceDurationIsUnavailable() {
         QueueEntry queueEntry = new QueueEntry();
         queueEntry.setPosition(3);

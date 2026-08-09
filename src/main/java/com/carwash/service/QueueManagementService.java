@@ -203,6 +203,7 @@ public class QueueManagementService {
         queueEntry.setQueueEntryId(queueEntry.getQueueEntryId().trim());
         queueEntry.setBooking(booking);
         queueEntry.setService(service);
+        queueEntry.recalculateEstimatedWait(queuePolicy.defaultServiceDuration());
         queueEntry.setJoinedAt(LocalDateTime.now(clock));
     }
 }
