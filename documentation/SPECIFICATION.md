@@ -2,7 +2,7 @@
 
 ## Product Vision
 
-A car wash booking and queue management backend that helps teams validate core customer, booking, queue, service catalog, notification-record, and reporting workflows before adding production security, persistence, and SaaS platform capabilities.
+A car wash booking and queue management backend that helps teams validate core customer, booking, queue, service catalog, notification-record, and reporting workflows with an implemented authentication/authorization baseline before adding durable persistence and SaaS platform capabilities.
 
 ## Stakeholders
 
@@ -23,12 +23,14 @@ Implemented in the current backend:
 - In-app notification record lookup by user.
 - Basic daily summary reporting from current in-memory data.
 - Swagger/OpenAPI documentation.
+- Secure BCrypt credential storage and stateless JWT login/current-user APIs.
+- RBAC and ownership authorization for customer, staff, business-owner, and platform-admin workflows.
+- Validated runtime policy configuration and standardized safe API errors.
 - Local Docker and Maven workflows.
 
 ## Partially Implemented Foundation
 
-- `User` contains password-hash and authentication helper fields/methods, but there is no login endpoint, session/token issuance, Spring Security integration, or verified secure credential storage.
-- `Role` exists as domain data, but role-based authorization is not enforced at the API layer.
+- JWT login and RBAC are implemented, but refresh tokens, logout/revocation, Marketplace tenant isolation, and security audit logging are not.
 - Notification domain objects can track statuses, but no external SMS/email provider sends messages.
 - A daily summary report endpoint exists, but richer dashboards, revenue reporting, filtering, and production analytics are not implemented.
 - Repository abstractions exist, but the running application uses in-memory storage rather than durable PostgreSQL persistence.
@@ -45,14 +47,15 @@ Implemented in the current backend:
 | FR-06 | Maintain in-app notification records and list recent records for a user.                     | Partially implemented |
 | FR-07 | Return consistent error responses for invalid requests and missing resources.                | Implemented           |
 | FR-08 | Provide a basic daily summary report from current data.                                      | Partially implemented |
+| FR-09 | Authenticate users with JWT and enforce current RBAC/ownership rules.                          | Implemented           |
 
 ## Functional Requirements: Planned/Future
 
 | Capability                                                         | Target Status                   |
 |--------------------------------------------------------------------|---------------------------------|
-| Authentication, login/logout, and token/session management.        | Planned near-term security work |
-| Secure credential hashing and storage.                             | Planned near-term security work |
-| RBAC enforcement for customer, staff, owner, and admin operations. | Planned near-term security work |
+| Refresh-token/logout/revocation lifecycle, if specified.           | Future security work            |
+| Security and operational audit logging.                            | Future security hardening       |
+| Tenant-scoped authorization for Marketplace businesses/branches.  | Future SaaS hardening           |
 | PostgreSQL persistence and migrations.                             | Planned persistence work        |
 | Business registration and tenant isolation.                        | Future SaaS hardening           |
 | External email/SMS notification delivery.                          | Future product/platform work    |
@@ -70,7 +73,7 @@ Implemented in the current backend:
 | API usability   | Swagger/OpenAPI documentation should remain available for local development.                                                       |
 | Extensibility   | Storage implementations should remain replaceable behind repository interfaces.                                                    |
 | Deployment      | Docker and Docker Compose should support repeatable local execution.                                                               |
-| Security        | Production authentication, authorization, and credential handling are not yet implemented and must be added before production use. |
+| Security        | BCrypt credentials, JWT authentication, RBAC, ownership authorization, and safe errors are implemented; tenant isolation, audit logging, durable persistence, and broader production hardening are still required. |
 | Persistence     | Running application storage is currently in-memory only.                                                                           |
 
 ## Business Rules
@@ -84,4 +87,4 @@ Implemented in the current backend:
 
 ## Out of Current Scope
 
-The current backend does not implement authentication, RBAC, secure credential storage, PostgreSQL persistence, payments, business registration, multi-tenancy, external notification delivery, observability, frontend applications, or production SaaS readiness.
+The current backend does not implement PostgreSQL persistence, payments, business registration, multi-tenancy, external notification delivery, observability, frontend applications, or production SaaS readiness. Authentication, RBAC, ownership authorization, and secure credential storage are implemented foundations.

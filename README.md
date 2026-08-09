@@ -160,7 +160,7 @@ Selected tests can be executed independently with Maven selectors:
 ./mvnw --batch-mode -Djacoco.skip=true -Dit.test=RbacAuthorizationIntegrationTest verify
 ```
 
-The JaCoCo HTML report is generated at `target/site/jacoco/index.html`. The current measured TEST-001 baseline is **1,262 covered lines, 215 missed lines, 1,477 total lines, or 85.44%**, with the enforced minimum remaining **80%**.
+The JaCoCo HTML report is generated at `target/site/jacoco/index.html`. The enforced line-coverage minimum is **80%**; CI artifacts contain the measured report for each verified commit.
 
 Generated outputs include:
 
@@ -232,7 +232,7 @@ sorted field entries. Malformed JSON uses `MALFORMED_REQUEST`; missing resources
 missing or invalid authentication remains 401; authenticated authorization failures remain 403; unexpected
 failures use `INTERNAL_ERROR` with the generic message `An unexpected error occurred`.
 
-See [API Documentation](documentation/API-DOCUMENTATION.md#standard-error-contract) for the full code table
+See [API Documentation](documentation/API-DOCUMENTATION.md#standard-response-and-error-conventions) for the full code table
 and representative 400, 401, 403, 404, and 500 responses.
 
 ## Product documentation
@@ -241,6 +241,9 @@ and representative 400, 401, 403, 404, and 500 responses.
 - [Product Specification](documentation/SPECIFICATION.md)
 - [Roadmap](documentation/ROADMAP.md)
 - [API Documentation](documentation/API-DOCUMENTATION.md)
+- [Runtime Policy Configuration](documentation/CONFIGURATION.md)
+- [Testing](documentation/TESTING.md)
+- [Bruno API Acceptance Suite](tests/bruno/carwash-api/README.md)
 - [Domain Model](documentation/DOMAIN-MODEL.md)
 - [System Requirements](documentation/SYSTEM-REQUIREMENTS.md)
 - [User Stories](documentation/USER-STORIES.md)

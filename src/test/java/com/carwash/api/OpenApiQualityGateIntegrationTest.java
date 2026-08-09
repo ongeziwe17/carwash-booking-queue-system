@@ -15,6 +15,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -23,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
 
     private static final Set<String> HTTP_METHODS = Set.of("get", "post", "put", "delete", "patch");
+    private static final Pattern PATH_PLACEHOLDER = Pattern.compile("\\{([^}/]+)}");
     private static final Set<String> EXPECTED_OPERATIONS = Set.of(
             "GET /api/vehicles/{id}", "PUT /api/vehicles/{id}", "DELETE /api/vehicles/{id}",
             "GET /api/users/{id}", "PUT /api/users/{id}", "DELETE /api/users/{id}",
@@ -119,6 +122,40 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         assertEquals(EXPECTED_OPERATIONS, actual);
     }
 
+    @Test
+    void operationsHaveUniqueIdsSummariesAndSuccessfulResponses() throws Exception {
+        Set<String> operationIds = new HashSet<>();
+        forEachOperation(openApi(), (method, path, operation) -> {
+            String label = method + " " + path;
+            String operationId = operation.path("operationId").asText();
+            assertFalse(operationId.isBlank(), label + " must have an operationId");
+            assertTrue(operationIds.add(operationId), "Duplicate operationId: " + operationId);
+            assertFalse(operation.path("summary").asText().isBlank(), label + " must have a summary");
+
+            boolean hasSuccess = operation.path("responses").properties().stream()
+                    .anyMatch(entry -> entry.getKey().startsWith("2"));
+            assertTrue(hasSuccess, label + " must document a 2xx response");
+        });
+    }
+
+    @Test
+    void pathParametersAndLocalReferencesAreImportable() throws Exception {
+        JsonNode document = openApi();
+        assertLocalComponentReferencesResolve(document, document, "#");
+
+        forEachOperation(document, (method, path, operation) -> {
+            Matcher placeholders = PATH_PLACEHOLDER.matcher(path);
+            while (placeholders.find()) {
+                String expectedName = placeholders.group(1);
+                JsonNode parameter = findPathParameter(operation.path("parameters"), expectedName);
+                assertFalse(parameter.isMissingNode(), method + " " + path
+                        + " is missing path parameter " + expectedName);
+                assertTrue(parameter.path("required").asBoolean(), method + " " + path
+                        + " path parameter " + expectedName + " must be required");
+            }
+        });
+    }
+
     private JsonNode openApi() throws Exception {
         String body = mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
@@ -136,6 +173,33 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         return mediaTypes.hasNext()
                 ? mediaTypes.next().getValue().path("schema").path("$ref").asText()
                 : "";
+    }
+
+    private JsonNode findPathParameter(JsonNode parameters, String name) {
+        if (parameters.isArray()) {
+            for (JsonNode parameter : parameters) {
+                if ("path".equals(parameter.path("in").asText()) && name.equals(parameter.path("name").asText())) {
+                    return parameter;
+                }
+            }
+        }
+        return parameters.path("__missing_path_parameter__");
+    }
+
+    private void assertLocalComponentReferencesResolve(JsonNode document, JsonNode node, String location) {
+        if (node.isObject()) {
+            String ref = node.path("$ref").asText();
+            if (!ref.isBlank()) {
+                assertTrue(ref.startsWith("#/components/"), location + " uses a non-local component reference: " + ref);
+                assertFalse(document.at(ref.substring(1)).isMissingNode(), location + " has unresolved reference " + ref);
+            }
+            node.properties().forEach(entry ->
+                    assertLocalComponentReferencesResolve(document, entry.getValue(), location + "/" + entry.getKey()));
+        } else if (node.isArray()) {
+            for (int index = 0; index < node.size(); index++) {
+                assertLocalComponentReferencesResolve(document, node.get(index), location + "/" + index);
+            }
+        }
     }
 
     private void forEachOperation(JsonNode document, OperationConsumer consumer) {

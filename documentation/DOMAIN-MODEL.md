@@ -109,7 +109,7 @@ COMPLETED
 
 Queue position updates are allowed only while the entry is `WAITING`. Called, in-progress, completed, or exited entries cannot be repositioned or physically deleted.
 
-Queue ordering automation, queue eligibility, cancellation windows, and rescheduling remain separate roadmap work.
+Queue ordering automation, queue eligibility, and dedicated rescheduling remain separate roadmap work. Booking cancellation already honors the deployment-configurable cancellation window documented in [CONFIGURATION.md](CONFIGURATION.md).
 
 ## 8. Mutable Reference Limitation
 

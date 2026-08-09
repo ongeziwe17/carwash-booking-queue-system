@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Car Wash Booking Queue System is a Spring Boot backend that exposes REST APIs for customer, vehicle, service catalog, booking, queue, and notification workflows. The current architecture is intentionally simple, so the product can validate core workflows before adding production concerns such as durable persistence, authentication, tenant isolation, and observability.
+The Car Wash Booking Queue System is a Spring Boot backend that exposes REST APIs for authentication, users, vehicles, services, bookings, queues, notifications, administration, and reporting. The current architecture is intentionally simple: JWT authentication, RBAC/ownership authorization, and safe API contracts are implemented, while durable persistence, tenant isolation, and production observability remain future concerns.
 
 ## Runtime View
 
@@ -36,7 +36,7 @@ flowchart LR
 ## Current Limitations
 
 - Runtime storage is currently in-memory only; durable PostgreSQL persistence is not configured for the application.
-- Authentication, secure credential storage, Spring Security, and RBAC enforcement are not implemented.
+- JWT authentication, BCrypt credential storage, Spring Security, RBAC, and ownership authorization are implemented; Marketplace tenant isolation is not, so elevated operational access is global.
 - Notification records are in-app data only; no external SMS/email provider delivery is implemented.
 - Daily summary reporting is basic and computed from current in-memory data.
 - Multi-tenancy, payments, observability, and production SaaS hardening are future work.
@@ -46,12 +46,11 @@ flowchart LR
 The current application is a backend foundation, not a production-ready SaaS platform. Planned architecture improvements include:
 
 1. Durable database persistence behind existing repository interfaces.
-2. Secure authentication and password handling.
-3. Role-based authorization for customers, staff, and business owners.
-4. Tenant-aware data boundaries for multiple car wash businesses.
-5. Background notification delivery for email/SMS providers.
-6. Observability through structured logs, metrics, traces, and health checks.
-7. Deployment hardening for cloud and container platforms.
+2. Tenant-aware data boundaries for multiple car wash businesses, building on the existing authentication/RBAC foundation.
+3. Security/operational audit logging and continued production security hardening.
+4. Background notification delivery for email/SMS providers.
+5. Observability through structured logs, metrics, traces, and health checks.
+6. Deployment hardening for cloud and container platforms.
 
 ## Local Deployment
 

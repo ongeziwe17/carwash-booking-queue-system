@@ -96,7 +96,7 @@ All classes below inherit the same per-method repository reset unless a class on
 | `QueueWorkflowIntegrationTest` | 8 | Queue lifecycle and relationship rules |
 | `NotificationWorkflowIntegrationTest` | 3 | Notification lookup and deterministic IDs |
 | `ReportWorkflowIntegrationTest` | 4 | Daily summary report contract |
-| `OpenApiQualityGateIntegrationTest` | 6 | DTO/error schemas, privacy, auth metadata and controller coverage |
+| `OpenApiQualityGateIntegrationTest` | 8 | DTO/error schemas, privacy, auth metadata, controller coverage, operation metadata, path parameters and local `$ref` integrity |
 | `AuthenticationIntegrationTest` | 4 | Real registration/login, JWT and public endpoint behaviour |
 | `RbacAuthorizationIntegrationTest` | 9 | Real role fixtures/login plus signed-token RBAC/ownership regressions |
 | `ApiErrorContractIntegrationTest` | 6 | Standard validation/protocol/security/internal error contract |

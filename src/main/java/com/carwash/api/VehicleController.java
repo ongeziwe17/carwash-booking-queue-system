@@ -156,7 +156,7 @@ public class VehicleController {
     @Operation(summary = "Delete vehicle")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Vehicle deleted"),
-            @ApiResponse(responseCode = "400", description = "Invalid identifier",
+            @ApiResponse(responseCode = "400", description = "Invalid identifier or vehicle-deletion rule violation",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Authentication required",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
