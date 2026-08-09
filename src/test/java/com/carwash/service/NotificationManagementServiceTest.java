@@ -1,12 +1,17 @@
 package com.carwash.service;
 
+import com.carwash.config.BookingPolicyProperties;
 import com.carwash.config.NotificationPolicyProperties;
 import com.carwash.domain.Booking;
 import com.carwash.domain.Notification;
 import com.carwash.domain.QueueEntry;
+import com.carwash.domain.User;
 import com.carwash.enums.BookingStatus;
+import com.carwash.enums.QueueStatus;
+import com.carwash.service.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -72,6 +77,50 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
     }
 
     @Test
+    void cancellationRemainsSuccessfulWhenLifecycleNotificationFails() {
+        Booking booking = createConfirmedBooking();
+        QueueEntry queueEntry = queueService.createQueueEntry(
+                new QueueEntry(ids.queueEntry(), booking, booking.getService()));
+        BookingManagementService serviceWithFailingNotifications = bookingServiceWith(failingNotificationService());
+
+        Booking cancelled = assertDoesNotThrow(() -> serviceWithFailingNotifications.cancelBooking(
+                booking.getBookingId(), booking.getUser().getUserId()));
+
+        assertEquals(BookingStatus.CANCELLED, cancelled.getStatus());
+        assertTrue(queueRepository.findById(queueEntry.getQueueEntryId()).isEmpty());
+        assertFalse(notificationTypes(booking).contains("BOOKING_CANCELLED"));
+    }
+
+    @Test
+    void serviceStartRemainsSuccessfulWhenLifecycleNotificationFails() {
+        QueueEntry queueEntry = createSavedQueueEntry();
+        queueService.callNext(queueEntry.getQueueEntryId());
+        QueueManagementService serviceWithFailingNotifications = queueServiceWith(failingNotificationService());
+
+        QueueEntry started = assertDoesNotThrow(
+                () -> serviceWithFailingNotifications.startService(queueEntry.getQueueEntryId()));
+
+        assertEquals(QueueStatus.IN_PROGRESS, started.getQueueStatus());
+        assertEquals(BookingStatus.IN_SERVICE, started.getBooking().getStatus());
+        assertFalse(notificationTypes(queueEntry.getBooking()).contains("SERVICE_STARTED"));
+    }
+
+    @Test
+    void serviceCompletionRemainsSuccessfulWhenLifecycleNotificationFails() {
+        QueueEntry queueEntry = createSavedQueueEntry();
+        queueService.callNext(queueEntry.getQueueEntryId());
+        queueService.startService(queueEntry.getQueueEntryId());
+        QueueManagementService serviceWithFailingNotifications = queueServiceWith(failingNotificationService());
+
+        QueueEntry completed = assertDoesNotThrow(
+                () -> serviceWithFailingNotifications.completeQueueEntry(queueEntry.getQueueEntryId()));
+
+        assertEquals(QueueStatus.COMPLETED, completed.getQueueStatus());
+        assertEquals(BookingStatus.COMPLETED, completed.getBooking().getStatus());
+        assertFalse(notificationTypes(queueEntry.getBooking()).contains("SERVICE_COMPLETED"));
+    }
+
+    @Test
     void recentNotificationsCanBeRetrievedByUserId() {
         Booking booking = createSavedBooking();
         bookingService.confirmBooking(booking.getBookingId());
@@ -113,5 +162,35 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
         bookingService.confirmBooking(booking.getBookingId());
         Notification notification = notificationService.findByUserId(booking.getUser().getUserId()).getFirst();
         assertEquals("notification-00000000000000000001", notification.getNotificationId());
+    }
+
+    private NotificationManagementService failingNotificationService() {
+        return new NotificationManagementService(
+                notificationRepository, userRepository, bookingRepository, coordinator, notificationIds,
+                new NotificationPolicyProperties(10), clock) {
+            @Override
+            public Notification createNotification(User user, Booking booking, String type, String message) {
+                throw new ResourceNotFoundException("Injected notification persistence failure");
+            }
+        };
+    }
+
+    private BookingManagementService bookingServiceWith(NotificationManagementService notifications) {
+        return new BookingManagementService(
+                bookingRepository, userRepository, vehicleRepository, serviceRepository,
+                queueRepository, notificationRepository, notifications, queueOrdering, coordinator,
+                new BookingPolicyProperties(1, Duration.ZERO), clock);
+    }
+
+    private QueueManagementService queueServiceWith(NotificationManagementService notifications) {
+        return new QueueManagementService(
+                queueRepository, bookingRepository, serviceRepository, notifications, coordinator,
+                queueOrdering, clock);
+    }
+
+    private List<String> notificationTypes(Booking booking) {
+        return notificationService.findByUserId(booking.getUser().getUserId()).stream()
+                .map(Notification::getType)
+                .toList();
     }
 }

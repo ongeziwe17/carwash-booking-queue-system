@@ -216,7 +216,11 @@ Queue API responses are detached snapshots built while the coordinator lock is h
 
 Results are sorted newest first by `sentAt`, with `notificationId` as the deterministic tie-breaker, and are limited by the deployment-configured recent-item default. The endpoint does not require the requested user ID to exist before an authorized admin lookup; no records therefore produce an empty list rather than a user `404`.
 
-Notifications are currently `IN_APP` only. SMS/email delivery and a broader public notification lifecycle are not implemented.
+Notifications are currently `IN_APP` only. The synchronized `BOOKING_CANCELLED`, `SERVICE_STARTED`, and
+`SERVICE_COMPLETED` notifications are attempted only after the canonical booking/queue state is committed. For this
+phase they are best-effort: a notification persistence failure is logged and does not turn an otherwise successful
+lifecycle operation into a failed API response. Durable notification delivery remains later NOTIFY work; SMS/email
+delivery and a broader public notification lifecycle are not implemented.
 
 ## Reports
 

@@ -14,6 +14,8 @@ import com.carwash.repository.ServiceRepository;
 import com.carwash.repository.inmemory.InMemoryDataCoordinator;
 import com.carwash.service.exception.BusinessRuleViolationException;
 import com.carwash.service.exception.ResourceNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -22,6 +24,8 @@ import java.util.List;
 import java.util.Objects;
 
 public class QueueManagementService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(QueueManagementService.class);
 
     private final QueueEntryRepository queueEntryRepository;
     private final BookingRepository bookingRepository;
@@ -155,7 +159,7 @@ public class QueueManagementService {
                 rollbackLifecycle(exception, bookingState, List.of(queueState));
                 throw exception;
             }
-            notifyCustomer(queueEntry, "SERVICE_STARTED", "Your service has started.");
+            notifyCustomerBestEffort(queueEntry, "SERVICE_STARTED", "Your service has started.");
             return snapshotQueueEntry(queueEntry);
         });
     }
@@ -191,7 +195,7 @@ public class QueueManagementService {
                 rollbackLifecycle(exception, bookingState, queueStates);
                 throw exception;
             }
-            notifyCustomer(queueEntry, "SERVICE_COMPLETED", "Your service has been completed.");
+            notifyCustomerBestEffort(queueEntry, "SERVICE_COMPLETED", "Your service has been completed.");
             return snapshotQueueEntry(queueEntry);
         });
     }
@@ -271,6 +275,15 @@ public class QueueManagementService {
         if (notificationManagementService != null && queueEntry.getBooking() != null) {
             notificationManagementService.createNotification(queueEntry.getBooking().getUser(),
                     queueEntry.getBooking(), type, message);
+        }
+    }
+
+    private void notifyCustomerBestEffort(QueueEntry queueEntry, String type, String message) {
+        try {
+            notifyCustomer(queueEntry, type, message);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Unable to create {} notification for queue entry {}",
+                    type, queueEntry.getQueueEntryId(), exception);
         }
     }
 

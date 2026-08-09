@@ -17,6 +17,8 @@ import com.carwash.repository.VehicleRepository;
 import com.carwash.repository.inmemory.InMemoryDataCoordinator;
 import com.carwash.service.exception.BusinessRuleViolationException;
 import com.carwash.service.exception.ResourceNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -24,6 +26,8 @@ import java.util.List;
 import java.util.Objects;
 
 public class BookingManagementService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(BookingManagementService.class);
 
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
@@ -159,7 +163,7 @@ public class BookingManagementService {
                 rollbackCancellation(exception, bookingState, queueStates);
                 throw exception;
             }
-            notifyCustomer(booking, "BOOKING_CANCELLED", "Your booking has been cancelled.");
+            notifyCustomerBestEffort(booking, "BOOKING_CANCELLED", "Your booking has been cancelled.");
             return booking;
         });
     }
@@ -380,6 +384,15 @@ public class BookingManagementService {
     private void notifyCustomer(Booking booking, String type, String message) {
         if (notificationManagementService != null) {
             notificationManagementService.createNotification(booking.getUser(), booking, type, message);
+        }
+    }
+
+    private void notifyCustomerBestEffort(Booking booking, String type, String message) {
+        try {
+            notifyCustomer(booking, type, message);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Unable to create {} notification for booking {}",
+                    type, booking.getBookingId(), exception);
         }
     }
 
