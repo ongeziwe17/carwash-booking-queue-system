@@ -1,7 +1,7 @@
 info:
   name: Duplicate queue ID is rejected
   type: http
-  seq: 24
+  seq: 26
   tags:
     - integrity
 
@@ -16,7 +16,7 @@ http:
     data: |-
       {
         "queueEntryId": "{{queueEntryId}}",
-        "bookingId": "{{bookingId}}",
+        "bookingId": "{{duplicateQueueBookingId}}",
         "serviceId": "{{serviceId}}",
         "position": 1
       }

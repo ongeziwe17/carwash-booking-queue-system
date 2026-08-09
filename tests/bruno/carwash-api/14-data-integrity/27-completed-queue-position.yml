@@ -1,7 +1,7 @@
 info:
   name: Completed queue cannot be repositioned
   type: http
-  seq: 25
+  seq: 27
   tags:
     - integrity
 

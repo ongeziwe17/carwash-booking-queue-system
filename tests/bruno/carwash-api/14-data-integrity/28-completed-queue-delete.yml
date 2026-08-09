@@ -1,7 +1,7 @@
 info:
   name: Completed queue cannot be deleted
   type: http
-  seq: 26
+  seq: 28
   tags:
     - integrity
 
