@@ -20,7 +20,7 @@ http:
         "userId": "{{customerUserId}}",
         "vehicleId": "{{customerVehicleId}}",
         "serviceId": "{{serviceId}}",
-        "scheduledDateTime": "{{future29}}",
+        "scheduledDateTime": "{{future31}}",
         "specialRequest": "Ownership validation fixture"
       }
   auth:

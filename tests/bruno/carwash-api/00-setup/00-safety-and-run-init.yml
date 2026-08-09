@@ -74,7 +74,7 @@ runtime:
           adminJourneyEmail: `admin-journey-${runId}@example.test`
         };
         for (const [key,value] of Object.entries(vars)) bru.setVar(key,value);
-        for (let i=1;i<=30;i++) {
+        for (let i=1;i<=32;i++) {
           const d = new Date(Date.now() + (7+i)*24*60*60*1000 + i*37*60*1000);
           bru.setVar(`future${i}`, d.toISOString().slice(0,19));
           if (i === 1) bru.setVar("testDate", d.toISOString().slice(0,10));
