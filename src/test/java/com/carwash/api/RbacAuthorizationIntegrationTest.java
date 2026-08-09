@@ -63,8 +63,8 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
     void customerCanAccessOwnResourcesButNotOtherCustomersOrOperationalApis() throws Exception {
         LoginIdentity customer = registerAndLogin(RoleName.CUSTOMER);
         LoginIdentity other = registerAndLogin(RoleName.CUSTOMER);
-        ResourceSet ownResources = createResourceSet(customer.userId());
-        ResourceSet otherResources = createResourceSet(other.userId());
+        ResourceSet ownResources = createQueuedResourceSet(customer.userId());
+        ResourceSet otherResources = createQueuedResourceSet(other.userId());
 
         mockMvc.perform(get("/api/users/{id}", customer.userId()).header(HttpHeaders.AUTHORIZATION, customer.bearer()))
                 .andExpect(status().isOk())
@@ -97,12 +97,14 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         LoginIdentity staff = registerAndLogin(RoleName.STAFF);
         LoginIdentity customer = registerAndLogin(RoleName.CUSTOMER);
         LoginIdentity other = registerAndLogin(RoleName.CUSTOMER);
-        ResourceSet resources = createResourceSet(customer.userId());
+        ResourceSet resources = createResourceSetWithoutQueue(customer.userId());
 
         mockMvc.perform(get("/api/vehicles/{id}", resources.primaryVehicleId()).header(HttpHeaders.AUTHORIZATION, staff.bearer()))
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/bookings/{id}", resources.bookingId()).header(HttpHeaders.AUTHORIZATION, staff.bearer()))
                 .andExpect(status().isOk());
+        assertOperationalUpdateCannotTransferOwner(staff, resources, other.userId());
+        enqueue(resources);
         mockMvc.perform(post("/api/queue-entries/{id}/call-next", resources.queueEntryId())
                         .header(HttpHeaders.AUTHORIZATION, staff.bearer()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.queueStatus").value("CALLED"));
@@ -113,7 +115,6 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         assertForbidden(mockMvc.perform(put("/api/admin/users/{id}/role", customer.userId())
                 .header(HttpHeaders.AUTHORIZATION, staff.bearer()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"roleName\":\"BUSINESS_OWNER\"}")));
-        assertOperationalUpdateCannotTransferOwner(staff, resources, other.userId());
     }
 
     @Test
@@ -121,12 +122,14 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         LoginIdentity owner = registerAndLogin(RoleName.BUSINESS_OWNER);
         LoginIdentity customer = registerAndLogin(RoleName.CUSTOMER);
         LoginIdentity other = registerAndLogin(RoleName.CUSTOMER);
-        ResourceSet resources = createResourceSet(customer.userId());
+        ResourceSet resources = createResourceSetWithoutQueue(customer.userId());
 
         mockMvc.perform(get("/api/vehicles/{id}", resources.primaryVehicleId()).header(HttpHeaders.AUTHORIZATION, owner.bearer()))
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/bookings/{id}", resources.bookingId()).header(HttpHeaders.AUTHORIZATION, owner.bearer()))
                 .andExpect(status().isOk());
+        assertOperationalUpdateCannotTransferOwner(owner, resources, other.userId());
+        enqueue(resources);
         mockMvc.perform(post("/api/queue-entries/{id}/call-next", resources.queueEntryId())
                         .header(HttpHeaders.AUTHORIZATION, owner.bearer())).andExpect(status().isOk());
         mockMvc.perform(post("/api/services").header(HttpHeaders.AUTHORIZATION, owner.bearer())
@@ -137,7 +140,6 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         assertForbidden(mockMvc.perform(put("/api/admin/users/{id}/role", customer.userId())
                 .header(HttpHeaders.AUTHORIZATION, owner.bearer()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"roleName\":\"STAFF\"}")));
-        assertOperationalUpdateCannotTransferOwner(owner, resources, other.userId());
     }
 
     @Test
@@ -145,7 +147,7 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         LoginIdentity administrator = registerAndLogin(RoleName.PLATFORM_ADMIN);
         LoginIdentity customer = registerAndLogin(RoleName.CUSTOMER);
         LoginIdentity other = registerAndLogin(RoleName.CUSTOMER);
-        ResourceSet resources = createResourceSet(customer.userId());
+        ResourceSet resources = createResourceSetWithoutQueue(customer.userId());
 
         mockMvc.perform(get("/api/users").header(HttpHeaders.AUTHORIZATION, administrator.bearer())).andExpect(status().isOk());
         mockMvc.perform(put("/api/admin/users/{id}/role", customer.userId())
@@ -176,8 +178,8 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
     void customerBookingUpdatesPreserveOwnerAndRejectAnotherCustomersVehicle() throws Exception {
         LoginIdentity customer = registerAndLogin(RoleName.CUSTOMER);
         LoginIdentity other = registerAndLogin(RoleName.CUSTOMER);
-        ResourceSet resources = createResourceSet(customer.userId());
-        ResourceSet otherResources = createResourceSet(other.userId());
+        ResourceSet resources = createResourceSetWithoutQueue(customer.userId());
+        ResourceSet otherResources = createResourceSetWithoutQueue(other.userId());
 
         Map<String, Object> allowedUpdate = updateBookingRequest(resources.alternateVehicleId(), resources.serviceId(), nextScheduledTime());
         mockMvc.perform(put("/api/bookings/{id}", resources.bookingId())
@@ -261,7 +263,13 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         return new LoginIdentity(userId, email, authentication.login(email, PASSWORD));
     }
 
-    private ResourceSet createResourceSet(String ownerId) {
+    private ResourceSet createQueuedResourceSet(String ownerId) {
+        ResourceSet resources = createResourceSetWithoutQueue(ownerId);
+        enqueue(resources);
+        return resources;
+    }
+
+    private ResourceSet createResourceSetWithoutQueue(String ownerId) {
         String primaryVehicleId = ids.vehicle();
         String alternateVehicleId = ids.vehicle();
         String serviceId = ids.service();
@@ -272,8 +280,12 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         Service service = services.createService(new Service(serviceId, "RBAC Wash", "authorization fixture", BigDecimal.valueOf(200), 30));
         Booking booking = bookings.createBooking(new Booking(bookingId, users.findById(ownerId), primary, service, nextScheduledTime(), "authorization fixture"));
         bookings.confirmBooking(bookingId);
-        queues.createQueueEntry(new QueueEntry(queueEntryId, booking, service));
         return new ResourceSet(ownerId, primaryVehicleId, alternateVehicleId, serviceId, bookingId, queueEntryId);
+    }
+
+    private void enqueue(ResourceSet resources) {
+        Booking booking = bookings.findById(resources.bookingId());
+        queues.createQueueEntry(new QueueEntry(resources.queueEntryId(), booking, booking.getService()));
     }
 
     private Map<String, Object> updateBookingRequest(String vehicleId, String serviceId, LocalDateTime scheduledDateTime) {
