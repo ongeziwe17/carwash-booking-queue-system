@@ -115,7 +115,11 @@ public class BookingController {
 
     @PutMapping("/{id}")
     @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
-    @Operation(summary = "Update booking")
+    @Operation(
+            summary = "Update booking",
+            description = "Updates a CREATED booking or a CONFIRMED booking without an active queue entry. "
+                    + "Bookings with active queue work cannot be updated."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Booking updated"),
             @ApiResponse(responseCode = "400", description = "Invalid request or booking rule violation",
@@ -149,7 +153,12 @@ public class BookingController {
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
-    @Operation(summary = "Cancel booking and return no content")
+    @Operation(
+            summary = "Cancel booking and return no content",
+            description = "Cancels an eligible CREATED or CONFIRMED booking. An associated WAITING or CALLED "
+                    + "queue entry is removed and the active queue is rebalanced. IN_SERVICE bookings cannot be "
+                    + "cancelled."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Booking cancelled"),
             @ApiResponse(responseCode = "400", description = "Invalid identifier or booking rule violation",
@@ -193,7 +202,12 @@ public class BookingController {
 
     @PostMapping("/{id}/cancel")
     @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
-    @Operation(summary = "Cancel booking")
+    @Operation(
+            summary = "Cancel booking",
+            description = "Cancels an eligible CREATED or CONFIRMED booking. An associated WAITING or CALLED "
+                    + "queue entry is removed and the active queue is rebalanced. IN_SERVICE bookings cannot be "
+                    + "cancelled."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Booking cancelled"),
             @ApiResponse(responseCode = "400", description = "Invalid identifier or booking rule violation",

@@ -70,7 +70,7 @@ class AggregateIntegrityServiceTest {
         vehicleManagement = new VehicleManagementService(vehicles, users, bookings, coordinator);
         serviceCatalog = new ServiceCatalogService(services, bookings, queues, coordinator, queueOrdering);
         bookingManagement = new BookingManagementService(bookings, users, vehicles, services, queues,
-                notifications, notificationManagement, coordinator,
+                notifications, notificationManagement, queueOrdering, coordinator,
                 new BookingPolicyProperties(1, Duration.ZERO), clock);
         queueManagement = new QueueManagementService(queues, bookings, services, notificationManagement, coordinator,
                 queueOrdering, clock);

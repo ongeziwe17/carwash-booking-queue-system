@@ -2,10 +2,12 @@ package com.carwash.service;
 
 import com.carwash.config.BookingPolicyProperties;
 import com.carwash.domain.Booking;
+import com.carwash.domain.QueueEntry;
 import com.carwash.domain.Service;
 import com.carwash.domain.User;
 import com.carwash.domain.Vehicle;
 import com.carwash.enums.BookingStatus;
+import com.carwash.enums.QueueStatus;
 import com.carwash.repository.BookingRepository;
 import com.carwash.repository.NotificationRepository;
 import com.carwash.repository.QueueEntryRepository;
@@ -30,6 +32,7 @@ public class BookingManagementService {
     private final QueueEntryRepository queueEntryRepository;
     private final NotificationRepository notificationRepository;
     private final NotificationManagementService notificationManagementService;
+    private final QueueOrderingService queueOrdering;
     private final InMemoryDataCoordinator coordinator;
     private final BookingPolicyProperties bookingPolicy;
     private final Clock clock;
@@ -40,6 +43,7 @@ public class BookingManagementService {
                                     QueueEntryRepository queueEntryRepository,
                                     NotificationRepository notificationRepository,
                                     NotificationManagementService notificationManagementService,
+                                    QueueOrderingService queueOrdering,
                                     InMemoryDataCoordinator coordinator,
                                     BookingPolicyProperties bookingPolicy,
                                     Clock clock) {
@@ -47,9 +51,10 @@ public class BookingManagementService {
         this.userRepository = Objects.requireNonNull(userRepository, "User repository is required");
         this.vehicleRepository = Objects.requireNonNull(vehicleRepository, "Vehicle repository is required");
         this.serviceRepository = Objects.requireNonNull(serviceRepository, "Service repository is required");
-        this.queueEntryRepository = queueEntryRepository;
+        this.queueEntryRepository = Objects.requireNonNull(queueEntryRepository, "Queue repository is required");
         this.notificationRepository = notificationRepository;
         this.notificationManagementService = notificationManagementService;
+        this.queueOrdering = Objects.requireNonNull(queueOrdering, "Queue ordering service is required");
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
         this.bookingPolicy = Objects.requireNonNull(bookingPolicy, "Booking policy is required");
         this.clock = Objects.requireNonNull(clock, "Application clock is required");
@@ -93,6 +98,9 @@ public class BookingManagementService {
         return coordinator.write(() -> {
             Booking existing = requireBooking(bookingId);
             requireModifiableBooking(existing);
+            if (queueEntryRepository.existsActiveByBookingId(bookingId)) {
+                throw new BusinessRuleViolationException("Booking cannot be updated while it has an active queue entry");
+            }
             User owner = requireExistingOwner(existing);
             Vehicle vehicle = resolveVehicle(vehicleId);
             requireVehicleOwnedBy(vehicle, owner, "Vehicle does not belong to booking owner");
@@ -115,8 +123,42 @@ public class BookingManagementService {
         return coordinator.write(() -> {
             Booking booking = requireBooking(bookingId);
             validateCancellationRequest(booking, customerId);
-            if (!booking.cancel()) throw new BusinessRuleViolationException("Invalid booking status transition");
-            if (!bookingRepository.update(booking)) throw new ResourceNotFoundException("Booking not found: " + bookingId);
+            QueueEntry activeQueueEntry = findActiveQueueEntry(bookingId);
+            if (activeQueueEntry != null && activeQueueEntry.getQueueStatus() == QueueStatus.IN_PROGRESS) {
+                throw new BusinessRuleViolationException("Booking cannot be cancelled while service is in progress");
+            }
+            if (activeQueueEntry != null
+                    && activeQueueEntry.getQueueStatus() != QueueStatus.WAITING
+                    && activeQueueEntry.getQueueStatus() != QueueStatus.CALLED) {
+                throw new BusinessRuleViolationException("Booking cannot be cancelled with its current queue state");
+            }
+            LifecycleStateSnapshot.BookingState bookingState = LifecycleStateSnapshot.booking(booking);
+            List<LifecycleStateSnapshot.QueueEntryState> queueStates = activeQueueEntry == null
+                    ? List.of()
+                    : LifecycleStateSnapshot.queueEntries(queueEntryRepository.findActiveOrdered());
+            boolean queueRemoved = false;
+            try {
+                if (activeQueueEntry != null) {
+                    if (!queueEntryRepository.deleteById(activeQueueEntry.getQueueEntryId())) {
+                        throw new ResourceNotFoundException(
+                                "Queue entry not found: " + activeQueueEntry.getQueueEntryId());
+                    }
+                    queueRemoved = true;
+                    if (booking.getQueueEntry() != null) {
+                        booking.detachQueueEntry(booking.getQueueEntry().getQueueEntryId());
+                    }
+                }
+                if (!booking.cancel()) {
+                    throw new BusinessRuleViolationException("Invalid booking status transition");
+                }
+                if (!bookingRepository.update(booking)) {
+                    throw new ResourceNotFoundException("Booking not found: " + bookingId);
+                }
+                if (queueRemoved) queueOrdering.rebalanceActiveQueue();
+            } catch (RuntimeException exception) {
+                rollbackCancellation(exception, bookingState, queueStates);
+                throw exception;
+            }
             notifyCustomer(booking, "BOOKING_CANCELLED", "Your booking has been cancelled.");
             return booking;
         });
@@ -254,6 +296,15 @@ public class BookingManagementService {
                 || !booking.getUser().getUserId().equals(customerId)) {
             throw new BusinessRuleViolationException("Booking can only be cancelled by the owning customer");
         }
+        if (booking.getStatus() == BookingStatus.IN_SERVICE) {
+            throw new BusinessRuleViolationException("Booking cannot be cancelled while service is in progress");
+        }
+        if (booking.getStatus() == BookingStatus.COMPLETED) {
+            throw new BusinessRuleViolationException("Completed booking cannot be cancelled");
+        }
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new BusinessRuleViolationException("Cancelled booking cannot be cancelled again");
+        }
         LocalDateTime now = LocalDateTime.now(clock);
         if (booking.getScheduledDateTime() == null || !now.isBefore(booking.getScheduledDateTime())) {
             throw new BusinessRuleViolationException("Only future bookings can be cancelled");
@@ -262,11 +313,37 @@ public class BookingManagementService {
         if (!now.isBefore(cutoff)) {
             throw new BusinessRuleViolationException("Booking cancellation window has closed");
         }
-        if (booking.getStatus() == BookingStatus.COMPLETED) {
-            throw new BusinessRuleViolationException("Completed booking cannot be cancelled");
-        }
-        if (booking.getStatus() == BookingStatus.CANCELLED) {
-            throw new BusinessRuleViolationException("Cancelled booking cannot be cancelled again");
+    }
+
+    private QueueEntry findActiveQueueEntry(String bookingId) {
+        return queueEntryRepository.findByBookingId(bookingId).stream()
+                .filter(queueEntry -> queueEntry.getQueueStatus() != null)
+                .filter(queueEntry -> queueEntry.getQueueStatus().isActive())
+                .findFirst()
+                .orElse(null);
+    }
+
+    private void rollbackCancellation(RuntimeException failure,
+                                      LifecycleStateSnapshot.BookingState bookingState,
+                                      List<LifecycleStateSnapshot.QueueEntryState> queueStates) {
+        try {
+            bookingState.restore();
+            for (LifecycleStateSnapshot.QueueEntryState queueState : queueStates) {
+                queueState.restore();
+                QueueEntry queueEntry = queueState.queueEntry();
+                if (queueEntryRepository.existsById(queueEntry.getQueueEntryId())) {
+                    if (!queueEntryRepository.update(queueEntry)) {
+                        throw new ResourceNotFoundException("Queue entry not found: " + queueEntry.getQueueEntryId());
+                    }
+                } else if (!queueEntryRepository.insert(queueEntry)) {
+                    throw new BusinessRuleViolationException("Queue entry ID already exists");
+                }
+            }
+            if (!bookingRepository.update(bookingState.booking())) {
+                throw new ResourceNotFoundException("Booking not found: " + bookingState.booking().getBookingId());
+            }
+        } catch (RuntimeException rollbackFailure) {
+            failure.addSuppressed(rollbackFailure);
         }
     }
 

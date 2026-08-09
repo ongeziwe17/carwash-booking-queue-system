@@ -13,8 +13,8 @@ Stories are grouped by delivery phase so planned capabilities are not confused w
 | US-CUR-001 | As an operator, I want to manage user records so vehicles and bookings can reference customers. | Create, retrieve, update, delete, and reject duplicate email records. | Implemented foundation; unsafe response contracts remain. |
 | US-CUR-002 | As a customer or operator, I want to manage vehicle records for a user. | Create, retrieve, update, delete, associate with an owner, and reject duplicate plates during creation. | Implemented foundation. |
 | US-CUR-003 | As an operator, I want to manage a wash-service catalogue. | Create, retrieve, update, delete, activate, deactivate, and filter services. | Implemented as a global catalogue only. |
-| US-CUR-004 | As an operator, I want to manage bookings. | Create future bookings for valid user/vehicle/service records, confirm, update, and cancel. | Implemented foundation with exact-slot capacity. |
-| US-CUR-005 | As staff, I want to manage queue entries. | Create, retrieve, server-order, manually rebalance, call, start, complete, and delete entries. | Implemented as one global single-location queue. |
+| US-CUR-004 | As an operator, I want to manage bookings. | Create future bookings for valid user/vehicle/service records, confirm, guarded update, and queue-aware cancel. | Implemented foundation with exact-slot capacity and lifecycle synchronization. |
+| US-CUR-005 | As staff, I want to manage queue entries. | Create, retrieve, server-order, manually rebalance, call, start, complete, and delete entries. | Implemented as one global single-location queue with synchronized booking lifecycle. |
 | US-CUR-006 | As a customer, I want to see recent in-app notifications. | Booking/queue events create records that can be listed by user. | Partially implemented. |
 | US-CUR-007 | As an operator, I want a daily operational summary. | Return booking and queue counts for a supplied date. | Partially implemented and in-memory only. |
 
@@ -37,7 +37,7 @@ Stories are grouped by delivery phase so planned capabilities are not confused w
 | --- | ---: | --- | --- |
 | US-QUEUE-001 | #16 | As a customer, I want only an eligible confirmed booking to enter one active queue. | Confirmed booking, active matching service, one active entry, validated IDs. |
 | US-QUEUE-002 | #17 | As a customer, I want the server to assign and recalculate my queue position and wait estimate. | Unique consecutive positions and ETA based on active work ahead. |
-| US-WORKFLOW-001 | #20 | As staff, I want booking and queue states synchronized so operational data and reports agree. | Queue start/completion updates booking state; cancellation cannot leave active queue work. |
+| US-WORKFLOW-001 | #20 | As staff, I want booking and queue states synchronized so operational data and reports agree. | Implemented: queue start/completion updates booking state; cancellation cannot leave active queue work. |
 | US-QUEUE-003 | #112 | As staff, I want a true call-next action so the first waiting entry is selected automatically. | Deterministic selection, empty-queue handling, accurate endpoint semantics. |
 | US-BOOKING-001 | #113 | As a customer, I want to reschedule or cancel within allowed policy windows. | Revalidate availability/conflicts; reject late or in-service changes; notify on success. |
 | US-AVAIL-001 | #114 | As a customer, I want to view available service slots before booking. | Available/full/past/inactive slots agree with booking validation. |

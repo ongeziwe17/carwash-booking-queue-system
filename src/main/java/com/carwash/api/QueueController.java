@@ -173,7 +173,11 @@ public class QueueController {
 
     @PostMapping("/{id}/start")
     @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
-    @Operation(summary = "Start queue entry service")
+    @Operation(
+            summary = "Start queue entry service",
+            description = "Starts the selected CALLED queue entry and transitions its associated CONFIRMED "
+                    + "booking to IN_SERVICE in the same coordinated operation."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Queue service started"),
             @ApiResponse(responseCode = "400", description = "Invalid identifier or queue rule violation",
@@ -195,7 +199,11 @@ public class QueueController {
 
     @PostMapping("/{id}/complete")
     @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
-    @Operation(summary = "Complete queue entry")
+    @Operation(
+            summary = "Complete queue entry",
+            description = "Completes the selected IN_PROGRESS queue entry, transitions its associated IN_SERVICE "
+                    + "booking to COMPLETED, and rebalances the remaining active queue."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Queue entry completed"),
             @ApiResponse(responseCode = "400", description = "Invalid identifier or queue rule violation",

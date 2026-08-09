@@ -1,0 +1,28 @@
+info:
+  name: Customer cannot cancel completed service
+  type: http
+  seq: 8
+  tags:
+    - workflow
+    - customer
+    - integrity
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings/{{opsE2eBookingId}}/cancel"
+  auth:
+    type: bearer
+    token: "{{otherCustomerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns HTTP 400", function() { expect(res.status).to.equal(400); });
+        test("uses BUSINESS_RULE_VIOLATION", function() { expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); });
+        test("reports completed cancellation rule", function() { expect(res.body.message).to.equal("Completed booking cannot be cancelled"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

@@ -1,0 +1,27 @@
+info:
+  name: Cancel booking with waiting queue entry
+  type: http
+  seq: 8
+  tags:
+    - workflow
+    - customer
+    - integrity
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings/{{workflowCancelWaitingBookingId}}/cancel"
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("booking is cancelled", function() { expect(res.body.status).to.equal("CANCELLED"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

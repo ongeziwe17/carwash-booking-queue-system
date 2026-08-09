@@ -1,6 +1,8 @@
 package com.carwash.service;
 
 import com.carwash.api.dto.DailySummaryReportResponse;
+import com.carwash.domain.Booking;
+import com.carwash.domain.QueueEntry;
 import com.carwash.enums.BookingStatus;
 import com.carwash.enums.QueueStatus;
 import com.carwash.testsupport.TestDates;
@@ -83,5 +85,36 @@ class DailySummaryReportServiceTest extends ServiceTestSupport {
         createSavedBooking(reportDateTime.plusMinutes(4), BookingStatus.COMPLETED);
         DailySummaryReportResponse report = reportService.generateDailySummary(reportDateTime.toLocalDate());
         assertEquals(3, report.pendingWorkload());
+    }
+
+    @Test
+    void dailySummaryReflectsSynchronizedOperationalLifecycle() {
+        LocalDateTime scheduled = TestDates.futureDays(15);
+        Booking booking = createConfirmedBooking(scheduled);
+        QueueEntry queueEntry = queueRepository.findById(queueService.createQueueEntry(
+                ids.queueEntry(), booking.getBookingId(), booking.getService().getServiceId())
+                .getQueueEntryId()).orElseThrow();
+
+        DailySummaryReportResponse before = reportService.generateDailySummary(scheduled.toLocalDate());
+        assertEquals(1, before.confirmedBookings());
+        assertEquals(1, before.waitingQueueEntries());
+        assertEquals(1, before.pendingWorkload());
+
+        queueService.callNext(queueEntry.getQueueEntryId());
+        DailySummaryReportResponse called = reportService.generateDailySummary(scheduled.toLocalDate());
+        assertEquals(1, called.confirmedBookings());
+        assertEquals(1, called.calledQueueEntries());
+
+        queueService.startService(queueEntry.getQueueEntryId());
+        DailySummaryReportResponse during = reportService.generateDailySummary(scheduled.toLocalDate());
+        assertEquals(BookingStatus.IN_SERVICE, booking.getStatus());
+        assertEquals(1, during.inProgressQueueEntries());
+        assertEquals(1, during.pendingWorkload());
+
+        queueService.completeQueueEntry(queueEntry.getQueueEntryId());
+        DailySummaryReportResponse completed = reportService.generateDailySummary(scheduled.toLocalDate());
+        assertEquals(1, completed.completedBookings());
+        assertEquals(1, completed.completedQueueEntries());
+        assertEquals(0, completed.pendingWorkload());
     }
 }

@@ -94,6 +94,70 @@ class QueueManagementServiceTest extends ServiceTestSupport {
     }
 
     @Test
+    void queueLifecycleSynchronizesAssociatedBookingAtStartAndCompletion() {
+        QueueEntry queueEntry = createQueueEntry(createConfirmedBooking());
+        Booking booking = queueEntry.getBooking();
+
+        QueueEntry called = queueService.callNext(queueEntry.getQueueEntryId());
+        assertEquals(QueueStatus.CALLED, called.getQueueStatus());
+        assertEquals(BookingStatus.CONFIRMED, called.getBooking().getStatus());
+        assertEquals(BookingStatus.CONFIRMED, booking.getStatus());
+
+        QueueEntry started = queueService.startService(queueEntry.getQueueEntryId());
+        assertEquals(QueueStatus.IN_PROGRESS, started.getQueueStatus());
+        assertEquals(BookingStatus.IN_SERVICE, started.getBooking().getStatus());
+        assertEquals(BookingStatus.IN_SERVICE, bookingRepository.findById(booking.getBookingId()).orElseThrow().getStatus());
+
+        QueueEntry completed = queueService.completeQueueEntry(queueEntry.getQueueEntryId());
+        assertEquals(QueueStatus.COMPLETED, completed.getQueueStatus());
+        assertEquals(0, completed.getEstimatedWaitMin());
+        assertEquals(BookingStatus.COMPLETED, completed.getBooking().getStatus());
+        assertEquals(BookingStatus.COMPLETED,
+                bookingRepository.findById(booking.getBookingId()).orElseThrow().getStatus());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = BookingStatus.class, names = {"CREATED", "CANCELLED", "IN_SERVICE", "COMPLETED"})
+    void startRejectsEveryIncompatibleBookingStateWithoutPartialMutation(BookingStatus bookingStatus) {
+        QueueEntry queueEntry = createQueueEntry(createConfirmedBooking());
+        queueService.callNext(queueEntry.getQueueEntryId());
+        Booking booking = queueEntry.getBooking();
+        booking.setStatus(bookingStatus);
+        assertTrue(bookingRepository.update(booking));
+
+        BusinessRuleViolationException exception = assertThrows(BusinessRuleViolationException.class,
+                () -> queueService.startService(queueEntry.getQueueEntryId()));
+
+        assertEquals("Booking must be confirmed before service can start", exception.getMessage());
+        assertEquals(QueueStatus.CALLED, queueEntry.getQueueStatus());
+        assertNull(queueEntry.getStartedAt());
+        assertEquals(bookingStatus, booking.getStatus());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = BookingStatus.class, names = {"CONFIRMED", "CANCELLED", "COMPLETED"})
+    void completionRejectsEveryIncompatibleBookingStateWithoutPartialMutation(BookingStatus bookingStatus) {
+        QueueEntry queueEntry = createQueueEntry(createConfirmedBooking());
+        queueService.callNext(queueEntry.getQueueEntryId());
+        queueService.startService(queueEntry.getQueueEntryId());
+        Booking booking = queueEntry.getBooking();
+        booking.setStatus(bookingStatus);
+        assertTrue(bookingRepository.update(booking));
+        int originalPosition = queueEntry.getPosition();
+        int originalWait = queueEntry.getEstimatedWaitMin();
+
+        BusinessRuleViolationException exception = assertThrows(BusinessRuleViolationException.class,
+                () -> queueService.completeQueueEntry(queueEntry.getQueueEntryId()));
+
+        assertEquals("Booking must be in service before queue completion", exception.getMessage());
+        assertEquals(QueueStatus.IN_PROGRESS, queueEntry.getQueueStatus());
+        assertNull(queueEntry.getCompletedAt());
+        assertEquals(originalPosition, queueEntry.getPosition());
+        assertEquals(originalWait, queueEntry.getEstimatedWaitMin());
+        assertEquals(bookingStatus, booking.getStatus());
+    }
+
+    @Test
     void queueMetricsRejectInvalidValues() {
         QueueEntry queueEntry = new QueueEntry();
 

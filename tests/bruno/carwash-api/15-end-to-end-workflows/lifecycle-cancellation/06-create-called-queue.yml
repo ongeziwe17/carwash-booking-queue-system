@@ -1,0 +1,39 @@
+info:
+  name: Create later queue entry for called cancellation
+  type: http
+  seq: 6
+  tags:
+    - workflow
+    - staff
+    - integrity
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/queue-entries"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "queueEntryId": "{{workflowCancelCalledQueueId}}",
+        "bookingId": "{{workflowCancelCalledBookingId}}",
+        "serviceId": "{{serviceId}}"
+      }
+  auth:
+    type: bearer
+    token: "{{staffToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("later entry is consecutive", function() { expect(Number(res.body.position)).to.equal(Number(bru.getVar("workflowCancelBaselinePosition")) + 1); });
+        test("later wait includes predecessor", function() { expect(Number(res.body.estimatedWaitMin)).to.be.greaterThan(Number(bru.getVar("workflowCancelBaselineWait"))); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

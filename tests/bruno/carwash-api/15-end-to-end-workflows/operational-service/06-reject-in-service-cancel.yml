@@ -1,0 +1,29 @@
+info:
+  name: Customer cannot cancel in-progress service
+  type: http
+  seq: 6
+  tags:
+    - workflow
+    - customer
+    - integrity
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings/{{opsE2eBookingId}}/cancel"
+  auth:
+    type: bearer
+    token: "{{otherCustomerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns HTTP 400", function() { expect(res.status).to.equal(400); });
+        test("uses BUSINESS_RULE_VIOLATION", function() { expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); });
+        test("reports in-progress cancellation rule", function() { expect(res.body.message).to.equal("Booking cannot be cancelled while service is in progress"); });
+        test("reports request path", function() { expect(res.body.path).to.equal(String(req.getUrl()).replace(/^https?:\/\/[^/]+/, "").split("?")[0]); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

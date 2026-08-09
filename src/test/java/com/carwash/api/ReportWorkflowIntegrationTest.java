@@ -50,15 +50,15 @@ class ReportWorkflowIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reportDate").value(reportDateTime.toLocalDate().toString()))
                 .andExpect(jsonPath("$.totalBookings").value(6))
-                .andExpect(jsonPath("$.confirmedBookings").value(5))
+                .andExpect(jsonPath("$.confirmedBookings").value(3))
                 .andExpect(jsonPath("$.cancelledBookings").value(1))
-                .andExpect(jsonPath("$.completedBookings").value(0))
+                .andExpect(jsonPath("$.completedBookings").value(1))
                 .andExpect(jsonPath("$.totalQueueEntries").value(4))
                 .andExpect(jsonPath("$.waitingQueueEntries").value(1))
                 .andExpect(jsonPath("$.calledQueueEntries").value(1))
                 .andExpect(jsonPath("$.inProgressQueueEntries").value(1))
                 .andExpect(jsonPath("$.completedQueueEntries").value(1))
-                .andExpect(jsonPath("$.pendingWorkload").value(5));
+                .andExpect(jsonPath("$.pendingWorkload").value(4));
     }
 
     @Test

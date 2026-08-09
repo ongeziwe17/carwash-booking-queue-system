@@ -86,7 +86,7 @@ abstract class ServiceTestSupport {
                 new NotificationPolicyProperties(10), clock);
         bookingService = new BookingManagementService(
                 bookingRepository, userRepository, vehicleRepository, serviceRepository,
-                queueRepository, notificationRepository, notificationService, coordinator,
+                queueRepository, notificationRepository, notificationService, queueOrdering, coordinator,
                 new BookingPolicyProperties(1, Duration.ZERO), clock);
         queueService = new QueueManagementService(
                 queueRepository, bookingRepository, serviceRepository, notificationService, coordinator,

@@ -4,6 +4,7 @@ import com.carwash.config.NotificationPolicyProperties;
 import com.carwash.domain.Booking;
 import com.carwash.domain.Notification;
 import com.carwash.domain.QueueEntry;
+import com.carwash.enums.BookingStatus;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -54,6 +55,7 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
         assertEquals(List.of("BOOKING_CONFIRMED", "QUEUE_CALLED", "SERVICE_STARTED"),
                 notifications.stream().map(Notification::getType).toList());
         assertEquals("Your service has started.", notifications.get(2).getMessage());
+        assertEquals(BookingStatus.IN_SERVICE, notifications.get(2).getBooking().getStatus());
     }
 
     @Test
@@ -66,6 +68,7 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
         assertEquals(List.of("BOOKING_CONFIRMED", "QUEUE_CALLED", "SERVICE_STARTED", "SERVICE_COMPLETED"),
                 notifications.stream().map(Notification::getType).toList());
         assertEquals("Your service has been completed.", notifications.get(3).getMessage());
+        assertEquals(BookingStatus.COMPLETED, notifications.get(3).getBooking().getStatus());
     }
 
     @Test

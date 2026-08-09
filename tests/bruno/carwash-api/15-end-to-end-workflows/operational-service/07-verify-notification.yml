@@ -1,7 +1,7 @@
 info:
   name: Ops journey customer receives notifications
   type: http
-  seq: 7
+  seq: 11
   tags:
     - workflow
     - customer

@@ -1,0 +1,33 @@
+info:
+  name: Capture operational report baseline
+  type: http
+  seq: 0
+  tags:
+    - workflow
+    - report
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/reports/daily-summary?date={{opsReportDate}}"
+  auth:
+    type: bearer
+    token: "{{adminToken}}"
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.status === 200) {
+          bru.setVar("opsBaselineCompletedBookings", Number(res.body.completedBookings));
+          bru.setVar("opsBaselineCompletedQueueEntries", Number(res.body.completedQueueEntries));
+          bru.setVar("opsBaselinePendingWorkload", Number(res.body.pendingWorkload));
+        }
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("captures numeric baseline", function() { expect(Number(res.body.completedBookings)).to.be.at.least(0); expect(Number(res.body.completedQueueEntries)).to.be.at.least(0); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

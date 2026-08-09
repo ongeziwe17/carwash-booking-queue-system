@@ -12,7 +12,7 @@ The application is a Spring Boot modular monolith using in-memory repositories. 
 | `Role` | Built-in role identity and permission catalogue | Runtime authorization derives permissions from the server-side role catalogue. |
 | `Vehicle` | Customer-owned vehicle details | Ownership cannot change through an ordinary update; plate uniqueness is enforced per owner on create and update. |
 | `Service` | Global service-catalogue entry | Referenced services must be deactivated rather than physically deleted. |
-| `Booking` | Customer, vehicle, service, schedule, status, and optional queue link | Owner is preserved; only `CREATED` and `CONFIRMED` bookings are editable. |
+| `Booking` | Customer, vehicle, service, schedule, status, and optional queue link | Owner is preserved; only `CREATED` and unqueued `CONFIRMED` bookings are editable. |
 | `QueueEntry` | Booking queue state, global active position, and estimated wait | Requires a confirmed booking and active matching service; one active entry is allowed per booking and active metrics are server managed. |
 | `Notification` | In-app notification record for a user and optional booking | User and booking references are resolved to canonical repository objects before insertion. |
 
@@ -76,7 +76,18 @@ After all eligibility checks pass, the service normalizes the new entry to `WAIT
 
 The current single-location runtime has one global active queue across all services. `WAITING`, `CALLED`, and `IN_PROGRESS` entries receive consecutive positions `1..N`. Their wait is the cumulative effective duration of active predecessors; each predecessor uses its positive service duration or the configured default-service-duration fallback. Changing a service's estimated duration rebalances active waits within the same coordinator write operation. `COMPLETED`, `EXITED`, and physically deleted entries do not contribute to active positions or waits. Terminal records may retain their last historical position, which does not block active position reuse, and their wait is zero. Public queue responses return detached snapshots created under the applicable coordinator read or write lock.
 
-Only a waiting queue entry may be physically deleted. Deletion removes the repository record, clears the booking link, and rebalances the remaining active queue inside the same coordinator write operation. Completion similarly removes the completed record from active metrics and recalculates later entries.
+Only a waiting queue entry may be physically deleted through the public queue operation. Deletion removes the repository record, clears the booking link, and rebalances the remaining active queue inside the same coordinator write operation. Booking cancellation is a separate cross-aggregate workflow: a valid cancellation may internally remove a `WAITING` or `CALLED` entry, detach it, cancel the booking, and rebalance. It never removes `IN_PROGRESS` work.
+
+Operational lifecycle pairs are synchronized inside the coordinator write boundary:
+
+| Booking | Queue | Meaning |
+|---|---|---|
+| `CONFIRMED` | `WAITING` | Eligible booking joined the queue. |
+| `CONFIRMED` | `CALLED` | Customer was called; service has not started. |
+| `IN_SERVICE` | `IN_PROGRESS` | Service started. |
+| `COMPLETED` | `COMPLETED` | Service and queue work completed. |
+
+Start and completion resolve the canonical booking from `BookingRepository`, validate both aggregates before mutation, update both repositories, and create the lifecycle notification only after synchronized state exists. Completion then rebalances the remaining active queue. Focused state snapshots restore lifecycle fields and queue metrics if a required in-memory repository update or rebalance fails.
 
 ### User and notifications
 
@@ -114,7 +125,7 @@ COMPLETED
 
 Queue position updates are allowed only while the entry is `WAITING`. The requested target must be within the current active queue size; movement reorders the full active list and recalculates all affected positions and waits. Called, in-progress, completed, or exited entries cannot be repositioned or physically deleted.
 
-Queue entry eligibility, active uniqueness, global ordering, recalculation, and cumulative wait estimates are implemented. Queue creation does not change booking status, and queue transitions do not yet synchronize booking lifecycle state. Lifecycle synchronization remains WORKFLOW-001, and true server-selected call-next remains QUEUE-003; `/call-next` is still ID-specific. Dedicated booking rescheduling also remains roadmap work. Booking cancellation already honors the deployment-configurable cancellation window documented in [CONFIGURATION.md](CONFIGURATION.md).
+Queue entry eligibility, active uniqueness, global ordering, recalculation, cumulative wait estimates, and booking/queue lifecycle synchronization are implemented. Queue creation and call keep the booking `CONFIRMED`; start and completion synchronize both aggregates. Valid booking cancellation removes `WAITING`/`CALLED` queue work, while in-service cancellation is rejected. Generic booking updates are blocked whenever an active queue entry exists. True server-selected call-next remains QUEUE-003; `/call-next` is still ID-specific. Dedicated booking rescheduling also remains roadmap work. Booking cancellation continues to honor the deployment-configurable cancellation window documented in [CONFIGURATION.md](CONFIGURATION.md).
 
 ## 8. Mutable Reference Limitation
 
