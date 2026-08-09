@@ -1,5 +1,6 @@
 package com.carwash.service;
 
+import com.carwash.config.NotificationPolicyProperties;
 import com.carwash.domain.Booking;
 import com.carwash.domain.Notification;
 import com.carwash.domain.QueueEntry;
@@ -72,6 +73,20 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
         List<Notification> notifications = notificationService.findRecentByUserId(booking.getUser().getUserId());
         assertEquals(2, notifications.size());
         assertEquals("BOOKING_CANCELLED", notifications.getFirst().getType());
+    }
+
+    @Test
+    void configuredRecentLimitAppliesOnlyToDefaultLookup() {
+        NotificationManagementService limitThree = new NotificationManagementService(
+                notificationRepository, userRepository, bookingRepository, coordinator, notificationIds,
+                new NotificationPolicyProperties(3));
+        Booking booking = createSavedBooking();
+        for (int index = 1; index <= 5; index++) {
+            limitThree.createNotification(booking.getUser(), booking, "TEST_" + index, "message " + index);
+        }
+
+        assertEquals(3, limitThree.findRecentByUserId(booking.getUser().getUserId()).size());
+        assertEquals(4, limitThree.findRecentByUserId(booking.getUser().getUserId(), 4).size());
     }
 
     @Test

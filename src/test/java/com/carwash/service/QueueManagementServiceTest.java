@@ -12,6 +12,8 @@ import com.carwash.testsupport.TestDates;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -23,6 +25,29 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         String queueId = ids.queueEntry();
         QueueEntry queueEntry = new QueueEntry(queueId, booking, booking.getService(), 1);
         assertEquals(queueId, queueService.createQueueEntry(queueEntry).getQueueEntryId());
+    }
+
+    @Test
+    void configuredFallbackDurationIsUsedWhenServiceDurationIsUnavailable() {
+        QueueEntry queueEntry = new QueueEntry();
+        queueEntry.setPosition(3);
+
+        queueEntry.recalculateEstimatedWait(Duration.ofMinutes(12));
+
+        assertEquals(24, queueEntry.getEstimatedWaitMin());
+    }
+
+    @Test
+    void queueLifecycleTimestampsUseSuppliedClock() {
+        Booking booking = createSavedBooking();
+        QueueEntry queueEntry = queueService.createQueueEntry(
+                new QueueEntry(ids.queueEntry(), booking, booking.getService(), 1));
+        LocalDateTime expected = LocalDateTime.now(clock);
+
+        assertEquals(expected, queueEntry.getJoinedAt());
+        assertEquals(expected, queueService.callNext(queueEntry.getQueueEntryId()).getCalledAt());
+        assertEquals(expected, queueService.startService(queueEntry.getQueueEntryId()).getStartedAt());
+        assertEquals(expected, queueService.completeQueueEntry(queueEntry.getQueueEntryId()).getCompletedAt());
     }
 
     @Test

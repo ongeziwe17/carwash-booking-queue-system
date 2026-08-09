@@ -1,5 +1,6 @@
 package com.carwash.service;
 
+import com.carwash.config.NotificationPolicyProperties;
 import com.carwash.domain.Booking;
 import com.carwash.domain.Notification;
 import com.carwash.domain.User;
@@ -17,19 +18,20 @@ import java.util.Objects;
 public class NotificationManagementService {
 
     private static final String DEFAULT_CHANNEL = "IN_APP";
-    private static final int DEFAULT_RECENT_LIMIT = 10;
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final BookingRepository bookingRepository;
     private final InMemoryDataCoordinator coordinator;
     private final NotificationIdGenerator notificationIdGenerator;
+    private final NotificationPolicyProperties notificationPolicy;
 
     public NotificationManagementService(NotificationRepository notificationRepository,
                                          UserRepository userRepository,
                                          BookingRepository bookingRepository,
                                          InMemoryDataCoordinator coordinator,
-                                         NotificationIdGenerator notificationIdGenerator) {
+                                         NotificationIdGenerator notificationIdGenerator,
+                                         NotificationPolicyProperties notificationPolicy) {
         this.notificationRepository = Objects.requireNonNull(notificationRepository,
                 "Notification repository is required");
         this.userRepository = userRepository;
@@ -37,6 +39,7 @@ public class NotificationManagementService {
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
         this.notificationIdGenerator = Objects.requireNonNull(notificationIdGenerator,
                 "Notification ID generator is required");
+        this.notificationPolicy = Objects.requireNonNull(notificationPolicy, "Notification policy is required");
     }
 
     public Notification createNotification(User user, Booking booking, String type, String message) {
@@ -70,7 +73,7 @@ public class NotificationManagementService {
     }
 
     public List<Notification> findRecentByUserId(String userId) {
-        return findRecentByUserId(userId, DEFAULT_RECENT_LIMIT);
+        return findRecentByUserId(userId, notificationPolicy.recentLimit());
     }
 
     public List<Notification> findRecentByUserId(String userId, int limit) {

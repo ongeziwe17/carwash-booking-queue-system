@@ -1,5 +1,8 @@
 package com.carwash.service;
 
+import com.carwash.config.BookingPolicyProperties;
+import com.carwash.config.NotificationPolicyProperties;
+import com.carwash.config.QueuePolicyProperties;
 import com.carwash.domain.Booking;
 import com.carwash.domain.Role;
 import com.carwash.domain.Service;
@@ -19,6 +22,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -54,13 +61,17 @@ class AggregateIntegrityServiceTest {
         bookings = new InMemoryBookingRepository();
         queues = new InMemoryQueueEntryRepository();
         notifications = new InMemoryNotificationRepository();
+        Clock clock = Clock.fixed(Instant.parse("2089-01-15T12:00:00Z"), ZoneOffset.UTC);
         NotificationManagementService notificationManagement = new NotificationManagementService(
-                notifications, users, bookings, coordinator, new AtomicNotificationIdGenerator());
+                notifications, users, bookings, coordinator, new AtomicNotificationIdGenerator(),
+                new NotificationPolicyProperties(10));
         vehicleManagement = new VehicleManagementService(vehicles, users, bookings, coordinator);
         serviceCatalog = new ServiceCatalogService(services, bookings, queues, coordinator);
         bookingManagement = new BookingManagementService(bookings, users, vehicles, services, queues,
-                notifications, notificationManagement, coordinator);
-        queueManagement = new QueueManagementService(queues, bookings, services, notificationManagement, coordinator);
+                notifications, notificationManagement, coordinator,
+                new BookingPolicyProperties(1, Duration.ZERO), clock);
+        queueManagement = new QueueManagementService(queues, bookings, services, notificationManagement, coordinator,
+                new QueuePolicyProperties(Duration.ofMinutes(10)), clock);
         userManagement = new UserManagementService(users, mock(UserCredentialService.class), vehicles,
                 bookings, notifications, coordinator);
     }
