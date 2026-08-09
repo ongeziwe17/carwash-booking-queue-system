@@ -52,9 +52,11 @@ The recommendation system must not be built before queue and availability behavi
 3. **WORKFLOW-001** — Synchronize booking and queue lifecycles (#20) — implemented.
 4. **QUEUE-003** — Implement true call-next behaviour (#112) — implemented.
 5. **BOOKING-001** — Add focused booking rescheduling; reusing the CONFIG-001 cancellation cutoff (#113) — implemented.
-6. **AVAIL-001** — Add a single-location service availability API (#114).
+6. **AVAIL-001** — Add a single-location service availability API (#114) — implemented.
 
 Expected outcome: confirmed bookings enter one ordered queue, positions and ETAs are server-managed, queue transitions keep booking state consistent, and customers can check availability before attempting a booking.
+
+Phase 1 is complete. The next roadmap issue is **MKT-001** (#115); Marketplace business/branch work remains Phase 2 scope.
 
 ## Phase 2 — Marketplace Business, Branch, and Availability Foundation
 

@@ -70,6 +70,14 @@ A booking may be physically deleted only when it is cancelled and has no queue e
 
 Focused rescheduling changes only `Booking.scheduledDateTime` and preserves its canonical owner, vehicle, service, and `CREATED`/`CONFIRMED` status. The current booking must still be future work and its configured booking-change cutoff must remain open. Canonical ownership and active-service eligibility plus customer/vehicle conflicts and exact-slot capacity are revalidated under the coordinator write lock before mutation. Active queue work blocks the operation, so successful rescheduling never changes queue order or metrics. A repository update failure restores the original schedule despite mutable in-memory references; the post-commit `BOOKING_RESCHEDULED` notification is best-effort.
 
+### Single-location slot policy and availability
+
+`BookingSlotPolicyService` is the one scheduling decision component for creation, rescheduling, generic service changes, and availability. It enforces strict future starts, the configured global opening/closing window, interval alignment relative to opening, service completion at or before closing, non-cancelled exact-start capacity, same-booking exclusion where applicable, and customer/vehicle conflict checks when those identities are available.
+
+`AvailabilityService` resolves one canonical active service and computes the complete response inside the coordinator read lock. Candidate starts are generated in ascending interval order; past/current starts and full slots are omitted, and response DTOs contain only start, estimated end, and remaining capacity values. Capacity is global across services at an exact start, while service duration is used only for estimated end and closing-time fit—not adjacent-slot overlap. `CANCELLED` bookings release capacity immediately.
+
+Availability does not mutate or reserve domain state. Booking creation remains the authoritative write operation and rechecks capacity plus customer/vehicle rules under the coordinator write lock. The current model has no branch, staff, bay, holiday, overlap, recommendation, or temporary-hold aggregate.
+
 ### Booking and queue entry
 
 Queue creation resolves the canonical booking and service inside one write boundary. The booking must be `CONFIRMED`, the matching service must be active, and the queue repository must not contain another active entry for the booking. Active queue states are `WAITING`, `CALLED`, and `IN_PROGRESS`; `COMPLETED` and `EXITED` are terminal/non-active.
@@ -131,7 +139,7 @@ COMPLETED
 
 Queue position updates are allowed only while the entry is `WAITING`. The requested target must be within the current active queue size; movement reorders the full active list and recalculates all affected positions and waits. Called, in-progress, completed, or exited entries cannot be repositioned or physically deleted.
 
-Queue entry eligibility, active uniqueness, global ordering, recalculation, cumulative wait estimates, true server-selected call-next, focused booking rescheduling, and booking/queue lifecycle synchronization are implemented. Queue creation and call keep the booking `CONFIRMED`; start and completion synchronize both aggregates. Valid booking cancellation removes `WAITING`/`CALLED` queue work, while in-service cancellation is rejected. Generic booking updates and rescheduling are blocked whenever an active queue entry exists. Cancellation and rescheduling share the deployment-configurable booking-change cutoff documented in [CONFIGURATION.md](CONFIGURATION.md).
+Queue entry eligibility, active uniqueness, global ordering, recalculation, cumulative wait estimates, true server-selected call-next, focused booking rescheduling, single-location availability, and booking/queue lifecycle synchronization are implemented. Queue creation and call keep the booking `CONFIRMED`; start and completion synchronize both aggregates. Valid booking cancellation removes `WAITING`/`CALLED` queue work, while in-service cancellation is rejected. Generic booking updates and rescheduling are blocked whenever an active queue entry exists. Creation, rescheduling, and service changes reuse the same operating-window/slot policy; cancellation and rescheduling share the deployment-configurable booking-change cutoff documented in [CONFIGURATION.md](CONFIGURATION.md).
 
 ## 8. Mutable Reference Limitation
 

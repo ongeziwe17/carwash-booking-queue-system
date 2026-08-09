@@ -1,0 +1,21 @@
+info:
+  name: Cancel availability occupant
+  type: http
+  seq: 9
+  tags: [availability, workflow]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings/{{availabilityBookingId}}/cancel"
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("booking is cancelled", function() { expect(res.body.status).to.equal("CANCELLED"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

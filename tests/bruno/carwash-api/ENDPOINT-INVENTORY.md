@@ -1,14 +1,15 @@
 # Current Endpoint Inventory
 
-Inventory source: the controllers and OpenAPI quality gate based on `staging` at `837dcac`. Generated `/v3/api-docs` is authoritative when wording differs.
+Inventory source: the controllers and OpenAPI quality gate based on `staging` at `836baac`. Generated `/v3/api-docs` is authoritative when wording differs.
 
-**Total HTTP operations: 39.**
+**Total HTTP operations: 40.**
 
 | Method | Path | Authentication | Role / permission | Ownership | Request DTO | Success | 400/401/403/404 | Important rules |
 |---|---|---|---|---|---|---:|---|---|
 | `PUT` | `/api/admin/users/{userId}/role` | Bearer | PLATFORM_ADMIN | N/A | `AssignRoleRequest` | 200 | 400,401,403,404 | Invalid role rejected; final active platform administrator cannot be demoted. |
 | `POST` | `/api/auth/login` | Public | N/A | N/A | `LoginRequest` | 200 | 400,401 | Returns INVALID_CREDENTIALS for wrong or unknown credentials; no password leakage. |
 | `GET` | `/api/auth/me` | Bearer | Any authenticated current role | Authenticated principal | `—` | 200 | 401,404 | Token role must still match current active repository user. |
+| `GET` | `/api/availability` | Bearer | All roles via SERVICE_READ | N/A | Query `serviceId`, `date` | 200 | 400,401,403,404 | Point-in-time single-location starts; global exact-slot remaining capacity; duration must fit closing; no reservation. |
 | `GET` | `/api/bookings` | Bearer | STAFF, BUSINESS_OWNER, PLATFORM_ADMIN | Operational access | `—` | 200 | 401,403 | Customers cannot list all bookings. |
 | `POST` | `/api/bookings` | Bearer | CUSTOMER: self; STAFF/OWNER/ADMIN: operational | Requested user must be self unless operational role | `CreateBookingRequest` | 201 | 400,401,403,404 | Future time, active service, vehicle ownership, configured slot capacity and conflicts enforced. |
 | `DELETE` | `/api/bookings/{id}` | Bearer | CUSTOMER: owner; STAFF/OWNER/ADMIN: operational | Booking owner for CUSTOMER | `—` | 204 | 400,401,403,404 | HTTP DELETE is cancellation, not physical deletion; configured cancellation cutoff applies. |

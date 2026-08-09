@@ -35,7 +35,7 @@ class DailySummaryReportServiceTest extends ServiceTestSupport {
     void dailySummaryCountsConfirmedBookings() {
         LocalDateTime reportDateTime = TestDates.futureDays(10);
         createSavedBooking(reportDateTime, BookingStatus.CONFIRMED);
-        createSavedBooking(reportDateTime.plusMinutes(1), BookingStatus.CREATED);
+        createSavedBooking(reportDateTime.plusMinutes(30), BookingStatus.CREATED);
         DailySummaryReportResponse report = reportService.generateDailySummary(reportDateTime.toLocalDate());
         assertEquals(2, report.totalBookings());
         assertEquals(1, report.confirmedBookings());
@@ -45,7 +45,7 @@ class DailySummaryReportServiceTest extends ServiceTestSupport {
     void dailySummaryCountsCancelledBookings() {
         LocalDateTime reportDateTime = TestDates.futureDays(10);
         createSavedBooking(reportDateTime, BookingStatus.CANCELLED);
-        createSavedBooking(reportDateTime.plusMinutes(1), BookingStatus.CONFIRMED);
+        createSavedBooking(reportDateTime.plusMinutes(30), BookingStatus.CONFIRMED);
         DailySummaryReportResponse report = reportService.generateDailySummary(reportDateTime.toLocalDate());
         assertEquals(1, report.cancelledBookings());
     }
@@ -54,7 +54,7 @@ class DailySummaryReportServiceTest extends ServiceTestSupport {
     void dailySummaryExcludesCancelledBookingsFromCompletedTotals() {
         LocalDateTime reportDateTime = TestDates.futureDays(10);
         createSavedBooking(reportDateTime, BookingStatus.CANCELLED);
-        createSavedBooking(reportDateTime.plusMinutes(1), BookingStatus.COMPLETED);
+        createSavedBooking(reportDateTime.plusMinutes(30), BookingStatus.COMPLETED);
         DailySummaryReportResponse report = reportService.generateDailySummary(reportDateTime.toLocalDate());
         assertEquals(1, report.completedBookings());
         assertEquals(1, report.cancelledBookings());
@@ -64,9 +64,9 @@ class DailySummaryReportServiceTest extends ServiceTestSupport {
     void dailySummaryCountsQueueEntriesByStatus() {
         LocalDateTime reportDateTime = TestDates.futureDays(10);
         createSavedQueueEntry(reportDateTime, QueueStatus.WAITING);
-        createSavedQueueEntry(reportDateTime.plusMinutes(1), QueueStatus.CALLED);
-        createSavedQueueEntry(reportDateTime.plusMinutes(2), QueueStatus.IN_PROGRESS);
-        createSavedQueueEntry(reportDateTime.plusMinutes(3), QueueStatus.COMPLETED);
+        createSavedQueueEntry(reportDateTime.plusMinutes(30), QueueStatus.CALLED);
+        createSavedQueueEntry(reportDateTime.plusMinutes(60), QueueStatus.IN_PROGRESS);
+        createSavedQueueEntry(reportDateTime.plusMinutes(90), QueueStatus.COMPLETED);
         DailySummaryReportResponse report = reportService.generateDailySummary(reportDateTime.toLocalDate());
         assertEquals(4, report.totalQueueEntries());
         assertEquals(1, report.waitingQueueEntries());
@@ -79,10 +79,10 @@ class DailySummaryReportServiceTest extends ServiceTestSupport {
     void dailySummaryCalculatesPendingWorkloadCorrectly() {
         LocalDateTime reportDateTime = TestDates.futureDays(10);
         createSavedBooking(reportDateTime, BookingStatus.CREATED);
-        createSavedBooking(reportDateTime.plusMinutes(1), BookingStatus.CONFIRMED);
-        createSavedBooking(reportDateTime.plusMinutes(2), BookingStatus.IN_SERVICE);
-        createSavedBooking(reportDateTime.plusMinutes(3), BookingStatus.CANCELLED);
-        createSavedBooking(reportDateTime.plusMinutes(4), BookingStatus.COMPLETED);
+        createSavedBooking(reportDateTime.plusMinutes(30), BookingStatus.CONFIRMED);
+        createSavedBooking(reportDateTime.plusMinutes(60), BookingStatus.IN_SERVICE);
+        createSavedBooking(reportDateTime.plusMinutes(90), BookingStatus.CANCELLED);
+        createSavedBooking(reportDateTime.plusMinutes(120), BookingStatus.COMPLETED);
         DailySummaryReportResponse report = reportService.generateDailySummary(reportDateTime.toLocalDate());
         assertEquals(3, report.pendingWorkload());
     }

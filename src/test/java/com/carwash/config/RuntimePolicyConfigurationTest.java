@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.Set;
 
@@ -30,6 +31,9 @@ class RuntimePolicyConfigurationTest {
             .withPropertyValues(
                     "carwash.policy.booking.max-active-bookings-per-slot=1",
                     "carwash.policy.booking.cancellation-window=PT0S",
+                    "carwash.policy.booking.operating-start=08:00",
+                    "carwash.policy.booking.operating-end=17:00",
+                    "carwash.policy.booking.slot-interval=PT30M",
                     "carwash.policy.notification.recent-limit=10",
                     "carwash.policy.queue.default-service-duration=PT10M",
                     "carwash.runtime.time-zone=UTC"
@@ -40,6 +44,9 @@ class RuntimePolicyConfigurationTest {
         contextRunner.withPropertyValues(
                 "carwash.policy.booking.max-active-bookings-per-slot=2",
                 "carwash.policy.booking.cancellation-window=PT2H",
+                "carwash.policy.booking.operating-start=07:30",
+                "carwash.policy.booking.operating-end=18:30",
+                "carwash.policy.booking.slot-interval=PT15M",
                 "carwash.policy.notification.recent-limit=3",
                 "carwash.policy.queue.default-service-duration=PT15M",
                 "carwash.runtime.time-zone=Africa/Johannesburg"
@@ -47,6 +54,9 @@ class RuntimePolicyConfigurationTest {
             assertNull(context.getStartupFailure());
             assertEquals(2, context.getBean(BookingPolicyProperties.class).maxActiveBookingsPerSlot());
             assertEquals(Duration.ofHours(2), context.getBean(BookingPolicyProperties.class).cancellationWindow());
+            assertEquals(LocalTime.of(7, 30), context.getBean(BookingPolicyProperties.class).operatingStart());
+            assertEquals(LocalTime.of(18, 30), context.getBean(BookingPolicyProperties.class).operatingEnd());
+            assertEquals(Duration.ofMinutes(15), context.getBean(BookingPolicyProperties.class).slotInterval());
             assertEquals(3, context.getBean(NotificationPolicyProperties.class).recentLimit());
             assertEquals(Duration.ofMinutes(15), context.getBean(QueuePolicyProperties.class).defaultServiceDuration());
             assertEquals(ZoneId.of("Africa/Johannesburg"), context.getBean(RuntimeProperties.class).timeZone());
@@ -89,6 +99,28 @@ class RuntimePolicyConfigurationTest {
     @Test
     void negativeCancellationWindowFailsStartupValidation() {
         assertInvalid("carwash.policy.booking.cancellation-window=-PT1S", "cancellation window");
+    }
+
+    @Test
+    void reversedOperatingWindowFailsStartupValidation() {
+        assertInvalid("carwash.policy.booking.operating-start=18:00",
+                "operating start must be before operating end");
+    }
+
+    @Test
+    void equalOperatingWindowFailsStartupValidation() {
+        assertInvalid("carwash.policy.booking.operating-start=17:00",
+                "operating start must be before operating end");
+    }
+
+    @Test
+    void zeroSlotIntervalFailsStartupValidation() {
+        assertInvalid("carwash.policy.booking.slot-interval=PT0S", "slot interval");
+    }
+
+    @Test
+    void negativeSlotIntervalFailsStartupValidation() {
+        assertInvalid("carwash.policy.booking.slot-interval=-PT1M", "slot interval");
     }
 
     @Test

@@ -15,7 +15,9 @@ import com.carwash.repository.inmemory.InMemoryUserRepository;
 import com.carwash.repository.inmemory.InMemoryVehicleRepository;
 import com.carwash.security.UserCredentialService;
 import com.carwash.service.AtomicNotificationIdGenerator;
+import com.carwash.service.AvailabilityService;
 import com.carwash.service.BookingManagementService;
+import com.carwash.service.BookingSlotPolicyService;
 import com.carwash.service.DailySummaryReportService;
 import com.carwash.service.NotificationIdGenerator;
 import com.carwash.service.NotificationManagementService;
@@ -70,6 +72,30 @@ public class ApplicationServiceConfig {
     @Bean
     public NotificationIdGenerator notificationIdGenerator() {
         return new AtomicNotificationIdGenerator();
+    }
+
+    @Bean
+    public BookingSlotPolicyService bookingSlotPolicyService(
+            BookingRepository bookingRepository,
+            BookingPolicyProperties bookingPolicy,
+            Clock clock
+    ) {
+        return new BookingSlotPolicyService(bookingRepository, bookingPolicy, clock);
+    }
+
+    @Bean
+    public AvailabilityService availabilityService(
+            ServiceRepository serviceRepository,
+            BookingSlotPolicyService bookingSlotPolicyService,
+            BookingPolicyProperties bookingPolicy,
+            InMemoryDataCoordinator coordinator
+    ) {
+        return new AvailabilityService(
+                serviceRepository,
+                bookingSlotPolicyService,
+                bookingPolicy,
+                coordinator
+        );
     }
 
     @Bean
@@ -165,6 +191,7 @@ public class ApplicationServiceConfig {
             QueueOrderingService queueOrderingService,
             InMemoryDataCoordinator coordinator,
             BookingPolicyProperties bookingPolicy,
+            BookingSlotPolicyService bookingSlotPolicyService,
             Clock clock
     ) {
         return new BookingManagementService(
@@ -178,6 +205,7 @@ public class ApplicationServiceConfig {
                 queueOrderingService,
                 coordinator,
                 bookingPolicy,
+                bookingSlotPolicyService,
                 clock
         );
     }

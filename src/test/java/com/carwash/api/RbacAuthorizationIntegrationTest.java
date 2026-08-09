@@ -77,6 +77,7 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/queue-entries/{id}", ownResources.queueEntryId()).header(HttpHeaders.AUTHORIZATION, customer.bearer()))
                 .andExpect(status().isOk());
+        assertAvailabilityAllowed(customer, ownResources.serviceId());
 
         assertForbidden(mockMvc.perform(get("/api/users/{id}", other.userId()).header(HttpHeaders.AUTHORIZATION, customer.bearer())));
         assertForbidden(mockMvc.perform(get("/api/vehicles/{id}", otherResources.primaryVehicleId()).header(HttpHeaders.AUTHORIZATION, customer.bearer())));
@@ -109,6 +110,7 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/bookings/{id}", resources.bookingId()).header(HttpHeaders.AUTHORIZATION, staff.bearer()))
                 .andExpect(status().isOk());
+        assertAvailabilityAllowed(staff, resources.serviceId());
         assertOperationalUpdateCannotTransferOwner(staff, resources, other.userId());
         enqueue(resources);
         mockMvc.perform(post("/api/queue-entries/call-next")
@@ -134,6 +136,7 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/bookings/{id}", resources.bookingId()).header(HttpHeaders.AUTHORIZATION, owner.bearer()))
                 .andExpect(status().isOk());
+        assertAvailabilityAllowed(owner, resources.serviceId());
         assertOperationalUpdateCannotTransferOwner(owner, resources, other.userId());
         enqueue(resources);
         mockMvc.perform(post("/api/queue-entries/{id}/call", resources.queueEntryId())
@@ -163,6 +166,7 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         mockMvc.perform(get("/api/vehicles").header(HttpHeaders.AUTHORIZATION, administrator.bearer())).andExpect(status().isOk());
         mockMvc.perform(get("/api/bookings").header(HttpHeaders.AUTHORIZATION, administrator.bearer())).andExpect(status().isOk());
         mockMvc.perform(get("/api/queue-entries").header(HttpHeaders.AUTHORIZATION, administrator.bearer())).andExpect(status().isOk());
+        assertAvailabilityAllowed(administrator, resources.serviceId());
         mockMvc.perform(post("/api/services").header(HttpHeaders.AUTHORIZATION, administrator.bearer())
                         .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(serviceRequest())))
                 .andExpect(status().isCreated());
@@ -245,6 +249,8 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
     @Test
     void authenticationAndAuthorizationErrorsUseSafeJsonContracts() throws Exception {
         assertUnauthorized(mockMvc.perform(get("/api/services")));
+        assertUnauthorized(mockMvc.perform(get("/api/availability")
+                .param("serviceId", "service").param("date", TestDates.future().toLocalDate().toString())));
         assertUnauthorized(mockMvc.perform(post("/api/bookings/missing/reschedule")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(rescheduleRequest(nextScheduledTime()))));
@@ -317,6 +323,14 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
                 "specialRequest", "authorization update");
     }
 
+    private void assertAvailabilityAllowed(LoginIdentity identity, String serviceId) throws Exception {
+        mockMvc.perform(get("/api/availability")
+                        .header(HttpHeaders.AUTHORIZATION, identity.bearer())
+                        .param("serviceId", serviceId)
+                        .param("date", TestDates.future().toLocalDate().toString()))
+                .andExpect(status().isOk());
+    }
+
     private String rescheduleRequest(LocalDateTime scheduledDateTime) throws Exception {
         return objectMapper.writeValueAsString(Map.of("scheduledDateTime", scheduledDateTime.toString()));
     }
@@ -331,7 +345,7 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
     }
 
     private LocalDateTime nextScheduledTime() {
-        return TestDates.futureDays(60).plusMinutes(++slotSequence);
+        return TestDates.futureDays(60 + ++slotSequence);
     }
 
     private void assertUnauthorized(ResultActions action) throws Exception {

@@ -1,0 +1,21 @@
+info:
+  name: Reject inactive service availability
+  type: http
+  seq: 11
+  tags: [availability, workflow]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/availability?serviceId={{availabilityInactiveServiceId}}&date={{availabilityDate}}"
+  auth:
+    type: bearer
+    token: "{{adminToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 400", function() { expect(res.status).to.equal(400); });
+        test("reports inactive service", function() { expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); expect(res.body.message).to.equal("Inactive service cannot be booked"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

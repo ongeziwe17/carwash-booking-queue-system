@@ -1,0 +1,33 @@
+info:
+  name: Create cross-service capacity fixture
+  type: http
+  seq: 2
+  tags: [availability, workflow]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/services"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "serviceId": "{{availabilityOtherServiceId}}",
+        "serviceName": "Availability Other Wash",
+        "description": "Cross-service capacity fixture",
+        "price": 100.0,
+        "estimatedDurationMin": 30
+      }
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -22,7 +22,7 @@ runtime:
           const notification = res.body.find(n => n.type === "BOOKING_RESCHEDULED" && n.booking && n.booking.bookingId === bru.getVar("bookingId"));
           expect(notification).to.exist;
           expect(notification.booking.scheduledDateTime).to.equal(bru.getVar("future3"));
-          expect(notification.message).to.include(bru.getVar("future3"));
+          expect(notification.message).to.include(bru.getVar("future3").slice(0, 16));
         });
 
 settings:

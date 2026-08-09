@@ -7,6 +7,7 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 | `PUT` | `/api/admin/users/{userId}/role` | ✅ | ✅ | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
 | `POST` | `/api/auth/login` | ✅ | ✅ | N/A — public endpoint | N/A — public or no wrong-role case | N/A — not user-owned | N/A — no state/dependency mutation | ✅ |
 | `GET` | `/api/auth/me` | ✅ | N/A — no request body/typed input case | ✅ | N/A — public or no wrong-role case | N/A — not user-owned | N/A — no state/dependency mutation | ✅ |
+| `GET` | `/api/availability` | ✅ | ✅ | ✅ | N/A — all current roles have SERVICE_READ | N/A — service/date capacity view | ✅ | ✅ |
 | `GET` | `/api/bookings` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | N/A — no state/dependency mutation | N/A — not needed in multi-step journey |
 | `POST` | `/api/bookings` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `DELETE` | `/api/bookings/{id}` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | ✅ | ✅ | N/A — not needed in multi-step journey |
@@ -46,13 +47,13 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 
 ## Totals
 
-- API operations: **39**
-- Happy-path functional coverage: **39/39**
-- 401 coverage: **37/37 protected operations** (2 public operations are N/A)
+- API operations: **40**
+- Happy-path functional coverage: **40/40**
+- 401 coverage: **38/38 protected operations** (2 public operations are N/A)
 - RBAC/403 applicability covered: **34 operations/capabilities**
 - Ownership applicability covered: **15 operations**
-- Validation applicability covered: **15 operations**
-- HTTP-visible integrity applicability covered: **23 operations**
-- Operations used in multi-step workflows: **24**
+- Validation applicability covered: **16 operations**
+- HTTP-visible integrity applicability covered: **24 operations**
+- Operations used in multi-step workflows: **25**
 
 The full authorization suite also exercises each significant role/capability allow/deny cell rather than relying only on per-operation counts.

@@ -1,0 +1,20 @@
+info:
+  name: Reject unauthenticated availability request
+  type: http
+  seq: 38
+  tags: [security]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/availability?serviceId={{availabilityServiceId}}&date={{availabilityDate}}"
+  auth:
+    type: none
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 401", function() { expect(res.status).to.equal(401); });
+        test("uses authentication contract", function() { expect(res.body.code).to.equal("AUTHENTICATION_REQUIRED"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

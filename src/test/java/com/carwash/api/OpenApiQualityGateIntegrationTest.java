@@ -39,6 +39,7 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
             "GET /api/queue-entries", "POST /api/queue-entries", "POST /api/queue-entries/{id}/start",
             "POST /api/queue-entries/{id}/complete", "POST /api/queue-entries/{id}/call",
             "POST /api/queue-entries/call-next",
+            "GET /api/availability",
             "GET /api/bookings", "POST /api/bookings", "POST /api/bookings/{id}/confirm",
             "POST /api/bookings/{id}/cancel", "POST /api/auth/login", "GET /api/reports/daily-summary",
             "GET /api/queue-entries/{id}", "DELETE /api/queue-entries/{id}",
@@ -123,7 +124,40 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         assertTrue(callNext.path("responses").has("404"));
         assertTrue(explicitCall.path("description").asText().contains("specified WAITING"));
         assertTrue(document.path("paths").path("/api/queue-entries/{id}/call-next").isMissingNode());
-        assertEquals(39, EXPECTED_OPERATIONS.size());
+        assertEquals(40, EXPECTED_OPERATIONS.size());
+    }
+
+    @Test
+    void availabilityContractUsesRequiredQueryParametersAndBoundedResponses() throws Exception {
+        JsonNode document = openApi();
+        JsonNode operation = document.path("paths").path("/api/availability").path("get");
+        assertTrue(operation.path("description").asText().contains("point-in-time"));
+        assertTrue(operation.path("description").asText().contains("does not reserve capacity"));
+
+        Map<String, JsonNode> parameters = new java.util.HashMap<>();
+        operation.path("parameters").forEach(parameter ->
+                parameters.put(parameter.path("name").asText(), parameter));
+        assertEquals(Set.of("serviceId", "date"), parameters.keySet());
+        assertTrue(parameters.get("serviceId").path("required").asBoolean());
+        assertTrue(parameters.get("date").path("required").asBoolean());
+        assertTrue(parameters.get("serviceId").path("description").asText().contains("service identifier"));
+        assertTrue(parameters.get("date").path("description").asText().contains("ISO YYYY-MM-DD"));
+        assertEquals("date", parameters.get("date").path("schema").path("format").asText());
+
+        assertEquals("#/components/schemas/ServiceAvailabilityResponse",
+                responseSchemaRef(operation.path("responses").path("200")));
+        JsonNode schemas = document.path("components").path("schemas");
+        assertEquals(Set.of("serviceId", "serviceName", "date", "estimatedServiceDurationMin",
+                "slotCapacity", "slots"), propertyNames(schemas.path("ServiceAvailabilityResponse")));
+        assertEquals(Set.of("startDateTime", "estimatedEndDateTime", "capacityRemaining"),
+                propertyNames(schemas.path("AvailabilitySlotResponse")));
+        for (String forbidden : Set.of("booking", "user", "vehicle", "queueEntry", "password")) {
+            assertFalse(schemas.path("ServiceAvailabilityResponse").path("properties").has(forbidden));
+            assertFalse(schemas.path("AvailabilitySlotResponse").path("properties").has(forbidden));
+        }
+        for (String response : Set.of("200", "400", "401", "403", "404", "405", "500")) {
+            assertTrue(operation.path("responses").has(response), "Missing availability response " + response);
+        }
     }
 
     @Test

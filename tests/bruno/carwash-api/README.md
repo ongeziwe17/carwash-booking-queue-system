@@ -100,6 +100,7 @@ Target useful groups:
 bru run --env local --tags=smoke
 bru run --env local --tags=rbac
 bru run --env local --tags=security
+bru run --env local --tags=availability
 ```
 
 Bruno executes sequentially by default; do **not** use `--parallel` for the full stateful workflow suite.
@@ -147,6 +148,7 @@ The collection verifies:
 - QUEUE-002 server-managed global positions, cumulative waits, full movement/deletion/completion rebalance, and obsolete position rejection;
 - QUEUE-003 true server-selected call-next ordering, non-waiting skip, explicit by-ID call override, and no-waiting 404 behavior;
 - BOOKING-001 focused CREATED/CONFIRMED rescheduling, shared cutoff enforcement, status preservation, target-slot validation, queue/service-state rejection, notification creation, and generic-update bypass prevention;
+- AVAIL-001 generated service/date slots, duration/closing fit, deterministic ordering, global remaining capacity, full-slot booking consistency, cancellation release, inactive/unknown/past rejection, and authenticated service-read access;
 - current queue states (`WAITING`, `CALLED`, `IN_PROGRESS`, `COMPLETED`);
 - real role changes and token acquisition;
 - final-platform-administrator protection without deleting or demoting the bootstrap admin.
@@ -160,6 +162,8 @@ The run-scoped booking-rescheduling workflow exercises full-slot and same-custom
 blocking, inactive associated services, and in-service/completed/cancelled states. Exact cutoff boundaries,
 repository-failure rollback, notification-failure handling, and final-slot concurrency remain deterministic Java-test
 responsibilities because the acceptance environment does not expose test-only clock or failure controls.
+
+The run-scoped availability workflow uses an isolated future date and services. It proves that an appointment for a different service consumes the same global exact-start capacity, the full slot disappears and cannot be booked, cancellation restores it, and a 60-minute service is never advertised past the closing boundary. Availability reads remain point-in-time snapshots and do not reserve capacity.
 
 ## Cleanup
 
