@@ -127,7 +127,8 @@ public class ApplicationServiceConfig {
             BookingRepository bookingRepository,
             InMemoryDataCoordinator coordinator,
             NotificationIdGenerator notificationIdGenerator,
-            NotificationPolicyProperties notificationPolicy
+            NotificationPolicyProperties notificationPolicy,
+            Clock clock
     ) {
         return new NotificationManagementService(
                 notificationRepository,
@@ -135,7 +136,8 @@ public class ApplicationServiceConfig {
                 bookingRepository,
                 coordinator,
                 notificationIdGenerator,
-                notificationPolicy
+                notificationPolicy,
+                clock
         );
     }
 

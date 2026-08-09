@@ -64,7 +64,7 @@ class AggregateIntegrityServiceTest {
         Clock clock = Clock.fixed(Instant.parse("2089-01-15T12:00:00Z"), ZoneOffset.UTC);
         NotificationManagementService notificationManagement = new NotificationManagementService(
                 notifications, users, bookings, coordinator, new AtomicNotificationIdGenerator(),
-                new NotificationPolicyProperties(10));
+                new NotificationPolicyProperties(10), clock);
         vehicleManagement = new VehicleManagementService(vehicles, users, bookings, coordinator);
         serviceCatalog = new ServiceCatalogService(services, bookings, queues, coordinator);
         bookingManagement = new BookingManagementService(bookings, users, vehicles, services, queues,

@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Setter
 @Getter
@@ -32,19 +33,19 @@ public class Notification {
         this.deliveryStatus = DeliveryStatus.PENDING;
     }
 
-    public void send() {
-        this.sentAt = LocalDateTime.now();
+    public void send(LocalDateTime now) {
+        this.sentAt = Objects.requireNonNull(now, "Notification sent time is required");
         this.deliveryStatus = DeliveryStatus.SENT;
     }
 
-    public void markAsRead() {
-        this.readAt = LocalDateTime.now();
+    public void markAsRead(LocalDateTime now) {
+        this.readAt = Objects.requireNonNull(now, "Notification read time is required");
         this.deliveryStatus = DeliveryStatus.READ;
     }
 
-    public void retryDelivery() {
+    public void retryDelivery(LocalDateTime now) {
         if (deliveryStatus == DeliveryStatus.FAILED || deliveryStatus == DeliveryStatus.PENDING) {
-            send();
+            send(now);
         }
     }
 

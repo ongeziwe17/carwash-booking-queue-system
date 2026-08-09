@@ -11,6 +11,8 @@ import com.carwash.repository.inmemory.InMemoryDataCoordinator;
 import com.carwash.service.exception.BusinessRuleViolationException;
 import com.carwash.service.exception.ResourceNotFoundException;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -25,13 +27,15 @@ public class NotificationManagementService {
     private final InMemoryDataCoordinator coordinator;
     private final NotificationIdGenerator notificationIdGenerator;
     private final NotificationPolicyProperties notificationPolicy;
+    private final Clock clock;
 
     public NotificationManagementService(NotificationRepository notificationRepository,
                                          UserRepository userRepository,
                                          BookingRepository bookingRepository,
                                          InMemoryDataCoordinator coordinator,
                                          NotificationIdGenerator notificationIdGenerator,
-                                         NotificationPolicyProperties notificationPolicy) {
+                                         NotificationPolicyProperties notificationPolicy,
+                                         Clock clock) {
         this.notificationRepository = Objects.requireNonNull(notificationRepository,
                 "Notification repository is required");
         this.userRepository = userRepository;
@@ -40,6 +44,7 @@ public class NotificationManagementService {
         this.notificationIdGenerator = Objects.requireNonNull(notificationIdGenerator,
                 "Notification ID generator is required");
         this.notificationPolicy = Objects.requireNonNull(notificationPolicy, "Notification policy is required");
+        this.clock = Objects.requireNonNull(clock, "Application clock is required");
     }
 
     public Notification createNotification(User user, Booking booking, String type, String message) {
@@ -51,7 +56,7 @@ public class NotificationManagementService {
             }
             Notification notification = new Notification(notificationIdGenerator.nextId(), canonicalUser,
                     canonicalBooking, type, message, DEFAULT_CHANNEL);
-            notification.send();
+            notification.send(LocalDateTime.now(clock));
             if (!notificationRepository.insert(notification)) {
                 throw new BusinessRuleViolationException("Notification ID already exists");
             }
@@ -96,7 +101,7 @@ public class NotificationManagementService {
             }
             Notification notification = notificationRepository.findById(notificationId)
                     .orElseThrow(() -> new ResourceNotFoundException("Notification not found: " + notificationId));
-            notification.markAsRead();
+            notification.markAsRead(LocalDateTime.now(clock));
             if (!notificationRepository.update(notification)) {
                 throw new ResourceNotFoundException("Notification not found: " + notificationId);
             }

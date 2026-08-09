@@ -6,6 +6,7 @@ import com.carwash.domain.Notification;
 import com.carwash.domain.QueueEntry;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -40,6 +41,7 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
         assertEquals(1, notifications.size());
         assertEquals("QUEUE_CALLED", notifications.getFirst().getType());
         assertEquals("Your vehicle is next in the queue.", notifications.getFirst().getMessage());
+        assertEquals(queueEntry.getCalledAt(), notifications.getFirst().getSentAt());
     }
 
     @Test
@@ -79,7 +81,7 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
     void configuredRecentLimitAppliesOnlyToDefaultLookup() {
         NotificationManagementService limitThree = new NotificationManagementService(
                 notificationRepository, userRepository, bookingRepository, coordinator, notificationIds,
-                new NotificationPolicyProperties(3));
+                new NotificationPolicyProperties(3), clock);
         Booking booking = createSavedBooking();
         for (int index = 1; index <= 5; index++) {
             limitThree.createNotification(booking.getUser(), booking, "TEST_" + index, "message " + index);
@@ -87,6 +89,18 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
 
         assertEquals(3, limitThree.findRecentByUserId(booking.getUser().getUserId()).size());
         assertEquals(4, limitThree.findRecentByUserId(booking.getUser().getUserId(), 4).size());
+    }
+
+    @Test
+    void notificationLifecycleTimestampsUseApplicationClock() {
+        Booking booking = createSavedBooking();
+        Notification notification = notificationService.createNotification(
+                booking.getUser(), booking, "TEST", "clock timestamp");
+
+        assertEquals(LocalDateTime.now(clock), notification.getSentAt());
+
+        notificationService.markAsRead(notification.getNotificationId());
+        assertEquals(LocalDateTime.now(clock), notification.getReadAt());
     }
 
     @Test

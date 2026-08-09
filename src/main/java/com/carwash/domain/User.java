@@ -184,12 +184,12 @@ public class User {
                 .orElse(-1);
     }
 
-    public boolean markNotificationAsRead(String notificationId) {
+    public boolean markNotificationAsRead(String notificationId, LocalDateTime now) {
         return notifications.stream()
                 .filter(notification -> notification.getNotificationId().equals(notificationId))
                 .findFirst()
                 .map(notification -> {
-                    notification.markAsRead();
+                    notification.markAsRead(now);
                     return true;
                 })
                 .orElse(false);
