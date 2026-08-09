@@ -4,6 +4,7 @@ import com.carwash.domain.Booking;
 import com.carwash.domain.QueueEntry;
 import com.carwash.domain.Service;
 import com.carwash.service.exception.BusinessRuleViolationException;
+import com.carwash.testsupport.TestDates;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -80,11 +81,11 @@ class ServiceCatalogServiceTest extends ServiceTestSupport {
 
     @Test
     void durationUpdateRecalculatesWaitsForActiveQueueEntries() {
-        Booking firstBooking = createConfirmedBooking();
+        Booking firstBooking = createConfirmedBooking(TestDates.futureDays(1));
         Service firstService = firstBooking.getService();
         catalogService.updateService(firstService.getServiceId(), firstService.getServiceName(),
                 firstService.getDescription(), firstService.getPrice(), 10);
-        Booking secondBooking = createConfirmedBooking();
+        Booking secondBooking = createConfirmedBooking(TestDates.futureDays(2));
         QueueEntry first = queueService.createQueueEntry(
                 ids.queueEntry(), firstBooking.getBookingId(), firstService.getServiceId());
         QueueEntry second = queueService.createQueueEntry(
