@@ -8,8 +8,8 @@ import java.time.Duration;
 import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RuntimePolicyConfigurationTest {
@@ -33,7 +33,7 @@ class RuntimePolicyConfigurationTest {
                 "carwash.policy.queue.default-service-duration=PT15M",
                 "carwash.runtime.time-zone=Africa/Johannesburg"
         ).run(context -> {
-            assertFalse(context.hasFailed());
+            assertNull(context.getStartupFailure());
             assertEquals(2, context.getBean(BookingPolicyProperties.class).maxActiveBookingsPerSlot());
             assertEquals(Duration.ofHours(2), context.getBean(BookingPolicyProperties.class).cancellationWindow());
             assertEquals(3, context.getBean(NotificationPolicyProperties.class).recentLimit());
@@ -80,7 +80,6 @@ class RuntimePolicyConfigurationTest {
 
     private void assertInvalid(String property, String expectedCause) {
         contextRunner.withPropertyValues(property).run(context -> {
-            assertTrue(context.hasFailed());
             Throwable failure = context.getStartupFailure();
             assertNotNull(failure);
             assertTrue(failureMessages(failure).toLowerCase().contains(expectedCause.toLowerCase()),
