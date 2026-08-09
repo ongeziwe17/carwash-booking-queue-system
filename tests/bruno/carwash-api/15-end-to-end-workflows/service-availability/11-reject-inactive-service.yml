@@ -6,12 +6,7 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/api/availability"
-  params:
-    - name: serviceId
-      value: "{{availabilityInactiveServiceId}}"
-    - name: date
-      value: "{{availabilityDate}}"
+  url: "{{baseUrl}}/api/availability?serviceId={{availabilityInactiveServiceId}}&date={{availabilityDate}}"
   auth:
     type: bearer
     token: "{{adminToken}}"
