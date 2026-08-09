@@ -288,6 +288,9 @@ public class BookingManagementService {
     private void validateAndResolveNewBooking(Booking booking) {
         if (booking == null) throw new BusinessRuleViolationException("Booking is required");
         if (isBlank(booking.getBookingId())) throw new BusinessRuleViolationException("Booking ID is required");
+        if (bookingRepository.existsById(booking.getBookingId().trim())) {
+            throw new BusinessRuleViolationException("Booking ID already exists");
+        }
         if (booking.getUser() == null || isBlank(booking.getUser().getUserId())) {
             throw new BusinessRuleViolationException("User is required");
         }
