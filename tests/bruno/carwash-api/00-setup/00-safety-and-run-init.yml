@@ -65,6 +65,11 @@ runtime:
           rescheduleInactiveBookingId: `reschedule-inactive-booking-${runId}`,
           rescheduleLifecycleBookingId: `reschedule-lifecycle-booking-${runId}`,
           rescheduleLifecycleQueueId: `reschedule-lifecycle-queue-${runId}`,
+          availabilityServiceId: `availability-service-${runId}`,
+          availabilityOtherServiceId: `availability-other-service-${runId}`,
+          availabilityInactiveServiceId: `availability-inactive-service-${runId}`,
+          availabilityBookingId: `availability-booking-${runId}`,
+          availabilityRejectedBookingId: `availability-rejected-booking-${runId}`,
           queueEligibilityBookingId: `queue-eligibility-booking-${runId}`,
           queueEligibilityPrimaryId: `queue-eligibility-primary-${runId}`,
           queueEligibilityDuplicateId: `queue-eligibility-duplicate-${runId}`,
@@ -85,11 +90,14 @@ runtime:
         };
         for (const [key,value] of Object.entries(vars)) bru.setVar(key,value);
         for (let i=1;i<=48;i++) {
-          const d = new Date(Date.now() + (7+i)*24*60*60*1000 + i*37*60*1000);
+          const d = new Date(Date.now() + (7+i)*24*60*60*1000);
+          d.setUTCHours(9, 0, 0, 0);
           bru.setVar(`future${i}`, d.toISOString().slice(0,19));
           if (i === 1) bru.setVar("testDate", d.toISOString().slice(0,10));
           if (i === 21) bru.setVar("opsReportDate", d.toISOString().slice(0,10));
         }
+        bru.setVar("availabilityDate", String(bru.getVar("future46")).slice(0, 10));
+        bru.setVar("availabilitySlot", bru.getVar("future46"));
         bru.setVar("pastDateTime", "2020-01-01T10:00:00");
     - type: tests
       code: |-

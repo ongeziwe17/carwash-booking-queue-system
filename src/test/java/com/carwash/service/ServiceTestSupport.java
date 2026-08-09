@@ -48,6 +48,8 @@ abstract class ServiceTestSupport {
     protected VehicleManagementService vehicleService;
     protected ServiceCatalogService catalogService;
     protected BookingManagementService bookingService;
+    protected BookingSlotPolicyService bookingSlotPolicy;
+    protected AvailabilityService availabilityService;
     protected QueueManagementService queueService;
     protected QueueOrderingService queueOrdering;
     protected NotificationManagementService notificationService;
@@ -55,6 +57,7 @@ abstract class ServiceTestSupport {
     protected DeterministicTestNotificationIdGenerator notificationIds;
     protected TestIdFactory ids;
     protected Clock clock;
+    protected BookingPolicyProperties bookingPolicy;
 
     @BeforeEach
     final void createFreshServiceGraph(TestInfo testInfo) {
@@ -84,10 +87,14 @@ abstract class ServiceTestSupport {
         notificationService = new NotificationManagementService(
                 notificationRepository, userRepository, bookingRepository, coordinator, notificationIds,
                 new NotificationPolicyProperties(10), clock);
+        bookingPolicy = new BookingPolicyProperties(1, Duration.ZERO);
+        bookingSlotPolicy = new BookingSlotPolicyService(bookingRepository, bookingPolicy, clock);
+        availabilityService = new AvailabilityService(
+                serviceRepository, bookingSlotPolicy, bookingPolicy, coordinator);
         bookingService = new BookingManagementService(
                 bookingRepository, userRepository, vehicleRepository, serviceRepository,
                 queueRepository, notificationRepository, notificationService, queueOrdering, coordinator,
-                new BookingPolicyProperties(1, Duration.ZERO), clock);
+                bookingPolicy, bookingSlotPolicy, clock);
         queueService = new QueueManagementService(
                 queueRepository, bookingRepository, serviceRepository, notificationService, coordinator,
                 queueOrdering, clock);

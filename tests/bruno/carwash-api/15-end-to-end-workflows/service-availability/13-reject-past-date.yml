@@ -1,0 +1,26 @@
+info:
+  name: Reject past availability date
+  type: http
+  seq: 13
+  tags: [availability, workflow, validation]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/availability"
+  params:
+    - name: serviceId
+      value: "{{availabilityServiceId}}"
+    - name: date
+      value: "2020-01-01"
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 400", function() { expect(res.status).to.equal(400); });
+        test("uses validation contract", function() { expect(res.body.code).to.equal("VALIDATION_FAILED"); expect(res.body.fieldErrors.some(e => e.field === "date")).to.equal(true); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

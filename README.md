@@ -9,6 +9,7 @@ Spring Boot backend foundation for car wash booking and queue management. The cu
 - Vehicle management with ownership and duplicate-plate validation.
 - Service catalogue management with activation workflows.
 - Booking management with ownership, lifecycle, time, capacity, and vehicle validation.
+- Read-only single-location service availability with configured operating hours, interval slots, service duration, and remaining global capacity.
 - Queue lifecycle operations.
 - In-app notification lookup.
 - Daily summary reporting.
@@ -113,7 +114,7 @@ The Compose file intentionally contains only the API. PostgreSQL remains tracked
 
 ## Runtime policy configuration
 
-Booking, notification, queue, and application-time policies use validated typed Spring configuration with safe defaults and environment-variable overrides. See [Runtime Policy Configuration](documentation/CONFIGURATION.md) for the supported properties, validation rules, cancellation cutoff semantics, duration syntax, and override examples.
+Booking, availability, notification, queue, and application-time policies use validated typed Spring configuration with safe defaults and environment-variable overrides. See [Runtime Policy Configuration](documentation/CONFIGURATION.md) for the supported properties, scheduling-window rules, validation, cancellation cutoff semantics, duration syntax, and override examples.
 
 ## Testing
 

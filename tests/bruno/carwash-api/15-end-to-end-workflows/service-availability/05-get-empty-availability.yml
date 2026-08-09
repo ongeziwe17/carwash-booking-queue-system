@@ -1,0 +1,30 @@
+info:
+  name: Customer gets generated availability
+  type: http
+  seq: 5
+  tags: [availability, workflow, customer]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/availability"
+  params:
+    - name: serviceId
+      value: "{{availabilityServiceId}}"
+    - name: date
+      value: "{{availabilityDate}}"
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("returns requested service and duration", function() { expect(res.body.serviceId).to.equal(bru.getVar("availabilityServiceId")); expect(res.body.estimatedServiceDurationMin).to.equal(60); });
+        test("returns configured capacity", function() { expect(res.body.slotCapacity).to.equal(1); expect(res.body.slots.every(s => s.capacityRemaining === 1)).to.equal(true); });
+        test("returns every duration-compatible slot", function() { expect(res.body.slots).to.have.length(17); expect(res.body.slots[0].startDateTime).to.equal(`${bru.getVar("availabilityDate")}T08:00:00`); expect(res.body.slots.at(-1).startDateTime).to.equal(`${bru.getVar("availabilityDate")}T16:00:00`); });
+        test("returns deterministic ascending starts", function() { const starts = res.body.slots.map(s => s.startDateTime); expect(starts).to.deep.equal([...starts].sort()); });
+        test("returns estimated ends", function() { expect(res.body.slots[0].estimatedEndDateTime).to.equal(`${bru.getVar("availabilityDate")}T09:00:00`); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

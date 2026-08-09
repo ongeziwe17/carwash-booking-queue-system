@@ -1,0 +1,21 @@
+info:
+  name: Deactivate availability fixture
+  type: http
+  seq: 4
+  tags: [availability, workflow]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/services/{{availabilityInactiveServiceId}}/deactivate"
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("service is inactive", function() { expect(res.body.active).to.equal(false); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

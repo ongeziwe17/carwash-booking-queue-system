@@ -40,7 +40,7 @@ Stories are grouped by delivery phase so planned capabilities are not confused w
 | US-WORKFLOW-001 | #20 | As staff, I want booking and queue states synchronized so operational data and reports agree. | Implemented: queue start/completion updates booking state; cancellation cannot leave active queue work. |
 | US-QUEUE-003 | #112 | As staff, I want a true call-next action so the first waiting entry is selected automatically. | Implemented: deterministic global first-WAITING selection, non-waiting skip, explicit override, and documented empty-queue handling. |
 | US-BOOKING-001 | #113 | As a customer, I want to reschedule or cancel within allowed policy windows. | Implemented: focused schedule-only rescheduling preserves status, revalidates slot/service/ownership, rejects late or queued work, and notifies on success. |
-| US-AVAIL-001 | #114 | As a customer, I want to view available service slots before booking. | Available/full/past/inactive slots agree with booking validation. |
+| US-AVAIL-001 | #114 | As a customer, I want to view available service slots before booking. | Implemented: deterministic future slots share booking grid/window/capacity rules, expose remaining global capacity and duration, omit full slots, and do not reserve capacity. |
 
 ## 5. Phase 2 — Marketplace Business and Branch Foundation
 

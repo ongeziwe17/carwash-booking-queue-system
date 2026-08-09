@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -145,6 +146,37 @@ class BookingManagementServiceTest extends ServiceTestSupport {
     void createBookingStillAllowsValidFutureBooking() {
         Booking booking = newBookingWithFixture(TestDates.futureDays(6));
         assertEquals(booking.getBookingId(), bookingService.createBooking(booking).getBookingId());
+    }
+
+    @Test
+    void bookingCreationRejectsOutsideHoursAndOffGridStarts() {
+        LocalDate date = TestDates.futureDays(8).toLocalDate();
+
+        assertThrows(BusinessRuleViolationException.class,
+                () -> bookingService.createBooking(newBookingWithFixture(date.atTime(7, 30))));
+        assertThrows(BusinessRuleViolationException.class,
+                () -> bookingService.createBooking(newBookingWithFixture(date.atTime(17, 0))));
+        assertThrows(BusinessRuleViolationException.class,
+                () -> bookingService.createBooking(newBookingWithFixture(date.atTime(9, 10))));
+        assertEquals(date.atTime(9, 30),
+                bookingService.createBooking(newBookingWithFixture(date.atTime(9, 30))).getScheduledDateTime());
+    }
+
+    @Test
+    void bookingCreationRequiresServiceToFinishByClosing() {
+        LocalDate date = TestDates.futureDays(9).toLocalDate();
+        User user = registerUser();
+        Vehicle vehicle = createVehicle(user);
+        Service hourService = catalogService.createService(new Service(
+                ids.service(), "Hour wash", "test", BigDecimal.TEN, 60));
+
+        Booking tooLate = new Booking(
+                ids.booking(), user, vehicle, hourService, date.atTime(16, 30), "too late");
+        assertThrows(BusinessRuleViolationException.class, () -> bookingService.createBooking(tooLate));
+
+        Booking valid = new Booking(
+                ids.booking(), user, vehicle, hourService, date.atTime(16, 0), "valid");
+        assertEquals(date.atTime(16, 0), bookingService.createBooking(valid).getScheduledDateTime());
     }
 
     @Test
@@ -560,8 +592,45 @@ class BookingManagementServiceTest extends ServiceTestSupport {
     }
 
     @Test
+    void reschedulingUsesTheSharedGridWindowAndDurationRules() {
+        Booking booking = createSavedBooking(TestDates.futureDays(74), BookingStatus.CREATED);
+        LocalDateTime original = booking.getScheduledDateTime();
+        LocalDate targetDate = TestDates.futureDays(75).toLocalDate();
+        booking.getService().setEstimatedDurationMin(60);
+        assertTrue(serviceRepository.update(booking.getService()));
+
+        for (LocalDateTime invalid : List.of(
+                targetDate.atTime(7, 30),
+                targetDate.atTime(9, 10),
+                targetDate.atTime(16, 30))) {
+            assertThrows(BusinessRuleViolationException.class,
+                    () -> bookingService.rescheduleBooking(booking.getBookingId(), invalid));
+            assertEquals(original, booking.getScheduledDateTime());
+        }
+
+        LocalDateTime valid = targetDate.atTime(9, 30);
+        assertEquals(valid, bookingService.rescheduleBooking(booking.getBookingId(), valid).getScheduledDateTime());
+    }
+
+    @Test
+    void genericServiceUpdateRejectsServiceThatWouldFinishAfterClosingWithoutMutation() {
+        LocalDateTime schedule = TestDates.futureDays(76).toLocalDate().atTime(16, 30);
+        Booking booking = bookingService.createBooking(newBookingWithFixture(schedule));
+        Service originalService = booking.getService();
+        Service longService = catalogService.createService(new Service(
+                ids.service(), "Long wash", "test", BigDecimal.TEN, 60));
+
+        assertThrows(BusinessRuleViolationException.class, () -> bookingService.updateBooking(
+                booking.getBookingId(), booking.getVehicle().getVehicleId(), longService.getServiceId(), "changed"));
+
+        assertSame(originalService, booking.getService());
+        assertEquals(schedule, booking.getScheduledDateTime());
+        assertEquals("none", booking.getSpecialRequest());
+    }
+
+    @Test
     void zeroCancellationWindowPreservesFutureBookingCancellation() {
-        LocalDateTime scheduled = LocalDateTime.now(clock).plusMinutes(1);
+        LocalDateTime scheduled = LocalDateTime.now(clock).plusMinutes(30);
         Booking booking = bookingService.createBooking(newBookingWithFixture(scheduled));
 
         assertEquals(BookingStatus.CANCELLED,

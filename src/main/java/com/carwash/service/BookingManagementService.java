@@ -39,6 +39,7 @@ public class BookingManagementService {
     private final QueueOrderingService queueOrdering;
     private final InMemoryDataCoordinator coordinator;
     private final BookingPolicyProperties bookingPolicy;
+    private final BookingSlotPolicyService slotPolicy;
     private final Clock clock;
 
 
@@ -51,6 +52,22 @@ public class BookingManagementService {
                                     InMemoryDataCoordinator coordinator,
                                     BookingPolicyProperties bookingPolicy,
                                     Clock clock) {
+        this(bookingRepository, userRepository, vehicleRepository, serviceRepository,
+                queueEntryRepository, notificationRepository, notificationManagementService,
+                queueOrdering, coordinator, bookingPolicy,
+                new BookingSlotPolicyService(bookingRepository, bookingPolicy, clock), clock);
+    }
+
+    public BookingManagementService(BookingRepository bookingRepository, UserRepository userRepository,
+                                    VehicleRepository vehicleRepository, ServiceRepository serviceRepository,
+                                    QueueEntryRepository queueEntryRepository,
+                                    NotificationRepository notificationRepository,
+                                    NotificationManagementService notificationManagementService,
+                                    QueueOrderingService queueOrdering,
+                                    InMemoryDataCoordinator coordinator,
+                                    BookingPolicyProperties bookingPolicy,
+                                    BookingSlotPolicyService slotPolicy,
+                                    Clock clock) {
         this.bookingRepository = Objects.requireNonNull(bookingRepository, "Booking repository is required");
         this.userRepository = Objects.requireNonNull(userRepository, "User repository is required");
         this.vehicleRepository = Objects.requireNonNull(vehicleRepository, "Vehicle repository is required");
@@ -61,6 +78,7 @@ public class BookingManagementService {
         this.queueOrdering = Objects.requireNonNull(queueOrdering, "Queue ordering service is required");
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
         this.bookingPolicy = Objects.requireNonNull(bookingPolicy, "Booking policy is required");
+        this.slotPolicy = Objects.requireNonNull(slotPolicy, "Booking slot policy is required");
         this.clock = Objects.requireNonNull(clock, "Application clock is required");
     }
 
@@ -109,13 +127,24 @@ public class BookingManagementService {
             requireVehicleOwnedBy(vehicle, owner, "Vehicle does not belong to booking owner");
             Service service = resolveService(serviceId);
             requireActiveService(service);
-            requireFutureSchedule(existing.getScheduledDateTime());
-            validateSlotAvailability(bookingId, existing.getScheduledDateTime(), owner, vehicle);
-            existing.setVehicle(vehicle);
-            existing.setService(service);
-            existing.setSpecialRequest(specialRequest);
-            if (!bookingRepository.update(existing)) {
-                throw new ResourceNotFoundException("Booking not found: " + bookingId);
+            slotPolicy.validateBookableSlot(
+                    bookingId, existing.getScheduledDateTime(), service, owner, vehicle);
+
+            Vehicle originalVehicle = existing.getVehicle();
+            Service originalService = existing.getService();
+            String originalSpecialRequest = existing.getSpecialRequest();
+            try {
+                existing.setVehicle(vehicle);
+                existing.setService(service);
+                existing.setSpecialRequest(specialRequest);
+                if (!bookingRepository.update(existing)) {
+                    throw new ResourceNotFoundException("Booking not found: " + bookingId);
+                }
+            } catch (RuntimeException exception) {
+                existing.setVehicle(originalVehicle);
+                existing.setService(originalService);
+                existing.setSpecialRequest(originalSpecialRequest);
+                throw exception;
             }
             return existing;
         });
@@ -137,8 +166,7 @@ public class BookingManagementService {
             requireVehicleOwnedBy(vehicle, owner, "Vehicle does not belong to booking owner");
             Service service = resolveCurrentService(booking);
             requireActiveService(service);
-            requireFutureReschedule(scheduledDateTime, now);
-            validateSlotAvailability(bookingId, scheduledDateTime, owner, vehicle);
+            slotPolicy.validateBookableSlot(bookingId, scheduledDateTime, service, owner, vehicle);
 
             LocalDateTime originalScheduledDateTime = booking.getScheduledDateTime();
             try {
@@ -274,8 +302,7 @@ public class BookingManagementService {
         Service service = resolveService(booking.getService().getServiceId());
         requireActiveService(service);
         requireVehicleOwnedBy(vehicle, user, "Vehicle does not belong to selected user");
-        requireFutureSchedule(booking.getScheduledDateTime());
-        validateSlotAvailability(booking.getBookingId(), booking.getScheduledDateTime(), user, vehicle);
+        slotPolicy.validateBookableSlot(null, booking.getScheduledDateTime(), service, user, vehicle);
         booking.setBookingId(booking.getBookingId().trim());
         booking.setUser(user);
         booking.setVehicle(vehicle);
@@ -356,18 +383,6 @@ public class BookingManagementService {
         if (!service.isActive()) throw new BusinessRuleViolationException("Inactive service cannot be booked");
     }
 
-    private void requireFutureSchedule(LocalDateTime scheduledDateTime) {
-        if (scheduledDateTime == null || scheduledDateTime.isBefore(LocalDateTime.now(clock))) {
-            throw new BusinessRuleViolationException("Scheduled date/time cannot be in the past");
-        }
-    }
-
-    private void requireFutureReschedule(LocalDateTime scheduledDateTime, LocalDateTime now) {
-        if (scheduledDateTime == null || !scheduledDateTime.isAfter(now)) {
-            throw new BusinessRuleViolationException("Scheduled date/time must be in the future");
-        }
-    }
-
     private void validateCancellationRequest(Booking booking, String customerId) {
         if (customerId == null || customerId.isBlank()) {
             throw new BusinessRuleViolationException("Customer ID is required to cancel booking");
@@ -425,36 +440,6 @@ public class BookingManagementService {
         } catch (RuntimeException rollbackFailure) {
             failure.addSuppressed(rollbackFailure);
         }
-    }
-
-    private void validateSlotAvailability(String bookingId, LocalDateTime scheduledDateTime,
-                                          User user, Vehicle vehicle) {
-        List<Booking> bookingsInSlot = bookingRepository.findByScheduledDateTime(scheduledDateTime).stream()
-                .filter(existingBooking -> !isSameBooking(existingBooking, bookingId))
-                .filter(this::isActiveBooking).toList();
-        boolean conflict = bookingsInSlot.stream()
-                .anyMatch(existingBooking -> hasSameCustomerAndVehicle(existingBooking, user, vehicle));
-        if (conflict) {
-            throw new BusinessRuleViolationException(
-                    "Customer vehicle already has an active booking for this scheduled date/time");
-        }
-        if (bookingsInSlot.size() >= bookingPolicy.maxActiveBookingsPerSlot()) {
-            throw new BusinessRuleViolationException("Booking time slot is already full");
-        }
-    }
-
-    private boolean isActiveBooking(Booking booking) {
-        return booking.getStatus() != BookingStatus.CANCELLED;
-    }
-
-    private boolean isSameBooking(Booking existingBooking, String bookingId) {
-        return existingBooking.getBookingId() != null && existingBooking.getBookingId().equals(bookingId);
-    }
-
-    private boolean hasSameCustomerAndVehicle(Booking existingBooking, User user, Vehicle vehicle) {
-        return existingBooking.getUser() != null && existingBooking.getVehicle() != null
-                && existingBooking.getUser().getUserId().equals(user.getUserId())
-                && existingBooking.getVehicle().getVehicleId().equals(vehicle.getVehicleId());
     }
 
     private void notifyCustomer(Booking booking, String type, String message) {
