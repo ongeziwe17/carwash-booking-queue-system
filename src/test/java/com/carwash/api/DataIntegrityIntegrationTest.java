@@ -99,7 +99,7 @@ class DataIntegrityIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(status().isOk());
         CreateQueueEntryRequest queue = QueueFixtureBuilder.valid(ids, fixture.booking.bookingId(), fixture.service.serviceId()).build();
         api.createQueueEntry(queue).andExpect(status().isCreated());
-        mockMvc.perform(post("/api/queue-entries/{id}/call-next", queue.queueEntryId())
+        mockMvc.perform(post("/api/queue-entries/{id}/call", queue.queueEntryId())
                         .with(authentication.platformAdminJwt())).andExpect(status().isOk());
         assertBusinessRule(mockMvc.perform(put("/api/queue-entries/{id}/position", queue.queueEntryId())
                         .with(authentication.platformAdminJwt()).contentType(MediaType.APPLICATION_JSON)

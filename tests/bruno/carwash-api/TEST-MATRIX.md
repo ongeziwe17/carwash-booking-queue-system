@@ -19,7 +19,8 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 | `POST` | `/api/queue-entries` | ✅ | ✅ | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
 | `DELETE` | `/api/queue-entries/{id}` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | N/A — not needed in multi-step journey |
 | `GET` | `/api/queue-entries/{id}` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | ✅ | N/A — no state/dependency mutation | ✅ |
-| `POST` | `/api/queue-entries/{id}/call-next` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
+| `POST` | `/api/queue-entries/call-next` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
+| `POST` | `/api/queue-entries/{id}/call` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
 | `POST` | `/api/queue-entries/{id}/complete` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
 | `PUT` | `/api/queue-entries/{id}/position` | ✅ | ✅ | ✅ | ✅ | N/A — not user-owned | ✅ | N/A — not needed in multi-step journey |
 | `POST` | `/api/queue-entries/{id}/start` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
@@ -44,13 +45,13 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 
 ## Totals
 
-- API operations: **37**
-- Happy-path functional coverage: **37/37**
-- 401 coverage: **35/35 protected operations** (2 public operations are N/A)
-- RBAC/403 applicability covered: **32 operations/capabilities**
+- API operations: **38**
+- Happy-path functional coverage: **38/38**
+- 401 coverage: **36/36 protected operations** (2 public operations are N/A)
+- RBAC/403 applicability covered: **33 operations/capabilities**
 - Ownership applicability covered: **14 operations**
 - Validation applicability covered: **14 operations**
-- HTTP-visible integrity applicability covered: **21 operations**
-- Operations used in multi-step workflows: **22**
+- HTTP-visible integrity applicability covered: **22 operations**
+- Operations used in multi-step workflows: **23**
 
 The full authorization suite also exercises each significant role/capability allow/deny cell rather than relying only on per-operation counts.

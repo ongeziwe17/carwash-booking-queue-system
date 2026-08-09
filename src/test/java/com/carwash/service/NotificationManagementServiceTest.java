@@ -42,7 +42,7 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
     @Test
     void queueCallCreatesNotification() {
         QueueEntry queueEntry = createSavedQueueEntry();
-        queueService.callNext(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(queueEntry.getQueueEntryId());
         List<Notification> notifications = notificationService.findByUserId(queueEntry.getBooking().getUser().getUserId());
         assertEquals(List.of("BOOKING_CONFIRMED", "QUEUE_CALLED"),
                 notifications.stream().map(Notification::getType).toList());
@@ -54,7 +54,7 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
     @Test
     void queueServiceStartCreatesNotification() {
         QueueEntry queueEntry = createSavedQueueEntry();
-        queueService.callNext(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(queueEntry.getQueueEntryId());
         queueService.startService(queueEntry.getQueueEntryId());
         List<Notification> notifications = notificationService.findByUserId(queueEntry.getBooking().getUser().getUserId());
         assertEquals(List.of("BOOKING_CONFIRMED", "QUEUE_CALLED", "SERVICE_STARTED"),
@@ -66,7 +66,7 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
     @Test
     void queueServiceCompletionCreatesNotification() {
         QueueEntry queueEntry = createSavedQueueEntry();
-        queueService.callNext(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(queueEntry.getQueueEntryId());
         queueService.startService(queueEntry.getQueueEntryId());
         queueService.completeQueueEntry(queueEntry.getQueueEntryId());
         List<Notification> notifications = notificationService.findByUserId(queueEntry.getBooking().getUser().getUserId());
@@ -94,7 +94,7 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
     @Test
     void serviceStartRemainsSuccessfulWhenLifecycleNotificationFails() {
         QueueEntry queueEntry = createSavedQueueEntry();
-        queueService.callNext(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(queueEntry.getQueueEntryId());
         QueueManagementService serviceWithFailingNotifications = queueServiceWith(failingNotificationService());
 
         QueueEntry started = assertDoesNotThrow(
@@ -108,7 +108,7 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
     @Test
     void serviceCompletionRemainsSuccessfulWhenLifecycleNotificationFails() {
         QueueEntry queueEntry = createSavedQueueEntry();
-        queueService.callNext(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(queueEntry.getQueueEntryId());
         queueService.startService(queueEntry.getQueueEntryId());
         QueueManagementService serviceWithFailingNotifications = queueServiceWith(failingNotificationService());
 

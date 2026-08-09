@@ -38,7 +38,7 @@ Stories are grouped by delivery phase so planned capabilities are not confused w
 | US-QUEUE-001 | #16 | As a customer, I want only an eligible confirmed booking to enter one active queue. | Confirmed booking, active matching service, one active entry, validated IDs. |
 | US-QUEUE-002 | #17 | As a customer, I want the server to assign and recalculate my queue position and wait estimate. | Unique consecutive positions and ETA based on active work ahead. |
 | US-WORKFLOW-001 | #20 | As staff, I want booking and queue states synchronized so operational data and reports agree. | Implemented: queue start/completion updates booking state; cancellation cannot leave active queue work. |
-| US-QUEUE-003 | #112 | As staff, I want a true call-next action so the first waiting entry is selected automatically. | Deterministic selection, empty-queue handling, accurate endpoint semantics. |
+| US-QUEUE-003 | #112 | As staff, I want a true call-next action so the first waiting entry is selected automatically. | Implemented: deterministic global first-WAITING selection, non-waiting skip, explicit override, and documented empty-queue handling. |
 | US-BOOKING-001 | #113 | As a customer, I want to reschedule or cancel within allowed policy windows. | Revalidate availability/conflicts; reject late or in-service changes; notify on success. |
 | US-AVAIL-001 | #114 | As a customer, I want to view available service slots before booking. | Available/full/past/inactive slots agree with booking validation. |
 

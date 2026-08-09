@@ -8,7 +8,7 @@ info:
 
 http:
   method: POST
-  url: "{{baseUrl}}/api/queue-entries/{{queueEntryId}}/call-next"
+  url: "{{baseUrl}}/api/queue-entries/{{queueEntryId}}/call"
   auth:
     type: bearer
     token: "{{staffToken}}"

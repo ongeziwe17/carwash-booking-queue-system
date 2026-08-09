@@ -1,6 +1,8 @@
 package com.carwash.service;
 
+import com.carwash.config.NotificationPolicyProperties;
 import com.carwash.domain.Booking;
+import com.carwash.domain.Notification;
 import com.carwash.domain.QueueEntry;
 import com.carwash.domain.Service;
 import com.carwash.domain.User;
@@ -88,9 +90,149 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         LocalDateTime expected = LocalDateTime.now(clock);
 
         assertEquals(expected, queueEntry.getJoinedAt());
-        assertEquals(expected, queueService.callNext(queueEntry.getQueueEntryId()).getCalledAt());
+        assertEquals(expected, queueService.callQueueEntry(queueEntry.getQueueEntryId()).getCalledAt());
         assertEquals(expected, queueService.startService(queueEntry.getQueueEntryId()).getStartedAt());
         assertEquals(expected, queueService.completeQueueEntry(queueEntry.getQueueEntryId()).getCompletedAt());
+    }
+
+    @Test
+    void callNextSelectsLowestPositionWaitingEntry() {
+        QueueEntry first = createQueueEntry(confirmedBookingWithDuration(10, 41));
+        QueueEntry second = createQueueEntry(confirmedBookingWithDuration(20, 42));
+        QueueEntry third = createQueueEntry(confirmedBookingWithDuration(30, 43));
+        queueService.updatePosition(third.getQueueEntryId(), 1);
+
+        QueueEntry selected = queueService.callNext();
+
+        assertEquals(third.getQueueEntryId(), selected.getQueueEntryId());
+        assertEquals(QueueStatus.CALLED, selected.getQueueStatus());
+        assertEquals(QueueStatus.WAITING, first.getQueueStatus());
+        assertEquals(QueueStatus.WAITING, second.getQueueStatus());
+    }
+
+    @Test
+    void callNextSkipsCalledAndInProgressAndPreservesQueueMetricsAndBookingState() {
+        QueueEntry first = createQueueEntry(confirmedBookingWithDuration(10, 44));
+        QueueEntry second = createQueueEntry(confirmedBookingWithDuration(20, 45));
+        QueueEntry third = createQueueEntry(confirmedBookingWithDuration(30, 46));
+        queueService.callQueueEntry(first.getQueueEntryId());
+        queueService.startService(first.getQueueEntryId());
+        queueService.callQueueEntry(second.getQueueEntryId());
+        List<Integer> positionsBefore = List.of(first.getPosition(), second.getPosition(), third.getPosition());
+        List<Integer> waitsBefore = List.of(first.getEstimatedWaitMin(), second.getEstimatedWaitMin(),
+                third.getEstimatedWaitMin());
+
+        QueueEntry selected = queueService.callNext();
+
+        assertEquals(third.getQueueEntryId(), selected.getQueueEntryId());
+        assertEquals(QueueStatus.CALLED, selected.getQueueStatus());
+        assertEquals(BookingStatus.CONFIRMED, selected.getBooking().getStatus());
+        assertEquals(LocalDateTime.now(clock), selected.getCalledAt());
+        assertNotSame(third, selected);
+        assertEquals(QueueStatus.IN_PROGRESS, first.getQueueStatus());
+        assertEquals(QueueStatus.CALLED, second.getQueueStatus());
+        assertEquals(positionsBefore, List.of(first.getPosition(), second.getPosition(), third.getPosition()));
+        assertEquals(waitsBefore, List.of(first.getEstimatedWaitMin(), second.getEstimatedWaitMin(),
+                third.getEstimatedWaitMin()));
+    }
+
+    @Test
+    void callNextIgnoresTerminalEntries() {
+        QueueEntry completed = createQueueEntry(confirmedBookingWithDuration(10, 47));
+        QueueEntry exited = createQueueEntry(confirmedBookingWithDuration(20, 48));
+        QueueEntry waiting = createQueueEntry(confirmedBookingWithDuration(30, 49));
+        completed.setQueueStatus(QueueStatus.COMPLETED);
+        exited.setQueueStatus(QueueStatus.EXITED);
+        assertTrue(queueRepository.update(completed));
+        assertTrue(queueRepository.update(exited));
+
+        assertEquals(waiting.getQueueEntryId(), queueService.callNext().getQueueEntryId());
+    }
+
+    @Test
+    void callNextReturnsNotFoundWhenQueueIsEmpty() {
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, queueService::callNext);
+
+        assertEquals("No waiting queue entry available", exception.getMessage());
+    }
+
+    @Test
+    void callNextReturnsNotFoundWhenActiveQueueHasNoWaitingEntries() {
+        QueueEntry called = createQueueEntry(confirmedBookingWithDuration(10, 50));
+        QueueEntry inProgress = createQueueEntry(confirmedBookingWithDuration(20, 51));
+        queueService.callQueueEntry(called.getQueueEntryId());
+        queueService.callQueueEntry(inProgress.getQueueEntryId());
+        queueService.startService(inProgress.getQueueEntryId());
+
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, queueService::callNext);
+
+        assertEquals("No waiting queue entry available", exception.getMessage());
+    }
+
+    @Test
+    void explicitCallSelectsOnlySpecifiedWaitingEntryAndReturnsDetachedSnapshot() {
+        QueueEntry first = createQueueEntry(confirmedBookingWithDuration(10, 52));
+        QueueEntry second = createQueueEntry(confirmedBookingWithDuration(20, 53));
+
+        QueueEntry selected = queueService.callQueueEntry(second.getQueueEntryId());
+
+        assertEquals(second.getQueueEntryId(), selected.getQueueEntryId());
+        assertEquals(QueueStatus.CALLED, selected.getQueueStatus());
+        assertEquals(QueueStatus.WAITING, first.getQueueStatus());
+        assertNotSame(second, selected);
+        assertNotSame(second.getBooking(), selected.getBooking());
+        assertNotSame(second.getService(), selected.getService());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = QueueStatus.class, names = {"CALLED", "IN_PROGRESS", "COMPLETED", "EXITED"})
+    void explicitCallRejectsEveryNonWaitingStatus(QueueStatus status) {
+        QueueEntry queueEntry = createSavedQueueEntry();
+        queueEntry.setQueueStatus(status);
+        assertTrue(queueRepository.update(queueEntry));
+
+        BusinessRuleViolationException exception = assertThrows(BusinessRuleViolationException.class,
+                () -> queueService.callQueueEntry(queueEntry.getQueueEntryId()));
+
+        assertEquals("Queue entry cannot be called in current state", exception.getMessage());
+    }
+
+    @Test
+    void explicitCallRejectsUnknownEntry() {
+        assertThrows(ResourceNotFoundException.class, () -> queueService.callQueueEntry(ids.queueEntry()));
+    }
+
+    @Test
+    void callNextRollsBackWhenQueueCalledNotificationFailsAndRetrySelectsSameEntry() {
+        QueueEntry queueEntry = createQueueEntry(confirmedBookingWithDuration(10, 54));
+        int originalPosition = queueEntry.getPosition();
+        int originalWait = queueEntry.getEstimatedWaitMin();
+        NotificationManagementService failingNotifications = new NotificationManagementService(
+                notificationRepository, userRepository, bookingRepository, coordinator, notificationIds,
+                new NotificationPolicyProperties(10), clock) {
+            @Override
+            public Notification createNotification(User user, Booking booking, String type, String message) {
+                if ("QUEUE_CALLED".equals(type)) {
+                    throw new IllegalStateException("notification persistence failed");
+                }
+                return super.createNotification(user, booking, type, message);
+            }
+        };
+        queueService = new QueueManagementService(
+                queueRepository, bookingRepository, serviceRepository, failingNotifications, coordinator,
+                queueOrdering, clock);
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, queueService::callNext);
+
+        assertEquals("notification persistence failed", exception.getMessage());
+        assertEquals(QueueStatus.WAITING, queueEntry.getQueueStatus());
+        assertNull(queueEntry.getCalledAt());
+        assertQueueMetrics(queueEntry, originalPosition, originalWait);
+
+        queueService = new QueueManagementService(
+                queueRepository, bookingRepository, serviceRepository, notificationService, coordinator,
+                queueOrdering, clock);
+        assertEquals(queueEntry.getQueueEntryId(), queueService.callNext().getQueueEntryId());
     }
 
     @Test
@@ -98,7 +240,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         QueueEntry queueEntry = createQueueEntry(createConfirmedBooking());
         Booking booking = queueEntry.getBooking();
 
-        QueueEntry called = queueService.callNext(queueEntry.getQueueEntryId());
+        QueueEntry called = queueService.callQueueEntry(queueEntry.getQueueEntryId());
         assertEquals(QueueStatus.CALLED, called.getQueueStatus());
         assertEquals(BookingStatus.CONFIRMED, called.getBooking().getStatus());
         assertEquals(BookingStatus.CONFIRMED, booking.getStatus());
@@ -120,7 +262,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
     @EnumSource(value = BookingStatus.class, names = {"CREATED", "CANCELLED", "IN_SERVICE", "COMPLETED"})
     void startRejectsEveryIncompatibleBookingStateWithoutPartialMutation(BookingStatus bookingStatus) {
         QueueEntry queueEntry = createQueueEntry(createConfirmedBooking());
-        queueService.callNext(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(queueEntry.getQueueEntryId());
         Booking booking = queueEntry.getBooking();
         booking.setStatus(bookingStatus);
         assertTrue(bookingRepository.update(booking));
@@ -138,7 +280,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
     @EnumSource(value = BookingStatus.class, names = {"CONFIRMED", "CANCELLED", "COMPLETED"})
     void completionRejectsEveryIncompatibleBookingStateWithoutPartialMutation(BookingStatus bookingStatus) {
         QueueEntry queueEntry = createQueueEntry(createConfirmedBooking());
-        queueService.callNext(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(queueEntry.getQueueEntryId());
         queueService.startService(queueEntry.getQueueEntryId());
         Booking booking = queueEntry.getBooking();
         booking.setStatus(bookingStatus);
@@ -170,7 +312,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         QueueEntry queueEntry = createSavedQueueEntry();
         assertThrows(BusinessRuleViolationException.class,
                 () -> queueService.completeQueueEntry(queueEntry.getQueueEntryId()));
-        queueService.callNext(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(queueEntry.getQueueEntryId());
         queueService.startService(queueEntry.getQueueEntryId());
         assertNotNull(queueService.completeQueueEntry(queueEntry.getQueueEntryId()).getCompletedAt());
     }
@@ -282,7 +424,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         QueueEntry second = createQueueEntry(confirmedBookingWithDuration(25, 8));
         QueueEntry third = createQueueEntry(confirmedBookingWithDuration(15, 9));
 
-        queueService.callNext(first.getQueueEntryId());
+        queueService.callQueueEntry(first.getQueueEntryId());
         queueService.startService(first.getQueueEntryId());
         QueueEntry completed = queueService.completeQueueEntry(first.getQueueEntryId());
 
@@ -468,6 +610,76 @@ class QueueManagementServiceTest extends ServiceTestSupport {
     }
 
     @Test
+    void concurrentCallNextWithSingleWaitingEntrySucceedsExactlyOnce() throws Exception {
+        QueueEntry queueEntry = createQueueEntry(confirmedBookingWithDuration(10, 55));
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<String>> futures = IntStream.range(0, 2)
+                    .mapToObj(index -> executor.submit(() -> {
+                        ready.countDown();
+                        if (!start.await(5, TimeUnit.SECONDS)) {
+                            throw new IllegalStateException("Concurrent start timed out");
+                        }
+                        try {
+                            return queueService.callNext().getQueueEntryId();
+                        } catch (ResourceNotFoundException exception) {
+                            return exception.getMessage();
+                        }
+                    })).toList();
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            start.countDown();
+
+            List<String> outcomes = new ArrayList<>();
+            for (Future<String> future : futures) outcomes.add(future.get(5, TimeUnit.SECONDS));
+
+            assertEquals(1, outcomes.stream().filter(queueEntry.getQueueEntryId()::equals).count());
+            assertEquals(1, outcomes.stream().filter("No waiting queue entry available"::equals).count());
+            assertEquals(QueueStatus.CALLED, queueEntry.getQueueStatus());
+            assertEquals(1, notificationRepository.findByBookingId(queueEntry.getBooking().getBookingId()).stream()
+                    .filter(notification -> "QUEUE_CALLED".equals(notification.getType())).count());
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void concurrentCallNextWithTwoWaitingEntriesSelectsDistinctEntries() throws Exception {
+        QueueEntry first = createQueueEntry(confirmedBookingWithDuration(10, 56));
+        QueueEntry second = createQueueEntry(confirmedBookingWithDuration(20, 57));
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<String>> futures = IntStream.range(0, 2)
+                    .mapToObj(index -> executor.submit(() -> {
+                        ready.countDown();
+                        if (!start.await(5, TimeUnit.SECONDS)) {
+                            throw new IllegalStateException("Concurrent start timed out");
+                        }
+                        return queueService.callNext().getQueueEntryId();
+                    })).toList();
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            start.countDown();
+
+            List<String> selectedIds = new ArrayList<>();
+            for (Future<String> future : futures) selectedIds.add(future.get(5, TimeUnit.SECONDS));
+
+            assertEquals(2, selectedIds.stream().distinct().count());
+            assertTrue(selectedIds.containsAll(List.of(first.getQueueEntryId(), second.getQueueEntryId())));
+            assertEquals(QueueStatus.CALLED, first.getQueueStatus());
+            assertEquals(QueueStatus.CALLED, second.getQueueStatus());
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
     void duplicateQueueEntryIdDoesNotOverwriteOriginalOrAttachSecondBooking() {
         Booking originalBooking = createConfirmedBooking(TestDates.futureDays(30));
         Booking secondBooking = createConfirmedBooking(TestDates.futureDays(31));
@@ -500,7 +712,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
     void queueWorkflowRejectsCallAlreadyCompleted() {
         QueueEntry queueEntry = completedQueueEntry();
         assertThrows(BusinessRuleViolationException.class,
-                () -> queueService.callNext(queueEntry.getQueueEntryId()));
+                () -> queueService.callQueueEntry(queueEntry.getQueueEntryId()));
     }
 
     @Test
@@ -547,7 +759,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
 
     private QueueEntry completedQueueEntry() {
         QueueEntry queueEntry = createSavedQueueEntry();
-        queueService.callNext(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(queueEntry.getQueueEntryId());
         queueService.startService(queueEntry.getQueueEntryId());
         return queueService.completeQueueEntry(queueEntry.getQueueEntryId());
     }

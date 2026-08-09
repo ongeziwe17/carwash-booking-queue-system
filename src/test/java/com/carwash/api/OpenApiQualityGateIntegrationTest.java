@@ -36,7 +36,8 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
             "GET /api/users", "POST /api/users", "GET /api/services", "POST /api/services",
             "POST /api/services/{id}/deactivate", "POST /api/services/{id}/activate",
             "GET /api/queue-entries", "POST /api/queue-entries", "POST /api/queue-entries/{id}/start",
-            "POST /api/queue-entries/{id}/complete", "POST /api/queue-entries/{id}/call-next",
+            "POST /api/queue-entries/{id}/complete", "POST /api/queue-entries/{id}/call",
+            "POST /api/queue-entries/call-next",
             "GET /api/bookings", "POST /api/bookings", "POST /api/bookings/{id}/confirm",
             "POST /api/bookings/{id}/cancel", "POST /api/auth/login", "GET /api/reports/daily-summary",
             "GET /api/queue-entries/{id}", "DELETE /api/queue-entries/{id}",
@@ -109,6 +110,19 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         assertFalse(queueRequest.path("properties").has("position"));
         assertTrue(document.path("paths").path("/api/queue-entries").path("post")
                 .path("description").asText().contains("server assigns"));
+    }
+
+    @Test
+    void queueCallOperationsHaveDistinctAccurateContracts() throws Exception {
+        JsonNode document = openApi();
+        JsonNode callNext = document.path("paths").path("/api/queue-entries/call-next").path("post");
+        JsonNode explicitCall = document.path("paths").path("/api/queue-entries/{id}/call").path("post");
+
+        assertTrue(callNext.path("description").asText().contains("lowest-position WAITING"));
+        assertTrue(callNext.path("responses").has("404"));
+        assertTrue(explicitCall.path("description").asText().contains("specified WAITING"));
+        assertTrue(document.path("paths").path("/api/queue-entries/{id}/call-next").isMissingNode());
+        assertEquals(38, EXPECTED_OPERATIONS.size());
     }
 
     @Test

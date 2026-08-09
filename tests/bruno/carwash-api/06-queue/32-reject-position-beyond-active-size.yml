@@ -1,7 +1,7 @@
 info:
   name: Reject manual position beyond active queue size
   type: http
-  seq: 34
+  seq: 32
   tags:
     - workflow
     - integrity

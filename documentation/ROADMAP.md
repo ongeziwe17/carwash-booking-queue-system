@@ -50,7 +50,7 @@ The recommendation system must not be built before queue and availability behavi
 1. **QUEUE-001** — Enforce queue-entry eligibility and uniqueness (#16) — implemented.
 2. **QUEUE-002** — Automate queue ordering, position recalculation, and wait estimates (#17) — implemented.
 3. **WORKFLOW-001** — Synchronize booking and queue lifecycles (#20) — implemented.
-4. **QUEUE-003** — Implement true call-next behaviour (#112).
+4. **QUEUE-003** — Implement true call-next behaviour (#112) — implemented.
 5. **BOOKING-001** — Add focused booking rescheduling; the configurable cancellation cutoff is already implemented by CONFIG-001 (#113).
 6. **AVAIL-001** — Add a single-location service availability API (#114).
 

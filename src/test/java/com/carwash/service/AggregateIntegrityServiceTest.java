@@ -170,7 +170,7 @@ class AggregateIntegrityServiceTest {
                 TestDates.futureDays(4), "");
         bookingManagement.confirmBooking(waiting.getBookingId());
         var queueEntry = queueManagement.createQueueEntry("state-queue", waiting.getBookingId(), "state-service");
-        queueManagement.callNext(queueEntry.getQueueEntryId());
+        queueManagement.callQueueEntry(queueEntry.getQueueEntryId());
         assertThrows(BusinessRuleViolationException.class, () -> queueManagement.updatePosition(queueEntry.getQueueEntryId(), 2));
         assertThrows(BusinessRuleViolationException.class, () -> queueManagement.deleteQueueEntry(queueEntry.getQueueEntryId()));
     }

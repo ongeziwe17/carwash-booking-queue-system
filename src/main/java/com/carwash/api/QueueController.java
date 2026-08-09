@@ -146,19 +146,43 @@ public class QueueController {
         return service.updatePosition(id, request.position());
     }
 
-    @PostMapping("/{id}/call-next")
+    @PostMapping("/call-next")
     @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
     @Operation(
-            summary = "Call queue entry",
-            description = "Marks the queue entry identified by {id} as CALLED; it does not select the next entry."
+            summary = "Call next queue entry",
+            description = "Selects the lowest-position WAITING entry from the global active queue and marks it "
+                    + "CALLED. CALLED and IN_PROGRESS entries are skipped."
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Queue entry called"),
+            @ApiResponse(responseCode = "200", description = "Selected queue entry called"),
+            @ApiResponse(responseCode = "401", description = "Authentication required",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Insufficient permission",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "No waiting queue entry available",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "405", description = "Method not allowed",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    })
+    public QueueEntry callNext() {
+        return service.callNext();
+    }
+
+    @PostMapping("/{id}/call")
+    @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
+    @Operation(
+            summary = "Call specified queue entry",
+            description = "Explicitly marks the specified WAITING queue entry as CALLED."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Specified queue entry called"),
             @ApiResponse(responseCode = "400", description = "Invalid identifier or queue rule violation",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Authentication required",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
-            @ApiResponse(responseCode = "403", description = "Access denied",
+            @ApiResponse(responseCode = "403", description = "Insufficient permission",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "404", description = "Queue entry not found",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
@@ -167,8 +191,8 @@ public class QueueController {
             @ApiResponse(responseCode = "500", description = "Internal server error",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public QueueEntry callNext(@PathVariable @NotBlank @Size(max = 64) String id) {
-        return service.callNext(id);
+    public QueueEntry callQueueEntry(@PathVariable @NotBlank @Size(max = 64) String id) {
+        return service.callQueueEntry(id);
     }
 
     @PostMapping("/{id}/start")

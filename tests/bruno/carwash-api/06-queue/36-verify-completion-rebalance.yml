@@ -1,7 +1,7 @@
 info:
   name: Verify terminal entries do not contribute to wait
   type: http
-  seq: 33
+  seq: 36
   tags:
     - workflow
     - integrity

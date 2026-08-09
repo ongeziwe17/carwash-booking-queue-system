@@ -22,7 +22,7 @@ Priority guide:
 | Vehicles | CRUD, owner association, duplicate-plate validation, ownership authorization and deletion integrity | Marketplace tenant scoping is not implemented. |
 | Services | Global service catalogue CRUD and activate/deactivate workflows | Branch-specific offerings are not implemented. |
 | Bookings | Create, retrieve, guarded update, confirm, synchronized cancellation, future-time validation, ownership validation, inactive-service rejection, configurable exact-slot capacity and cancellation cutoff | Dedicated rescheduling and branch context are not implemented. |
-| Queues | Eligible creation, server-managed global ordering/waits, full manual rebalance, synchronized call/start/complete workflow, and delete | True automatic call-next selection is not implemented. |
+| Queues | Eligible creation, server-managed global ordering/waits, true call-next selection, explicit call override, full manual rebalance, synchronized call/start/complete workflow, and delete | Branch-scoped queues are not implemented. |
 | Notifications | In-app notification creation and recent lookup by user | Read APIs and external delivery are incomplete. |
 | Reports | Basic in-memory daily summary | Tenant/branch analytics and revenue reporting are future work. |
 | API/Docs | Generated Swagger/OpenAPI plus human-readable API documentation and contract quality gates | DOCS-001 keeps written and generated contracts aligned. |
@@ -47,6 +47,7 @@ Completed issue cleanup:
 - #16 — Queue-entry eligibility and active uniqueness (QUEUE-001).
 - #17 — Server-managed queue ordering and wait estimates (QUEUE-002).
 - #20 — Synchronized booking and queue lifecycles (WORKFLOW-001).
+- #112 — True server-selected call-next queue behaviour (QUEUE-003).
 
 ## 3. Phase 0 — Immediate Hardening
 
@@ -68,7 +69,7 @@ Completed issue cleanup:
 | QUEUE-001 | #16 | Enforce queue-entry eligibility and uniqueness | P0 | API-002, DATA-001 |
 | QUEUE-002 | #17 | Automate queue ordering, recalculation, and wait estimates | P0 | QUEUE-001 |
 | WORKFLOW-001 | #20 | Synchronize booking and queue lifecycles — implemented | P0 | QUEUE-001 |
-| QUEUE-003 | #112 | Implement true call-next queue behaviour | P1 | QUEUE-001, QUEUE-002 |
+| QUEUE-003 | #112 | Implement true call-next queue behaviour — implemented | P1 | QUEUE-001, QUEUE-002 |
 | BOOKING-001 | #113 | Add focused booking rescheduling; cancellation cutoff is already implemented by CONFIG-001 | P1 | CONFIG-001, WORKFLOW-001 |
 | AVAIL-001 | #114 | Add single-location service availability API | P1 | CONFIG-001, DATA-001 |
 
