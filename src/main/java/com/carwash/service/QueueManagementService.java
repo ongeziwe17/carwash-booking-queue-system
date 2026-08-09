@@ -14,6 +14,8 @@ import com.carwash.repository.ServiceRepository;
 import com.carwash.repository.inmemory.InMemoryDataCoordinator;
 import com.carwash.service.exception.BusinessRuleViolationException;
 import com.carwash.service.exception.ResourceNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -22,6 +24,8 @@ import java.util.List;
 import java.util.Objects;
 
 public class QueueManagementService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(QueueManagementService.class);
 
     private final QueueEntryRepository queueEntryRepository;
     private final BookingRepository bookingRepository;
@@ -132,11 +136,30 @@ public class QueueManagementService {
     public QueueEntry startService(String queueEntryId) {
         return coordinator.write(() -> {
             QueueEntry queueEntry = requireQueueEntry(queueEntryId);
-            if (!queueEntry.startService(LocalDateTime.now(clock))) {
+            if (queueEntry.getQueueStatus() != QueueStatus.CALLED) {
                 throw new BusinessRuleViolationException("Queue entry cannot start service in current state");
             }
-            updateQueueEntry(queueEntry);
-            notifyCustomer(queueEntry, "SERVICE_STARTED", "Your service has started.");
+            Booking booking = requireCanonicalBooking(queueEntry);
+            if (booking.getStatus() != BookingStatus.CONFIRMED) {
+                throw new BusinessRuleViolationException("Booking must be confirmed before service can start");
+            }
+            LifecycleStateSnapshot.QueueEntryState queueState = LifecycleStateSnapshot.queueEntry(queueEntry);
+            LifecycleStateSnapshot.BookingState bookingState = LifecycleStateSnapshot.booking(booking);
+            try {
+                queueEntry.setBooking(booking);
+                if (!queueEntry.startService(LocalDateTime.now(clock))) {
+                    throw new BusinessRuleViolationException("Queue entry cannot start service in current state");
+                }
+                if (!booking.startService()) {
+                    throw new BusinessRuleViolationException("Booking must be confirmed before service can start");
+                }
+                updateQueueEntry(queueEntry);
+                updateBooking(booking);
+            } catch (RuntimeException exception) {
+                rollbackLifecycle(exception, bookingState, List.of(queueState));
+                throw exception;
+            }
+            notifyCustomerBestEffort(queueEntry, "SERVICE_STARTED", "Your service has started.");
             return snapshotQueueEntry(queueEntry);
         });
     }
@@ -147,12 +170,32 @@ public class QueueManagementService {
             if (queueEntry.getStartedAt() == null) {
                 throw new BusinessRuleViolationException("Queue entry cannot be completed before it has started");
             }
-            if (!queueEntry.complete(LocalDateTime.now(clock))) {
+            if (queueEntry.getQueueStatus() != QueueStatus.IN_PROGRESS) {
                 throw new BusinessRuleViolationException("Queue entry cannot be completed in current state");
             }
-            updateQueueEntry(queueEntry);
-            queueOrdering.rebalanceActiveQueue();
-            notifyCustomer(queueEntry, "SERVICE_COMPLETED", "Your service has been completed.");
+            Booking booking = requireCanonicalBooking(queueEntry);
+            if (booking.getStatus() != BookingStatus.IN_SERVICE) {
+                throw new BusinessRuleViolationException("Booking must be in service before queue completion");
+            }
+            List<LifecycleStateSnapshot.QueueEntryState> queueStates =
+                    LifecycleStateSnapshot.queueEntries(queueEntryRepository.findActiveOrdered());
+            LifecycleStateSnapshot.BookingState bookingState = LifecycleStateSnapshot.booking(booking);
+            try {
+                queueEntry.setBooking(booking);
+                if (!queueEntry.complete(LocalDateTime.now(clock))) {
+                    throw new BusinessRuleViolationException("Queue entry cannot be completed in current state");
+                }
+                if (!booking.completeService()) {
+                    throw new BusinessRuleViolationException("Booking must be in service before queue completion");
+                }
+                updateQueueEntry(queueEntry);
+                updateBooking(booking);
+                queueOrdering.rebalanceActiveQueue();
+            } catch (RuntimeException exception) {
+                rollbackLifecycle(exception, bookingState, queueStates);
+                throw exception;
+            }
+            notifyCustomerBestEffort(queueEntry, "SERVICE_COMPLETED", "Your service has been completed.");
             return snapshotQueueEntry(queueEntry);
         });
     }
@@ -188,10 +231,59 @@ public class QueueManagementService {
         }
     }
 
+    private void updateBooking(Booking booking) {
+        if (!bookingRepository.update(booking)) {
+            throw new ResourceNotFoundException("Booking not found: " + booking.getBookingId());
+        }
+    }
+
+    private Booking requireCanonicalBooking(QueueEntry queueEntry) {
+        Booking associatedBooking = queueEntry.getBooking();
+        if (associatedBooking == null || associatedBooking.getBookingId() == null
+                || associatedBooking.getBookingId().isBlank()) {
+            throw new BusinessRuleViolationException("Queue entry must have an associated booking");
+        }
+        String bookingId = associatedBooking.getBookingId();
+        Booking canonicalBooking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found: " + bookingId));
+        if (!bookingId.equals(canonicalBooking.getBookingId())) {
+            throw new BusinessRuleViolationException("Queue entry booking association is inconsistent");
+        }
+        if (canonicalBooking.getQueueEntry() == null
+                || !queueEntry.getQueueEntryId().equals(canonicalBooking.getQueueEntry().getQueueEntryId())) {
+            throw new BusinessRuleViolationException("Queue entry booking association is inconsistent");
+        }
+        return canonicalBooking;
+    }
+
+    private void rollbackLifecycle(RuntimeException failure,
+                                   LifecycleStateSnapshot.BookingState bookingState,
+                                   List<LifecycleStateSnapshot.QueueEntryState> queueStates) {
+        try {
+            bookingState.restore();
+            for (LifecycleStateSnapshot.QueueEntryState queueState : queueStates) {
+                queueState.restore();
+                updateQueueEntry(queueState.queueEntry());
+            }
+            updateBooking(bookingState.booking());
+        } catch (RuntimeException rollbackFailure) {
+            failure.addSuppressed(rollbackFailure);
+        }
+    }
+
     private void notifyCustomer(QueueEntry queueEntry, String type, String message) {
         if (notificationManagementService != null && queueEntry.getBooking() != null) {
             notificationManagementService.createNotification(queueEntry.getBooking().getUser(),
                     queueEntry.getBooking(), type, message);
+        }
+    }
+
+    private void notifyCustomerBestEffort(QueueEntry queueEntry, String type, String message) {
+        try {
+            notifyCustomer(queueEntry, type, message);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Unable to create {} notification for queue entry {}",
+                    type, queueEntry.getQueueEntryId(), exception);
         }
     }
 

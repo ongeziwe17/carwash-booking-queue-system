@@ -5,6 +5,9 @@ import com.carwash.api.dto.CreateQueueEntryRequest;
 import com.carwash.api.dto.CreateServiceRequest;
 import com.carwash.api.dto.CreateUserRequest;
 import com.carwash.api.dto.CreateVehicleRequest;
+import com.carwash.domain.Booking;
+import com.carwash.enums.BookingStatus;
+import com.carwash.repository.BookingRepository;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.BookingApiFixture;
 import com.carwash.testsupport.BookingFixtureBuilder;
@@ -14,6 +17,7 @@ import com.carwash.testsupport.TestDates;
 import com.carwash.testsupport.UserFixtureBuilder;
 import com.carwash.testsupport.VehicleFixtureBuilder;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 
 import java.util.List;
@@ -28,6 +32,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
+
+    @Autowired
+    private BookingRepository bookingRepository;
 
     @Test
     void createQueueEntryRejectsUnknownBooking() throws Exception {
@@ -294,16 +301,60 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         CreateQueueEntryRequest queue = createQueue(booking);
         mockMvc.perform(post("/api/queue-entries/{id}/call-next", queue.queueEntryId())
                         .with(authentication.platformAdminJwt()))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.queueStatus").value("CALLED"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.queueStatus").value("CALLED"))
+                .andExpect(jsonPath("$.booking.status").value("CONFIRMED"));
         mockMvc.perform(post("/api/queue-entries/{id}/start", queue.queueEntryId())
                         .with(authentication.platformAdminJwt()))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.queueStatus").value("IN_PROGRESS"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.queueStatus").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.booking.status").value("IN_SERVICE"));
         mockMvc.perform(post("/api/queue-entries/{id}/complete", queue.queueEntryId())
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.queueStatus").value("COMPLETED"))
+                .andExpect(jsonPath("$.booking.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.estimatedWaitMin").value(0))
                 .andExpect(jsonPath("$.completedAt").exists());
+        mockMvc.perform(get("/api/bookings/{id}", booking.booking().bookingId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+    }
+
+    @Test
+    void startRejectsIncompatibleCanonicalBookingWithStandardError() throws Exception {
+        BookingApiFixture.CreatedBooking booking = bookingFixture().createBooking(TestDates.futureDays(40));
+        CreateQueueEntryRequest queue = createQueue(booking);
+        postQueueAction(queue, "call-next");
+        Booking canonical = bookingRepository.findById(booking.booking().bookingId()).orElseThrow();
+        canonical.setStatus(BookingStatus.CANCELLED);
+        bookingRepository.update(canonical);
+
+        mockMvc.perform(post("/api/queue-entries/{id}/start", queue.queueEntryId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.message").value("Booking must be confirmed before service can start"))
+                .andExpect(jsonPath("$.path").value("/api/queue-entries/" + queue.queueEntryId() + "/start"));
+    }
+
+    @Test
+    void completionRejectsIncompatibleCanonicalBookingWithStandardError() throws Exception {
+        BookingApiFixture.CreatedBooking booking = bookingFixture().createBooking(TestDates.futureDays(41));
+        CreateQueueEntryRequest queue = createQueue(booking);
+        postQueueAction(queue, "call-next");
+        postQueueAction(queue, "start");
+        Booking canonical = bookingRepository.findById(booking.booking().bookingId()).orElseThrow();
+        canonical.setStatus(BookingStatus.CONFIRMED);
+        bookingRepository.update(canonical);
+
+        mockMvc.perform(post("/api/queue-entries/{id}/complete", queue.queueEntryId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.message").value("Booking must be in service before queue completion"))
+                .andExpect(jsonPath("$.path").value("/api/queue-entries/" + queue.queueEntryId() + "/complete"));
     }
 
     @Test

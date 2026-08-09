@@ -1,0 +1,28 @@
+info:
+  name: Call second cancellation entry
+  type: http
+  seq: 11
+  tags:
+    - workflow
+    - staff
+    - integrity
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/queue-entries/{{workflowCancelCalledQueueId}}/call-next"
+  auth:
+    type: bearer
+    token: "{{staffToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("queue entry is called", function() { expect(res.body.queueStatus).to.equal("CALLED"); });
+        test("call keeps booking confirmed", function() { expect(res.body.booking.status).to.equal("CONFIRMED"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

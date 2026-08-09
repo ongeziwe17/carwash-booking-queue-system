@@ -1,0 +1,39 @@
+info:
+  name: Create called-cancellation booking
+  type: http
+  seq: 2
+  tags:
+    - workflow
+    - customer
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "bookingId": "{{workflowCancelCalledBookingId}}",
+        "userId": "{{customerUserId}}",
+        "vehicleId": "{{customerVehicleId}}",
+        "serviceId": "{{serviceId}}",
+        "scheduledDateTime": "{{future26}}",
+        "specialRequest": "CALLED cancellation workflow"
+      }
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

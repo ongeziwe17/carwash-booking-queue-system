@@ -1,0 +1,44 @@
+info:
+  name: Create queue entry for waiting cancellation
+  type: http
+  seq: 5
+  tags:
+    - workflow
+    - staff
+    - integrity
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/queue-entries"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "queueEntryId": "{{workflowCancelWaitingQueueId}}",
+        "bookingId": "{{workflowCancelWaitingBookingId}}",
+        "serviceId": "{{serviceId}}"
+      }
+  auth:
+    type: bearer
+    token: "{{staffToken}}"
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.status === 201) {
+          bru.setVar("workflowCancelBaselinePosition", Number(res.body.position));
+          bru.setVar("workflowCancelBaselineWait", Number(res.body.estimatedWaitMin));
+        }
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("queue entry is waiting", function() { expect(res.body.queueStatus).to.equal("WAITING"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

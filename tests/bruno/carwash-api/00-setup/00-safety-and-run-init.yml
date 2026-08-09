@@ -43,6 +43,7 @@ runtime:
           disposableVehicleId: `vehicle-delete-${runId}`, plateConflictVehicleId: `vehicle-plate-${runId}`,
           serviceId: `service-${runId}`, toggleServiceId: `service-toggle-${runId}`, inactiveServiceId: `service-inactive-${runId}`,
           bookingId: `booking-${runId}`, otherBookingId: `booking-other-${runId}`, cancelBookingId: `booking-cancel-${runId}`,
+          ownershipUpdateBookingId: `booking-ownership-update-${runId}`,
           deleteRouteBookingId: `booking-delete-route-${runId}`, fullSlotBookingId: `booking-full-a-${runId}`,
           conflictBookingId: `booking-conflict-a-${runId}`, duplicateQueueBookingId: `booking-duplicate-queue-${runId}`,
           queueEntryId: `queue-${runId}`, otherQueueEntryId: `queue-other-${runId}`,
@@ -50,6 +51,10 @@ runtime:
           e2eCustomerUserId: `e2e-customer-${runId}`, e2eCustomerEmail: `e2e-customer-${runId}@example.test`,
           e2eVehicleId: `e2e-vehicle-${runId}`, e2eBookingId: `e2e-booking-${runId}`,
           opsBookingId: `ops-booking-${runId}`, opsQueueId: `ops-queue-${runId}`,
+          workflowCancelWaitingBookingId: `workflow-cancel-waiting-booking-${runId}`,
+          workflowCancelCalledBookingId: `workflow-cancel-called-booking-${runId}`,
+          workflowCancelWaitingQueueId: `workflow-cancel-waiting-queue-${runId}`,
+          workflowCancelCalledQueueId: `workflow-cancel-called-queue-${runId}`,
           queueEligibilityBookingId: `queue-eligibility-booking-${runId}`,
           queueEligibilityPrimaryId: `queue-eligibility-primary-${runId}`,
           queueEligibilityDuplicateId: `queue-eligibility-duplicate-${runId}`,
@@ -69,10 +74,11 @@ runtime:
           adminJourneyEmail: `admin-journey-${runId}@example.test`
         };
         for (const [key,value] of Object.entries(vars)) bru.setVar(key,value);
-        for (let i=1;i<=30;i++) {
+        for (let i=1;i<=32;i++) {
           const d = new Date(Date.now() + (7+i)*24*60*60*1000 + i*37*60*1000);
           bru.setVar(`future${i}`, d.toISOString().slice(0,19));
           if (i === 1) bru.setVar("testDate", d.toISOString().slice(0,10));
+          if (i === 21) bru.setVar("opsReportDate", d.toISOString().slice(0,10));
         }
         bru.setVar("pastDateTime", "2020-01-01T10:00:00");
     - type: tests

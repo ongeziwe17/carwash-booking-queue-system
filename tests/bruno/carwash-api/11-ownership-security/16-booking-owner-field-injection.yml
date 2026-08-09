@@ -1,7 +1,7 @@
 info:
   name: Booking update rejects ownership field injection
   type: http
-  seq: 16
+  seq: 17
   tags:
     - ownership
     - security
@@ -9,7 +9,7 @@ info:
 
 http:
   method: PUT
-  url: "{{baseUrl}}/api/bookings/{{bookingId}}"
+  url: "{{baseUrl}}/api/bookings/{{ownershipUpdateBookingId}}"
   headers:
     - name: Content-Type
       value: "application/json"
@@ -19,7 +19,7 @@ http:
       {
         "vehicleId": "{{customerVehicleId}}",
         "serviceId": "{{serviceId}}",
-        "scheduledDateTime": "{{future10}}",
+        "scheduledDateTime": "{{future32}}",
         "specialRequest": "ownership injection",
         "userId": "{{otherCustomerUserId}}"
       }

@@ -1,0 +1,27 @@
+info:
+  name: Operational booking remains completed
+  type: http
+  seq: 9
+  tags:
+    - workflow
+    - customer
+    - integrity
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/bookings/{{opsE2eBookingId}}"
+  auth:
+    type: bearer
+    token: "{{otherCustomerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("booking is completed", function() { expect(res.body.status).to.equal("COMPLETED"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

@@ -1,17 +1,22 @@
 package com.carwash.api;
 
 import com.carwash.api.dto.CreateBookingRequest;
+import com.carwash.api.dto.CreateQueueEntryRequest;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.BookingApiFixture;
 import com.carwash.testsupport.BookingFixtureBuilder;
+import com.carwash.testsupport.QueueFixtureBuilder;
 import com.carwash.testsupport.TestDates;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
 
 import java.time.LocalDateTime;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -49,6 +54,64 @@ class BookingWorkflowIntegrationTest extends ApiIntegrationTestSupport {
                         .with(authentication.platformAdminJwt())
                         .param("customerId", created.resources().user().userId()))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void queuedBookingCancellationRemovesEntryAndRebalancesRemainingQueue() throws Exception {
+        BookingApiFixture.CreatedBooking firstBooking = fixture().createBooking(TestDates.futureDays(30));
+        BookingApiFixture.CreatedBooking secondBooking = fixture().createBooking(TestDates.futureDays(31));
+        CreateQueueEntryRequest firstQueue = createConfirmedQueue(firstBooking);
+        CreateQueueEntryRequest secondQueue = createConfirmedQueue(secondBooking);
+
+        mockMvc.perform(post("/api/bookings/{id}/cancel", firstBooking.booking().bookingId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+        mockMvc.perform(get("/api/queue-entries/{id}", firstQueue.queueEntryId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/queue-entries/{id}", secondQueue.queueEntryId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.position").value(1))
+                .andExpect(jsonPath("$.estimatedWaitMin").value(0));
+    }
+
+    @Test
+    void inServiceBookingCancellationReturnsStandardBusinessRuleError() throws Exception {
+        BookingApiFixture.CreatedBooking booking = fixture().createBooking(TestDates.futureDays(32));
+        CreateQueueEntryRequest queue = createConfirmedQueue(booking);
+        postQueueAction(queue, "call-next");
+        postQueueAction(queue, "start");
+
+        mockMvc.perform(post("/api/bookings/{id}/cancel", booking.booking().bookingId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.message").value("Booking cannot be cancelled while service is in progress"))
+                .andExpect(jsonPath("$.path").value("/api/bookings/" + booking.booking().bookingId() + "/cancel"));
+    }
+
+    @Test
+    void activeQueuedBookingUpdateReturnsStandardBusinessRuleError() throws Exception {
+        BookingApiFixture.CreatedBooking booking = fixture().createBooking(TestDates.futureDays(33));
+        createConfirmedQueue(booking);
+        String request = objectMapper.writeValueAsString(java.util.Map.of(
+                "vehicleId", booking.resources().vehicle().vehicleId(),
+                "serviceId", booking.resources().service().serviceId(),
+                "scheduledDateTime", TestDates.futureDays(34),
+                "specialRequest", "must not change"
+        ));
+
+        mockMvc.perform(put("/api/bookings/{id}", booking.booking().bookingId())
+                        .with(authentication.platformAdminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.message").value(
+                        "Booking cannot be updated while it has an active queue entry"))
+                .andExpect(jsonPath("$.path").value("/api/bookings/" + booking.booking().bookingId()));
     }
 
     @Test
@@ -190,5 +253,21 @@ class BookingWorkflowIntegrationTest extends ApiIntegrationTestSupport {
                         resources.service().serviceId())
                 .scheduledDateTime(scheduled)
                 .build();
+    }
+
+    private CreateQueueEntryRequest createConfirmedQueue(BookingApiFixture.CreatedBooking booking) throws Exception {
+        mockMvc.perform(post("/api/bookings/{id}/confirm", booking.booking().bookingId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk());
+        CreateQueueEntryRequest queue = QueueFixtureBuilder.valid(ids, booking.booking().bookingId(),
+                booking.resources().service().serviceId()).build();
+        api.createQueueEntry(queue).andExpect(status().isCreated());
+        return queue;
+    }
+
+    private void postQueueAction(CreateQueueEntryRequest queue, String action) throws Exception {
+        mockMvc.perform(post("/api/queue-entries/{id}/" + action, queue.queueEntryId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk());
     }
 }

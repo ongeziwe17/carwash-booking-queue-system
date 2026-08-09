@@ -162,6 +162,7 @@ public class ApplicationServiceConfig {
             QueueEntryRepository queueEntryRepository,
             NotificationRepository notificationRepository,
             NotificationManagementService notificationManagementService,
+            QueueOrderingService queueOrderingService,
             InMemoryDataCoordinator coordinator,
             BookingPolicyProperties bookingPolicy,
             Clock clock
@@ -174,6 +175,7 @@ public class ApplicationServiceConfig {
                 queueEntryRepository,
                 notificationRepository,
                 notificationManagementService,
+                queueOrderingService,
                 coordinator,
                 bookingPolicy,
                 clock

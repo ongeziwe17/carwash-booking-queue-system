@@ -1,0 +1,40 @@
+info:
+  name: Create waiting-cancellation booking
+  type: http
+  seq: 1
+  tags:
+    - workflow
+    - customer
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "bookingId": "{{workflowCancelWaitingBookingId}}",
+        "userId": "{{customerUserId}}",
+        "vehicleId": "{{customerVehicleId}}",
+        "serviceId": "{{serviceId}}",
+        "scheduledDateTime": "{{future25}}",
+        "specialRequest": "WAITING cancellation workflow"
+      }
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("booking starts created", function() { expect(res.body.status).to.equal("CREATED"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

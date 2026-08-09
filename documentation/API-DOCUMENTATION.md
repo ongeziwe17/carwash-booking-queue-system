@@ -172,8 +172,8 @@ New services are active. Activation/deactivation changes that state without chan
 | GET | `/api/bookings` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 Booking[]` | 401, 403, 405, 500 | List all bookings. |
 | GET | `/api/bookings/{id}` | Bearer; owner or operational role | `200 Booking` | 400, 401, 403, 404, 405, 500 | Get a booking. |
 | POST | `/api/bookings` | Bearer; customer for self, operational role for any user | `201 Booking` | 400, 401, 403, 404, 405, 415, 500 | Create a booking. |
-| PUT | `/api/bookings/{id}` | Bearer; owner or operational role | `200 Booking` | 400, 401, 403, 404, 405, 415, 500 | Update mutable booking details. |
-| DELETE | `/api/bookings/{id}` | Bearer; owner or operational role | `204` | 400, 401, 403, 404, 405, 500 | Cancel the booking; do not physically delete it. |
+| PUT | `/api/bookings/{id}` | Bearer; owner or operational role | `200 Booking` | 400, 401, 403, 404, 405, 415, 500 | Update mutable booking details when no active queue entry exists. |
+| DELETE | `/api/bookings/{id}` | Bearer; owner or operational role | `204` | 400, 401, 403, 404, 405, 500 | Apply booking cancellation semantics; do not physically delete the booking. |
 | POST | `/api/bookings/{id}/confirm` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 Booking` | 400, 401, 403, 404, 405, 500 | Confirm a created booking. |
 | POST | `/api/bookings/{id}/cancel` | Bearer; owner or operational role | `200 Booking` | 400, 401, 403, 404, 405, 500 | Cancel and return the updated booking. |
 
@@ -181,7 +181,7 @@ New services are active. Activation/deactivation changes that state without chan
 
 `scheduledDateTime` is a local date-time interpreted against the configured application clock/timezone and must be in the future. The referenced user, vehicle, and service must exist; the vehicle must belong to the booking owner; the service must be active. Active bookings sharing an exact scheduled date/time are limited by the configured slot capacity, and the same customer/vehicle cannot have another active booking in that slot.
 
-Ordinary updates are allowed only in `CREATED` or `CONFIRMED`. Confirmation transitions a valid `CREATED` booking to `CONFIRMED`. Cancellation can transition only `CREATED` or `CONFIRMED` bookings, and only while the booking is still in the future and the configured cancellation cutoff remains open. `IN_SERVICE`, `COMPLETED`, and already-`CANCELLED` bookings reject cancellation. Both public cancellation routes use that same cancellation behavior.
+Ordinary updates are allowed only in `CREATED` or `CONFIRMED`, and are rejected while the booking has an active `WAITING`, `CALLED`, or `IN_PROGRESS` queue entry. Confirmation transitions a valid `CREATED` booking to `CONFIRMED`. Cancellation can transition only `CREATED` or `CONFIRMED` bookings, and only while the booking is still in the future and the configured cancellation cutoff remains open. A valid cancellation removes an associated `WAITING` or `CALLED` queue entry, clears `Booking.queueEntry`, and rebalances remaining positions and waits before returning. `IN_SERVICE`, `COMPLETED`, and already-`CANCELLED` bookings reject cancellation. Both public cancellation routes use that same behavior; HTTP `DELETE` remains cancellation rather than physical booking deletion.
 
 There is an internal service-layer physical delete operation for already-cancelled bookings with no queue entry, but no public hard-delete endpoint. Dedicated booking rescheduling is not implemented.
 
@@ -194,8 +194,8 @@ There is an internal service-layer physical delete operation for already-cancell
 | POST | `/api/queue-entries` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `201 QueueEntry` | 400, 401, 403, 404, 405, 415, 500 | Append and attach an eligible entry with server-generated metrics. |
 | PUT | `/api/queue-entries/{id}/position` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry` | 400, 401, 403, 404, 405, 415, 500 | Move a waiting entry and rebalance the active queue. |
 | POST | `/api/queue-entries/{id}/call-next` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry` | 400, 401, 403, 404, 405, 500 | Mark this specific waiting entry as called. |
-| POST | `/api/queue-entries/{id}/start` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry` | 400, 401, 403, 404, 405, 500 | Start service for a called entry. |
-| POST | `/api/queue-entries/{id}/complete` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry` | 400, 401, 403, 404, 405, 500 | Complete an in-progress entry. |
+| POST | `/api/queue-entries/{id}/start` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry` | 400, 401, 403, 404, 405, 500 | Start a `CALLED` entry and synchronize its booking to `IN_SERVICE`. |
+| POST | `/api/queue-entries/{id}/complete` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry` | 400, 401, 403, 404, 405, 500 | Complete an `IN_PROGRESS` entry and synchronize its booking to `COMPLETED`. |
 | DELETE | `/api/queue-entries/{id}` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `204` | 400, 401, 403, 404, 405, 500 | Delete a waiting entry and clear its booking link. |
 
 `CreateQueueEntryRequest` accepts only `queueEntryId`, `bookingId`, and `serviceId`. Queue entry creation requires an existing `CONFIRMED` booking and its existing, active matching service. A booking may have only one active queue entry, where `WAITING`, `CALLED`, and `IN_PROGRESS` are active and `COMPLETED` and `EXITED` are terminal/non-active. Every new entry is initialized by the server as `WAITING`, appended to the one global active queue, and assigned its position, lifecycle timestamps, and estimated wait inside the current single-JVM write boundary. The canonical entry is then attached to the canonical booking. Because JSON request contracts are strict, the removed creation-time `position` property is rejected as `400 MALFORMED_REQUEST`; it is not ignored as a compatibility hint.
@@ -206,7 +206,7 @@ Queue API responses are detached snapshots built while the coordinator lock is h
 
 `estimatedWaitMin` is the cumulative effective service duration of active entries ahead; an entry's own duration is not part of its wait. A predecessor uses its positive `estimatedDurationMin`, or the configured default service duration when no positive value is available. Completed, exited, and physically deleted entries do not contribute; terminal records have zero wait.
 
-`UpdateQueuePositionRequest` contains one positive `position`. Only `WAITING` entries may move, and the target cannot exceed the active queue size. A successful move reorders the entry and recalculates every affected active position and wait. The lifecycle remains `WAITING → CALLED → IN_PROGRESS → COMPLETED`; ordering changes do not alter queue or booking lifecycle state. Queue creation and transitions still do not synchronize booking status—that remains WORKFLOW-001. The endpoint name `/call-next` is historical: it acts on the supplied queue-entry `{id}` and does **not** choose the next eligible customer; true server-selected call-next remains QUEUE-003 work.
+`UpdateQueuePositionRequest` contains one positive `position`. Only `WAITING` entries may move, and the target cannot exceed the active queue size. A successful move reorders the entry and recalculates every affected active position and wait. Queue creation keeps the booking `CONFIRMED`, and calling a selected entry produces `CONFIRMED + CALLED`. Starting service atomically produces `IN_SERVICE + IN_PROGRESS`; completion atomically produces `COMPLETED + COMPLETED` before notification and response snapshot creation. Ordering changes do not alter lifecycle state. The endpoint name `/call-next` is historical: it acts on the supplied queue-entry `{id}` and does **not** choose the next eligible customer; true server-selected call-next remains QUEUE-003 work.
 
 ## Notifications
 
@@ -216,7 +216,11 @@ Queue API responses are detached snapshots built while the coordinator lock is h
 
 Results are sorted newest first by `sentAt`, with `notificationId` as the deterministic tie-breaker, and are limited by the deployment-configured recent-item default. The endpoint does not require the requested user ID to exist before an authorized admin lookup; no records therefore produce an empty list rather than a user `404`.
 
-Notifications are currently `IN_APP` only. SMS/email delivery and a broader public notification lifecycle are not implemented.
+Notifications are currently `IN_APP` only. The synchronized `BOOKING_CANCELLED`, `SERVICE_STARTED`, and
+`SERVICE_COMPLETED` notifications are attempted only after the canonical booking/queue state is committed. For this
+phase they are best-effort: a notification persistence failure is logged and does not turn an otherwise successful
+lifecycle operation into a failed API response. Durable notification delivery remains later NOTIFY work; SMS/email
+delivery and a broader public notification lifecycle are not implemented.
 
 ## Reports
 
@@ -226,7 +230,7 @@ Notifications are currently `IN_APP` only. SMS/email delivery and a broader publ
 
 The required `date` query parameter uses ISO `yyyy-MM-dd`, for example `?date=2026-08-09`. A missing date returns `400 MISSING_PARAMETER`; an invalid date returns `400 INVALID_PARAMETER`.
 
-`DailySummaryReportResponse` contains `reportDate`, `totalBookings`, `confirmedBookings`, `cancelledBookings`, `completedBookings`, `totalQueueEntries`, `waitingQueueEntries`, `calledQueueEntries`, `inProgressQueueEntries`, `completedQueueEntries`, and `pendingWorkload`. It is an in-memory operational summary, not a tenant-aware analytics/dashboard API.
+`DailySummaryReportResponse` contains `reportDate`, `totalBookings`, `confirmedBookings`, `cancelledBookings`, `completedBookings`, `totalQueueEntries`, `waitingQueueEntries`, `calledQueueEntries`, `inProgressQueueEntries`, `completedQueueEntries`, and `pendingWorkload`. Booking and queue completion now occur in one coordinated lifecycle operation, so their completed counts are based on synchronized source aggregates. It is an in-memory operational summary, not a tenant-aware analytics/dashboard API.
 
 ## Representative success examples
 

@@ -1,0 +1,44 @@
+info:
+  name: Customer creates dedicated ownership-update booking
+  type: http
+  seq: 15
+  tags:
+    - ownership
+    - security
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "bookingId": "{{ownershipUpdateBookingId}}",
+        "userId": "{{customerUserId}}",
+        "vehicleId": "{{customerVehicleId}}",
+        "serviceId": "{{serviceId}}",
+        "scheduledDateTime": "{{future31}}",
+        "specialRequest": "Ownership validation fixture"
+      }
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns HTTP 201", function() { expect(res.status).to.equal(201); });
+        test("creates an unqueued modifiable booking", function() {
+          expect(res.body.bookingId).to.equal(bru.getVar("ownershipUpdateBookingId"));
+          expect(res.body.status).to.equal("CREATED");
+          expect(res.body.queueEntry == null).to.equal(true);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

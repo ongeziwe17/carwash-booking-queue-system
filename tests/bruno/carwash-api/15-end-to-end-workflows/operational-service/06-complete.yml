@@ -1,7 +1,7 @@
 info:
   name: Ops complete service
   type: http
-  seq: 6
+  seq: 7
   tags:
     - workflow
     - staff
@@ -30,6 +30,8 @@ runtime:
         if (bootstrapPassword && !bootstrapPassword.includes("process.env")) expect(payload).to.not.include(bootstrapPassword);
         test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
         test("COMPLETED", function() { expect(res.body.queueStatus).to.equal("COMPLETED"); });
+        test("completion synchronizes booking", function() { expect(res.body.booking.status).to.equal("COMPLETED"); });
+        test("completed wait is zero", function() { expect(res.body.estimatedWaitMin).to.equal(0); });
 
 settings:
   encodeUrl: true
