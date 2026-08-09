@@ -16,7 +16,7 @@ http:
     type: json
     data: |-
       {
-        "position": 2
+        "position": {{queueOrderingBeyondActivePosition}}
       }
   auth:
     type: bearer
