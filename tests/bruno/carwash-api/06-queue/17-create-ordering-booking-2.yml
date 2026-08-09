@@ -20,7 +20,7 @@ http:
         "userId": "{{customerUserId}}",
         "vehicleId": "{{customerVehicleId}}",
         "serviceId": "{{queueOrderingService25Id}}",
-        "scheduledDateTime": "{{future25}}",
+        "scheduledDateTime": "{{future28}}",
         "specialRequest": "QUEUE-002 second entry"
       }
   auth:
