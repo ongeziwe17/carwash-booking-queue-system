@@ -1,11 +1,21 @@
 package com.carwash.config;
 
+import com.carwash.api.dto.CreateBookingRequest;
+import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.boot.validation.autoconfigure.ValidationAutoConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -15,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RuntimePolicyConfigurationTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withConfiguration(AutoConfigurations.of(ValidationAutoConfiguration.class))
             .withUserConfiguration(RuntimePolicyConfig.class)
             .withPropertyValues(
                     "carwash.policy.booking.max-active-bookings-per-slot=1",
@@ -41,6 +52,28 @@ class RuntimePolicyConfigurationTest {
             assertEquals(ZoneId.of("Africa/Johannesburg"), context.getBean(RuntimeProperties.class).timeZone());
             assertEquals(ZoneId.of("Africa/Johannesburg"), context.getBean(Clock.class).getZone());
         });
+    }
+
+    @Test
+    void beanValidationFutureConstraintUsesApplicationClock() {
+        contextRunner
+                .withUserConfiguration(FixedClockConfiguration.class)
+                .withPropertyValues("carwash.runtime.time-zone=America/New_York")
+                .run(context -> {
+                    assertNull(context.getStartupFailure());
+                    Validator validator = context.getBean(Validator.class);
+
+                    CreateBookingRequest futureAccordingToApplicationClock = new CreateBookingRequest(
+                            "booking-1", "user-1", "vehicle-1", "service-1",
+                            LocalDateTime.of(2000, 1, 1, 7, 30), null);
+
+                    Set<String> violatedFields = validator.validate(futureAccordingToApplicationClock).stream()
+                            .map(violation -> violation.getPropertyPath().toString())
+                            .collect(java.util.stream.Collectors.toSet());
+
+                    assertTrue(violatedFields.isEmpty(),
+                            () -> "Expected @Future to use the fixed application clock, violations: " + violatedFields);
+                });
     }
 
     @Test
@@ -97,5 +130,15 @@ class RuntimePolicyConfigurationTest {
             current = current.getCause();
         }
         return messages.toString();
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class FixedClockConfiguration {
+
+        @Bean
+        @Primary
+        Clock fixedClock() {
+            return Clock.fixed(Instant.parse("2000-01-01T12:00:00Z"), ZoneId.of("America/New_York"));
+        }
     }
 }
