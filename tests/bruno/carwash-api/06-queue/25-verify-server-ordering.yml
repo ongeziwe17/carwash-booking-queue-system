@@ -20,11 +20,14 @@ runtime:
         test("returns 200", function() { expect(res.status).to.equal(200); });
         test("active queue is globally ordered with cumulative waits", function() {
           const active = res.body.filter(entry => ["WAITING", "CALLED", "IN_PROGRESS"].includes(entry.queueStatus));
-          expect(active.slice(0, 3).map(entry => entry.queueEntryId)).to.deep.equal([
+          const entries = [
             bru.getVar("queueOrderingEntry1Id"), bru.getVar("queueOrderingEntry2Id"), bru.getVar("queueOrderingEntry3Id")
-          ]);
-          expect(active.slice(0, 3).map(entry => entry.position)).to.deep.equal([1, 2, 3]);
-          expect(active.slice(0, 3).map(entry => entry.estimatedWaitMin)).to.deep.equal([0, 10, 35]);
+          ].map(id => active.find(entry => entry.queueEntryId === id));
+          const start = Number(bru.getVar("queueOrderingStartPosition"));
+          const baselineWait = Number(bru.getVar("queueOrderingBaselineWait"));
+          expect(entries.every(Boolean)).to.equal(true);
+          expect(entries.map(entry => entry.position)).to.deep.equal([start, start + 1, start + 2]);
+          expect(entries.map(entry => entry.estimatedWaitMin)).to.deep.equal([baselineWait, baselineWait + 10, baselineWait + 35]);
         });
         test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
 

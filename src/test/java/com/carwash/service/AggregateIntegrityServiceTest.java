@@ -65,13 +65,15 @@ class AggregateIntegrityServiceTest {
         NotificationManagementService notificationManagement = new NotificationManagementService(
                 notifications, users, bookings, coordinator, new AtomicNotificationIdGenerator(),
                 new NotificationPolicyProperties(10), clock);
+        QueueOrderingService queueOrdering = new QueueOrderingService(
+                queues, coordinator, new QueuePolicyProperties(Duration.ofMinutes(10)));
         vehicleManagement = new VehicleManagementService(vehicles, users, bookings, coordinator);
-        serviceCatalog = new ServiceCatalogService(services, bookings, queues, coordinator);
+        serviceCatalog = new ServiceCatalogService(services, bookings, queues, coordinator, queueOrdering);
         bookingManagement = new BookingManagementService(bookings, users, vehicles, services, queues,
                 notifications, notificationManagement, coordinator,
                 new BookingPolicyProperties(1, Duration.ZERO), clock);
         queueManagement = new QueueManagementService(queues, bookings, services, notificationManagement, coordinator,
-                new QueuePolicyProperties(Duration.ofMinutes(10)), clock);
+                queueOrdering, clock);
         userManagement = new UserManagementService(users, mock(UserCredentialService.class), vehicles,
                 bookings, notifications, coordinator);
     }

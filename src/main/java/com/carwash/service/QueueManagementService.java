@@ -1,9 +1,11 @@
 package com.carwash.service;
 
-import com.carwash.config.QueuePolicyProperties;
 import com.carwash.domain.Booking;
 import com.carwash.domain.QueueEntry;
+import com.carwash.domain.Role;
 import com.carwash.domain.Service;
+import com.carwash.domain.User;
+import com.carwash.domain.Vehicle;
 import com.carwash.enums.BookingStatus;
 import com.carwash.enums.QueueStatus;
 import com.carwash.repository.BookingRepository;
@@ -14,7 +16,6 @@ import com.carwash.service.exception.BusinessRuleViolationException;
 import com.carwash.service.exception.ResourceNotFoundException;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +28,7 @@ public class QueueManagementService {
     private final ServiceRepository serviceRepository;
     private final NotificationManagementService notificationManagementService;
     private final InMemoryDataCoordinator coordinator;
-    private final QueuePolicyProperties queuePolicy;
+    private final QueueOrderingService queueOrdering;
     private final Clock clock;
 
 
@@ -36,14 +37,14 @@ public class QueueManagementService {
                                   ServiceRepository serviceRepository,
                                   NotificationManagementService notificationManagementService,
                                   InMemoryDataCoordinator coordinator,
-                                  QueuePolicyProperties queuePolicy,
+                                  QueueOrderingService queueOrdering,
                                   Clock clock) {
         this.queueEntryRepository = Objects.requireNonNull(queueEntryRepository, "Queue repository is required");
         this.bookingRepository = Objects.requireNonNull(bookingRepository, "Booking repository is required");
         this.serviceRepository = Objects.requireNonNull(serviceRepository, "Service repository is required");
         this.notificationManagementService = notificationManagementService;
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
-        this.queuePolicy = Objects.requireNonNull(queuePolicy, "Queue policy is required");
+        this.queueOrdering = Objects.requireNonNull(queueOrdering, "Queue ordering service is required");
         this.clock = Objects.requireNonNull(clock, "Application clock is required");
     }
 
@@ -71,7 +72,7 @@ public class QueueManagementService {
                 if (!bookingRepository.update(booking)) {
                     throw new ResourceNotFoundException("Booking not found: " + booking.getBookingId());
                 }
-                rebalanceActiveQueue(queueEntryRepository.findActiveOrdered());
+                queueOrdering.rebalanceActiveQueue();
             } catch (RuntimeException exception) {
                 queueEntryRepository.deleteById(queueEntry.getQueueEntryId());
                 booking.detachQueueEntry(queueEntry.getQueueEntryId());
@@ -83,15 +84,19 @@ public class QueueManagementService {
     }
 
     public QueueEntry findById(String queueEntryId) {
-        return coordinator.read(() -> requireQueueEntry(queueEntryId));
+        return coordinator.read(() -> snapshotQueueEntry(requireQueueEntry(queueEntryId)));
     }
 
     public List<QueueEntry> findAll() {
-        return coordinator.read(queueEntryRepository::findAllOrdered);
+        return coordinator.read(() -> queueEntryRepository.findAllOrdered().stream()
+                .map(this::snapshotQueueEntry)
+                .toList());
     }
 
     public List<QueueEntry> findByServiceId(String serviceId) {
-        return coordinator.read(() -> queueEntryRepository.findByServiceId(serviceId));
+        return coordinator.read(() -> queueEntryRepository.findByServiceId(serviceId).stream()
+                .map(this::snapshotQueueEntry)
+                .toList());
     }
 
     public QueueEntry updatePosition(String queueEntryId, int position) {
@@ -107,7 +112,7 @@ public class QueueManagementService {
             }
             activeQueue.removeIf(entry -> queueEntryId.equals(entry.getQueueEntryId()));
             activeQueue.add(position - 1, queueEntry);
-            rebalanceActiveQueue(activeQueue);
+            queueOrdering.rebalanceActiveQueue(activeQueue);
             return queueEntry;
         });
     }
@@ -146,7 +151,7 @@ public class QueueManagementService {
                 throw new BusinessRuleViolationException("Queue entry cannot be completed in current state");
             }
             updateQueueEntry(queueEntry);
-            rebalanceActiveQueue(queueEntryRepository.findActiveOrdered());
+            queueOrdering.rebalanceActiveQueue();
             notifyCustomer(queueEntry, "SERVICE_COMPLETED", "Your service has been completed.");
             return queueEntry;
         });
@@ -168,7 +173,7 @@ public class QueueManagementService {
                     throw new ResourceNotFoundException("Booking not found: " + booking.getBookingId());
                 }
             }
-            rebalanceActiveQueue(queueEntryRepository.findActiveOrdered());
+            queueOrdering.rebalanceActiveQueue();
         });
     }
 
@@ -236,35 +241,73 @@ public class QueueManagementService {
         queueEntry.updateQueueMetrics(position, 0);
     }
 
-    private void rebalanceActiveQueue(List<QueueEntry> orderedActiveQueue) {
-        List<Integer> estimatedWaits = new ArrayList<>(orderedActiveQueue.size());
-        int estimatedWaitMin = 0;
-        for (int index = 0; index < orderedActiveQueue.size(); index++) {
-            estimatedWaits.add(estimatedWaitMin);
-            if (index < orderedActiveQueue.size() - 1) {
-                estimatedWaitMin = Math.addExact(
-                        estimatedWaitMin, effectiveServiceDurationMinutes(orderedActiveQueue.get(index)));
-            }
-        }
-        for (int index = 0; index < orderedActiveQueue.size(); index++) {
-            QueueEntry queueEntry = orderedActiveQueue.get(index);
-            queueEntry.updateQueueMetrics(index + 1, estimatedWaits.get(index));
-            updateQueueEntry(queueEntry);
-        }
+    private QueueEntry snapshotQueueEntry(QueueEntry source) {
+        QueueEntry snapshot = new QueueEntry();
+        snapshot.setQueueEntryId(source.getQueueEntryId());
+        snapshot.setBooking(snapshotBooking(source.getBooking()));
+        snapshot.setService(snapshotService(source.getService()));
+        snapshot.setPosition(source.getPosition());
+        snapshot.setQueueStatus(source.getQueueStatus());
+        snapshot.setJoinedAt(source.getJoinedAt());
+        snapshot.setCalledAt(source.getCalledAt());
+        snapshot.setStartedAt(source.getStartedAt());
+        snapshot.setCompletedAt(source.getCompletedAt());
+        snapshot.setEstimatedWaitMin(source.getEstimatedWaitMin());
+        return snapshot;
     }
 
-    private int effectiveServiceDurationMinutes(QueueEntry queueEntry) {
-        Service service = queueEntry.getService();
-        if (service != null && service.getEstimatedDurationMin() > 0) {
-            return service.getEstimatedDurationMin();
-        }
-        return durationInMinutes(queuePolicy.defaultServiceDuration());
+    private Booking snapshotBooking(Booking source) {
+        if (source == null) return null;
+        Booking snapshot = new Booking();
+        snapshot.setBookingId(source.getBookingId());
+        snapshot.setUser(snapshotUser(source.getUser()));
+        snapshot.setVehicle(snapshotVehicle(source.getVehicle()));
+        snapshot.setService(snapshotService(source.getService()));
+        snapshot.setScheduledDateTime(source.getScheduledDateTime());
+        snapshot.setStatus(source.getStatus());
+        snapshot.setCreatedAt(source.getCreatedAt());
+        snapshot.setSpecialRequest(source.getSpecialRequest());
+        return snapshot;
     }
 
-    private int durationInMinutes(Duration duration) {
-        long seconds = duration.getSeconds();
-        long minutes = seconds / 60;
-        if (seconds % 60 != 0 || duration.getNano() != 0) minutes++;
-        return Math.toIntExact(Math.max(minutes, 1));
+    private User snapshotUser(User source) {
+        if (source == null) return null;
+        User snapshot = new User();
+        snapshot.setUserId(source.getUserId());
+        snapshot.setFullName(source.getFullName());
+        snapshot.setEmail(source.getEmail());
+        snapshot.setPhone(source.getPhone());
+        snapshot.setAccountStatus(source.getAccountStatus());
+        snapshot.setCreatedAt(source.getCreatedAt());
+        snapshot.setLastLoginAt(source.getLastLoginAt());
+        snapshot.setRole(snapshotRole(source.getRole()));
+        return snapshot;
+    }
+
+    private Role snapshotRole(Role source) {
+        if (source == null) return null;
+        return new Role(source.getRoleId(), source.getRoleName(), source.getDescription(), source.getPermissions());
+    }
+
+    private Vehicle snapshotVehicle(Vehicle source) {
+        if (source == null) return null;
+        Vehicle snapshot = new Vehicle(
+                source.getVehicleId(), source.getPlateNumber(), source.getVehicleType(), source.getBrand(),
+                source.getModel(), source.getColor(), source.getNotes());
+        snapshot.setUserId(source.getUserId());
+        return snapshot;
+    }
+
+    private Service snapshotService(Service source) {
+        if (source == null) return null;
+        Service snapshot = new Service();
+        snapshot.setServiceId(source.getServiceId());
+        snapshot.setServiceName(source.getServiceName());
+        snapshot.setDescription(source.getDescription());
+        snapshot.setPrice(source.getPrice());
+        snapshot.setEstimatedDurationMin(source.getEstimatedDurationMin());
+        snapshot.setActive(source.isActive());
+        snapshot.setCreatedAt(source.getCreatedAt());
+        return snapshot;
     }
 }

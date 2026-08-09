@@ -1,5 +1,5 @@
 info:
-  name: Move third waiting entry to first
+  name: Move third waiting entry to workflow start
   type: http
   seq: 26
   tags:
@@ -16,7 +16,7 @@ http:
     type: json
     data: |-
       {
-        "position": 1
+        "position": {{queueOrderingStartPosition}}
       }
   auth:
     type: bearer
@@ -27,7 +27,7 @@ runtime:
     - type: tests
       code: |-
         test("returns 200", function() { expect(res.status).to.equal(200); });
-        test("moved entry is first with no wait", function() { expect(res.body.position).to.equal(1); expect(res.body.estimatedWaitMin).to.equal(0); expect(res.body.queueStatus).to.equal("WAITING"); });
+        test("moved entry leads the workflow block", function() { expect(res.body.position).to.equal(Number(bru.getVar("queueOrderingStartPosition"))); expect(res.body.estimatedWaitMin).to.equal(Number(bru.getVar("queueOrderingBaselineWait"))); expect(res.body.queueStatus).to.equal("WAITING"); });
         test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
 
 settings:

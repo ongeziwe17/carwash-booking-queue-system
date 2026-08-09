@@ -20,6 +20,7 @@ import com.carwash.service.DailySummaryReportService;
 import com.carwash.service.NotificationIdGenerator;
 import com.carwash.service.NotificationManagementService;
 import com.carwash.service.QueueManagementService;
+import com.carwash.service.QueueOrderingService;
 import com.carwash.service.ServiceCatalogService;
 import com.carwash.service.UserManagementService;
 import com.carwash.service.VehicleManagementService;
@@ -72,6 +73,15 @@ public class ApplicationServiceConfig {
     }
 
     @Bean
+    public QueueOrderingService queueOrderingService(
+            QueueEntryRepository queueEntryRepository,
+            InMemoryDataCoordinator coordinator,
+            QueuePolicyProperties queuePolicy
+    ) {
+        return new QueueOrderingService(queueEntryRepository, coordinator, queuePolicy);
+    }
+
+    @Bean
     public UserManagementService userManagementService(
             UserRepository userRepository,
             UserCredentialService credentialService,
@@ -110,13 +120,15 @@ public class ApplicationServiceConfig {
             ServiceRepository serviceRepository,
             BookingRepository bookingRepository,
             QueueEntryRepository queueEntryRepository,
-            InMemoryDataCoordinator coordinator
+            InMemoryDataCoordinator coordinator,
+            QueueOrderingService queueOrderingService
     ) {
         return new ServiceCatalogService(
                 serviceRepository,
                 bookingRepository,
                 queueEntryRepository,
-                coordinator
+                coordinator,
+                queueOrderingService
         );
     }
 
@@ -175,7 +187,7 @@ public class ApplicationServiceConfig {
             ServiceRepository serviceRepository,
             NotificationManagementService notificationManagementService,
             InMemoryDataCoordinator coordinator,
-            QueuePolicyProperties queuePolicy,
+            QueueOrderingService queueOrderingService,
             Clock clock
     ) {
         return new QueueManagementService(
@@ -184,7 +196,7 @@ public class ApplicationServiceConfig {
                 serviceRepository,
                 notificationManagementService,
                 coordinator,
-                queuePolicy,
+                queueOrderingService,
                 clock
         );
     }

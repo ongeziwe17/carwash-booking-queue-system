@@ -18,11 +18,11 @@ runtime:
     - type: tests
       code: |-
         test("returns 200", function() { expect(res.status).to.equal(200); });
-        test("remaining active entry moves to first with no wait", function() {
+        test("remaining workflow entry closes the workflow gap", function() {
           const active = res.body.filter(entry => ["WAITING", "CALLED", "IN_PROGRESS"].includes(entry.queueStatus));
-          expect(active[0].queueEntryId).to.equal(bru.getVar("queueOrderingEntry2Id"));
-          expect(active[0].position).to.equal(1);
-          expect(active[0].estimatedWaitMin).to.equal(0);
+          const remaining = active.find(entry => entry.queueEntryId === bru.getVar("queueOrderingEntry2Id"));
+          expect(remaining.position).to.equal(Number(bru.getVar("queueOrderingStartPosition")));
+          expect(remaining.estimatedWaitMin).to.equal(Number(bru.getVar("queueOrderingBaselineWait")));
           const completed = res.body.find(entry => entry.queueEntryId === bru.getVar("queueOrderingEntry3Id"));
           expect(completed.queueStatus).to.equal("COMPLETED");
           expect(completed.estimatedWaitMin).to.equal(0);

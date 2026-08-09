@@ -28,6 +28,7 @@ import java.util.stream.IntStream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -65,7 +66,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         assertQueueMetrics(first, 1, 0);
         assertQueueMetrics(second, 2, 10);
         assertQueueMetrics(third, 3, 35);
-        assertEquals(List.of(first, second, third), queueService.findAll());
+        assertQueueOrder(queueService.findAll(), first, second, third);
     }
 
     @Test
@@ -222,7 +223,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         assertEquals(0, completed.getEstimatedWaitMin());
         assertQueueMetrics(second, 1, 0);
         assertQueueMetrics(third, 2, 25);
-        assertEquals(List.of(second, third, completed), queueService.findAll());
+        assertQueueOrder(queueService.findAll(), second, third, completed);
     }
 
     @Test
@@ -238,7 +239,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         assertNull(deletedBooking.getQueueEntry());
         assertQueueMetrics(first, 1, 0);
         assertQueueMetrics(third, 2, 10);
-        assertEquals(List.of(first, third), queueService.findAll());
+        assertQueueOrder(queueService.findAll(), first, third);
     }
 
     @Test
@@ -251,7 +252,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         assertQueueMetrics(third, 1, 0);
         assertQueueMetrics(first, 2, 30);
         assertQueueMetrics(second, 3, 40);
-        assertEquals(List.of(third, first, second), queueService.findAll());
+        assertQueueOrder(queueService.findAll(), third, first, second);
 
         queueService.updatePosition(third.getQueueEntryId(), 3);
         assertQueueMetrics(first, 1, 0);
@@ -259,7 +260,31 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         assertQueueMetrics(third, 3, 30);
 
         queueService.updatePosition(second.getQueueEntryId(), 2);
-        assertEquals(List.of(first, second, third), queueService.findAll());
+        assertQueueOrder(queueService.findAll(), first, second, third);
+    }
+
+    @Test
+    void queueReadsReturnDetachedDeepSnapshots() {
+        QueueEntry first = createQueueEntry(confirmedBookingWithDuration(10, 16));
+        QueueEntry second = createQueueEntry(confirmedBookingWithDuration(20, 17));
+        List<QueueEntry> snapshot = queueService.findAll();
+
+        assertNotSame(first, snapshot.getFirst());
+        assertNotSame(first.getBooking(), snapshot.getFirst().getBooking());
+        assertNotSame(first.getService(), snapshot.getFirst().getService());
+        assertQueueMetrics(snapshot.getFirst(), 1, 0);
+        assertQueueMetrics(snapshot.get(1), 2, 10);
+
+        Service firstService = first.getService();
+        catalogService.updateService(firstService.getServiceId(), firstService.getServiceName(),
+                firstService.getDescription(), firstService.getPrice(), 30);
+        queueService.updatePosition(second.getQueueEntryId(), 1);
+
+        assertQueueMetrics(snapshot.getFirst(), 1, 0);
+        assertQueueMetrics(snapshot.get(1), 2, 10);
+        assertEquals(10, snapshot.getFirst().getService().getEstimatedDurationMin());
+        assertQueueMetrics(queueRepository.findById(second.getQueueEntryId()).orElseThrow(), 1, 0);
+        assertQueueMetrics(queueRepository.findById(first.getQueueEntryId()).orElseThrow(), 2, 20);
     }
 
     @Test
@@ -440,6 +465,11 @@ class QueueManagementServiceTest extends ServiceTestSupport {
     private void assertQueueMetrics(QueueEntry queueEntry, int position, int estimatedWaitMin) {
         assertEquals(position, queueEntry.getPosition());
         assertEquals(estimatedWaitMin, queueEntry.getEstimatedWaitMin());
+    }
+
+    private void assertQueueOrder(List<QueueEntry> actual, QueueEntry... expected) {
+        assertEquals(List.of(expected).stream().map(QueueEntry::getQueueEntryId).toList(),
+                actual.stream().map(QueueEntry::getQueueEntryId).toList());
     }
 
     private QueueEntry completedQueueEntry() {

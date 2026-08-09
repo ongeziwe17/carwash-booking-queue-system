@@ -49,6 +49,7 @@ abstract class ServiceTestSupport {
     protected ServiceCatalogService catalogService;
     protected BookingManagementService bookingService;
     protected QueueManagementService queueService;
+    protected QueueOrderingService queueOrdering;
     protected NotificationManagementService notificationService;
     protected DailySummaryReportService reportService;
     protected DeterministicTestNotificationIdGenerator notificationIds;
@@ -76,7 +77,10 @@ abstract class ServiceTestSupport {
         userService = new UserManagementService(userRepository, credentialService,
                 vehicleRepository, bookingRepository, notificationRepository, coordinator);
         vehicleService = new VehicleManagementService(vehicleRepository, userRepository, bookingRepository, coordinator);
-        catalogService = new ServiceCatalogService(serviceRepository, bookingRepository, queueRepository, coordinator);
+        queueOrdering = new QueueOrderingService(
+                queueRepository, coordinator, new QueuePolicyProperties(Duration.ofMinutes(10)));
+        catalogService = new ServiceCatalogService(
+                serviceRepository, bookingRepository, queueRepository, coordinator, queueOrdering);
         notificationService = new NotificationManagementService(
                 notificationRepository, userRepository, bookingRepository, coordinator, notificationIds,
                 new NotificationPolicyProperties(10), clock);
@@ -86,7 +90,7 @@ abstract class ServiceTestSupport {
                 new BookingPolicyProperties(1, Duration.ZERO), clock);
         queueService = new QueueManagementService(
                 queueRepository, bookingRepository, serviceRepository, notificationService, coordinator,
-                new QueuePolicyProperties(Duration.ofMinutes(10)), clock);
+                queueOrdering, clock);
         reportService = new DailySummaryReportService(bookingRepository, queueRepository, coordinator);
     }
 
