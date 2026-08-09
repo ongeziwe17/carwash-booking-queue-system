@@ -66,7 +66,7 @@ Completed issue cleanup:
 | QUEUE-002 | #17 | Automate queue ordering, recalculation, and wait estimates | P0 | QUEUE-001 |
 | WORKFLOW-001 | #20 | Synchronize booking and queue lifecycles | P0 | QUEUE-001 |
 | QUEUE-003 | #112 | Implement true call-next queue behaviour | P1 | QUEUE-001, QUEUE-002 |
-| BOOKING-001 | #113 | Add rescheduling and configurable cancellation windows | P1 | CONFIG-001, WORKFLOW-001 |
+| BOOKING-001 | #113 | Add focused booking rescheduling; cancellation cutoff is already implemented by CONFIG-001 | P1 | CONFIG-001, WORKFLOW-001 |
 | AVAIL-001 | #114 | Add single-location service availability API | P1 | CONFIG-001, DATA-001 |
 
 Phase exit criteria:

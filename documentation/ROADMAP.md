@@ -51,7 +51,7 @@ The recommendation system must not be built before queue and availability behavi
 2. **QUEUE-002** — Automate queue ordering, position recalculation, and wait estimates (#17).
 3. **WORKFLOW-001** — Synchronize booking and queue lifecycles (#20).
 4. **QUEUE-003** — Implement true call-next behaviour (#112).
-5. **BOOKING-001** — Add rescheduling and configurable cancellation windows (#113).
+5. **BOOKING-001** — Add focused booking rescheduling; the configurable cancellation cutoff is already implemented by CONFIG-001 (#113).
 6. **AVAIL-001** — Add a single-location service availability API (#114).
 
 Expected outcome: confirmed bookings enter one ordered queue, positions and ETAs are server-managed, queue transitions keep booking state consistent, and customers can check availability before attempting a booking.
