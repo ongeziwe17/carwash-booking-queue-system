@@ -1,0 +1,30 @@
+info:
+  name: Confirm queue eligibility booking
+  type: http
+  seq: 3
+  tags:
+    - queue-eligibility
+    - workflow
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings/{{queueEligibilityBookingId}}/confirm"
+  auth:
+    type: bearer
+    token: "{{staffToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("booking is CONFIRMED", function() { expect(res.body.status).to.equal("CONFIRMED"); });
+        const lower = JSON.stringify(res.body ?? {}).toLowerCase();
+        for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password", "accesstoken"]) {
+          expect(lower, `response leaked ${forbidden}`).to.not.include(forbidden);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

@@ -6,8 +6,11 @@ import com.carwash.domain.Role;
 import com.carwash.domain.Service;
 import com.carwash.domain.User;
 import com.carwash.domain.Vehicle;
+import com.carwash.enums.QueueStatus;
 import com.carwash.testsupport.TestDates;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.math.BigDecimal;
 
@@ -65,7 +68,24 @@ class InMemoryRepositoryCrudTest {
         assertEquals(1, queues.findByBookingId("b-1").size());
         assertEquals(1, queues.findByServiceId("s-2").size());
         assertTrue(queues.existsByBookingId("b-1"));
+        assertTrue(queues.existsActiveByBookingId("b-1"));
         assertTrue(queues.existsByServiceId("s-2"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(QueueStatus.class)
+    void activeQueueLookupUsesCentralizedQueueStatusSemantics(QueueStatus status) {
+        InMemoryQueueEntryRepository queues = new InMemoryQueueEntryRepository();
+        User user = user("u-active", "active@example.com");
+        Service service = service("s-active", "Active lookup");
+        Booking booking = booking("b-active", user, service);
+        QueueEntry queueEntry = new QueueEntry("q-active", booking, service, 1);
+        queueEntry.setQueueStatus(status);
+        assertTrue(queues.insert(queueEntry));
+
+        assertEquals(status.isActive(), queues.existsActiveByBookingId("b-active"));
+        assertFalse(queues.existsActiveByBookingId("missing"));
+        assertFalse(queues.existsActiveByBookingId(null));
     }
 
     @Test

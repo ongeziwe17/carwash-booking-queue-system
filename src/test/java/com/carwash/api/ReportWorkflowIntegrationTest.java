@@ -50,7 +50,7 @@ class ReportWorkflowIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reportDate").value(reportDateTime.toLocalDate().toString()))
                 .andExpect(jsonPath("$.totalBookings").value(6))
-                .andExpect(jsonPath("$.confirmedBookings").value(1))
+                .andExpect(jsonPath("$.confirmedBookings").value(5))
                 .andExpect(jsonPath("$.cancelledBookings").value(1))
                 .andExpect(jsonPath("$.completedBookings").value(0))
                 .andExpect(jsonPath("$.totalQueueEntries").value(4))
@@ -93,6 +93,7 @@ class ReportWorkflowIntegrationTest extends ApiIntegrationTestSupport {
     }
 
     private CreateQueueEntryRequest createQueue(BookingApiFixture.CreatedBooking booking) throws Exception {
+        postBookingAction(booking, "confirm");
         CreateQueueEntryRequest request = QueueFixtureBuilder.valid(ids, booking.booking().bookingId(),
                 booking.resources().service().serviceId()).build();
         api.createQueueEntry(request).andExpect(status().isCreated());

@@ -125,6 +125,16 @@ abstract class ServiceTestSupport {
         return bookingService.createBooking(newBookingWithFixture(TestDates.future()));
     }
 
+    protected Booking createConfirmedBooking() {
+        Booking booking = createSavedBooking();
+        return bookingService.confirmBooking(booking.getBookingId());
+    }
+
+    protected Booking createConfirmedBooking(LocalDateTime scheduledDateTime) {
+        Booking booking = bookingService.createBooking(newBookingWithFixture(scheduledDateTime));
+        return bookingService.confirmBooking(booking.getBookingId());
+    }
+
     protected Booking createSavedBooking(LocalDateTime scheduledDateTime, BookingStatus status) {
         Booking booking = bookingService.createBooking(newBookingWithFixture(scheduledDateTime));
         booking.setStatus(status);
@@ -132,12 +142,12 @@ abstract class ServiceTestSupport {
     }
 
     protected QueueEntry createSavedQueueEntry() {
-        Booking booking = createSavedBooking();
+        Booking booking = createConfirmedBooking();
         return queueService.createQueueEntry(new QueueEntry(ids.queueEntry(), booking, booking.getService(), 1));
     }
 
     protected QueueEntry createSavedQueueEntry(LocalDateTime scheduledDateTime, QueueStatus status) {
-        Booking booking = createSavedBooking(scheduledDateTime, BookingStatus.CONFIRMED);
+        Booking booking = createConfirmedBooking(scheduledDateTime);
         QueueEntry queueEntry = queueService.createQueueEntry(
                 new QueueEntry(ids.queueEntry(), booking, booking.getService(), 1));
         queueEntry.setQueueStatus(status);

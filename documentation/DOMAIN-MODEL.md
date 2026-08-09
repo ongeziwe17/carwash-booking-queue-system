@@ -13,7 +13,7 @@ The application is a Spring Boot modular monolith using in-memory repositories. 
 | `Vehicle` | Customer-owned vehicle details | Ownership cannot change through an ordinary update; plate uniqueness is enforced per owner on create and update. |
 | `Service` | Global service-catalogue entry | Referenced services must be deactivated rather than physically deleted. |
 | `Booking` | Customer, vehicle, service, schedule, status, and optional queue link | Owner is preserved; only `CREATED` and `CONFIRMED` bookings are editable. |
-| `QueueEntry` | Booking queue state and position | The canonical entry is attached to its booking; only waiting entries may be repositioned or deleted. |
+| `QueueEntry` | Booking queue state and position | Requires a confirmed booking and active matching service; one active entry is allowed per booking. |
 | `Notification` | In-app notification record for a user and optional booking | User and booking references are resolved to canonical repository objects before insertion. |
 
 ## 3. Repository Contract
@@ -69,7 +69,9 @@ A booking may be physically deleted only when it is cancelled and has no queue e
 
 ### Booking and queue entry
 
-Queue creation resolves the canonical booking and service, inserts the entry, and attaches it to `Booking.queueEntry` inside one write boundary.
+Queue creation resolves the canonical booking and service inside one write boundary. The booking must be `CONFIRMED`, the matching service must be active, and the queue repository must not contain another active entry for the booking. Active queue states are `WAITING`, `CALLED`, and `IN_PROGRESS`; `COMPLETED` and `EXITED` are terminal/non-active.
+
+After all eligibility checks pass, the service normalizes the new entry to `WAITING`, supplies its lifecycle timestamp and wait estimate, inserts it, and attaches it to `Booking.queueEntry`. The caller continues to supply a positive position until QUEUE-002 implements server-managed ordering. The existing single queue reference is retained; QUEUE-001 does not redesign booking queue history or re-entry semantics.
 
 Only a waiting queue entry may be physically deleted. Deletion removes the repository record and clears the booking link.
 
@@ -109,7 +111,7 @@ COMPLETED
 
 Queue position updates are allowed only while the entry is `WAITING`. Called, in-progress, completed, or exited entries cannot be repositioned or physically deleted.
 
-Queue ordering automation, queue eligibility, and dedicated rescheduling remain separate roadmap work. Booking cancellation already honors the deployment-configurable cancellation window documented in [CONFIGURATION.md](CONFIGURATION.md).
+Queue entry eligibility and active uniqueness are implemented. Queue creation does not change booking status, and queue transitions do not yet synchronize booking lifecycle state. Automatic ordering/position recalculation remains QUEUE-002, lifecycle synchronization remains WORKFLOW-001, and true server-selected call-next remains QUEUE-003. Dedicated booking rescheduling also remains roadmap work. Booking cancellation already honors the deployment-configurable cancellation window documented in [CONFIGURATION.md](CONFIGURATION.md).
 
 ## 8. Mutable Reference Limitation
 

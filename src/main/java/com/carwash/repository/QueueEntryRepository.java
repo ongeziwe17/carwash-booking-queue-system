@@ -9,5 +9,6 @@ public interface QueueEntryRepository extends Repository<QueueEntry, String> {
     List<QueueEntry> findByServiceId(String serviceId);
 
     boolean existsByBookingId(String bookingId);
+    boolean existsActiveByBookingId(String bookingId);
     boolean existsByServiceId(String serviceId);
 }

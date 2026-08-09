@@ -84,7 +84,11 @@ public class QueueController {
     @PostMapping
     @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create queue entry")
+    @Operation(
+            summary = "Create queue entry",
+            description = "Only confirmed bookings using their active matching service can enter the queue. "
+                    + "A booking cannot have more than one active queue entry; position remains caller supplied."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Queue entry created"),
             @ApiResponse(responseCode = "400", description = "Invalid request or queue rule violation",

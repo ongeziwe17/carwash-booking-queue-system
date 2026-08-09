@@ -47,7 +47,7 @@ Expected outcome: safe bounded DTOs, predictable validation/errors, no silent ID
 
 The recommendation system must not be built before queue and availability behaviour is reliable.
 
-1. **QUEUE-001** — Enforce queue-entry eligibility and uniqueness (#16).
+1. **QUEUE-001** — Enforce queue-entry eligibility and uniqueness (#16) — implemented.
 2. **QUEUE-002** — Automate queue ordering, position recalculation, and wait estimates (#17).
 3. **WORKFLOW-001** — Synchronize booking and queue lifecycles (#20).
 4. **QUEUE-003** — Implement true call-next behaviour (#112).

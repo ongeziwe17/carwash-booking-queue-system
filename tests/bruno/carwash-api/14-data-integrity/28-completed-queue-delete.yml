@@ -1,25 +1,13 @@
 info:
-  name: Duplicate queue ID is rejected
+  name: Completed queue cannot be deleted
   type: http
-  seq: 24
+  seq: 28
   tags:
     - integrity
 
 http:
-  method: POST
-  url: "{{baseUrl}}/api/queue-entries"
-  headers:
-    - name: Content-Type
-      value: "application/json"
-  body:
-    type: json
-    data: |-
-      {
-        "queueEntryId": "{{queueEntryId}}",
-        "bookingId": "{{fullSlotBookingId}}",
-        "serviceId": "{{serviceId}}",
-        "position": 1
-      }
+  method: DELETE
+  url: "{{baseUrl}}/api/queue-entries/{{queueEntryId}}"
   auth:
     type: bearer
     token: "{{staffToken}}"
@@ -32,7 +20,7 @@ runtime:
         test("uses BUSINESS_RULE_VIOLATION", function() { expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); expect(res.body.status).to.equal(400); });
         test("reports request path", function() { expect(res.body.path).to.equal(String(req.getUrl()).replace(/^https?:\/\/[^/]+/, "").split("?")[0]); });
         test("has ISO timestamp and fieldErrors", function() { expect(Number.isNaN(Date.parse(res.body.timestamp))).to.equal(false); expect(Array.isArray(res.body.fieldErrors)).to.equal(true); });
-        test("uses safe business message", function() { expect(res.body.message).to.include("Queue entry ID already exists"); });
+        test("uses safe business message", function() { expect(res.body.message).to.include("waiting"); });
         const payload = JSON.stringify(res.body ?? {});
         const lower = payload.toLowerCase();
         for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password"]) {
