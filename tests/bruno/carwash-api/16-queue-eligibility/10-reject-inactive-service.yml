@@ -18,8 +18,7 @@ http:
       {
         "queueEntryId": "{{queueEligibilityInactiveQueueId}}",
         "bookingId": "{{queueEligibilityInactiveBookingId}}",
-        "serviceId": "{{queueEligibilityInactiveServiceId}}",
-        "position": 1
+        "serviceId": "{{queueEligibilityInactiveServiceId}}"
       }
   auth:
     type: bearer

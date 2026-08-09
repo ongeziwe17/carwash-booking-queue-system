@@ -144,6 +144,7 @@ The collection verifies:
 - safe standard error responses and sensitive-data absence;
 - DATA-001 duplicate/dependency/lifecycle protections;
 - QUEUE-001 confirmed-booking, active-service, matching-service, and active-entry uniqueness rules;
+- QUEUE-002 server-managed global positions, cumulative waits, full movement/deletion/completion rebalance, and obsolete position rejection;
 - current queue states (`WAITING`, `CALLED`, `IN_PROGRESS`, `COMPLETED`);
 - real role changes and token acquisition;
 - final-platform-administrator protection without deleting or demoting the bootstrap admin.

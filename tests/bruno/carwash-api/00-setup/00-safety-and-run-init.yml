@@ -56,6 +56,15 @@ runtime:
           queueEligibilityInactiveServiceId: `queue-eligibility-inactive-service-${runId}`,
           queueEligibilityInactiveBookingId: `queue-eligibility-inactive-booking-${runId}`,
           queueEligibilityInactiveQueueId: `queue-eligibility-inactive-${runId}`,
+          queueOrderingService10Id: `queue-ordering-service-10-${runId}`,
+          queueOrderingService25Id: `queue-ordering-service-25-${runId}`,
+          queueOrderingService15Id: `queue-ordering-service-15-${runId}`,
+          queueOrderingBooking1Id: `queue-ordering-booking-1-${runId}`,
+          queueOrderingBooking2Id: `queue-ordering-booking-2-${runId}`,
+          queueOrderingBooking3Id: `queue-ordering-booking-3-${runId}`,
+          queueOrderingEntry1Id: `queue-ordering-entry-1-${runId}`,
+          queueOrderingEntry2Id: `queue-ordering-entry-2-${runId}`,
+          queueOrderingEntry3Id: `queue-ordering-entry-3-${runId}`,
           ownerJourneyServiceId: `owner-journey-service-${runId}`, adminRbacServiceId: `admin-rbac-service-${runId}`, adminJourneyUserId: `admin-journey-${runId}`,
           adminJourneyEmail: `admin-journey-${runId}@example.test`
         };

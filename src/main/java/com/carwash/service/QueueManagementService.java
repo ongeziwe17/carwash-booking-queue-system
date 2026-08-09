@@ -14,7 +14,9 @@ import com.carwash.service.exception.BusinessRuleViolationException;
 import com.carwash.service.exception.ResourceNotFoundException;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -45,10 +47,10 @@ public class QueueManagementService {
         this.clock = Objects.requireNonNull(clock, "Application clock is required");
     }
 
-    public QueueEntry createQueueEntry(String queueEntryId, String bookingId, String serviceId, int position) {
+    public QueueEntry createQueueEntry(String queueEntryId, String bookingId, String serviceId) {
         Booking booking = new Booking(); booking.setBookingId(bookingId);
         Service service = new Service(); service.setServiceId(serviceId);
-        return createQueueEntry(new QueueEntry(queueEntryId, booking, service, position));
+        return createQueueEntry(new QueueEntry(queueEntryId, booking, service));
     }
 
     public QueueEntry createQueueEntry(QueueEntry queueEntry) {
@@ -59,7 +61,8 @@ public class QueueManagementService {
                     && !queueEntry.getQueueEntryId().equals(booking.getQueueEntry().getQueueEntryId())) {
                 throw new BusinessRuleViolationException("Booking already has a queue entry");
             }
-            initializeNewQueueEntry(queueEntry);
+            List<QueueEntry> activeQueue = queueEntryRepository.findActiveOrdered();
+            initializeNewQueueEntry(queueEntry, activeQueue.size() + 1);
             if (!queueEntryRepository.insert(queueEntry)) {
                 throw new BusinessRuleViolationException("Queue entry ID already exists");
             }
@@ -68,9 +71,11 @@ public class QueueManagementService {
                 if (!bookingRepository.update(booking)) {
                     throw new ResourceNotFoundException("Booking not found: " + booking.getBookingId());
                 }
+                rebalanceActiveQueue(queueEntryRepository.findActiveOrdered());
             } catch (RuntimeException exception) {
                 queueEntryRepository.deleteById(queueEntry.getQueueEntryId());
                 booking.detachQueueEntry(queueEntry.getQueueEntryId());
+                bookingRepository.update(booking);
                 throw exception;
             }
             return queueEntry;
@@ -82,7 +87,7 @@ public class QueueManagementService {
     }
 
     public List<QueueEntry> findAll() {
-        return coordinator.read(queueEntryRepository::findAll);
+        return coordinator.read(queueEntryRepository::findAllOrdered);
     }
 
     public List<QueueEntry> findByServiceId(String serviceId) {
@@ -96,8 +101,13 @@ public class QueueManagementService {
             if (queueEntry.getQueueStatus() != QueueStatus.WAITING) {
                 throw new BusinessRuleViolationException("Only waiting queue entries can be repositioned");
             }
-            queueEntry.updatePosition(position, queuePolicy.defaultServiceDuration());
-            updateQueueEntry(queueEntry);
+            List<QueueEntry> activeQueue = new ArrayList<>(queueEntryRepository.findActiveOrdered());
+            if (position > activeQueue.size()) {
+                throw new BusinessRuleViolationException("Queue position exceeds active queue size");
+            }
+            activeQueue.removeIf(entry -> queueEntryId.equals(entry.getQueueEntryId()));
+            activeQueue.add(position - 1, queueEntry);
+            rebalanceActiveQueue(activeQueue);
             return queueEntry;
         });
     }
@@ -136,6 +146,7 @@ public class QueueManagementService {
                 throw new BusinessRuleViolationException("Queue entry cannot be completed in current state");
             }
             updateQueueEntry(queueEntry);
+            rebalanceActiveQueue(queueEntryRepository.findActiveOrdered());
             notifyCustomer(queueEntry, "SERVICE_COMPLETED", "Your service has been completed.");
             return queueEntry;
         });
@@ -157,6 +168,7 @@ public class QueueManagementService {
                     throw new ResourceNotFoundException("Booking not found: " + booking.getBookingId());
                 }
             }
+            rebalanceActiveQueue(queueEntryRepository.findActiveOrdered());
         });
     }
 
@@ -183,7 +195,6 @@ public class QueueManagementService {
         if (queueEntry.getQueueEntryId() == null || queueEntry.getQueueEntryId().isBlank()) {
             throw new BusinessRuleViolationException("Queue entry ID is required");
         }
-        if (queueEntry.getPosition() <= 0) throw new BusinessRuleViolationException("Queue position must be positive");
         if (queueEntry.getBooking() == null || queueEntry.getBooking().getBookingId() == null
                 || queueEntry.getBooking().getBookingId().isBlank()) {
             throw new BusinessRuleViolationException("Booking is required");
@@ -216,12 +227,44 @@ public class QueueManagementService {
         queueEntry.setService(service);
     }
 
-    private void initializeNewQueueEntry(QueueEntry queueEntry) {
+    private void initializeNewQueueEntry(QueueEntry queueEntry, int position) {
         queueEntry.setQueueStatus(QueueStatus.WAITING);
         queueEntry.setJoinedAt(LocalDateTime.now(clock));
         queueEntry.setCalledAt(null);
         queueEntry.setStartedAt(null);
         queueEntry.setCompletedAt(null);
-        queueEntry.recalculateEstimatedWait(queuePolicy.defaultServiceDuration());
+        queueEntry.updateQueueMetrics(position, 0);
+    }
+
+    private void rebalanceActiveQueue(List<QueueEntry> orderedActiveQueue) {
+        List<Integer> estimatedWaits = new ArrayList<>(orderedActiveQueue.size());
+        int estimatedWaitMin = 0;
+        for (int index = 0; index < orderedActiveQueue.size(); index++) {
+            estimatedWaits.add(estimatedWaitMin);
+            if (index < orderedActiveQueue.size() - 1) {
+                estimatedWaitMin = Math.addExact(
+                        estimatedWaitMin, effectiveServiceDurationMinutes(orderedActiveQueue.get(index)));
+            }
+        }
+        for (int index = 0; index < orderedActiveQueue.size(); index++) {
+            QueueEntry queueEntry = orderedActiveQueue.get(index);
+            queueEntry.updateQueueMetrics(index + 1, estimatedWaits.get(index));
+            updateQueueEntry(queueEntry);
+        }
+    }
+
+    private int effectiveServiceDurationMinutes(QueueEntry queueEntry) {
+        Service service = queueEntry.getService();
+        if (service != null && service.getEstimatedDurationMin() > 0) {
+            return service.getEstimatedDurationMin();
+        }
+        return durationInMinutes(queuePolicy.defaultServiceDuration());
+    }
+
+    private int durationInMinutes(Duration duration) {
+        long seconds = duration.getSeconds();
+        long minutes = seconds / 60;
+        if (seconds % 60 != 0 || duration.getNano() != 0) minutes++;
+        return Math.toIntExact(Math.max(minutes, 1));
     }
 }

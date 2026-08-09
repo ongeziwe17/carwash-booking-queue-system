@@ -1,5 +1,5 @@
 info:
-  name: Staff updates waiting position
+  name: Staff rebalances waiting position
   type: http
   seq: 4
   tags:
@@ -16,7 +16,7 @@ http:
     type: json
     data: |-
       {
-        "position": 2
+        "position": 1
       }
   auth:
     type: bearer
@@ -38,7 +38,7 @@ runtime:
         const bootstrapPassword = bru.interpolate("{{process.env.BRUNO_BOOTSTRAP_ADMIN_PASSWORD}}");
         if (bootstrapPassword && !bootstrapPassword.includes("process.env")) expect(payload).to.not.include(bootstrapPassword);
         test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
-        test("position updated", function() { expect(res.body.position).to.equal(2); });
+        test("position remains valid", function() { expect(res.body.position).to.equal(1); expect(res.body.estimatedWaitMin).to.equal(0); });
 
 settings:
   encodeUrl: true

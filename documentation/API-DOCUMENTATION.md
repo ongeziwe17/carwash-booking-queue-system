@@ -189,20 +189,22 @@ There is an internal service-layer physical delete operation for already-cancell
 
 | Method | Path | Auth / access | Success | Expected errors | Purpose |
 |---|---|---|---|---|---|
-| GET | `/api/queue-entries` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry[]` | 401, 403, 405, 500 | List all queue entries. |
+| GET | `/api/queue-entries` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry[]` | 401, 403, 405, 500 | List active entries in operational order, followed by terminal history. |
 | GET | `/api/queue-entries/{id}` | Bearer; booking owner or operational role | `200 QueueEntry` | 400, 401, 403, 404, 405, 500 | Get a queue entry. |
-| POST | `/api/queue-entries` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `201 QueueEntry` | 400, 401, 403, 404, 405, 415, 500 | Create and attach a queue entry. |
-| PUT | `/api/queue-entries/{id}/position` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry` | 400, 401, 403, 404, 405, 415, 500 | Manually reposition a waiting entry. |
+| POST | `/api/queue-entries` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `201 QueueEntry` | 400, 401, 403, 404, 405, 415, 500 | Append and attach an eligible entry with server-generated metrics. |
+| PUT | `/api/queue-entries/{id}/position` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry` | 400, 401, 403, 404, 405, 415, 500 | Move a waiting entry and rebalance the active queue. |
 | POST | `/api/queue-entries/{id}/call-next` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry` | 400, 401, 403, 404, 405, 500 | Mark this specific waiting entry as called. |
 | POST | `/api/queue-entries/{id}/start` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry` | 400, 401, 403, 404, 405, 500 | Start service for a called entry. |
 | POST | `/api/queue-entries/{id}/complete` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry` | 400, 401, 403, 404, 405, 500 | Complete an in-progress entry. |
 | DELETE | `/api/queue-entries/{id}` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `204` | 400, 401, 403, 404, 405, 500 | Delete a waiting entry and clear its booking link. |
 
-`CreateQueueEntryRequest` accepts `queueEntryId`, `bookingId`, `serviceId`, and positive `position`. Queue entry creation requires an existing `CONFIRMED` booking and its existing, active matching service. A booking may have only one active queue entry, where `WAITING`, `CALLED`, and `IN_PROGRESS` are active and `COMPLETED` and `EXITED` are terminal/non-active. Every new entry is initialized by the server as `WAITING`, with server-controlled lifecycle timestamps and estimated wait; the positive position remains caller supplied for now. The canonical entry is attached to the canonical booking inside the current single-JVM write boundary. `UpdateQueuePositionRequest` contains only a positive `position`.
+`CreateQueueEntryRequest` accepts only `queueEntryId`, `bookingId`, and `serviceId`. Queue entry creation requires an existing `CONFIRMED` booking and its existing, active matching service. A booking may have only one active queue entry, where `WAITING`, `CALLED`, and `IN_PROGRESS` are active and `COMPLETED` and `EXITED` are terminal/non-active. Every new entry is initialized by the server as `WAITING`, appended to the one global active queue, and assigned its position, lifecycle timestamps, and estimated wait inside the current single-JVM write boundary. The canonical entry is then attached to the canonical booking. Because JSON request contracts are strict, the removed creation-time `position` property is rejected as `400 MALFORMED_REQUEST`; it is not ignored as a compatibility hint.
 
-The lifecycle implemented today is `WAITING → CALLED → IN_PROGRESS → COMPLETED`. Only `WAITING` entries may be manually repositioned or deleted. Queue creation does not change the booking status, and later queue transitions do not yet synchronize the booking lifecycle; that remains WORKFLOW-001. The endpoint name `/call-next` is historical: it acts on the supplied queue-entry `{id}` and does **not** choose the next eligible customer. Automatic queue sorting/recalculation remains QUEUE-002 work, and true server-selected call-next remains QUEUE-003 work.
+Active positions are unique and consecutive from `1..N`. New entries append at `N + 1`; completion and physical deletion remove an entry from active calculations and immediately close later position gaps. `GET /api/queue-entries` returns active entries first by `position`, then uses `joinedAt` and `queueEntryId` as deterministic tie-breakers for inconsistent legacy state; terminal records follow in stable order. Service-filtered internal retrieval preserves global positions rather than creating a separate service queue. Branch-specific queues are not implemented.
 
-`estimatedWaitMin` is calculated from the submitted position and service duration; the configured fallback service duration is used defensively when no positive service duration is available.
+`estimatedWaitMin` is the cumulative effective service duration of active entries ahead; an entry's own duration is not part of its wait. A predecessor uses its positive `estimatedDurationMin`, or the configured default service duration when no positive value is available. Completed, exited, and physically deleted entries do not contribute; terminal records have zero wait.
+
+`UpdateQueuePositionRequest` contains one positive `position`. Only `WAITING` entries may move, and the target cannot exceed the active queue size. A successful move reorders the entry and recalculates every affected active position and wait. The lifecycle remains `WAITING → CALLED → IN_PROGRESS → COMPLETED`; ordering changes do not alter queue or booking lifecycle state. Queue creation and transitions still do not synchronize booking status—that remains WORKFLOW-001. The endpoint name `/call-next` is historical: it acts on the supplied queue-entry `{id}` and does **not** choose the next eligible customer; true server-selected call-next remains QUEUE-003 work.
 
 ## Notifications
 
@@ -318,11 +320,11 @@ The full `Booking` response also contains the resolved `user`, `vehicle`, and `s
   "calledAt": null,
   "startedAt": null,
   "completedAt": null,
-  "estimatedWaitMin": 30
+  "estimatedWaitMin": 10
 }
 ```
 
-The full `QueueEntry` response also contains its resolved `booking` and `service` objects.
+The full `QueueEntry` response also contains its resolved `booking` and `service` objects. In this example, a 10-minute active service is ahead of the entry; the response position and wait were assigned by the server.
 
 ### Notification — `200` list item (selected fields)
 
@@ -458,7 +460,7 @@ See [Runtime Policy Configuration](CONFIGURATION.md) for defaults, validation, c
 - Multi-instance transaction/locking guarantees are not provided.
 - Marketplace tenant isolation and business/branch models are not implemented.
 - The service catalogue is global, not branch-specific.
-- Queue positions are supplied/manually updated; there is no automatic queue-ordering engine or true server-selected call-next workflow.
+- Queue ordering is one global single-location sequence; branch-specific queues and true server-selected call-next are not implemented.
 - Queue/booking lifecycle synchronization is not yet complete beyond the transitions currently implemented.
 - Notifications are in-app only; there is no SMS/email provider delivery.
 - Payments/refunds are not implemented.
@@ -476,7 +478,7 @@ The following are roadmap capabilities, not implemented endpoints. No paths are 
 - refresh-token/logout/revocation lifecycle, if later specified;
 - durable PostgreSQL persistence and database-backed transaction boundaries;
 - Marketplace business/branch model and tenant isolation;
-- automatic queue ordering and true call-next selection;
+- true server-selected call-next selection;
 - dedicated booking rescheduling and availability search;
 - payment/refund workflows;
 - external email/SMS delivery;

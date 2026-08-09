@@ -16,7 +16,7 @@ Implemented on `staging`:
 - Vehicle CRUD, user ownership, and duplicate plate validation during creation.
 - Global service catalogue CRUD with active/inactive workflows.
 - Booking creation, update, confirmation, cancellation, future-time validation, ownership validation, inactive-service rejection, and exact-slot capacity validation.
-- Queue entry creation, manual position update, call/start/complete transitions, and deletion.
+- Eligible queue entry creation with server-managed global ordering, cumulative wait estimates, full manual rebalance, call/start/complete transitions, and deletion.
 - In-app notification creation and recent lookup by user.
 - Basic daily booking and queue summary reporting.
 - BCrypt credential storage, JWT authentication, RBAC, ownership authorization, and platform-admin role assignment.
@@ -24,7 +24,7 @@ Implemented on `staging`:
 - Validated runtime policy configuration for booking, notification, queue, and application-time behavior.
 - Swagger/OpenAPI with CI contract export/quality gates, Maven tests, Docker, Docker Compose, and Bruno HTTP acceptance coverage.
 
-Current limitations include some non-user domain response schemas, in-memory-only storage, manually managed queue positions, incomplete booking/queue lifecycle synchronization, no business/branch model or tenant isolation, no payments/external notification delivery, and no production observability platform. Authentication and RBAC are implemented but do not provide tenant isolation.
+Current limitations include some non-user domain response schemas, in-memory-only storage, incomplete booking/queue lifecycle synchronization, a global single-location queue with no branch model or tenant isolation, no payments/external notification delivery, and no production observability platform. Authentication and RBAC are implemented but do not provide tenant isolation.
 
 ## Phase 0 — API, Data, Test, and Delivery Hardening
 
@@ -48,7 +48,7 @@ Expected outcome: safe bounded DTOs, predictable validation/errors, no silent ID
 The recommendation system must not be built before queue and availability behaviour is reliable.
 
 1. **QUEUE-001** — Enforce queue-entry eligibility and uniqueness (#16) — implemented.
-2. **QUEUE-002** — Automate queue ordering, position recalculation, and wait estimates (#17).
+2. **QUEUE-002** — Automate queue ordering, position recalculation, and wait estimates (#17) — implemented.
 3. **WORKFLOW-001** — Synchronize booking and queue lifecycles (#20).
 4. **QUEUE-003** — Implement true call-next behaviour (#112).
 5. **BOOKING-001** — Add focused booking rescheduling; the configurable cancellation cutoff is already implemented by CONFIG-001 (#113).

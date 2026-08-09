@@ -91,7 +91,7 @@ class AggregateIntegrityServiceTest {
         assertSame(booking, bookings.findById("aggregate-booking").orElseThrow());
         assertEquals(1, user.getBookings().size());
         bookingManagement.confirmBooking("aggregate-booking");
-        var queueEntry = queueManagement.createQueueEntry("aggregate-queue", "aggregate-booking", "aggregate-service", 1);
+        var queueEntry = queueManagement.createQueueEntry("aggregate-queue", "aggregate-booking", "aggregate-service");
         assertSame(queueEntry, booking.getQueueEntry());
         assertThrows(BusinessRuleViolationException.class, () -> vehicleManagement.deleteVehicle("aggregate-vehicle"));
         assertThrows(BusinessRuleViolationException.class, () -> serviceCatalog.deleteService("aggregate-service"));
@@ -166,7 +166,7 @@ class AggregateIntegrityServiceTest {
         Booking waiting = bookingManagement.createBooking("state-queue-booking", user.getUserId(), "state-vehicle", "state-service",
                 TestDates.futureDays(4), "");
         bookingManagement.confirmBooking(waiting.getBookingId());
-        var queueEntry = queueManagement.createQueueEntry("state-queue", waiting.getBookingId(), "state-service", 1);
+        var queueEntry = queueManagement.createQueueEntry("state-queue", waiting.getBookingId(), "state-service");
         queueManagement.callNext(queueEntry.getQueueEntryId());
         assertThrows(BusinessRuleViolationException.class, () -> queueManagement.updatePosition(queueEntry.getQueueEntryId(), 2));
         assertThrows(BusinessRuleViolationException.class, () -> queueManagement.deleteQueueEntry(queueEntry.getQueueEntryId()));

@@ -1,0 +1,41 @@
+info:
+  name: Create second ordering booking
+  type: http
+  seq: 17
+  tags:
+    - workflow
+    - integrity
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "bookingId": "{{queueOrderingBooking2Id}}",
+        "userId": "{{customerUserId}}",
+        "vehicleId": "{{customerVehicleId}}",
+        "serviceId": "{{queueOrderingService25Id}}",
+        "scheduledDateTime": "{{future25}}",
+        "specialRequest": "QUEUE-002 second entry"
+      }
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("booking starts CREATED", function() { expect(res.body.status).to.equal("CREATED"); });
+        test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

@@ -1,0 +1,34 @@
+info:
+  name: Verify server managed queue ordering
+  type: http
+  seq: 25
+  tags:
+    - workflow
+    - integrity
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/queue-entries"
+  auth:
+    type: bearer
+    token: "{{staffToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("active queue is globally ordered with cumulative waits", function() {
+          const active = res.body.filter(entry => ["WAITING", "CALLED", "IN_PROGRESS"].includes(entry.queueStatus));
+          expect(active.slice(0, 3).map(entry => entry.queueEntryId)).to.deep.equal([
+            bru.getVar("queueOrderingEntry1Id"), bru.getVar("queueOrderingEntry2Id"), bru.getVar("queueOrderingEntry3Id")
+          ]);
+          expect(active.slice(0, 3).map(entry => entry.position)).to.deep.equal([1, 2, 3]);
+          expect(active.slice(0, 3).map(entry => entry.estimatedWaitMin)).to.deep.equal([0, 10, 35]);
+        });
+        test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false
