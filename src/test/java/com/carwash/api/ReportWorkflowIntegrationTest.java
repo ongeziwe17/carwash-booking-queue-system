@@ -35,12 +35,12 @@ class ReportWorkflowIntegrationTest extends ApiIntegrationTestSupport {
 
         createQueue(waiting);
         CreateQueueEntryRequest calledQueue = createQueue(called);
-        postQueueAction(calledQueue, "call-next");
+        postQueueAction(calledQueue, "call");
         CreateQueueEntryRequest progressQueue = createQueue(progress);
-        postQueueAction(progressQueue, "call-next");
+        postQueueAction(progressQueue, "call");
         postQueueAction(progressQueue, "start");
         CreateQueueEntryRequest completedQueue = createQueue(completed);
-        postQueueAction(completedQueue, "call-next");
+        postQueueAction(completedQueue, "call");
         postQueueAction(completedQueue, "start");
         postQueueAction(completedQueue, "complete");
 

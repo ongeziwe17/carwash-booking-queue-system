@@ -83,7 +83,9 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         assertForbidden(mockMvc.perform(get("/api/queue-entries/{id}", otherResources.queueEntryId()).header(HttpHeaders.AUTHORIZATION, customer.bearer())));
         assertForbidden(mockMvc.perform(post("/api/services").header(HttpHeaders.AUTHORIZATION, customer.bearer())
                 .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(serviceRequest()))));
-        assertForbidden(mockMvc.perform(post("/api/queue-entries/{id}/call-next", ownResources.queueEntryId())
+        assertForbidden(mockMvc.perform(post("/api/queue-entries/call-next")
+                .header(HttpHeaders.AUTHORIZATION, customer.bearer())));
+        assertForbidden(mockMvc.perform(post("/api/queue-entries/{id}/call", ownResources.queueEntryId())
                 .header(HttpHeaders.AUTHORIZATION, customer.bearer())));
         assertForbidden(mockMvc.perform(get("/api/reports/daily-summary").header(HttpHeaders.AUTHORIZATION, customer.bearer())
                 .param("date", TestDates.future().toLocalDate().toString())));
@@ -105,7 +107,7 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(status().isOk());
         assertOperationalUpdateCannotTransferOwner(staff, resources, other.userId());
         enqueue(resources);
-        mockMvc.perform(post("/api/queue-entries/{id}/call-next", resources.queueEntryId())
+        mockMvc.perform(post("/api/queue-entries/call-next")
                         .header(HttpHeaders.AUTHORIZATION, staff.bearer()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.queueStatus").value("CALLED"));
         assertForbidden(mockMvc.perform(post("/api/services").header(HttpHeaders.AUTHORIZATION, staff.bearer())
@@ -130,7 +132,7 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(status().isOk());
         assertOperationalUpdateCannotTransferOwner(owner, resources, other.userId());
         enqueue(resources);
-        mockMvc.perform(post("/api/queue-entries/{id}/call-next", resources.queueEntryId())
+        mockMvc.perform(post("/api/queue-entries/{id}/call", resources.queueEntryId())
                         .header(HttpHeaders.AUTHORIZATION, owner.bearer())).andExpect(status().isOk());
         mockMvc.perform(post("/api/services").header(HttpHeaders.AUTHORIZATION, owner.bearer())
                         .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(serviceRequest())))

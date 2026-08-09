@@ -3,10 +3,12 @@ package com.carwash.repository;
 import com.carwash.domain.QueueEntry;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface QueueEntryRepository extends Repository<QueueEntry, String> {
     List<QueueEntry> findAllOrdered();
     List<QueueEntry> findActiveOrdered();
+    Optional<QueueEntry> findNextWaiting();
     List<QueueEntry> findByBookingId(String bookingId);
     List<QueueEntry> findByServiceId(String serviceId);
 

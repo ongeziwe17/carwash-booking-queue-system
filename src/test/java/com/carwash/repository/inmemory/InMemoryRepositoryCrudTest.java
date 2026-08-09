@@ -133,6 +133,69 @@ class InMemoryRepositoryCrudTest {
     }
 
     @Test
+    void nextWaitingSelectsLowestPositionRegardlessOfInsertionOrder() {
+        InMemoryQueueEntryRepository queues = new InMemoryQueueEntryRepository();
+        User user = user("u-next-order", "next-order@example.com");
+        Service service = service("s-next-order", "Next order");
+        QueueEntry third = queue("q-third", booking("b-third", user, service), service, 3,
+                QueueStatus.WAITING, LocalDateTime.of(2090, 4, 1, 8, 3));
+        QueueEntry first = queue("q-first", booking("b-first", user, service), service, 1,
+                QueueStatus.WAITING, LocalDateTime.of(2090, 4, 1, 8, 1));
+        QueueEntry second = queue("q-second", booking("b-second", user, service), service, 2,
+                QueueStatus.WAITING, LocalDateTime.of(2090, 4, 1, 8, 2));
+        List.of(third, first, second).forEach(entry -> assertTrue(queues.insert(entry)));
+
+        assertEquals(first, queues.findNextWaiting().orElseThrow());
+    }
+
+    @Test
+    void nextWaitingSkipsCalledAndInProgressEntries() {
+        InMemoryQueueEntryRepository queues = new InMemoryQueueEntryRepository();
+        User user = user("u-next-skip", "next-skip@example.com");
+        Service service = service("s-next-skip", "Next skip");
+        QueueEntry called = queue("q-called", booking("b-called", user, service), service, 1,
+                QueueStatus.CALLED, LocalDateTime.of(2090, 4, 2, 8, 1));
+        QueueEntry inProgress = queue("q-progress", booking("b-progress", user, service), service, 2,
+                QueueStatus.IN_PROGRESS, LocalDateTime.of(2090, 4, 2, 8, 2));
+        QueueEntry waiting = queue("q-waiting", booking("b-waiting", user, service), service, 3,
+                QueueStatus.WAITING, LocalDateTime.of(2090, 4, 2, 8, 3));
+        List.of(waiting, called, inProgress).forEach(entry -> assertTrue(queues.insert(entry)));
+
+        assertEquals(waiting, queues.findNextWaiting().orElseThrow());
+    }
+
+    @Test
+    void nextWaitingIgnoresTerminalEntries() {
+        InMemoryQueueEntryRepository queues = new InMemoryQueueEntryRepository();
+        User user = user("u-next-terminal", "next-terminal@example.com");
+        Service service = service("s-next-terminal", "Next terminal");
+        QueueEntry completed = queue("q-completed", booking("b-completed", user, service), service, 1,
+                QueueStatus.COMPLETED, LocalDateTime.of(2090, 4, 3, 8, 1));
+        QueueEntry exited = queue("q-exited", booking("b-exited", user, service), service, 2,
+                QueueStatus.EXITED, LocalDateTime.of(2090, 4, 3, 8, 2));
+        List.of(completed, exited).forEach(entry -> assertTrue(queues.insert(entry)));
+
+        assertTrue(queues.findNextWaiting().isEmpty());
+    }
+
+    @Test
+    void nextWaitingPreservesJoinedTimeThenIdTieBreakers() {
+        InMemoryQueueEntryRepository queues = new InMemoryQueueEntryRepository();
+        User user = user("u-next-tie", "next-tie@example.com");
+        Service service = service("s-next-tie", "Next tie");
+        LocalDateTime joined = LocalDateTime.of(2090, 4, 4, 8, 0);
+        QueueEntry late = queue("q-0", booking("b-late", user, service), service, 1,
+                QueueStatus.WAITING, joined.plusMinutes(1));
+        QueueEntry idB = queue("q-b", booking("b-b", user, service), service, 1,
+                QueueStatus.WAITING, joined);
+        QueueEntry idA = queue("q-a", booking("b-a", user, service), service, 1,
+                QueueStatus.WAITING, joined);
+        List.of(late, idB, idA).forEach(entry -> assertTrue(queues.insert(entry)));
+
+        assertEquals(idA, queues.findNextWaiting().orElseThrow());
+    }
+
+    @Test
     void serviceFilteredQueuePreservesGlobalPositionsAndOperationalOrder() {
         InMemoryQueueEntryRepository queues = new InMemoryQueueEntryRepository();
         User user = user("u-filter", "filter@example.com");

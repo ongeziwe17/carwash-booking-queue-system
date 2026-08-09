@@ -81,7 +81,7 @@ class BookingWorkflowIntegrationTest extends ApiIntegrationTestSupport {
     void inServiceBookingCancellationReturnsStandardBusinessRuleError() throws Exception {
         BookingApiFixture.CreatedBooking booking = fixture().createBooking(TestDates.futureDays(32));
         CreateQueueEntryRequest queue = createConfirmedQueue(booking);
-        postQueueAction(queue, "call-next");
+        postQueueAction(queue, "call");
         postQueueAction(queue, "start");
 
         mockMvc.perform(post("/api/bookings/{id}/cancel", booking.booking().bookingId())

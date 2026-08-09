@@ -40,7 +40,7 @@ class LifecycleFailureRollbackTest {
         Fixture fixture = new Fixture();
         Booking booking = fixture.confirmedBooking("start", 10, 1);
         QueueEntry queueEntry = fixture.queueEntry(booking, "start");
-        fixture.queueService.callNext(queueEntry.getQueueEntryId());
+        fixture.queueService.callQueueEntry(queueEntry.getQueueEntryId());
         fixture.bookings.failNextUpdate();
 
         assertThrows(ResourceNotFoundException.class,
@@ -57,7 +57,7 @@ class LifecycleFailureRollbackTest {
         Fixture fixture = new Fixture();
         Booking booking = fixture.confirmedBooking("complete", 10, 2);
         QueueEntry queueEntry = fixture.queueEntry(booking, "complete");
-        fixture.queueService.callNext(queueEntry.getQueueEntryId());
+        fixture.queueService.callQueueEntry(queueEntry.getQueueEntryId());
         fixture.queueService.startService(queueEntry.getQueueEntryId());
         int originalPosition = queueEntry.getPosition();
         int originalWait = queueEntry.getEstimatedWaitMin();
@@ -80,7 +80,7 @@ class LifecycleFailureRollbackTest {
         Booking secondBooking = fixture.confirmedBooking("rebalance-second", 25, 4);
         QueueEntry first = fixture.queueEntry(firstBooking, "rebalance-first");
         QueueEntry second = fixture.queueEntry(secondBooking, "rebalance-second");
-        fixture.queueService.callNext(first.getQueueEntryId());
+        fixture.queueService.callQueueEntry(first.getQueueEntryId());
         fixture.queueService.startService(first.getQueueEntryId());
         fixture.queues.failOnNthUpdate(2);
 

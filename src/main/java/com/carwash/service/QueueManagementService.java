@@ -121,16 +121,13 @@ public class QueueManagementService {
         });
     }
 
-    public QueueEntry callNext(String queueEntryId) {
-        return coordinator.write(() -> {
-            QueueEntry queueEntry = requireQueueEntry(queueEntryId);
-            if (!queueEntry.callNext(LocalDateTime.now(clock))) {
-                throw new BusinessRuleViolationException("Queue entry cannot be called in current state");
-            }
-            updateQueueEntry(queueEntry);
-            notifyCustomer(queueEntry, "QUEUE_CALLED", "Your vehicle is next in the queue.");
-            return snapshotQueueEntry(queueEntry);
-        });
+    public QueueEntry callNext() {
+        return coordinator.write(() -> callWaitingEntry(queueEntryRepository.findNextWaiting()
+                .orElseThrow(() -> new ResourceNotFoundException("No waiting queue entry available"))));
+    }
+
+    public QueueEntry callQueueEntry(String queueEntryId) {
+        return coordinator.write(() -> callWaitingEntry(requireQueueEntry(queueEntryId)));
     }
 
     public QueueEntry startService(String queueEntryId) {
@@ -234,6 +231,34 @@ public class QueueManagementService {
     private void updateBooking(Booking booking) {
         if (!bookingRepository.update(booking)) {
             throw new ResourceNotFoundException("Booking not found: " + booking.getBookingId());
+        }
+    }
+
+    private QueueEntry callWaitingEntry(QueueEntry queueEntry) {
+        if (queueEntry.getQueueStatus() != QueueStatus.WAITING) {
+            throw new BusinessRuleViolationException("Queue entry cannot be called in current state");
+        }
+        LifecycleStateSnapshot.QueueEntryState queueState = LifecycleStateSnapshot.queueEntry(queueEntry);
+        try {
+            if (!queueEntry.callNext(LocalDateTime.now(clock))) {
+                throw new BusinessRuleViolationException("Queue entry cannot be called in current state");
+            }
+            updateQueueEntry(queueEntry);
+            notifyCustomer(queueEntry, "QUEUE_CALLED", "Your vehicle is next in the queue.");
+            return snapshotQueueEntry(queueEntry);
+        } catch (RuntimeException exception) {
+            rollbackQueueCall(exception, queueState);
+            throw exception;
+        }
+    }
+
+    private void rollbackQueueCall(RuntimeException failure,
+                                   LifecycleStateSnapshot.QueueEntryState queueState) {
+        try {
+            queueState.restore();
+            updateQueueEntry(queueState.queueEntry());
+        } catch (RuntimeException rollbackFailure) {
+            failure.addSuppressed(rollbackFailure);
         }
     }
 

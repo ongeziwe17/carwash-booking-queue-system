@@ -145,11 +145,15 @@ The collection verifies:
 - DATA-001 duplicate/dependency/lifecycle protections;
 - QUEUE-001 confirmed-booking, active-service, matching-service, and active-entry uniqueness rules;
 - QUEUE-002 server-managed global positions, cumulative waits, full movement/deletion/completion rebalance, and obsolete position rejection;
+- QUEUE-003 true server-selected call-next ordering, non-waiting skip, explicit by-ID call override, and no-waiting 404 behavior;
 - current queue states (`WAITING`, `CALLED`, `IN_PROGRESS`, `COMPLETED`);
 - real role changes and token acquisition;
 - final-platform-administrator protection without deleting or demoting the bootstrap admin.
 
-Expiry/signing-clock manipulation and internal concurrency guarantees remain Java-test responsibilities.
+The run-scoped queue-ordering workflow captures its relative baseline, moves a dedicated entry to the front, proves
+that global call-next selects it, starts it, proves the next call skips that in-progress entry, verifies the documented
+no-waiting 404, and completes both entries so the suite remains rerunnable. Expiry/signing-clock manipulation and
+internal concurrency guarantees remain Java-test responsibilities.
 
 ## Cleanup
 

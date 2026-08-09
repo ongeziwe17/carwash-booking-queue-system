@@ -193,7 +193,7 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         Booking booking = createConfirmedBooking(TestDates.futureDays(22));
         QueueEntry queueEntry = canonicalQueue(queueService.createQueueEntry(
                 ids.queueEntry(), booking.getBookingId(), booking.getService().getServiceId()));
-        queueService.callNext(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(queueEntry.getQueueEntryId());
 
         assertThrows(BusinessRuleViolationException.class,
                 () -> queueService.deleteQueueEntry(queueEntry.getQueueEntryId()));
@@ -209,7 +209,7 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         Booking booking = createConfirmedBooking(TestDates.futureDays(23));
         QueueEntry queueEntry = canonicalQueue(queueService.createQueueEntry(
                 ids.queueEntry(), booking.getBookingId(), booking.getService().getServiceId()));
-        queueService.callNext(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(queueEntry.getQueueEntryId());
         queueService.startService(queueEntry.getQueueEntryId());
         int notificationsBefore = notificationRepository.findByBookingId(booking.getBookingId()).size();
 

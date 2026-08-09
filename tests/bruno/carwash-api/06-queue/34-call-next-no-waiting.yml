@@ -1,0 +1,31 @@
+info:
+  name: Call next returns not found when no waiting entry remains
+  type: http
+  seq: 34
+  tags:
+    - workflow
+    - integrity
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/queue-entries/call-next"
+  auth:
+    type: bearer
+    token: "{{staffToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 404", function() { expect(res.status).to.equal(404); });
+        test("uses documented no-waiting error", function() {
+          expect(res.body.code).to.equal("RESOURCE_NOT_FOUND");
+          expect(res.body.message).to.equal("No waiting queue entry available");
+          expect(res.body.path).to.equal("/api/queue-entries/call-next");
+        });
+        test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

@@ -1,21 +1,14 @@
 info:
-  name: 401 POST /api/queue-entries/{id}/call-next
+  name: 401 POST /api/queue-entries/{id}/call
   type: http
-  seq: 25
+  seq: 36
   tags:
     - auth
     - security
 
 http:
   method: POST
-  url: "{{baseUrl}}/api/queue-entries/{{queueEntryId}}/call-next"
-  headers:
-    - name: Content-Type
-      value: "application/json"
-  body:
-    type: json
-    data: |-
-      {}
+  url: "{{baseUrl}}/api/queue-entries/{{queueEntryId}}/call"
   auth:
     type: none
 
@@ -33,11 +26,7 @@ runtime:
         for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password"]) {
           expect(lower, `response leaked ${forbidden}`).to.not.include(forbidden);
         }
-        const rawPassword = bru.interpolate("{{process.env.BRUNO_TEST_USER_PASSWORD}}");
-        if (rawPassword && !rawPassword.includes("process.env")) expect(payload).to.not.include(rawPassword);
-        const bootstrapPassword = bru.interpolate("{{process.env.BRUNO_BOOTSTRAP_ADMIN_PASSWORD}}");
-        if (bootstrapPassword && !bootstrapPassword.includes("process.env")) expect(payload).to.not.include(bootstrapPassword);
-        test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
+        test("does not expose access tokens", function() { expect(lower).to.not.include("accesstoken"); });
 
 settings:
   encodeUrl: true

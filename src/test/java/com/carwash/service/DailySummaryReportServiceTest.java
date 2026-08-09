@@ -100,7 +100,7 @@ class DailySummaryReportServiceTest extends ServiceTestSupport {
         assertEquals(1, before.waitingQueueEntries());
         assertEquals(1, before.pendingWorkload());
 
-        queueService.callNext(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(queueEntry.getQueueEntryId());
         DailySummaryReportResponse called = reportService.generateDailySummary(scheduled.toLocalDate());
         assertEquals(1, called.confirmedBookings());
         assertEquals(1, called.calledQueueEntries());

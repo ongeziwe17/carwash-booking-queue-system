@@ -9,7 +9,7 @@ info:
 
 http:
   method: POST
-  url: "{{baseUrl}}/api/queue-entries/{{workflowCancelCalledQueueId}}/call-next"
+  url: "{{baseUrl}}/api/queue-entries/{{workflowCancelCalledQueueId}}/call"
   auth:
     type: bearer
     token: "{{staffToken}}"

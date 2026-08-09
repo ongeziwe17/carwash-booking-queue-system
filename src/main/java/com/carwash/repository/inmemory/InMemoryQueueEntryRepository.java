@@ -1,10 +1,12 @@
 package com.carwash.repository.inmemory;
 
 import com.carwash.domain.QueueEntry;
+import com.carwash.enums.QueueStatus;
 import com.carwash.repository.QueueEntryRepository;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 public class InMemoryQueueEntryRepository extends InMemoryRepository<QueueEntry, String>
         implements QueueEntryRepository {
@@ -27,6 +29,13 @@ public class InMemoryQueueEntryRepository extends InMemoryRepository<QueueEntry,
         return findMatching(InMemoryQueueEntryRepository::isActive).stream()
                 .sorted(QUEUE_ORDER)
                 .toList();
+    }
+
+    @Override
+    public Optional<QueueEntry> findNextWaiting() {
+        return findActiveOrdered().stream()
+                .filter(queueEntry -> queueEntry.getQueueStatus() == QueueStatus.WAITING)
+                .findFirst();
     }
 
     @Override

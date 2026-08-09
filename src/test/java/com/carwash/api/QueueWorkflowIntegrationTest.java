@@ -192,7 +192,7 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         CreateQueueEntryRequest first = createQueue(createBookingWithDuration(10, 23), 1, 0);
         CreateQueueEntryRequest second = createQueue(createBookingWithDuration(25, 24), 2, 10);
         CreateQueueEntryRequest third = createQueue(createBookingWithDuration(15, 25), 3, 35);
-        postQueueAction(first, "call-next");
+        postQueueAction(first, "call");
         postQueueAction(first, "start");
 
         mockMvc.perform(post("/api/queue-entries/{id}/complete", first.queueEntryId())
@@ -285,7 +285,7 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
 
-        postQueueAction(queue, "call-next");
+        postQueueAction(queue, "call");
         mockMvc.perform(put("/api/queue-entries/{id}/position", queue.queueEntryId())
                         .with(authentication.platformAdminJwt())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -299,7 +299,7 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
     void bookingAndQueueWorkflowCompletesSuccessfully() throws Exception {
         BookingApiFixture.CreatedBooking booking = bookingFixture().createBooking(TestDates.futureDays(6));
         CreateQueueEntryRequest queue = createQueue(booking);
-        mockMvc.perform(post("/api/queue-entries/{id}/call-next", queue.queueEntryId())
+        mockMvc.perform(post("/api/queue-entries/{id}/call", queue.queueEntryId())
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.queueStatus").value("CALLED"))
@@ -323,10 +323,66 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
     }
 
     @Test
+    void trueCallNextSkipsNonWaitingEntriesAndPreservesPositionsAndWaits() throws Exception {
+        CreateQueueEntryRequest first = createQueue(createBookingWithDuration(10, 60), 1, 0);
+        CreateQueueEntryRequest second = createQueue(createBookingWithDuration(20, 61), 2, 10);
+        CreateQueueEntryRequest third = createQueue(createBookingWithDuration(30, 62), 3, 30);
+        postQueueAction(first, "call");
+        postQueueAction(first, "start");
+
+        mockMvc.perform(post("/api/queue-entries/call-next")
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.queueEntryId").value(second.queueEntryId()))
+                .andExpect(jsonPath("$.queueStatus").value("CALLED"))
+                .andExpect(jsonPath("$.booking.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.position").value(2))
+                .andExpect(jsonPath("$.estimatedWaitMin").value(10))
+                .andExpect(jsonPath("$.calledAt").exists());
+
+        mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].queueEntryId").value(first.queueEntryId()))
+                .andExpect(jsonPath("$[0].queueStatus").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$[0].position").value(1))
+                .andExpect(jsonPath("$[0].estimatedWaitMin").value(0))
+                .andExpect(jsonPath("$[1].queueEntryId").value(second.queueEntryId()))
+                .andExpect(jsonPath("$[1].queueStatus").value("CALLED"))
+                .andExpect(jsonPath("$[1].position").value(2))
+                .andExpect(jsonPath("$[1].estimatedWaitMin").value(10))
+                .andExpect(jsonPath("$[2].queueEntryId").value(third.queueEntryId()))
+                .andExpect(jsonPath("$[2].queueStatus").value("WAITING"))
+                .andExpect(jsonPath("$[2].position").value(3))
+                .andExpect(jsonPath("$[2].estimatedWaitMin").value(30));
+    }
+
+    @Test
+    void repeatedTrueCallNextSelectsEachWaitingEntryThenReturnsNotFound() throws Exception {
+        CreateQueueEntryRequest first = createQueue(createBookingWithDuration(10, 63), 1, 0);
+        CreateQueueEntryRequest second = createQueue(createBookingWithDuration(20, 64), 2, 10);
+        CreateQueueEntryRequest third = createQueue(createBookingWithDuration(30, 65), 3, 30);
+
+        for (CreateQueueEntryRequest expected : List.of(first, second, third)) {
+            mockMvc.perform(post("/api/queue-entries/call-next")
+                            .with(authentication.platformAdminJwt()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.queueEntryId").value(expected.queueEntryId()))
+                    .andExpect(jsonPath("$.queueStatus").value("CALLED"));
+        }
+
+        mockMvc.perform(post("/api/queue-entries/call-next")
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("No waiting queue entry available"))
+                .andExpect(jsonPath("$.path").value("/api/queue-entries/call-next"));
+    }
+
+    @Test
     void startRejectsIncompatibleCanonicalBookingWithStandardError() throws Exception {
         BookingApiFixture.CreatedBooking booking = bookingFixture().createBooking(TestDates.futureDays(40));
         CreateQueueEntryRequest queue = createQueue(booking);
-        postQueueAction(queue, "call-next");
+        postQueueAction(queue, "call");
         Booking canonical = bookingRepository.findById(booking.booking().bookingId()).orElseThrow();
         canonical.setStatus(BookingStatus.CANCELLED);
         bookingRepository.update(canonical);
@@ -343,7 +399,7 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
     void completionRejectsIncompatibleCanonicalBookingWithStandardError() throws Exception {
         BookingApiFixture.CreatedBooking booking = bookingFixture().createBooking(TestDates.futureDays(41));
         CreateQueueEntryRequest queue = createQueue(booking);
-        postQueueAction(queue, "call-next");
+        postQueueAction(queue, "call");
         postQueueAction(queue, "start");
         Booking canonical = bookingRepository.findById(booking.booking().bookingId()).orElseThrow();
         canonical.setStatus(BookingStatus.CONFIRMED);
@@ -386,14 +442,14 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
     void queueWorkflowRejectsAlreadyCompletedTransitions() throws Exception {
         BookingApiFixture.CreatedBooking booking = bookingFixture().createBooking(TestDates.futureDays(9));
         CreateQueueEntryRequest queue = createQueue(booking);
-        mockMvc.perform(post("/api/queue-entries/{id}/call-next", queue.queueEntryId())
+        mockMvc.perform(post("/api/queue-entries/{id}/call", queue.queueEntryId())
                         .with(authentication.platformAdminJwt())).andExpect(status().isOk());
         mockMvc.perform(post("/api/queue-entries/{id}/start", queue.queueEntryId())
                         .with(authentication.platformAdminJwt())).andExpect(status().isOk());
         mockMvc.perform(post("/api/queue-entries/{id}/complete", queue.queueEntryId())
                         .with(authentication.platformAdminJwt())).andExpect(status().isOk());
 
-        mockMvc.perform(post("/api/queue-entries/{id}/call-next", queue.queueEntryId())
+        mockMvc.perform(post("/api/queue-entries/{id}/call", queue.queueEntryId())
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value(containsString("cannot be called")));
         mockMvc.perform(post("/api/queue-entries/{id}/start", queue.queueEntryId())
