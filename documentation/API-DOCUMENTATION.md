@@ -181,7 +181,7 @@ New services are active. Activation/deactivation changes that state without chan
 
 `scheduledDateTime` is a local date-time interpreted against the configured application clock/timezone and must be in the future. The referenced user, vehicle, and service must exist; the vehicle must belong to the booking owner; the service must be active. Active bookings sharing an exact scheduled date/time are limited by the configured slot capacity, and the same customer/vehicle cannot have another active booking in that slot.
 
-Ordinary updates are allowed only in `CREATED` or `CONFIRMED`. Confirmation transitions a valid `CREATED` booking to `CONFIRMED`. Cancellation is allowed only for a future booking while the configured cancellation cutoff remains open and the booking is not already terminal. Both public cancellation routes use that same cancellation behavior.
+Ordinary updates are allowed only in `CREATED` or `CONFIRMED`. Confirmation transitions a valid `CREATED` booking to `CONFIRMED`. Cancellation can transition only `CREATED` or `CONFIRMED` bookings, and only while the booking is still in the future and the configured cancellation cutoff remains open. `IN_SERVICE`, `COMPLETED`, and already-`CANCELLED` bookings reject cancellation. Both public cancellation routes use that same cancellation behavior.
 
 There is an internal service-layer physical delete operation for already-cancelled bookings with no queue entry, but no public hard-delete endpoint. Dedicated booking rescheduling is not implemented.
 
