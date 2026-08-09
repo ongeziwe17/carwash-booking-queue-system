@@ -1,0 +1,32 @@
+info:
+  name: Staff confirms booking for queue deletion
+  type: http
+  seq: 9
+  tags:
+    - staff
+    - workflow
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings/{{opsBookingId}}/confirm"
+  auth:
+    type: bearer
+    token: "{{staffToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("booking is confirmed", function() { expect(res.body.status).to.equal("CONFIRMED"); });
+        const payload = JSON.stringify(res.body ?? {});
+        const lower = payload.toLowerCase();
+        for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password"]) {
+          expect(lower, `response leaked ${forbidden}`).to.not.include(forbidden);
+        }
+        test("does not expose access tokens", function() { expect(lower).to.not.include("accesstoken"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

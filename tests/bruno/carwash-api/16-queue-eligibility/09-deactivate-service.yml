@@ -1,0 +1,30 @@
+info:
+  name: Deactivate confirmed booking service
+  type: http
+  seq: 9
+  tags:
+    - queue-eligibility
+    - workflow
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/services/{{queueEligibilityInactiveServiceId}}/deactivate"
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("service is inactive", function() { expect(res.body.active).to.equal(false); });
+        const lower = JSON.stringify(res.body ?? {}).toLowerCase();
+        for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password", "accesstoken"]) {
+          expect(lower, `response leaked ${forbidden}`).to.not.include(forbidden);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

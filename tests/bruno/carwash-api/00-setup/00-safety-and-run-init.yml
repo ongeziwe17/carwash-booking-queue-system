@@ -49,6 +49,12 @@ runtime:
           e2eCustomerUserId: `e2e-customer-${runId}`, e2eCustomerEmail: `e2e-customer-${runId}@example.test`,
           e2eVehicleId: `e2e-vehicle-${runId}`, e2eBookingId: `e2e-booking-${runId}`,
           opsBookingId: `ops-booking-${runId}`, opsQueueId: `ops-queue-${runId}`,
+          queueEligibilityBookingId: `queue-eligibility-booking-${runId}`,
+          queueEligibilityPrimaryId: `queue-eligibility-primary-${runId}`,
+          queueEligibilityDuplicateId: `queue-eligibility-duplicate-${runId}`,
+          queueEligibilityInactiveServiceId: `queue-eligibility-inactive-service-${runId}`,
+          queueEligibilityInactiveBookingId: `queue-eligibility-inactive-booking-${runId}`,
+          queueEligibilityInactiveQueueId: `queue-eligibility-inactive-${runId}`,
           ownerJourneyServiceId: `owner-journey-service-${runId}`, adminRbacServiceId: `admin-rbac-service-${runId}`, adminJourneyUserId: `admin-journey-${runId}`,
           adminJourneyEmail: `admin-journey-${runId}@example.test`
         };

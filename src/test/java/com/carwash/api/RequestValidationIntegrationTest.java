@@ -88,6 +88,9 @@ class RequestValidationIntegrationTest extends ApiIntegrationTestSupport {
                 "queueEntryId", ids.queueEntry(), "bookingId", booking.bookingId(),
                 "serviceId", service.serviceId(), "position", 0), "position");
 
+        mockMvc.perform(post("/api/bookings/{id}/confirm", booking.bookingId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk());
         CreateQueueEntryRequest queue = QueueFixtureBuilder.valid(ids, booking.bookingId(), service.serviceId()).build();
         api.createQueueEntry(queue).andExpect(status().isCreated());
         assertValidation(put("/api/queue-entries/{id}/position", queue.queueEntryId())

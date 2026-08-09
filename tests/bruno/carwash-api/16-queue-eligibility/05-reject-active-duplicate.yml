@@ -1,0 +1,43 @@
+info:
+  name: Reject second active queue entry
+  type: http
+  seq: 5
+  tags:
+    - queue-eligibility
+    - integrity
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/queue-entries"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "queueEntryId": "{{queueEligibilityDuplicateId}}",
+        "bookingId": "{{queueEligibilityBookingId}}",
+        "serviceId": "{{serviceId}}",
+        "position": 2
+      }
+  auth:
+    type: bearer
+    token: "{{staffToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 400", function() { expect(res.status).to.equal(400); });
+        test("uses BUSINESS_RULE_VIOLATION", function() { expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); });
+        test("reports active uniqueness rule", function() { expect(res.body.message).to.equal("Booking already has an active queue entry"); });
+        const lower = JSON.stringify(res.body ?? {}).toLowerCase();
+        for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password", "accesstoken"]) {
+          expect(lower, `response leaked ${forbidden}`).to.not.include(forbidden);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

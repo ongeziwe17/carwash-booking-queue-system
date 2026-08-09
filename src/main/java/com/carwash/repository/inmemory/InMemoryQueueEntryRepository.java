@@ -27,6 +27,15 @@ public class InMemoryQueueEntryRepository extends InMemoryRepository<QueueEntry,
     }
 
     @Override
+    public boolean existsActiveByBookingId(String bookingId) {
+        if (bookingId == null) return false;
+        return anyMatch(queueEntry -> queueEntry.getBooking() != null
+                && bookingId.equals(queueEntry.getBooking().getBookingId())
+                && queueEntry.getQueueStatus() != null
+                && queueEntry.getQueueStatus().isActive());
+    }
+
+    @Override
     public boolean existsByServiceId(String serviceId) {
         return anyMatch(queueEntry -> queueEntry.getService() != null
                 && serviceId.equals(queueEntry.getService().getServiceId()));

@@ -4,6 +4,7 @@ import com.carwash.config.QueuePolicyProperties;
 import com.carwash.domain.Booking;
 import com.carwash.domain.QueueEntry;
 import com.carwash.domain.Service;
+import com.carwash.enums.BookingStatus;
 import com.carwash.enums.QueueStatus;
 import com.carwash.repository.BookingRepository;
 import com.carwash.repository.QueueEntryRepository;
@@ -58,6 +59,7 @@ public class QueueManagementService {
                     && !queueEntry.getQueueEntryId().equals(booking.getQueueEntry().getQueueEntryId())) {
                 throw new BusinessRuleViolationException("Booking already has a queue entry");
             }
+            initializeNewQueueEntry(queueEntry);
             if (!queueEntryRepository.insert(queueEntry)) {
                 throw new BusinessRuleViolationException("Queue entry ID already exists");
             }
@@ -193,6 +195,9 @@ public class QueueManagementService {
         Booking booking = bookingRepository.findById(queueEntry.getBooking().getBookingId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Booking not found: " + queueEntry.getBooking().getBookingId()));
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new BusinessRuleViolationException("Only confirmed bookings can join the queue");
+        }
         Service service = serviceRepository.findById(queueEntry.getService().getServiceId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Service not found: " + queueEntry.getService().getServiceId()));
@@ -200,10 +205,23 @@ public class QueueManagementService {
                 || !booking.getService().getServiceId().equals(service.getServiceId())) {
             throw new BusinessRuleViolationException("Queue entry service must match booking service");
         }
+        if (!service.isActive()) {
+            throw new BusinessRuleViolationException("Inactive service cannot join the queue");
+        }
+        if (queueEntryRepository.existsActiveByBookingId(booking.getBookingId())) {
+            throw new BusinessRuleViolationException("Booking already has an active queue entry");
+        }
         queueEntry.setQueueEntryId(queueEntry.getQueueEntryId().trim());
         queueEntry.setBooking(booking);
         queueEntry.setService(service);
-        queueEntry.recalculateEstimatedWait(queuePolicy.defaultServiceDuration());
+    }
+
+    private void initializeNewQueueEntry(QueueEntry queueEntry) {
+        queueEntry.setQueueStatus(QueueStatus.WAITING);
         queueEntry.setJoinedAt(LocalDateTime.now(clock));
+        queueEntry.setCalledAt(null);
+        queueEntry.setStartedAt(null);
+        queueEntry.setCompletedAt(null);
+        queueEntry.recalculateEstimatedWait(queuePolicy.defaultServiceDuration());
     }
 }

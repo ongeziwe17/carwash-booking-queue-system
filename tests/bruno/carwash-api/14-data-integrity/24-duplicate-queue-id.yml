@@ -16,7 +16,7 @@ http:
     data: |-
       {
         "queueEntryId": "{{queueEntryId}}",
-        "bookingId": "{{fullSlotBookingId}}",
+        "bookingId": "{{bookingId}}",
         "serviceId": "{{serviceId}}",
         "position": 1
       }

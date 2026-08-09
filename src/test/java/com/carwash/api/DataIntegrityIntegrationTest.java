@@ -55,12 +55,26 @@ class DataIntegrityIntegrationTest extends ApiIntegrationTestSupport {
         CreateBookingRequest duplicateBooking = new CreateBookingRequest(booking.bookingId(), booking.userId(),
                 booking.vehicleId(), booking.serviceId(), booking.scheduledDateTime(), "Replacement");
         assertBusinessRule(api.createBooking(duplicateBooking), "/api/bookings", "Booking ID already exists");
+        mockMvc.perform(post("/api/bookings/{id}/confirm", booking.bookingId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk());
 
         CreateQueueEntryRequest queue = QueueFixtureBuilder.valid(ids, booking.bookingId(), service.serviceId()).build();
         api.createQueueEntry(queue).andExpect(status().isCreated());
-        CreateQueueEntryRequest duplicateQueue = new CreateQueueEntryRequest(queue.queueEntryId(), queue.bookingId(),
-                queue.serviceId(), 2);
+        CreateBookingRequest secondBooking = BookingFixtureBuilder.valid(
+                        ids, user.userId(), vehicle.vehicleId(), service.serviceId())
+                .scheduledDateTime(TestDates.futureDays(41)).build();
+        api.createBooking(secondBooking).andExpect(status().isCreated());
+        mockMvc.perform(post("/api/bookings/{id}/confirm", secondBooking.bookingId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk());
+        CreateQueueEntryRequest duplicateQueue = new CreateQueueEntryRequest(queue.queueEntryId(),
+                secondBooking.bookingId(), queue.serviceId(), 2);
         assertBusinessRule(api.createQueueEntry(duplicateQueue), "/api/queue-entries", "Queue entry ID already exists");
+        mockMvc.perform(get("/api/queue-entries/{id}", queue.queueEntryId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.booking.bookingId").value(booking.bookingId()));
     }
 
     @Test
@@ -80,6 +94,9 @@ class DataIntegrityIntegrationTest extends ApiIntegrationTestSupport {
     @Test
     void terminalBookingAndQueueMutationsReturnBusinessRuleViolation() throws Exception {
         Fixture fixture = createFixture(TestDates.futureDays(42));
+        mockMvc.perform(post("/api/bookings/{id}/confirm", fixture.booking.bookingId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk());
         CreateQueueEntryRequest queue = QueueFixtureBuilder.valid(ids, fixture.booking.bookingId(), fixture.service.serviceId()).build();
         api.createQueueEntry(queue).andExpect(status().isCreated());
         mockMvc.perform(post("/api/queue-entries/{id}/call-next", queue.queueEntryId())

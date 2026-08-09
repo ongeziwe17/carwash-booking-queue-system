@@ -1,7 +1,7 @@
 info:
   name: Staff deletes waiting queue entry
   type: http
-  seq: 10
+  seq: 11
   tags:
     - staff
     - integrity
