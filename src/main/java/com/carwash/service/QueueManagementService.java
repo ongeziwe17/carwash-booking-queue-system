@@ -1,5 +1,6 @@
 package com.carwash.service;
 
+import com.carwash.config.QueuePolicyProperties;
 import com.carwash.domain.Booking;
 import com.carwash.domain.QueueEntry;
 import com.carwash.domain.Service;
@@ -11,6 +12,8 @@ import com.carwash.repository.inmemory.InMemoryDataCoordinator;
 import com.carwash.service.exception.BusinessRuleViolationException;
 import com.carwash.service.exception.ResourceNotFoundException;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 
@@ -21,18 +24,24 @@ public class QueueManagementService {
     private final ServiceRepository serviceRepository;
     private final NotificationManagementService notificationManagementService;
     private final InMemoryDataCoordinator coordinator;
+    private final QueuePolicyProperties queuePolicy;
+    private final Clock clock;
 
 
     public QueueManagementService(QueueEntryRepository queueEntryRepository,
                                   BookingRepository bookingRepository,
                                   ServiceRepository serviceRepository,
                                   NotificationManagementService notificationManagementService,
-                                  InMemoryDataCoordinator coordinator) {
+                                  InMemoryDataCoordinator coordinator,
+                                  QueuePolicyProperties queuePolicy,
+                                  Clock clock) {
         this.queueEntryRepository = Objects.requireNonNull(queueEntryRepository, "Queue repository is required");
         this.bookingRepository = Objects.requireNonNull(bookingRepository, "Booking repository is required");
         this.serviceRepository = Objects.requireNonNull(serviceRepository, "Service repository is required");
         this.notificationManagementService = notificationManagementService;
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
+        this.queuePolicy = Objects.requireNonNull(queuePolicy, "Queue policy is required");
+        this.clock = Objects.requireNonNull(clock, "Application clock is required");
     }
 
     public QueueEntry createQueueEntry(String queueEntryId, String bookingId, String serviceId, int position) {
@@ -85,7 +94,7 @@ public class QueueManagementService {
             if (queueEntry.getQueueStatus() != QueueStatus.WAITING) {
                 throw new BusinessRuleViolationException("Only waiting queue entries can be repositioned");
             }
-            queueEntry.updatePosition(position);
+            queueEntry.updatePosition(position, queuePolicy.defaultServiceDuration());
             updateQueueEntry(queueEntry);
             return queueEntry;
         });
@@ -94,7 +103,9 @@ public class QueueManagementService {
     public QueueEntry callNext(String queueEntryId) {
         return coordinator.write(() -> {
             QueueEntry queueEntry = requireQueueEntry(queueEntryId);
-            if (!queueEntry.callNext()) throw new BusinessRuleViolationException("Queue entry cannot be called in current state");
+            if (!queueEntry.callNext(LocalDateTime.now(clock))) {
+                throw new BusinessRuleViolationException("Queue entry cannot be called in current state");
+            }
             updateQueueEntry(queueEntry);
             notifyCustomer(queueEntry, "QUEUE_CALLED", "Your vehicle is next in the queue.");
             return queueEntry;
@@ -104,7 +115,9 @@ public class QueueManagementService {
     public QueueEntry startService(String queueEntryId) {
         return coordinator.write(() -> {
             QueueEntry queueEntry = requireQueueEntry(queueEntryId);
-            if (!queueEntry.startService()) throw new BusinessRuleViolationException("Queue entry cannot start service in current state");
+            if (!queueEntry.startService(LocalDateTime.now(clock))) {
+                throw new BusinessRuleViolationException("Queue entry cannot start service in current state");
+            }
             updateQueueEntry(queueEntry);
             notifyCustomer(queueEntry, "SERVICE_STARTED", "Your service has started.");
             return queueEntry;
@@ -117,7 +130,9 @@ public class QueueManagementService {
             if (queueEntry.getStartedAt() == null) {
                 throw new BusinessRuleViolationException("Queue entry cannot be completed before it has started");
             }
-            if (!queueEntry.complete()) throw new BusinessRuleViolationException("Queue entry cannot be completed in current state");
+            if (!queueEntry.complete(LocalDateTime.now(clock))) {
+                throw new BusinessRuleViolationException("Queue entry cannot be completed in current state");
+            }
             updateQueueEntry(queueEntry);
             notifyCustomer(queueEntry, "SERVICE_COMPLETED", "Your service has been completed.");
             return queueEntry;
@@ -188,5 +203,7 @@ public class QueueManagementService {
         queueEntry.setQueueEntryId(queueEntry.getQueueEntryId().trim());
         queueEntry.setBooking(booking);
         queueEntry.setService(service);
+        queueEntry.recalculateEstimatedWait(queuePolicy.defaultServiceDuration());
+        queueEntry.setJoinedAt(LocalDateTime.now(clock));
     }
 }

@@ -111,6 +111,10 @@ docker compose down --remove-orphans
 
 The Compose file intentionally contains only the API. PostgreSQL remains tracked under DATA-002.
 
+## Runtime policy configuration
+
+Booking, notification, queue, and application-time policies use validated typed Spring configuration with safe defaults and environment-variable overrides. See [Runtime Policy Configuration](documentation/CONFIGURATION.md) for the supported properties, validation rules, cancellation cutoff semantics, duration syntax, and override examples.
+
 ## Testing
 
 The test suite has two Maven responsibilities:

@@ -1,5 +1,6 @@
 package com.carwash.service;
 
+import com.carwash.config.BookingPolicyProperties;
 import com.carwash.domain.Booking;
 import com.carwash.domain.Service;
 import com.carwash.domain.User;
@@ -15,13 +16,12 @@ import com.carwash.repository.inmemory.InMemoryDataCoordinator;
 import com.carwash.service.exception.BusinessRuleViolationException;
 import com.carwash.service.exception.ResourceNotFoundException;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 
 public class BookingManagementService {
-
-    private static final int MAX_ACTIVE_BOOKINGS_PER_SLOT = 1;
 
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
@@ -31,6 +31,8 @@ public class BookingManagementService {
     private final NotificationRepository notificationRepository;
     private final NotificationManagementService notificationManagementService;
     private final InMemoryDataCoordinator coordinator;
+    private final BookingPolicyProperties bookingPolicy;
+    private final Clock clock;
 
 
     public BookingManagementService(BookingRepository bookingRepository, UserRepository userRepository,
@@ -38,7 +40,9 @@ public class BookingManagementService {
                                     QueueEntryRepository queueEntryRepository,
                                     NotificationRepository notificationRepository,
                                     NotificationManagementService notificationManagementService,
-                                    InMemoryDataCoordinator coordinator) {
+                                    InMemoryDataCoordinator coordinator,
+                                    BookingPolicyProperties bookingPolicy,
+                                    Clock clock) {
         this.bookingRepository = Objects.requireNonNull(bookingRepository, "Booking repository is required");
         this.userRepository = Objects.requireNonNull(userRepository, "User repository is required");
         this.vehicleRepository = Objects.requireNonNull(vehicleRepository, "Vehicle repository is required");
@@ -47,6 +51,8 @@ public class BookingManagementService {
         this.notificationRepository = notificationRepository;
         this.notificationManagementService = notificationManagementService;
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
+        this.bookingPolicy = Objects.requireNonNull(bookingPolicy, "Booking policy is required");
+        this.clock = Objects.requireNonNull(clock, "Application clock is required");
     }
 
     public Booking createBooking(String bookingId, String userId, String vehicleId, String serviceId,
@@ -191,6 +197,7 @@ public class BookingManagementService {
         booking.setUser(user);
         booking.setVehicle(vehicle);
         booking.setService(service);
+        booking.setCreatedAt(LocalDateTime.now(clock));
     }
 
     private void requireModifiableBooking(Booking booking) {
@@ -234,7 +241,7 @@ public class BookingManagementService {
     }
 
     private void requireFutureSchedule(LocalDateTime scheduledDateTime) {
-        if (scheduledDateTime == null || scheduledDateTime.isBefore(LocalDateTime.now())) {
+        if (scheduledDateTime == null || scheduledDateTime.isBefore(LocalDateTime.now(clock))) {
             throw new BusinessRuleViolationException("Scheduled date/time cannot be in the past");
         }
     }
@@ -247,8 +254,13 @@ public class BookingManagementService {
                 || !booking.getUser().getUserId().equals(customerId)) {
             throw new BusinessRuleViolationException("Booking can only be cancelled by the owning customer");
         }
-        if (booking.getScheduledDateTime() == null || booking.getScheduledDateTime().isBefore(LocalDateTime.now())) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (booking.getScheduledDateTime() == null || !now.isBefore(booking.getScheduledDateTime())) {
             throw new BusinessRuleViolationException("Only future bookings can be cancelled");
+        }
+        LocalDateTime cutoff = booking.getScheduledDateTime().minus(bookingPolicy.cancellationWindow());
+        if (!now.isBefore(cutoff)) {
+            throw new BusinessRuleViolationException("Booking cancellation window has closed");
         }
         if (booking.getStatus() == BookingStatus.COMPLETED) {
             throw new BusinessRuleViolationException("Completed booking cannot be cancelled");
@@ -269,7 +281,7 @@ public class BookingManagementService {
             throw new BusinessRuleViolationException(
                     "Customer vehicle already has an active booking for this scheduled date/time");
         }
-        if (bookingsInSlot.size() >= MAX_ACTIVE_BOOKINGS_PER_SLOT) {
+        if (bookingsInSlot.size() >= bookingPolicy.maxActiveBookingsPerSlot()) {
             throw new BusinessRuleViolationException("Booking time slot is already full");
         }
     }

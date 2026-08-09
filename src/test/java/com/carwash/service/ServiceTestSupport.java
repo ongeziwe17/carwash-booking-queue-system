@@ -1,6 +1,9 @@
 package com.carwash.service;
 
+import com.carwash.config.BookingPolicyProperties;
+import com.carwash.config.NotificationPolicyProperties;
 import com.carwash.config.PasswordSecurityProperties;
+import com.carwash.config.QueuePolicyProperties;
 import com.carwash.domain.Booking;
 import com.carwash.domain.QueueEntry;
 import com.carwash.domain.User;
@@ -25,7 +28,11 @@ import org.junit.jupiter.api.TestInfo;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 abstract class ServiceTestSupport {
 
@@ -46,6 +53,7 @@ abstract class ServiceTestSupport {
     protected DailySummaryReportService reportService;
     protected DeterministicTestNotificationIdGenerator notificationIds;
     protected TestIdFactory ids;
+    protected Clock clock;
 
     @BeforeEach
     final void createFreshServiceGraph(TestInfo testInfo) {
@@ -61,6 +69,7 @@ abstract class ServiceTestSupport {
         notificationRepository = new InMemoryNotificationRepository();
         coordinator = new InMemoryDataCoordinator();
         notificationIds = new DeterministicTestNotificationIdGenerator();
+        clock = Clock.fixed(Instant.parse("2089-01-15T12:00:00Z"), ZoneOffset.UTC);
 
         UserCredentialService credentialService = new UserCredentialService(
                 new BCryptPasswordEncoder(4), new PasswordSecurityProperties(4, 12, 72));
@@ -69,12 +78,15 @@ abstract class ServiceTestSupport {
         vehicleService = new VehicleManagementService(vehicleRepository, userRepository, bookingRepository, coordinator);
         catalogService = new ServiceCatalogService(serviceRepository, bookingRepository, queueRepository, coordinator);
         notificationService = new NotificationManagementService(
-                notificationRepository, userRepository, bookingRepository, coordinator, notificationIds);
+                notificationRepository, userRepository, bookingRepository, coordinator, notificationIds,
+                new NotificationPolicyProperties(10), clock);
         bookingService = new BookingManagementService(
                 bookingRepository, userRepository, vehicleRepository, serviceRepository,
-                queueRepository, notificationRepository, notificationService, coordinator);
+                queueRepository, notificationRepository, notificationService, coordinator,
+                new BookingPolicyProperties(1, Duration.ZERO), clock);
         queueService = new QueueManagementService(
-                queueRepository, bookingRepository, serviceRepository, notificationService, coordinator);
+                queueRepository, bookingRepository, serviceRepository, notificationService, coordinator,
+                new QueuePolicyProperties(Duration.ofMinutes(10)), clock);
         reportService = new DailySummaryReportService(bookingRepository, queueRepository, coordinator);
     }
 

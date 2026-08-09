@@ -1,5 +1,6 @@
 package com.carwash.service;
 
+import com.carwash.config.BookingPolicyProperties;
 import com.carwash.domain.Booking;
 import com.carwash.domain.Service;
 import com.carwash.domain.User;
@@ -11,6 +12,7 @@ import com.carwash.testsupport.TestDates;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -93,6 +95,20 @@ class BookingManagementServiceTest extends ServiceTestSupport {
     }
 
     @Test
+    void configuredCapacityAllowsTwoActiveBookingsButRejectsThird() {
+        BookingManagementService capacityTwo = bookingServiceWithPolicy(2, Duration.ZERO);
+        LocalDateTime scheduled = TestDates.futureDays(7);
+
+        Booking first = newBookingWithFixture(scheduled);
+        Booking second = newBookingWithFixture(scheduled);
+        Booking third = newBookingWithFixture(scheduled);
+
+        assertEquals(first.getBookingId(), capacityTwo.createBooking(first).getBookingId());
+        assertEquals(second.getBookingId(), capacityTwo.createBooking(second).getBookingId());
+        assertThrows(BusinessRuleViolationException.class, () -> capacityTwo.createBooking(third));
+    }
+
+    @Test
     void createBookingIgnoresCancelledBookingWhenCheckingSlotCapacity() {
         LocalDateTime scheduled = TestDates.futureDays(4);
         Booking cancelled = bookingService.createBooking(newBookingWithFixture(scheduled));
@@ -143,6 +159,46 @@ class BookingManagementServiceTest extends ServiceTestSupport {
     }
 
     @Test
+    void zeroCancellationWindowPreservesFutureBookingCancellation() {
+        LocalDateTime scheduled = LocalDateTime.now(clock).plusMinutes(1);
+        Booking booking = bookingService.createBooking(newBookingWithFixture(scheduled));
+
+        assertEquals(BookingStatus.CANCELLED,
+                bookingService.cancelBooking(booking.getBookingId(), booking.getUser().getUserId()).getStatus());
+    }
+
+    @Test
+    void configuredCancellationWindowAllowsBeforeCutoffAndRejectsAfterCutoff() {
+        BookingManagementService twoHourWindow = bookingServiceWithPolicy(1, Duration.ofHours(2));
+        LocalDateTime now = LocalDateTime.now(clock);
+        Booking outsideWindow = twoHourWindow.createBooking(newBookingWithFixture(now.plusHours(3)));
+        Booking insideWindow = twoHourWindow.createBooking(newBookingWithFixture(now.plusHours(1)));
+
+        assertEquals(BookingStatus.CANCELLED,
+                twoHourWindow.cancelBooking(outsideWindow.getBookingId(), outsideWindow.getUser().getUserId()).getStatus());
+        BusinessRuleViolationException exception = assertThrows(BusinessRuleViolationException.class,
+                () -> twoHourWindow.cancelBooking(insideWindow.getBookingId(), insideWindow.getUser().getUserId()));
+        assertTrue(exception.getMessage().contains("window"));
+    }
+
+    @Test
+    void cancellationIsRejectedAtExactConfiguredCutoff() {
+        BookingManagementService twoHourWindow = bookingServiceWithPolicy(1, Duration.ofHours(2));
+        Booking booking = twoHourWindow.createBooking(
+                newBookingWithFixture(LocalDateTime.now(clock).plusHours(2)));
+
+        assertThrows(BusinessRuleViolationException.class,
+                () -> twoHourWindow.cancelBooking(booking.getBookingId(), booking.getUser().getUserId()));
+    }
+
+    @Test
+    void futureValidationUsesSuppliedClockRatherThanHostTime() {
+        Booking booking = newBookingWithFixture(LocalDateTime.now(clock).minusMinutes(1));
+
+        assertThrows(BusinessRuleViolationException.class, () -> bookingService.createBooking(booking));
+    }
+
+    @Test
     void customerCannotCancelAnotherCustomersBooking() {
         Booking booking = createSavedBooking();
         User other = registerUser();
@@ -178,5 +234,12 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         assertThrows(BusinessRuleViolationException.class,
                 () -> bookingService.cancelBooking(booking.getBookingId(), booking.getUser().getUserId()));
         assertEquals(BookingStatus.CANCELLED, bookingService.findById(booking.getBookingId()).getStatus());
+    }
+
+    private BookingManagementService bookingServiceWithPolicy(int capacity, Duration cancellationWindow) {
+        return new BookingManagementService(
+                bookingRepository, userRepository, vehicleRepository, serviceRepository,
+                queueRepository, notificationRepository, notificationService, coordinator,
+                new BookingPolicyProperties(capacity, cancellationWindow), clock);
     }
 }

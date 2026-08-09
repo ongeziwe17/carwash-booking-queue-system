@@ -26,6 +26,8 @@ import com.carwash.service.VehicleManagementService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.time.Clock;
+
 @Configuration
 public class ApplicationServiceConfig {
 
@@ -124,14 +126,18 @@ public class ApplicationServiceConfig {
             UserRepository userRepository,
             BookingRepository bookingRepository,
             InMemoryDataCoordinator coordinator,
-            NotificationIdGenerator notificationIdGenerator
+            NotificationIdGenerator notificationIdGenerator,
+            NotificationPolicyProperties notificationPolicy,
+            Clock clock
     ) {
         return new NotificationManagementService(
                 notificationRepository,
                 userRepository,
                 bookingRepository,
                 coordinator,
-                notificationIdGenerator
+                notificationIdGenerator,
+                notificationPolicy,
+                clock
         );
     }
 
@@ -144,7 +150,9 @@ public class ApplicationServiceConfig {
             QueueEntryRepository queueEntryRepository,
             NotificationRepository notificationRepository,
             NotificationManagementService notificationManagementService,
-            InMemoryDataCoordinator coordinator
+            InMemoryDataCoordinator coordinator,
+            BookingPolicyProperties bookingPolicy,
+            Clock clock
     ) {
         return new BookingManagementService(
                 bookingRepository,
@@ -154,7 +162,9 @@ public class ApplicationServiceConfig {
                 queueEntryRepository,
                 notificationRepository,
                 notificationManagementService,
-                coordinator
+                coordinator,
+                bookingPolicy,
+                clock
         );
     }
 
@@ -164,14 +174,18 @@ public class ApplicationServiceConfig {
             BookingRepository bookingRepository,
             ServiceRepository serviceRepository,
             NotificationManagementService notificationManagementService,
-            InMemoryDataCoordinator coordinator
+            InMemoryDataCoordinator coordinator,
+            QueuePolicyProperties queuePolicy,
+            Clock clock
     ) {
         return new QueueManagementService(
                 queueEntryRepository,
                 bookingRepository,
                 serviceRepository,
                 notificationManagementService,
-                coordinator
+                coordinator,
+                queuePolicy,
+                clock
         );
     }
 
