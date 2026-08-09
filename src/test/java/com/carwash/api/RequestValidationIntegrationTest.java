@@ -85,8 +85,8 @@ class RequestValidationIntegrationTest extends ApiIntegrationTestSupport {
                 invalidBookingUpdate, "serviceId");
 
         assertValidation(post("/api/queue-entries").with(authentication.platformAdminJwt()), Map.of(
-                "queueEntryId", ids.queueEntry(), "bookingId", booking.bookingId(),
-                "serviceId", service.serviceId(), "position", 0), "position");
+                "queueEntryId", " ", "bookingId", booking.bookingId(),
+                "serviceId", service.serviceId()), "queueEntryId");
 
         mockMvc.perform(post("/api/bookings/{id}/confirm", booking.bookingId())
                         .with(authentication.platformAdminJwt()))

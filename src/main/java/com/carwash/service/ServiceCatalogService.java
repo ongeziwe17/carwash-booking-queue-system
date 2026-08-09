@@ -18,18 +18,21 @@ public class ServiceCatalogService {
     private final BookingRepository bookingRepository;
     private final QueueEntryRepository queueEntryRepository;
     private final InMemoryDataCoordinator coordinator;
+    private final QueueOrderingService queueOrdering;
 
 
     public ServiceCatalogService(
             ServiceRepository serviceRepository,
             BookingRepository bookingRepository,
             QueueEntryRepository queueEntryRepository,
-            InMemoryDataCoordinator coordinator
+            InMemoryDataCoordinator coordinator,
+            QueueOrderingService queueOrdering
     ) {
         this.serviceRepository = Objects.requireNonNull(serviceRepository, "Service repository is required");
         this.bookingRepository = bookingRepository;
         this.queueEntryRepository = queueEntryRepository;
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
+        this.queueOrdering = Objects.requireNonNull(queueOrdering, "Queue ordering service is required");
     }
 
     public Service createService(String serviceId, String serviceName, String description,
@@ -76,11 +79,13 @@ public class ServiceCatalogService {
             if (service == null) throw new BusinessRuleViolationException("Service is required");
             Service existing = requireService(service.getServiceId());
             validateService(service);
+            boolean durationChanged = existing.getEstimatedDurationMin() != service.getEstimatedDurationMin();
             existing.updateDetails(service.getServiceName(), service.getDescription(), service.getPrice(),
                     service.getEstimatedDurationMin());
             if (!serviceRepository.update(existing)) {
                 throw new ResourceNotFoundException("Service not found: " + existing.getServiceId());
             }
+            if (durationChanged) queueOrdering.rebalanceActiveQueue();
             return existing;
         });
     }

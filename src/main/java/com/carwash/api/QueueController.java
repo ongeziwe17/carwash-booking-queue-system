@@ -86,8 +86,9 @@ public class QueueController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(
             summary = "Create queue entry",
-            description = "Only confirmed bookings using their active matching service can enter the queue. "
-                    + "A booking cannot have more than one active queue entry; position remains caller supplied."
+            description = "Appends an eligible confirmed booking using its active matching service to the global "
+                    + "active queue. The server assigns its position and estimated wait; a booking cannot have more "
+                    + "than one active queue entry."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Queue entry created"),
@@ -110,14 +111,17 @@ public class QueueController {
         return service.createQueueEntry(
                 request.queueEntryId(),
                 request.bookingId(),
-                request.serviceId(),
-                request.position()
+                request.serviceId()
         );
     }
 
     @PutMapping("/{id}/position")
     @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
-    @Operation(summary = "Update queue position")
+    @Operation(
+            summary = "Move queue entry",
+            description = "Moves a WAITING entry to the requested active position and rebalances positions and "
+                    + "estimated waits across the global active queue."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Queue position updated"),
             @ApiResponse(responseCode = "400", description = "Invalid request or queue rule violation",

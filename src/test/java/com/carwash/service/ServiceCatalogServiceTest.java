@@ -1,7 +1,10 @@
 package com.carwash.service;
 
+import com.carwash.domain.Booking;
+import com.carwash.domain.QueueEntry;
 import com.carwash.domain.Service;
 import com.carwash.service.exception.BusinessRuleViolationException;
+import com.carwash.testsupport.TestDates;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -74,5 +77,28 @@ class ServiceCatalogServiceTest extends ServiceTestSupport {
     void findByActiveReturnsEmptyListWhenNoServicesMatch() {
         createService();
         assertTrue(catalogService.findByActive(false).isEmpty());
+    }
+
+    @Test
+    void durationUpdateRecalculatesWaitsForActiveQueueEntries() {
+        Booking firstBooking = createConfirmedBooking(TestDates.futureDays(1));
+        Service firstService = firstBooking.getService();
+        catalogService.updateService(firstService.getServiceId(), firstService.getServiceName(),
+                firstService.getDescription(), firstService.getPrice(), 10);
+        Booking secondBooking = createConfirmedBooking(TestDates.futureDays(2));
+        QueueEntry firstResponse = queueService.createQueueEntry(
+                ids.queueEntry(), firstBooking.getBookingId(), firstService.getServiceId());
+        QueueEntry secondResponse = queueService.createQueueEntry(
+                ids.queueEntry(), secondBooking.getBookingId(), secondBooking.getService().getServiceId());
+        QueueEntry first = queueRepository.findById(firstResponse.getQueueEntryId()).orElseThrow();
+        QueueEntry second = queueRepository.findById(secondResponse.getQueueEntryId()).orElseThrow();
+        assertEquals(10, second.getEstimatedWaitMin());
+
+        catalogService.updateService(firstService.getServiceId(), firstService.getServiceName(),
+                firstService.getDescription(), firstService.getPrice(), 40);
+
+        assertEquals(0, first.getEstimatedWaitMin());
+        assertEquals(40, second.getEstimatedWaitMin());
+        assertEquals(40, queueRepository.findById(second.getQueueEntryId()).orElseThrow().getEstimatedWaitMin());
     }
 }

@@ -272,7 +272,7 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         Service service = services.createService(new Service(serviceId, "RBAC Wash", "authorization fixture", BigDecimal.valueOf(200), 30));
         Booking booking = bookings.createBooking(new Booking(bookingId, users.findById(ownerId), primary, service, nextScheduledTime(), "authorization fixture"));
         bookings.confirmBooking(bookingId);
-        queues.createQueueEntry(new QueueEntry(queueEntryId, booking, service, 1));
+        queues.createQueueEntry(new QueueEntry(queueEntryId, booking, service));
         return new ResourceSet(ownerId, primaryVehicleId, alternateVehicleId, serviceId, bookingId, queueEntryId);
     }
 

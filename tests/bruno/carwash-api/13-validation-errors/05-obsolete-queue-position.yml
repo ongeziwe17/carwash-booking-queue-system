@@ -1,5 +1,5 @@
 info:
-  name: Queue zero position
+  name: Obsolete queue creation position is rejected
   type: http
   seq: 5
   tags:
@@ -18,7 +18,7 @@ http:
         "queueEntryId": "invalid-queue-{{runId}}",
         "bookingId": "{{bookingId}}",
         "serviceId": "{{serviceId}}",
-        "position": 0
+        "position": 99
       }
   auth:
     type: bearer
@@ -29,10 +29,10 @@ runtime:
     - type: tests
       code: |-
         test("returns HTTP 400", function() { expect(res.status).to.equal(400); });
-        test("uses VALIDATION_FAILED", function() { expect(res.body.code).to.equal("VALIDATION_FAILED"); expect(res.body.status).to.equal(400); });
+        test("uses MALFORMED_REQUEST", function() { expect(res.body.code).to.equal("MALFORMED_REQUEST"); expect(res.body.status).to.equal(400); });
         test("reports request path", function() { expect(res.body.path).to.equal(String(req.getUrl()).replace(/^https?:\/\/[^/]+/, "").split("?")[0]); });
         test("has ISO timestamp and fieldErrors", function() { expect(Number.isNaN(Date.parse(res.body.timestamp))).to.equal(false); expect(Array.isArray(res.body.fieldErrors)).to.equal(true); });
-        test("uses safe message", function() { expect(res.body.message).to.equal("Request validation failed"); });
+        test("uses safe message", function() { expect(res.body.message).to.equal("Malformed or invalid request body"); });
         const payload = JSON.stringify(res.body ?? {});
         const lower = payload.toLowerCase();
         for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password"]) {

@@ -22,7 +22,7 @@ Priority guide:
 | Vehicles | CRUD, owner association, duplicate-plate validation, ownership authorization and deletion integrity | Marketplace tenant scoping is not implemented. |
 | Services | Global service catalogue CRUD and activate/deactivate workflows | Branch-specific offerings are not implemented. |
 | Bookings | Create, retrieve, update, confirm, cancel, future-time validation, ownership validation, inactive-service rejection, configurable exact-slot capacity and cancellation cutoff | Dedicated rescheduling and branch context are not implemented. |
-| Queues | Create, retrieve, manual position update, call, start, complete, and delete | Ordering is client-managed and booking state is not fully synchronized. |
+| Queues | Eligible creation, server-managed global ordering/waits, full manual rebalance, call, start, complete, and delete | Booking state is not yet synchronized with queue transitions. |
 | Notifications | In-app notification creation and recent lookup by user | Read APIs and external delivery are incomplete. |
 | Reports | Basic in-memory daily summary | Tenant/branch analytics and revenue reporting are future work. |
 | API/Docs | Generated Swagger/OpenAPI plus human-readable API documentation and contract quality gates | DOCS-001 keeps written and generated contracts aligned. |
@@ -44,6 +44,8 @@ Completed issue cleanup:
 - #109 — Staging CI/CD and branch promotion (CI-001).
 - #110 — Test isolation and quality gates (TEST-001).
 - #111 — Runtime policy configuration (CONFIG-001).
+- #16 — Queue-entry eligibility and active uniqueness (QUEUE-001).
+- #17 — Server-managed queue ordering and wait estimates (QUEUE-002).
 
 ## 3. Phase 0 — Immediate Hardening
 

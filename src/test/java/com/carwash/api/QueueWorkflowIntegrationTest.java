@@ -1,10 +1,18 @@
 package com.carwash.api;
 
+import com.carwash.api.dto.CreateBookingRequest;
 import com.carwash.api.dto.CreateQueueEntryRequest;
+import com.carwash.api.dto.CreateServiceRequest;
+import com.carwash.api.dto.CreateUserRequest;
+import com.carwash.api.dto.CreateVehicleRequest;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.BookingApiFixture;
+import com.carwash.testsupport.BookingFixtureBuilder;
 import com.carwash.testsupport.QueueFixtureBuilder;
+import com.carwash.testsupport.ServiceFixtureBuilder;
 import com.carwash.testsupport.TestDates;
+import com.carwash.testsupport.UserFixtureBuilder;
+import com.carwash.testsupport.VehicleFixtureBuilder;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
@@ -12,8 +20,10 @@ import java.util.List;
 import java.util.Map;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -42,16 +52,22 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
     }
 
     @Test
-    void createQueueEntryRejectsInvalidPosition() throws Exception {
+    void createQueueEntryRejectsObsoleteClientPosition() throws Exception {
         BookingApiFixture.CreatedBooking booking = bookingFixture().createBooking(TestDates.futureDays(3));
-        CreateQueueEntryRequest request = QueueFixtureBuilder.valid(ids, booking.booking().bookingId(),
-                        booking.resources().service().serviceId())
-                .position(0).build();
-        api.createQueueEntry(request)
+        Map<String, Object> obsoleteRequest = Map.of(
+                "queueEntryId", ids.queueEntry(),
+                "bookingId", booking.booking().bookingId(),
+                "serviceId", booking.resources().service().serviceId(),
+                "position", 99);
+
+        mockMvc.perform(post("/api/queue-entries")
+                        .with(authentication.platformAdminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(obsoleteRequest)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.message").value("Request validation failed"))
-                .andExpect(jsonPath("$.fieldErrors[0].field").value("position"));
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
+                .andExpect(jsonPath("$.message").value("Malformed or invalid request body"))
+                .andExpect(jsonPath("$.path").value("/api/queue-entries"));
     }
 
     @Test
@@ -94,7 +110,7 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         BookingApiFixture.CreatedBooking booking = bookingFixture().createBooking(TestDates.futureDays(12));
         CreateQueueEntryRequest first = createQueue(booking);
         CreateQueueEntryRequest second = QueueFixtureBuilder.valid(ids, booking.booking().bookingId(),
-                booking.resources().service().serviceId()).position(2).build();
+                booking.resources().service().serviceId()).build();
 
         assertBusinessRule(api.createQueueEntry(second), "Booking already has an active queue entry");
         mockMvc.perform(get("/api/queue-entries/{id}", first.queueEntryId())
@@ -119,23 +135,17 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
     }
 
     @Test
-    void queueEntryRequestValidationRejectsBlankIdsAndInvalidPositions() throws Exception {
+    void queueEntryRequestValidationRejectsBlankIds() throws Exception {
         String queueId = ids.queueEntry();
         String bookingId = ids.booking();
         String serviceId = ids.service();
         List<QueueValidationCase> cases = List.of(
                 new QueueValidationCase(Map.of("queueEntryId", " ", "bookingId", bookingId,
-                        "serviceId", serviceId, "position", 1), "queueEntryId"),
+                        "serviceId", serviceId), "queueEntryId"),
                 new QueueValidationCase(Map.of("queueEntryId", queueId, "bookingId", " ",
-                        "serviceId", serviceId, "position", 1), "bookingId"),
+                        "serviceId", serviceId), "bookingId"),
                 new QueueValidationCase(Map.of("queueEntryId", queueId, "bookingId", bookingId,
-                        "serviceId", " ", "position", 1), "serviceId"),
-                new QueueValidationCase(Map.of("queueEntryId", queueId, "bookingId", bookingId,
-                        "serviceId", serviceId), "position"),
-                new QueueValidationCase(Map.of("queueEntryId", queueId, "bookingId", bookingId,
-                        "serviceId", serviceId, "position", 0), "position"),
-                new QueueValidationCase(Map.of("queueEntryId", queueId, "bookingId", bookingId,
-                        "serviceId", serviceId, "position", -1), "position")
+                        "serviceId", " "), "serviceId")
         );
 
         for (QueueValidationCase validationCase : cases) {
@@ -149,6 +159,133 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
                     .andExpect(jsonPath("$.message").value("Request validation failed"))
                     .andExpect(jsonPath("$.fieldErrors[?(@.field == '" + validationCase.field() + "')]").exists());
         }
+    }
+
+    @Test
+    void serverAppendsEntriesAndCalculatesCumulativeWaitsAcrossServices() throws Exception {
+        CreateQueueEntryRequest first = createQueue(createBookingWithDuration(10, 20), 1, 0);
+        CreateQueueEntryRequest second = createQueue(createBookingWithDuration(25, 21), 2, 10);
+        CreateQueueEntryRequest third = createQueue(createBookingWithDuration(15, 22), 3, 35);
+
+        mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].queueEntryId").value(first.queueEntryId()))
+                .andExpect(jsonPath("$[0].position").value(1))
+                .andExpect(jsonPath("$[0].estimatedWaitMin").value(0))
+                .andExpect(jsonPath("$[1].queueEntryId").value(second.queueEntryId()))
+                .andExpect(jsonPath("$[1].position").value(2))
+                .andExpect(jsonPath("$[1].estimatedWaitMin").value(10))
+                .andExpect(jsonPath("$[2].queueEntryId").value(third.queueEntryId()))
+                .andExpect(jsonPath("$[2].position").value(3))
+                .andExpect(jsonPath("$[2].estimatedWaitMin").value(35));
+    }
+
+    @Test
+    void completionClosesActiveGapAndRecalculatesLaterWaits() throws Exception {
+        CreateQueueEntryRequest first = createQueue(createBookingWithDuration(10, 23), 1, 0);
+        CreateQueueEntryRequest second = createQueue(createBookingWithDuration(25, 24), 2, 10);
+        CreateQueueEntryRequest third = createQueue(createBookingWithDuration(15, 25), 3, 35);
+        postQueueAction(first, "call-next");
+        postQueueAction(first, "start");
+
+        mockMvc.perform(post("/api/queue-entries/{id}/complete", first.queueEntryId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.queueStatus").value("COMPLETED"))
+                .andExpect(jsonPath("$.estimatedWaitMin").value(0));
+
+        mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].queueEntryId").value(second.queueEntryId()))
+                .andExpect(jsonPath("$[0].position").value(1))
+                .andExpect(jsonPath("$[0].estimatedWaitMin").value(0))
+                .andExpect(jsonPath("$[1].queueEntryId").value(third.queueEntryId()))
+                .andExpect(jsonPath("$[1].position").value(2))
+                .andExpect(jsonPath("$[1].estimatedWaitMin").value(25))
+                .andExpect(jsonPath("$[2].queueEntryId").value(first.queueEntryId()))
+                .andExpect(jsonPath("$[2].queueStatus").value("COMPLETED"));
+    }
+
+    @Test
+    void deletionClosesGapAndRecalculatesLaterWaits() throws Exception {
+        CreateQueueEntryRequest first = createQueue(createBookingWithDuration(10, 26), 1, 0);
+        CreateQueueEntryRequest second = createQueue(createBookingWithDuration(25, 27), 2, 10);
+        CreateQueueEntryRequest third = createQueue(createBookingWithDuration(15, 28), 3, 35);
+
+        mockMvc.perform(delete("/api/queue-entries/{id}", second.queueEntryId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].queueEntryId").value(first.queueEntryId()))
+                .andExpect(jsonPath("$[0].position").value(1))
+                .andExpect(jsonPath("$[0].estimatedWaitMin").value(0))
+                .andExpect(jsonPath("$[1].queueEntryId").value(third.queueEntryId()))
+                .andExpect(jsonPath("$[1].position").value(2))
+                .andExpect(jsonPath("$[1].estimatedWaitMin").value(10));
+    }
+
+    @Test
+    void manualMovementRebalancesAllAffectedEntries() throws Exception {
+        CreateQueueEntryRequest first = createQueue(createBookingWithDuration(10, 29), 1, 0);
+        CreateQueueEntryRequest second = createQueue(createBookingWithDuration(20, 30), 2, 10);
+        CreateQueueEntryRequest third = createQueue(createBookingWithDuration(30, 31), 3, 30);
+
+        mockMvc.perform(put("/api/queue-entries/{id}/position", third.queueEntryId())
+                        .with(authentication.platformAdminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"position\":1}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.queueEntryId").value(third.queueEntryId()))
+                .andExpect(jsonPath("$.position").value(1))
+                .andExpect(jsonPath("$.estimatedWaitMin").value(0));
+
+        mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].queueEntryId").value(third.queueEntryId()))
+                .andExpect(jsonPath("$[0].position").value(1))
+                .andExpect(jsonPath("$[0].estimatedWaitMin").value(0))
+                .andExpect(jsonPath("$[1].queueEntryId").value(first.queueEntryId()))
+                .andExpect(jsonPath("$[1].position").value(2))
+                .andExpect(jsonPath("$[1].estimatedWaitMin").value(30))
+                .andExpect(jsonPath("$[2].queueEntryId").value(second.queueEntryId()))
+                .andExpect(jsonPath("$[2].position").value(3))
+                .andExpect(jsonPath("$[2].estimatedWaitMin").value(40));
+    }
+
+    @Test
+    void manualMovementValidationPreservesStandardErrors() throws Exception {
+        CreateQueueEntryRequest queue = createQueue(createBookingWithDuration(10, 32), 1, 0);
+
+        assertPositionValidation(queue.queueEntryId(), "{\"position\":null}");
+        assertPositionValidation(queue.queueEntryId(), "{\"position\":0}");
+        assertPositionValidation(queue.queueEntryId(), "{\"position\":-1}");
+
+        mockMvc.perform(put("/api/queue-entries/{id}/position", queue.queueEntryId())
+                        .with(authentication.platformAdminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"position\":2}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.message").value("Queue position exceeds active queue size"));
+
+        mockMvc.perform(put("/api/queue-entries/{id}/position", ids.queueEntry())
+                        .with(authentication.platformAdminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"position\":1}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+
+        postQueueAction(queue, "call-next");
+        mockMvc.perform(put("/api/queue-entries/{id}/position", queue.queueEntryId())
+                        .with(authentication.platformAdminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"position\":1}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.message").value("Only waiting queue entries can be repositioned"));
     }
 
     @Test
@@ -221,14 +358,39 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
     }
 
     private CreateQueueEntryRequest createQueue(BookingApiFixture.CreatedBooking booking) throws Exception {
+        return createQueue(booking, 1, 0);
+    }
+
+    private CreateQueueEntryRequest createQueue(BookingApiFixture.CreatedBooking booking,
+                                                int expectedPosition, int expectedWait) throws Exception {
         confirmBooking(booking);
         CreateQueueEntryRequest queue = QueueFixtureBuilder.valid(ids, booking.booking().bookingId(),
                 booking.resources().service().serviceId()).build();
         api.createQueueEntry(queue)
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.queueEntryId").value(queue.queueEntryId()))
-                .andExpect(jsonPath("$.queueStatus").value("WAITING"));
+                .andExpect(jsonPath("$.queueStatus").value("WAITING"))
+                .andExpect(jsonPath("$.position").value(expectedPosition))
+                .andExpect(jsonPath("$.estimatedWaitMin").value(expectedWait));
         return queue;
+    }
+
+    private BookingApiFixture.CreatedBooking createBookingWithDuration(int duration, int futureDay) throws Exception {
+        CreateUserRequest user = UserFixtureBuilder.valid(ids).build();
+        api.createUser(user).andExpect(status().isCreated());
+        CreateVehicleRequest vehicle = VehicleFixtureBuilder.valid(ids, user.userId()).build();
+        api.createVehicle(vehicle).andExpect(status().isCreated());
+        CreateServiceRequest service = ServiceFixtureBuilder.valid(ids)
+                .estimatedDurationMin(duration)
+                .build();
+        api.createService(service).andExpect(status().isCreated());
+        CreateBookingRequest booking = BookingFixtureBuilder.valid(
+                        ids, user.userId(), vehicle.vehicleId(), service.serviceId())
+                .scheduledDateTime(TestDates.futureDays(futureDay))
+                .build();
+        api.createBooking(booking).andExpect(status().isCreated());
+        return new BookingApiFixture.CreatedBooking(
+                new BookingApiFixture.Resources(user, vehicle, service), booking);
     }
 
     private void confirmBooking(BookingApiFixture.CreatedBooking booking) throws Exception {
@@ -236,6 +398,23 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CONFIRMED"));
+    }
+
+    private void postQueueAction(CreateQueueEntryRequest queue, String action) throws Exception {
+        mockMvc.perform(post("/api/queue-entries/{id}/" + action, queue.queueEntryId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk());
+    }
+
+    private void assertPositionValidation(String queueEntryId, String body) throws Exception {
+        mockMvc.perform(put("/api/queue-entries/{id}/position", queueEntryId)
+                        .with(authentication.platformAdminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fieldErrors[?(@.field == 'position')]").exists());
     }
 
     private void assertBusinessRule(org.springframework.test.web.servlet.ResultActions action, String message)

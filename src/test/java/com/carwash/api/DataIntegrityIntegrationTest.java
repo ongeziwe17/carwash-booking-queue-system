@@ -69,7 +69,7 @@ class DataIntegrityIntegrationTest extends ApiIntegrationTestSupport {
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isOk());
         CreateQueueEntryRequest duplicateQueue = new CreateQueueEntryRequest(queue.queueEntryId(),
-                secondBooking.bookingId(), queue.serviceId(), 2);
+                secondBooking.bookingId(), queue.serviceId());
         assertBusinessRule(api.createQueueEntry(duplicateQueue), "/api/queue-entries", "Queue entry ID already exists");
         mockMvc.perform(get("/api/queue-entries/{id}", queue.queueEntryId())
                         .with(authentication.platformAdminJwt()))

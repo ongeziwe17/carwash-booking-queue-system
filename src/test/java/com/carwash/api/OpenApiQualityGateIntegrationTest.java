@@ -99,6 +99,19 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
     }
 
     @Test
+    void queueCreationSchemaKeepsPositionServerManaged() throws Exception {
+        JsonNode document = openApi();
+        JsonNode queueRequest = document.path("components").path("schemas").path("CreateQueueEntryRequest");
+        Set<String> required = new HashSet<>();
+        queueRequest.path("required").forEach(field -> required.add(field.asText()));
+
+        assertEquals(Set.of("queueEntryId", "bookingId", "serviceId"), required);
+        assertFalse(queueRequest.path("properties").has("position"));
+        assertTrue(document.path("paths").path("/api/queue-entries").path("post")
+                .path("description").asText().contains("server assigns"));
+    }
+
+    @Test
     void authenticationRequirementsMatchPublicAndProtectedEndpoints() throws Exception {
         JsonNode document = openApi();
         assertTrue(document.path("security").isArray() && !document.path("security").isEmpty());

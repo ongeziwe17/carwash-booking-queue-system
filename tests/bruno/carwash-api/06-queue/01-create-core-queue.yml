@@ -18,8 +18,7 @@ http:
       {
         "queueEntryId": "{{queueEntryId}}",
         "bookingId": "{{bookingId}}",
-        "serviceId": "{{serviceId}}",
-        "position": 1
+        "serviceId": "{{serviceId}}"
       }
   auth:
     type: bearer

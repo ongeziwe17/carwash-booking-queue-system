@@ -14,7 +14,7 @@ Stories are grouped by delivery phase so planned capabilities are not confused w
 | US-CUR-002 | As a customer or operator, I want to manage vehicle records for a user. | Create, retrieve, update, delete, associate with an owner, and reject duplicate plates during creation. | Implemented foundation. |
 | US-CUR-003 | As an operator, I want to manage a wash-service catalogue. | Create, retrieve, update, delete, activate, deactivate, and filter services. | Implemented as a global catalogue only. |
 | US-CUR-004 | As an operator, I want to manage bookings. | Create future bookings for valid user/vehicle/service records, confirm, update, and cancel. | Implemented foundation with exact-slot capacity. |
-| US-CUR-005 | As staff, I want to manage queue entries. | Create, retrieve, manually position, call, start, complete, and delete entries. | Implemented foundation; ordering is not yet server-managed. |
+| US-CUR-005 | As staff, I want to manage queue entries. | Create, retrieve, server-order, manually rebalance, call, start, complete, and delete entries. | Implemented as one global single-location queue. |
 | US-CUR-006 | As a customer, I want to see recent in-app notifications. | Booking/queue events create records that can be listed by user. | Partially implemented. |
 | US-CUR-007 | As an operator, I want a daily operational summary. | Return booking and queue counts for a supplied date. | Partially implemented and in-memory only. |
 
