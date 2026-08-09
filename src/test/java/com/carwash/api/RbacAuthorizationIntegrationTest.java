@@ -30,6 +30,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -200,7 +201,7 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
                         .header(HttpHeaders.AUTHORIZATION, customer.bearer()).contentType(MediaType.APPLICATION_JSON)
                         .content(rescheduleRequest(rescheduled)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.scheduledDateTime").value(rescheduled.toString()))
+                .andExpect(jsonPath("$.scheduledDateTime").value(apiDateTime(rescheduled)))
                 .andExpect(jsonPath("$.status").value("CONFIRMED"));
 
         Map<String, Object> rejectedUpdate = updateBookingRequest(otherResources.primaryVehicleId(), resources.serviceId());
@@ -264,7 +265,7 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
                         .header(HttpHeaders.AUTHORIZATION, operator.bearer()).contentType(MediaType.APPLICATION_JSON)
                         .content(rescheduleRequest(rescheduled)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.scheduledDateTime").value(rescheduled.toString()))
+                .andExpect(jsonPath("$.scheduledDateTime").value(apiDateTime(rescheduled)))
                 .andExpect(jsonPath("$.status").value("CONFIRMED"));
         Map<String, Object> transfer = new LinkedHashMap<>(allowed);
         transfer.put("userId", attemptedOwnerId);
@@ -318,6 +319,10 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
 
     private String rescheduleRequest(LocalDateTime scheduledDateTime) throws Exception {
         return objectMapper.writeValueAsString(Map.of("scheduledDateTime", scheduledDateTime.toString()));
+    }
+
+    private String apiDateTime(LocalDateTime value) {
+        return value.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
     }
 
     private Map<String, Object> serviceRequest() {

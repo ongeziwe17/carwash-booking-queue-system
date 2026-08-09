@@ -12,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
 import static org.hamcrest.Matchers.containsString;
@@ -30,7 +31,7 @@ class BookingReschedulingIntegrationTest extends ApiIntegrationTestSupport {
 
         reschedule(created.booking().bookingId(), target)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.scheduledDateTime").value(target.toString()))
+                .andExpect(jsonPath("$.scheduledDateTime").value(apiDateTime(target)))
                 .andExpect(jsonPath("$.status").value("CREATED"))
                 .andExpect(jsonPath("$.user.userId").value(created.resources().user().userId()))
                 .andExpect(jsonPath("$.vehicle.vehicleId").value(created.resources().vehicle().vehicleId()))
@@ -38,13 +39,13 @@ class BookingReschedulingIntegrationTest extends ApiIntegrationTestSupport {
         mockMvc.perform(get("/api/bookings/{id}", created.booking().bookingId())
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.scheduledDateTime").value(target.toString()))
+                .andExpect(jsonPath("$.scheduledDateTime").value(apiDateTime(target)))
                 .andExpect(jsonPath("$.status").value("CREATED"));
         mockMvc.perform(get("/api/notifications/user/{userId}", created.resources().user().userId())
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].type").value("BOOKING_RESCHEDULED"))
-                .andExpect(jsonPath("$[0].booking.scheduledDateTime").value(target.toString()))
+                .andExpect(jsonPath("$[0].booking.scheduledDateTime").value(apiDateTime(target)))
                 .andExpect(jsonPath("$[0].message").value(containsString(target.toString())));
     }
 
@@ -56,7 +57,7 @@ class BookingReschedulingIntegrationTest extends ApiIntegrationTestSupport {
 
         reschedule(created.booking().bookingId(), target)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.scheduledDateTime").value(target.toString()))
+                .andExpect(jsonPath("$.scheduledDateTime").value(apiDateTime(target)))
                 .andExpect(jsonPath("$.status").value("CONFIRMED"));
     }
 
@@ -75,7 +76,7 @@ class BookingReschedulingIntegrationTest extends ApiIntegrationTestSupport {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validUpdate)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.scheduledDateTime").value(original.toString()))
+                .andExpect(jsonPath("$.scheduledDateTime").value(apiDateTime(original)))
                 .andExpect(jsonPath("$.specialRequest").value("non-schedule update"));
 
         Map<String, Object> bypass = new java.util.LinkedHashMap<>(validUpdate);
@@ -89,7 +90,7 @@ class BookingReschedulingIntegrationTest extends ApiIntegrationTestSupport {
         mockMvc.perform(get("/api/bookings/{id}", created.booking().bookingId())
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.scheduledDateTime").value(original.toString()));
+                .andExpect(jsonPath("$.scheduledDateTime").value(apiDateTime(original)));
     }
 
     @Test
@@ -233,6 +234,10 @@ class BookingReschedulingIntegrationTest extends ApiIntegrationTestSupport {
         mockMvc.perform(get("/api/bookings/{id}", bookingId)
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.scheduledDateTime").value(expected.toString()));
+                .andExpect(jsonPath("$.scheduledDateTime").value(apiDateTime(expected)));
+    }
+
+    private String apiDateTime(LocalDateTime value) {
+        return value.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
     }
 }
