@@ -1,0 +1,23 @@
+info:
+  name: Queue booking for reschedule rejection
+  type: http
+  seq: 9
+  tags: [workflow, staff]
+http:
+  method: POST
+  url: "{{baseUrl}}/api/queue-entries"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body:
+    type: json
+    data: |-
+      {
+        "queueEntryId": "{{rescheduleQueuedQueueId}}",
+        "bookingId": "{{rescheduleQueuedBookingId}}",
+        "serviceId": "{{serviceId}}"
+      }
+  auth: { type: bearer, token: "{{staffToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("returns 201 WAITING", function() { expect(res.status).to.equal(201); expect(res.body.queueStatus).to.equal("WAITING"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

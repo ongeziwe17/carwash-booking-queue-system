@@ -19,7 +19,6 @@ http:
       {
         "vehicleId": "{{customerVehicleId}}",
         "serviceId": "{{serviceId}}",
-        "scheduledDateTime": "{{future32}}",
         "specialRequest": "ownership injection",
         "userId": "{{otherCustomerUserId}}"
       }

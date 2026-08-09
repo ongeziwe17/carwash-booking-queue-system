@@ -32,6 +32,7 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
             "GET /api/services/{id}", "PUT /api/services/{id}", "DELETE /api/services/{id}",
             "PUT /api/queue-entries/{id}/position", "GET /api/bookings/{id}",
             "PUT /api/bookings/{id}", "DELETE /api/bookings/{id}",
+            "POST /api/bookings/{id}/reschedule",
             "PUT /api/admin/users/{userId}/role", "GET /api/vehicles", "POST /api/vehicles",
             "GET /api/users", "POST /api/users", "GET /api/services", "POST /api/services",
             "POST /api/services/{id}/deactivate", "POST /api/services/{id}/activate",
@@ -122,7 +123,31 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         assertTrue(callNext.path("responses").has("404"));
         assertTrue(explicitCall.path("description").asText().contains("specified WAITING"));
         assertTrue(document.path("paths").path("/api/queue-entries/{id}/call-next").isMissingNode());
-        assertEquals(38, EXPECTED_OPERATIONS.size());
+        assertEquals(39, EXPECTED_OPERATIONS.size());
+    }
+
+    @Test
+    void bookingUpdateAndRescheduleSchemasKeepScheduleMutationSeparate() throws Exception {
+        JsonNode document = openApi();
+        JsonNode schemas = document.path("components").path("schemas");
+        JsonNode update = schemas.path("UpdateBookingRequest");
+        JsonNode reschedule = schemas.path("RescheduleBookingRequest");
+
+        assertEquals(Set.of("vehicleId", "serviceId", "specialRequest"), propertyNames(update));
+        assertFalse(update.path("properties").has("scheduledDateTime"));
+        assertEquals(Set.of("scheduledDateTime"), propertyNames(reschedule));
+        assertEquals(Set.of("scheduledDateTime"), requiredNames(reschedule));
+        assertEquals("date-time", reschedule.path("properties").path("scheduledDateTime").path("format").asText());
+
+        JsonNode operation = document.path("paths").path("/api/bookings/{id}/reschedule").path("post");
+        assertTrue(operation.path("description").asText().contains("preserving its status"));
+        assertEquals("#/components/schemas/RescheduleBookingRequest", operation.path("requestBody")
+                .path("content").path("application/json").path("schema").path("$ref").asText());
+        for (String response : Set.of("200", "400", "401", "403", "404", "405", "415", "500")) {
+            assertTrue(operation.path("responses").has(response), "Missing reschedule response " + response);
+        }
+        assertTrue(document.path("paths").path("/api/bookings/{id}").path("put")
+                .path("description").asText().contains("Schedule changes must use"));
     }
 
     @Test
@@ -211,6 +236,18 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
             }
         }
         return parameters.path("__missing_path_parameter__");
+    }
+
+    private Set<String> propertyNames(JsonNode schema) {
+        Set<String> names = new HashSet<>();
+        schema.path("properties").properties().forEach(entry -> names.add(entry.getKey()));
+        return names;
+    }
+
+    private Set<String> requiredNames(JsonNode schema) {
+        Set<String> names = new HashSet<>();
+        schema.path("required").forEach(field -> names.add(field.asText()));
+        return names;
     }
 
     private void assertLocalComponentReferencesResolve(JsonNode document, JsonNode node, String location) {

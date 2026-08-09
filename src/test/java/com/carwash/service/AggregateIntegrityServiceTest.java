@@ -165,7 +165,7 @@ class AggregateIntegrityServiceTest {
         assertTrue(booking.startService());
         assertTrue(bookings.update(booking));
         assertThrows(BusinessRuleViolationException.class,
-                () -> bookingManagement.updateBooking("state-booking", "state-vehicle", "state-service", TestDates.futureDays(3), ""));
+                () -> bookingManagement.updateBooking("state-booking", "state-vehicle", "state-service", ""));
         Booking waiting = bookingManagement.createBooking("state-queue-booking", user.getUserId(), "state-vehicle", "state-service",
                 TestDates.futureDays(4), "");
         bookingManagement.confirmBooking(waiting.getBookingId());

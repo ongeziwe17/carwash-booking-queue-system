@@ -99,7 +99,6 @@ class BookingWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         String request = objectMapper.writeValueAsString(java.util.Map.of(
                 "vehicleId", booking.resources().vehicle().vehicleId(),
                 "serviceId", booking.resources().service().serviceId(),
-                "scheduledDateTime", TestDates.futureDays(34),
                 "specialRequest", "must not change"
         ));
 

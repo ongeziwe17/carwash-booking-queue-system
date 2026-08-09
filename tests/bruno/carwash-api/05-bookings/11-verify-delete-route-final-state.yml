@@ -1,7 +1,7 @@
 info:
   name: Verify DELETE route preserved cancelled record
   type: http
-  seq: 11
+  seq: 15
   tags:
     - customer
     - integrity

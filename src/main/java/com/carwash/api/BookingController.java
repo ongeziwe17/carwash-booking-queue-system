@@ -2,6 +2,7 @@ package com.carwash.api;
 
 import com.carwash.api.dto.ApiErrorResponse;
 import com.carwash.api.dto.CreateBookingRequest;
+import com.carwash.api.dto.RescheduleBookingRequest;
 import com.carwash.api.dto.UpdateBookingRequest;
 import com.carwash.domain.Booking;
 import com.carwash.service.BookingManagementService;
@@ -117,8 +118,8 @@ public class BookingController {
     @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
     @Operation(
             summary = "Update booking",
-            description = "Updates a CREATED booking or a CONFIRMED booking without an active queue entry. "
-                    + "Bookings with active queue work cannot be updated."
+            description = "Updates non-schedule details for a CREATED booking or a CONFIRMED booking without an "
+                    + "active queue entry. Schedule changes must use POST /api/bookings/{id}/reschedule."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Booking updated"),
@@ -145,9 +146,41 @@ public class BookingController {
                 id,
                 request.vehicleId(),
                 request.serviceId(),
-                request.scheduledDateTime(),
                 request.specialRequest()
         );
+    }
+
+    @PostMapping("/{id}/reschedule")
+    @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
+    @Operation(
+            summary = "Reschedule booking",
+            description = "Reschedules an eligible future CREATED or CONFIRMED booking while preserving its status, "
+                    + "vehicle, service, and owner. The request is rejected when the booking-change cutoff has "
+                    + "closed, active queue work exists, the target slot is full or conflicting, or the associated "
+                    + "service is inactive."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Booking rescheduled"),
+            @ApiResponse(responseCode = "400", description = "Invalid request or booking rule violation",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Authentication required",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Access denied",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Booking or referenced resource not found",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "405", description = "Method not allowed",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "415", description = "Unsupported media type",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    })
+    public Booking reschedule(
+            @PathVariable @NotBlank @Size(max = 64) String id,
+            @Valid @RequestBody RescheduleBookingRequest request
+    ) {
+        return service.rescheduleBooking(id, request.scheduledDateTime());
     }
 
     @DeleteMapping("/{id}")

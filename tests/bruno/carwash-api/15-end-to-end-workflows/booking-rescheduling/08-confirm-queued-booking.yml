@@ -1,0 +1,14 @@
+info:
+  name: Confirm booking for active queue rejection
+  type: http
+  seq: 8
+  tags: [workflow, staff]
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings/{{rescheduleQueuedBookingId}}/confirm"
+  auth: { type: bearer, token: "{{staffToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("returns 200", function() { expect(res.status).to.equal(200); expect(res.body.status).to.equal("CONFIRMED"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

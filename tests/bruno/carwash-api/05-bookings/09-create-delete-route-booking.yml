@@ -1,7 +1,7 @@
 info:
   name: Create booking for DELETE cancellation
   type: http
-  seq: 9
+  seq: 13
   tags:
     - customer
 

@@ -1,0 +1,20 @@
+info:
+  name: Reschedule rejects full target slot
+  type: http
+  seq: 3
+  tags: [workflow, customer, integrity]
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings/{{rescheduleFullMovingId}}/reschedule"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body:
+    type: json
+    data: '{ "scheduledDateTime": "{{future34}}" }'
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 400", function() { expect(res.status).to.equal(400); });
+        test("reports full slot", function() { expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); expect(res.body.message).to.equal("Booking time slot is already full"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

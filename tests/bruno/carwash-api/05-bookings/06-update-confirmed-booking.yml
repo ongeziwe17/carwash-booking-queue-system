@@ -1,7 +1,7 @@
 info:
   name: Customer updates CONFIRMED booking
   type: http
-  seq: 6
+  seq: 7
   tags:
     - customer
     - integrity
@@ -18,7 +18,6 @@ http:
       {
         "vehicleId": "{{customerVehicleId}}",
         "serviceId": "{{serviceId}}",
-        "scheduledDateTime": "{{future3}}",
         "specialRequest": "Updated after confirmation"
       }
   auth:
@@ -41,7 +40,7 @@ runtime:
         const bootstrapPassword = bru.interpolate("{{process.env.BRUNO_BOOTSTRAP_ADMIN_PASSWORD}}");
         if (bootstrapPassword && !bootstrapPassword.includes("process.env")) expect(payload).to.not.include(bootstrapPassword);
         test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
-        test("confirmed booking remains confirmed", function() { expect(res.body.status).to.equal("CONFIRMED"); expect(res.body.user.userId).to.equal(bru.getVar("customerUserId")); });
+        test("confirmed booking and schedule are preserved", function() { expect(res.body.status).to.equal("CONFIRMED"); expect(res.body.user.userId).to.equal(bru.getVar("customerUserId")); expect(res.body.scheduledDateTime).to.equal(bru.getVar("future2")); });
 
 settings:
   encodeUrl: true

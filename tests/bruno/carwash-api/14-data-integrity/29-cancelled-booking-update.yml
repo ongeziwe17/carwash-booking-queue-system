@@ -17,7 +17,6 @@ http:
       {
         "vehicleId": "{{customerVehicleId}}",
         "serviceId": "{{serviceId}}",
-        "scheduledDateTime": "{{future18}}",
         "specialRequest": "denied"
       }
   auth:

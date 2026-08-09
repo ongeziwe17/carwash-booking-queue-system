@@ -51,7 +51,6 @@ class Sec003RemediationIntegrationTest extends ApiIntegrationTestSupport {
         Map<String, Object> transferRequest = new LinkedHashMap<>();
         transferRequest.put("vehicleId", otherVehicleId);
         transferRequest.put("serviceId", serviceId);
-        transferRequest.put("scheduledDateTime", TestDates.futureDays(3).toString());
         transferRequest.put("specialRequest", "attempted transfer");
 
         mockMvc.perform(put("/api/bookings/{id}", bookingId)

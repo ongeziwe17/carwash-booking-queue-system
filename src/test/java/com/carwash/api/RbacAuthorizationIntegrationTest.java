@@ -80,6 +80,9 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         assertForbidden(mockMvc.perform(get("/api/users/{id}", other.userId()).header(HttpHeaders.AUTHORIZATION, customer.bearer())));
         assertForbidden(mockMvc.perform(get("/api/vehicles/{id}", otherResources.primaryVehicleId()).header(HttpHeaders.AUTHORIZATION, customer.bearer())));
         assertForbidden(mockMvc.perform(get("/api/bookings/{id}", otherResources.bookingId()).header(HttpHeaders.AUTHORIZATION, customer.bearer())));
+        assertForbidden(mockMvc.perform(post("/api/bookings/{id}/reschedule", otherResources.bookingId())
+                .header(HttpHeaders.AUTHORIZATION, customer.bearer()).contentType(MediaType.APPLICATION_JSON)
+                .content(rescheduleRequest(nextScheduledTime()))));
         assertForbidden(mockMvc.perform(get("/api/queue-entries/{id}", otherResources.queueEntryId()).header(HttpHeaders.AUTHORIZATION, customer.bearer())));
         assertForbidden(mockMvc.perform(post("/api/services").header(HttpHeaders.AUTHORIZATION, customer.bearer())
                 .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(serviceRequest()))));
@@ -183,7 +186,7 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         ResourceSet resources = createResourceSetWithoutQueue(customer.userId());
         ResourceSet otherResources = createResourceSetWithoutQueue(other.userId());
 
-        Map<String, Object> allowedUpdate = updateBookingRequest(resources.alternateVehicleId(), resources.serviceId(), nextScheduledTime());
+        Map<String, Object> allowedUpdate = updateBookingRequest(resources.alternateVehicleId(), resources.serviceId());
         mockMvc.perform(put("/api/bookings/{id}", resources.bookingId())
                         .header(HttpHeaders.AUTHORIZATION, customer.bearer()).contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(allowedUpdate)))
@@ -192,7 +195,15 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(jsonPath("$.vehicle.vehicleId").value(resources.alternateVehicleId()));
         assertEquals(customer.userId(), bookings.findById(resources.bookingId()).getUser().getUserId());
 
-        Map<String, Object> rejectedUpdate = updateBookingRequest(otherResources.primaryVehicleId(), resources.serviceId(), nextScheduledTime());
+        LocalDateTime rescheduled = nextScheduledTime();
+        mockMvc.perform(post("/api/bookings/{id}/reschedule", resources.bookingId())
+                        .header(HttpHeaders.AUTHORIZATION, customer.bearer()).contentType(MediaType.APPLICATION_JSON)
+                        .content(rescheduleRequest(rescheduled)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scheduledDateTime").value(rescheduled.toString()))
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+
+        Map<String, Object> rejectedUpdate = updateBookingRequest(otherResources.primaryVehicleId(), resources.serviceId());
         mockMvc.perform(put("/api/bookings/{id}", resources.bookingId())
                         .header(HttpHeaders.AUTHORIZATION, customer.bearer()).contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(rejectedUpdate)))
@@ -233,6 +244,9 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
     @Test
     void authenticationAndAuthorizationErrorsUseSafeJsonContracts() throws Exception {
         assertUnauthorized(mockMvc.perform(get("/api/services")));
+        assertUnauthorized(mockMvc.perform(post("/api/bookings/missing/reschedule")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(rescheduleRequest(nextScheduledTime()))));
         LoginIdentity customer = registerAndLogin(RoleName.CUSTOMER);
         assertForbidden(mockMvc.perform(post("/api/services").header(HttpHeaders.AUTHORIZATION, customer.bearer())
                 .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(serviceRequest()))));
@@ -240,11 +254,18 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
 
     private void assertOperationalUpdateCannotTransferOwner(LoginIdentity operator, ResourceSet resources, String attemptedOwnerId)
             throws Exception {
-        Map<String, Object> allowed = updateBookingRequest(resources.alternateVehicleId(), resources.serviceId(), nextScheduledTime());
+        Map<String, Object> allowed = updateBookingRequest(resources.alternateVehicleId(), resources.serviceId());
         mockMvc.perform(put("/api/bookings/{id}", resources.bookingId())
                         .header(HttpHeaders.AUTHORIZATION, operator.bearer()).contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(allowed)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.user.userId").value(resources.ownerId()));
+        LocalDateTime rescheduled = nextScheduledTime();
+        mockMvc.perform(post("/api/bookings/{id}/reschedule", resources.bookingId())
+                        .header(HttpHeaders.AUTHORIZATION, operator.bearer()).contentType(MediaType.APPLICATION_JSON)
+                        .content(rescheduleRequest(rescheduled)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scheduledDateTime").value(rescheduled.toString()))
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
         Map<String, Object> transfer = new LinkedHashMap<>(allowed);
         transfer.put("userId", attemptedOwnerId);
         mockMvc.perform(put("/api/bookings/{id}", resources.bookingId())
@@ -290,9 +311,13 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         queues.createQueueEntry(new QueueEntry(resources.queueEntryId(), booking, booking.getService()));
     }
 
-    private Map<String, Object> updateBookingRequest(String vehicleId, String serviceId, LocalDateTime scheduledDateTime) {
+    private Map<String, Object> updateBookingRequest(String vehicleId, String serviceId) {
         return Map.of("vehicleId", vehicleId, "serviceId", serviceId,
-                "scheduledDateTime", scheduledDateTime.toString(), "specialRequest", "authorization update");
+                "specialRequest", "authorization update");
+    }
+
+    private String rescheduleRequest(LocalDateTime scheduledDateTime) throws Exception {
+        return objectMapper.writeValueAsString(Map.of("scheduledDateTime", scheduledDateTime.toString()));
     }
 
     private Map<String, Object> serviceRequest() {

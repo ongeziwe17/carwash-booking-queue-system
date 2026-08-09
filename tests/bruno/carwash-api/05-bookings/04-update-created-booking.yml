@@ -18,7 +18,6 @@ http:
       {
         "vehicleId": "{{customerVehicleId}}",
         "serviceId": "{{serviceId}}",
-        "scheduledDateTime": "{{future2}}",
         "specialRequest": "Updated before confirmation"
       }
   auth:
@@ -41,7 +40,7 @@ runtime:
         const bootstrapPassword = bru.interpolate("{{process.env.BRUNO_BOOTSTRAP_ADMIN_PASSWORD}}");
         if (bootstrapPassword && !bootstrapPassword.includes("process.env")) expect(payload).to.not.include(bootstrapPassword);
         test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
-        test("owner remains Customer A", function() { expect(res.body.user.userId).to.equal(bru.getVar("customerUserId")); expect(res.body.status).to.equal("CREATED"); });
+        test("owner and schedule remain unchanged", function() { expect(res.body.user.userId).to.equal(bru.getVar("customerUserId")); expect(res.body.status).to.equal("CREATED"); expect(res.body.scheduledDateTime).to.equal(bru.getVar("future1")); });
 
 settings:
   encodeUrl: true

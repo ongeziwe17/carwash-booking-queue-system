@@ -1,0 +1,20 @@
+info:
+  name: Reschedule rejects inactive associated service
+  type: http
+  seq: 16
+  tags: [workflow, customer, integrity]
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings/{{rescheduleInactiveBookingId}}/reschedule"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body:
+    type: json
+    data: '{ "scheduledDateTime": "{{future42}}" }'
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 400", function() { expect(res.status).to.equal(400); });
+        test("reports inactive service", function() { expect(res.body.message).to.equal("Inactive service cannot be booked"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
