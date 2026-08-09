@@ -61,7 +61,7 @@ The cleaner also resets only the test implementation of `NotificationIdGenerator
 
 ## Post-refactor test ownership
 
-The post-refactor verification measured **195 tests across 33 classes**: **115 Surefire tests** and **80 Failsafe integration tests**.
+The current verification measures **216 tests across 34 classes**: **134 Surefire tests** and **82 Failsafe integration tests**.
 
 ### Surefire: unit, repository and service tests
 
@@ -77,11 +77,12 @@ The post-refactor verification measured **195 tests across 33 classes**: **115 S
 | `UserManagementServiceTest` | 10 | Fresh service graph per method |
 | `VehicleManagementServiceTest` | 7 | Fresh service graph per method |
 | `ServiceCatalogServiceTest` | 8 | Fresh service graph per method |
-| `BookingManagementServiceTest` | 19 | Fresh service graph and deterministic booking dates |
-| `QueueManagementServiceTest` | 11 | Fresh service graph and queue lifecycle |
-| `NotificationManagementServiceTest` | 7 | Fresh service graph; deterministic notification IDs |
+| `BookingManagementServiceTest` | 24 | Fresh service graph and deterministic booking dates |
+| `QueueManagementServiceTest` | 14 | Fresh service graph and queue lifecycle |
+| `NotificationManagementServiceTest` | 9 | Fresh service graph; deterministic notification IDs |
 | `DailySummaryReportServiceTest` | 7 | Fresh service graph; fixed report dates |
 | `UserManagementSecurityTest` | 4 | Fresh repository/service; bounded administrator concurrency |
+| `RuntimePolicyConfigurationTest` | 9 | Configuration binding, validation and runtime-policy boundary coverage |
 
 ### Failsafe: Spring integration tests
 

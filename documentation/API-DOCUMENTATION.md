@@ -94,7 +94,7 @@ The codes currently emitted by the API are:
 
 `UNKNOWN_PROPERTY` exists in the internal error-code enum, but the current HTTP handler intentionally surfaces rejected unknown JSON properties as `MALFORMED_REQUEST`; clients should rely on the emitted contract above.
 
-Errors never contain rejected request values, request bodies, Java exception names, stack traces, passwords, encoded credentials, JWTs, authorization headers, or signing secrets.
+Errors do not echo request bodies, Java exception names, stack traces, passwords, encoded credentials, JWTs, authorization headers, or signing secrets. Validation errors identify fields and messages without echoing rejected values; resource-not-found and some business-rule messages may include non-secret resource identifiers.
 
 ## Authentication API
 
