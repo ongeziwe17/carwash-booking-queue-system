@@ -12,7 +12,7 @@ Runtime policy values are bound to validated Spring `@ConfigurationProperties` r
 | `carwash.policy.queue.default-service-duration` | `CARWASH_QUEUE_DEFAULT_SERVICE_DURATION` | `Duration` | `PT10M` | greater than zero | Defensive ETA duration used when a queue calculation has no positive service duration. Queue estimates are exposed in whole minutes, so a positive sub-minute fallback rounds up to one minute. |
 | `carwash.runtime.time-zone` | `CARWASH_TIME_ZONE` | `ZoneId` | `UTC` | valid Java/IANA zone ID | Zone used by the application `Clock` for local date/time policy decisions and queue lifecycle timestamps. |
 
-`UTC` is the explicit runtime default because the current product documentation does not establish one business operating geography. It avoids inheriting a developer machine or container timezone. An environment with a defined local business zone can override it, for example `Africa/Johannesburg`.
+`UTC` is the explicit runtime default because the current product documentation does not establish one business operating geography. It avoids inheriting a developer machine or container timezone. An environment with a defined local business zone can override it, for example `Africa/Johannesburg`. Bean Validation time constraints such as booking `@Future` validation use the same application `Clock`, so request validation and service policy decisions interpret local date/time values consistently.
 
 ## Duration values
 
