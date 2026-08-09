@@ -1,14 +1,14 @@
 info:
   name: Customer cannot attach another customer vehicle to own booking
   type: http
-  seq: 15
+  seq: 16
   tags:
     - ownership
     - security
 
 http:
   method: PUT
-  url: "{{baseUrl}}/api/bookings/{{bookingId}}"
+  url: "{{baseUrl}}/api/bookings/{{ownershipUpdateBookingId}}"
   headers:
     - name: Content-Type
       value: "application/json"
@@ -18,7 +18,7 @@ http:
       {
         "vehicleId": "{{otherCustomerVehicleId}}",
         "serviceId": "{{serviceId}}",
-        "scheduledDateTime": "{{future10}}",
+        "scheduledDateTime": "{{future30}}",
         "specialRequest": "ownership attack"
       }
   auth:

@@ -43,6 +43,7 @@ runtime:
           disposableVehicleId: `vehicle-delete-${runId}`, plateConflictVehicleId: `vehicle-plate-${runId}`,
           serviceId: `service-${runId}`, toggleServiceId: `service-toggle-${runId}`, inactiveServiceId: `service-inactive-${runId}`,
           bookingId: `booking-${runId}`, otherBookingId: `booking-other-${runId}`, cancelBookingId: `booking-cancel-${runId}`,
+          ownershipUpdateBookingId: `booking-ownership-update-${runId}`,
           deleteRouteBookingId: `booking-delete-route-${runId}`, fullSlotBookingId: `booking-full-a-${runId}`,
           conflictBookingId: `booking-conflict-a-${runId}`, duplicateQueueBookingId: `booking-duplicate-queue-${runId}`,
           queueEntryId: `queue-${runId}`, otherQueueEntryId: `queue-other-${runId}`,
