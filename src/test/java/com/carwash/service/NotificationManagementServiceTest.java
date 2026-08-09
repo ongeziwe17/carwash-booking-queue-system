@@ -38,10 +38,11 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
         QueueEntry queueEntry = createSavedQueueEntry();
         queueService.callNext(queueEntry.getQueueEntryId());
         List<Notification> notifications = notificationService.findByUserId(queueEntry.getBooking().getUser().getUserId());
-        assertEquals(1, notifications.size());
-        assertEquals("QUEUE_CALLED", notifications.getFirst().getType());
-        assertEquals("Your vehicle is next in the queue.", notifications.getFirst().getMessage());
-        assertEquals(queueEntry.getCalledAt(), notifications.getFirst().getSentAt());
+        assertEquals(List.of("BOOKING_CONFIRMED", "QUEUE_CALLED"),
+                notifications.stream().map(Notification::getType).toList());
+        Notification queueCalled = notifications.get(1);
+        assertEquals("Your vehicle is next in the queue.", queueCalled.getMessage());
+        assertEquals(queueEntry.getCalledAt(), queueCalled.getSentAt());
     }
 
     @Test
@@ -50,9 +51,9 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
         queueService.callNext(queueEntry.getQueueEntryId());
         queueService.startService(queueEntry.getQueueEntryId());
         List<Notification> notifications = notificationService.findByUserId(queueEntry.getBooking().getUser().getUserId());
-        assertEquals(2, notifications.size());
-        assertTrue(notifications.stream().anyMatch(notification -> notification.getType().equals("SERVICE_STARTED")
-                && notification.getMessage().equals("Your service has started.")));
+        assertEquals(List.of("BOOKING_CONFIRMED", "QUEUE_CALLED", "SERVICE_STARTED"),
+                notifications.stream().map(Notification::getType).toList());
+        assertEquals("Your service has started.", notifications.get(2).getMessage());
     }
 
     @Test
@@ -62,9 +63,9 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
         queueService.startService(queueEntry.getQueueEntryId());
         queueService.completeQueueEntry(queueEntry.getQueueEntryId());
         List<Notification> notifications = notificationService.findByUserId(queueEntry.getBooking().getUser().getUserId());
-        assertEquals(3, notifications.size());
-        assertTrue(notifications.stream().anyMatch(notification -> notification.getType().equals("SERVICE_COMPLETED")
-                && notification.getMessage().equals("Your service has been completed.")));
+        assertEquals(List.of("BOOKING_CONFIRMED", "QUEUE_CALLED", "SERVICE_STARTED", "SERVICE_COMPLETED"),
+                notifications.stream().map(Notification::getType).toList());
+        assertEquals("Your service has been completed.", notifications.get(3).getMessage());
     }
 
     @Test
