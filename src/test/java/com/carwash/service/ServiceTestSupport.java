@@ -147,13 +147,16 @@ abstract class ServiceTestSupport {
 
     protected QueueEntry createSavedQueueEntry() {
         Booking booking = createConfirmedBooking();
-        return queueService.createQueueEntry(new QueueEntry(ids.queueEntry(), booking, booking.getService()));
+        QueueEntry created = queueService.createQueueEntry(
+                new QueueEntry(ids.queueEntry(), booking, booking.getService()));
+        return queueRepository.findById(created.getQueueEntryId()).orElseThrow();
     }
 
     protected QueueEntry createSavedQueueEntry(LocalDateTime scheduledDateTime, QueueStatus status) {
         Booking booking = createConfirmedBooking(scheduledDateTime);
-        QueueEntry queueEntry = queueService.createQueueEntry(
+        QueueEntry created = queueService.createQueueEntry(
                 new QueueEntry(ids.queueEntry(), booking, booking.getService()));
+        QueueEntry queueEntry = queueRepository.findById(created.getQueueEntryId()).orElseThrow();
         queueEntry.setQueueStatus(status);
         if (!status.isActive()) queueEntry.updateQueueMetrics(queueEntry.getPosition(), 0);
         queueRepository.update(queueEntry);

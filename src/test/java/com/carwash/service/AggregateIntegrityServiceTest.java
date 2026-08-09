@@ -94,7 +94,8 @@ class AggregateIntegrityServiceTest {
         assertEquals(1, user.getBookings().size());
         bookingManagement.confirmBooking("aggregate-booking");
         var queueEntry = queueManagement.createQueueEntry("aggregate-queue", "aggregate-booking", "aggregate-service");
-        assertSame(queueEntry, booking.getQueueEntry());
+        assertEquals(queueEntry.getQueueEntryId(), booking.getQueueEntry().getQueueEntryId());
+        assertSame(queues.findById(queueEntry.getQueueEntryId()).orElseThrow(), booking.getQueueEntry());
         assertThrows(BusinessRuleViolationException.class, () -> vehicleManagement.deleteVehicle("aggregate-vehicle"));
         assertThrows(BusinessRuleViolationException.class, () -> serviceCatalog.deleteService("aggregate-service"));
         assertThrows(BusinessRuleViolationException.class, () -> bookingManagement.deleteBooking("aggregate-booking"));

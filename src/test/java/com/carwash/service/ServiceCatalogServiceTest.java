@@ -86,10 +86,12 @@ class ServiceCatalogServiceTest extends ServiceTestSupport {
         catalogService.updateService(firstService.getServiceId(), firstService.getServiceName(),
                 firstService.getDescription(), firstService.getPrice(), 10);
         Booking secondBooking = createConfirmedBooking(TestDates.futureDays(2));
-        QueueEntry first = queueService.createQueueEntry(
+        QueueEntry firstResponse = queueService.createQueueEntry(
                 ids.queueEntry(), firstBooking.getBookingId(), firstService.getServiceId());
-        QueueEntry second = queueService.createQueueEntry(
+        QueueEntry secondResponse = queueService.createQueueEntry(
                 ids.queueEntry(), secondBooking.getBookingId(), secondBooking.getService().getServiceId());
+        QueueEntry first = queueRepository.findById(firstResponse.getQueueEntryId()).orElseThrow();
+        QueueEntry second = queueRepository.findById(secondResponse.getQueueEntryId()).orElseThrow();
         assertEquals(10, second.getEstimatedWaitMin());
 
         catalogService.updateService(firstService.getServiceId(), firstService.getServiceName(),

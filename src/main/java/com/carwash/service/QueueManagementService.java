@@ -79,7 +79,7 @@ public class QueueManagementService {
                 bookingRepository.update(booking);
                 throw exception;
             }
-            return queueEntry;
+            return snapshotQueueEntry(queueEntry);
         });
     }
 
@@ -113,7 +113,7 @@ public class QueueManagementService {
             activeQueue.removeIf(entry -> queueEntryId.equals(entry.getQueueEntryId()));
             activeQueue.add(position - 1, queueEntry);
             queueOrdering.rebalanceActiveQueue(activeQueue);
-            return queueEntry;
+            return snapshotQueueEntry(queueEntry);
         });
     }
 
@@ -125,7 +125,7 @@ public class QueueManagementService {
             }
             updateQueueEntry(queueEntry);
             notifyCustomer(queueEntry, "QUEUE_CALLED", "Your vehicle is next in the queue.");
-            return queueEntry;
+            return snapshotQueueEntry(queueEntry);
         });
     }
 
@@ -137,7 +137,7 @@ public class QueueManagementService {
             }
             updateQueueEntry(queueEntry);
             notifyCustomer(queueEntry, "SERVICE_STARTED", "Your service has started.");
-            return queueEntry;
+            return snapshotQueueEntry(queueEntry);
         });
     }
 
@@ -153,7 +153,7 @@ public class QueueManagementService {
             updateQueueEntry(queueEntry);
             queueOrdering.rebalanceActiveQueue();
             notifyCustomer(queueEntry, "SERVICE_COMPLETED", "Your service has been completed.");
-            return queueEntry;
+            return snapshotQueueEntry(queueEntry);
         });
     }
 

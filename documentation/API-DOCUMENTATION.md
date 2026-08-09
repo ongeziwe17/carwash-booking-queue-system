@@ -202,7 +202,7 @@ There is an internal service-layer physical delete operation for already-cancell
 
 Active positions are unique and consecutive from `1..N`. New entries append at `N + 1`; completion and physical deletion remove an entry from active calculations and immediately close later position gaps. `GET /api/queue-entries` returns active entries first by `position`, then uses `joinedAt` and `queueEntryId` as deterministic tie-breakers for inconsistent legacy state; terminal records follow in stable order. Service-filtered internal retrieval preserves global positions rather than creating a separate service queue. Branch-specific queues are not implemented.
 
-Queue GET responses are detached snapshots built while the coordinator read lock is held, so later queue mutations cannot alter an in-flight response. Updating an estimated service duration immediately rebalances active waits within the same single-JVM write boundary.
+Queue API responses are detached snapshots built while the coordinator lock is held, so later queue mutations cannot alter an in-flight response. Updating an estimated service duration immediately rebalances active waits within the same single-JVM write boundary.
 
 `estimatedWaitMin` is the cumulative effective service duration of active entries ahead; an entry's own duration is not part of its wait. A predecessor uses its positive `estimatedDurationMin`, or the configured default service duration when no positive value is available. Completed, exited, and physically deleted entries do not contribute; terminal records have zero wait.
 

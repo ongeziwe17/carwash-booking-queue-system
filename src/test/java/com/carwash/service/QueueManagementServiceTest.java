@@ -48,9 +48,10 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         assertEquals(QueueStatus.WAITING, created.getQueueStatus());
         assertEquals(1, created.getPosition());
         assertEquals(0, created.getEstimatedWaitMin());
-        assertSame(booking, created.getBooking());
-        assertSame(booking.getService(), created.getService());
-        assertSame(created, booking.getQueueEntry());
+        assertNotSame(candidate, created);
+        assertEquals(booking.getBookingId(), created.getBooking().getBookingId());
+        assertEquals(booking.getService().getServiceId(), created.getService().getServiceId());
+        assertSame(candidate, booking.getQueueEntry());
     }
 
     @Test
@@ -205,8 +206,10 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         assertNull(created.getCalledAt());
         assertNull(created.getStartedAt());
         assertNull(created.getCompletedAt());
-        assertSame(booking, created.getBooking());
-        assertSame(booking.getService(), created.getService());
+        assertNotSame(candidate, created);
+        assertEquals(booking.getBookingId(), created.getBooking().getBookingId());
+        assertEquals(booking.getService().getServiceId(), created.getService().getServiceId());
+        assertSame(candidate, booking.getQueueEntry());
     }
 
     @Test
@@ -248,13 +251,16 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         QueueEntry second = createQueueEntry(confirmedBookingWithDuration(20, 14));
         QueueEntry third = createQueueEntry(confirmedBookingWithDuration(30, 15));
 
-        assertSame(third, queueService.updatePosition(third.getQueueEntryId(), 1));
+        QueueEntry moveResponse = queueService.updatePosition(third.getQueueEntryId(), 1);
+        assertNotSame(third, moveResponse);
+        assertQueueMetrics(moveResponse, 1, 0);
         assertQueueMetrics(third, 1, 0);
         assertQueueMetrics(first, 2, 30);
         assertQueueMetrics(second, 3, 40);
         assertQueueOrder(queueService.findAll(), third, first, second);
 
         queueService.updatePosition(third.getQueueEntryId(), 3);
+        assertQueueMetrics(moveResponse, 1, 0);
         assertQueueMetrics(first, 1, 0);
         assertQueueMetrics(second, 2, 10);
         assertQueueMetrics(third, 3, 30);
@@ -402,8 +408,9 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         Booking originalBooking = createConfirmedBooking(TestDates.futureDays(30));
         Booking secondBooking = createConfirmedBooking(TestDates.futureDays(31));
         String duplicateId = ids.queueEntry();
-        QueueEntry original = queueService.createQueueEntry(
+        QueueEntry originalResponse = queueService.createQueueEntry(
                 new QueueEntry(duplicateId, originalBooking, originalBooking.getService()));
+        QueueEntry original = queueRepository.findById(originalResponse.getQueueEntryId()).orElseThrow();
 
         BusinessRuleViolationException exception = assertThrows(BusinessRuleViolationException.class,
                 () -> queueService.createQueueEntry(
@@ -411,6 +418,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
 
         assertEquals("Queue entry ID already exists", exception.getMessage());
         assertEquals(1, queueRepository.findAll().size());
+        assertNotSame(originalResponse, original);
         assertSame(original, queueRepository.findById(duplicateId).orElseThrow());
         assertSame(original, originalBooking.getQueueEntry());
         assertNull(secondBooking.getQueueEntry());
@@ -458,8 +466,9 @@ class QueueManagementServiceTest extends ServiceTestSupport {
     }
 
     private QueueEntry createQueueEntry(Booking booking) {
-        return queueService.createQueueEntry(ids.queueEntry(), booking.getBookingId(),
+        QueueEntry created = queueService.createQueueEntry(ids.queueEntry(), booking.getBookingId(),
                 booking.getService().getServiceId());
+        return queueRepository.findById(created.getQueueEntryId()).orElseThrow();
     }
 
     private void assertQueueMetrics(QueueEntry queueEntry, int position, int estimatedWaitMin) {
