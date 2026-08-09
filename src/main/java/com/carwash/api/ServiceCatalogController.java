@@ -6,6 +6,7 @@ import com.carwash.api.dto.UpdateServiceRequest;
 import com.carwash.domain.Service;
 import com.carwash.service.ServiceCatalogService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -44,7 +45,7 @@ public class ServiceCatalogController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('PERM_SERVICE_READ')")
-    @Operation(summary = "List services")
+    @Operation(summary = "List services", description = "Optionally filter the global catalogue by active state.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Services returned"),
             @ApiResponse(responseCode = "400", description = "Invalid active parameter",
@@ -58,7 +59,9 @@ public class ServiceCatalogController {
             @ApiResponse(responseCode = "500", description = "Internal server error",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public List<Service> getAll(@RequestParam(required = false) Boolean active) {
+    public List<Service> getAll(
+            @Parameter(description = "Optional active-state filter") @RequestParam(required = false) Boolean active
+    ) {
         return active == null ? service.findAll() : service.findByActive(active);
     }
 
@@ -152,7 +155,7 @@ public class ServiceCatalogController {
     @Operation(summary = "Delete service")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Service deleted"),
-            @ApiResponse(responseCode = "400", description = "Invalid identifier",
+            @ApiResponse(responseCode = "400", description = "Invalid identifier or service-deletion rule violation",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Authentication required",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),

@@ -93,7 +93,10 @@ public class UserController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @SecurityRequirements
-    @Operation(summary = "Register a customer")
+    @Operation(
+            summary = "Register a customer",
+            description = "Public registration always creates a CUSTOMER; privileged roles cannot be selected here."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "User registered",
                     content = @Content(schema = @Schema(implementation = UserResponse.class))),

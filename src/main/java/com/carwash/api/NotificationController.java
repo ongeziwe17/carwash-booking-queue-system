@@ -34,7 +34,10 @@ public class NotificationController {
 
     @GetMapping("/user/{userId}")
     @PreAuthorize("@resourceAuthorization.canAccessNotifications(authentication, #userId)")
-    @Operation(summary = "List recent notifications for a user")
+    @Operation(
+            summary = "List recent notifications for a user",
+            description = "Returns the deployment-configured recent-item limit, newest first. Notifications are in-app only."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Notifications returned"),
             @ApiResponse(responseCode = "400", description = "Invalid user identifier",

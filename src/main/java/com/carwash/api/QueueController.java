@@ -140,7 +140,10 @@ public class QueueController {
 
     @PostMapping("/{id}/call-next")
     @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
-    @Operation(summary = "Call queue entry")
+    @Operation(
+            summary = "Call queue entry",
+            description = "Marks the queue entry identified by {id} as CALLED; it does not select the next entry."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Queue entry called"),
             @ApiResponse(responseCode = "400", description = "Invalid identifier or queue rule violation",
@@ -210,7 +213,7 @@ public class QueueController {
     @Operation(summary = "Delete queue entry")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Queue entry deleted"),
-            @ApiResponse(responseCode = "400", description = "Invalid identifier",
+            @ApiResponse(responseCode = "400", description = "Invalid identifier or queue-deletion rule violation",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Authentication required",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
