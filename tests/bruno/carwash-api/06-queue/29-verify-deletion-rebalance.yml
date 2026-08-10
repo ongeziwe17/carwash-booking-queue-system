@@ -1,0 +1,37 @@
+info:
+  name: Verify deletion closes active queue gap
+  type: http
+  seq: 29
+  tags:
+    - workflow
+    - integrity
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/queue-entries"
+  auth:
+    type: bearer
+    token: "{{staffToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("deletion closes position and wait gaps", function() {
+          const active = res.body.filter(entry => ["WAITING", "CALLED", "IN_PROGRESS"].includes(entry.queueStatus));
+          const entries = [
+            bru.getVar("queueOrderingEntry3Id"), bru.getVar("queueOrderingEntry2Id")
+          ].map(id => active.find(entry => entry.queueEntryId === id));
+          const start = Number(bru.getVar("queueOrderingStartPosition"));
+          const baselineWait = Number(bru.getVar("queueOrderingBaselineWait"));
+          expect(entries.every(Boolean)).to.equal(true);
+          expect(entries.map(entry => entry.position)).to.deep.equal([start, start + 1]);
+          expect(entries.map(entry => entry.estimatedWaitMin)).to.deep.equal([baselineWait, baselineWait + 15]);
+        });
+        test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

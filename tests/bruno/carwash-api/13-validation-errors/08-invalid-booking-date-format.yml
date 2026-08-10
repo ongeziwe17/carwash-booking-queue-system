@@ -1,0 +1,52 @@
+info:
+  name: Invalid date-time is malformed request
+  type: http
+  seq: 8
+  tags:
+    - validation
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "bookingId": "{{conflictBookingId}}",
+        "userId": "{{customerUserId}}",
+        "vehicleId": "{{customerVehicleId}}",
+        "serviceId": "{{serviceId}}",
+        "scheduledDateTime": "not-a-date",
+        "specialRequest": "Bruno acceptance booking"
+      }
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns HTTP 400", function() { expect(res.status).to.equal(400); });
+        test("uses MALFORMED_REQUEST", function() { expect(res.body.code).to.equal("MALFORMED_REQUEST"); expect(res.body.status).to.equal(400); });
+        test("reports request path", function() { expect(res.body.path).to.equal(String(req.getUrl()).replace(/^https?:\/\/[^/]+/, "").split("?")[0]); });
+        test("has ISO timestamp and fieldErrors", function() { expect(Number.isNaN(Date.parse(res.body.timestamp))).to.equal(false); expect(Array.isArray(res.body.fieldErrors)).to.equal(true); });
+        test("uses safe message", function() { expect(res.body.message).to.equal("Malformed or invalid request body"); });
+        const payload = JSON.stringify(res.body ?? {});
+        const lower = payload.toLowerCase();
+        for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password"]) {
+          expect(lower, `response leaked ${forbidden}`).to.not.include(forbidden);
+        }
+        const rawPassword = bru.interpolate("{{process.env.BRUNO_TEST_USER_PASSWORD}}");
+        if (rawPassword && !rawPassword.includes("process.env")) expect(payload).to.not.include(rawPassword);
+        const bootstrapPassword = bru.interpolate("{{process.env.BRUNO_BOOTSTRAP_ADMIN_PASSWORD}}");
+        if (bootstrapPassword && !bootstrapPassword.includes("process.env")) expect(payload).to.not.include(bootstrapPassword);
+        test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

@@ -1,0 +1,36 @@
+info:
+  name: Customer A cannot reschedule Customer B booking
+  type: http
+  seq: 18
+  tags:
+    - ownership
+    - security
+    - customer
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings/{{otherBookingId}}/reschedule"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "scheduledDateTime": "{{future33}}"
+      }
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns HTTP 403", function() { expect(res.status).to.equal(403); });
+        test("uses ACCESS_DENIED", function() { expect(res.body.code).to.equal("ACCESS_DENIED"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

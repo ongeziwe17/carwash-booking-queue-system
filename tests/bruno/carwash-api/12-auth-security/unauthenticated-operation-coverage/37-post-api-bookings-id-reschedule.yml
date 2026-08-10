@@ -1,0 +1,33 @@
+info:
+  name: 401 POST /api/bookings/{id}/reschedule
+  type: http
+  seq: 37
+  tags:
+    - security
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings/{{bookingId}}/reschedule"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "scheduledDateTime": "{{future33}}"
+      }
+  auth:
+    type: none
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns HTTP 401", function() { expect(res.status).to.equal(401); });
+        test("uses AUTHENTICATION_REQUIRED", function() { expect(res.body.code).to.equal("AUTHENTICATION_REQUIRED"); expect(res.body.status).to.equal(401); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

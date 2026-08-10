@@ -1,0 +1,43 @@
+info:
+  name: Create service for inactive eligibility check
+  type: http
+  seq: 6
+  tags:
+    - queue-eligibility
+    - workflow
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/services"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "serviceId": "{{queueEligibilityInactiveServiceId}}",
+        "serviceName": "Queue eligibility wash",
+        "description": "Service used to verify inactive queue rejection",
+        "price": 120.00,
+        "estimatedDurationMin": 25
+      }
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("service starts active", function() { expect(res.body.active).to.equal(true); });
+        const lower = JSON.stringify(res.body ?? {}).toLowerCase();
+        for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password", "accesstoken"]) {
+          expect(lower, `response leaked ${forbidden}`).to.not.include(forbidden);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

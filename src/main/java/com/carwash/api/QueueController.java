@@ -84,7 +84,12 @@ public class QueueController {
     @PostMapping
     @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create queue entry")
+    @Operation(
+            summary = "Create queue entry",
+            description = "Appends an eligible confirmed booking using its active matching service to the global "
+                    + "active queue. The server assigns its position and estimated wait; a booking cannot have more "
+                    + "than one active queue entry."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Queue entry created"),
             @ApiResponse(responseCode = "400", description = "Invalid request or queue rule violation",
@@ -106,14 +111,17 @@ public class QueueController {
         return service.createQueueEntry(
                 request.queueEntryId(),
                 request.bookingId(),
-                request.serviceId(),
-                request.position()
+                request.serviceId()
         );
     }
 
     @PutMapping("/{id}/position")
     @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
-    @Operation(summary = "Update queue position")
+    @Operation(
+            summary = "Move queue entry",
+            description = "Moves a WAITING entry to the requested active position and rebalances positions and "
+                    + "estimated waits across the global active queue."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Queue position updated"),
             @ApiResponse(responseCode = "400", description = "Invalid request or queue rule violation",
@@ -138,16 +146,43 @@ public class QueueController {
         return service.updatePosition(id, request.position());
     }
 
-    @PostMapping("/{id}/call-next")
+    @PostMapping("/call-next")
     @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
-    @Operation(summary = "Call queue entry")
+    @Operation(
+            summary = "Call next queue entry",
+            description = "Selects the lowest-position WAITING entry from the global active queue and marks it "
+                    + "CALLED. CALLED and IN_PROGRESS entries are skipped."
+    )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Queue entry called"),
+            @ApiResponse(responseCode = "200", description = "Selected queue entry called"),
+            @ApiResponse(responseCode = "401", description = "Authentication required",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Insufficient permission",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "No waiting queue entry available",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "405", description = "Method not allowed",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Internal server error",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    })
+    public QueueEntry callNext() {
+        return service.callNext();
+    }
+
+    @PostMapping("/{id}/call")
+    @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
+    @Operation(
+            summary = "Call specified queue entry",
+            description = "Explicitly marks the specified WAITING queue entry as CALLED."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Specified queue entry called"),
             @ApiResponse(responseCode = "400", description = "Invalid identifier or queue rule violation",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Authentication required",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
-            @ApiResponse(responseCode = "403", description = "Access denied",
+            @ApiResponse(responseCode = "403", description = "Insufficient permission",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "404", description = "Queue entry not found",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
@@ -156,13 +191,17 @@ public class QueueController {
             @ApiResponse(responseCode = "500", description = "Internal server error",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public QueueEntry callNext(@PathVariable @NotBlank @Size(max = 64) String id) {
-        return service.callNext(id);
+    public QueueEntry callQueueEntry(@PathVariable @NotBlank @Size(max = 64) String id) {
+        return service.callQueueEntry(id);
     }
 
     @PostMapping("/{id}/start")
     @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
-    @Operation(summary = "Start queue entry service")
+    @Operation(
+            summary = "Start queue entry service",
+            description = "Starts the selected CALLED queue entry and transitions its associated CONFIRMED "
+                    + "booking to IN_SERVICE in the same coordinated operation."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Queue service started"),
             @ApiResponse(responseCode = "400", description = "Invalid identifier or queue rule violation",
@@ -184,7 +223,11 @@ public class QueueController {
 
     @PostMapping("/{id}/complete")
     @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
-    @Operation(summary = "Complete queue entry")
+    @Operation(
+            summary = "Complete queue entry",
+            description = "Completes the selected IN_PROGRESS queue entry, transitions its associated IN_SERVICE "
+                    + "booking to COMPLETED, and rebalances the remaining active queue."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Queue entry completed"),
             @ApiResponse(responseCode = "400", description = "Invalid identifier or queue rule violation",
@@ -210,7 +253,7 @@ public class QueueController {
     @Operation(summary = "Delete queue entry")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Queue entry deleted"),
-            @ApiResponse(responseCode = "400", description = "Invalid identifier",
+            @ApiResponse(responseCode = "400", description = "Invalid identifier or queue-deletion rule violation",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Authentication required",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),

@@ -1,0 +1,36 @@
+info:
+  name: Reschedule rejects a past target time
+  type: http
+  seq: 9
+  tags:
+    - customer
+    - validation
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings/{{bookingId}}/reschedule"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "scheduledDateTime": "{{pastDateTime}}"
+      }
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns HTTP 400", function() { expect(res.status).to.equal(400); });
+        test("uses VALIDATION_FAILED", function() { expect(res.body.code).to.equal("VALIDATION_FAILED"); });
+        test("reports scheduledDateTime", function() { expect(res.body.fieldErrors.some(e => e.field === "scheduledDateTime")).to.equal(true); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

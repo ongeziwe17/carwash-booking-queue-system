@@ -1,0 +1,46 @@
+info:
+  name: Accept confirmed booking into queue
+  type: http
+  seq: 4
+  tags:
+    - queue-eligibility
+    - workflow
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/queue-entries"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "queueEntryId": "{{queueEligibilityPrimaryId}}",
+        "bookingId": "{{queueEligibilityBookingId}}",
+        "serviceId": "{{serviceId}}"
+      }
+  auth:
+    type: bearer
+    token: "{{staffToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("new entry is normalized to WAITING", function() {
+          expect(res.body.queueStatus).to.equal("WAITING");
+          expect(res.body.calledAt).to.equal(null);
+          expect(res.body.startedAt).to.equal(null);
+          expect(res.body.completedAt).to.equal(null);
+        });
+        const lower = JSON.stringify(res.body ?? {}).toLowerCase();
+        for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password", "accesstoken"]) {
+          expect(lower, `response leaked ${forbidden}`).to.not.include(forbidden);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

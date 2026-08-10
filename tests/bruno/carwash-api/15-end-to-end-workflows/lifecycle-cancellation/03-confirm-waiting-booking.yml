@@ -1,0 +1,26 @@
+info:
+  name: Confirm waiting-cancellation booking
+  type: http
+  seq: 3
+  tags:
+    - workflow
+    - staff
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings/{{workflowCancelWaitingBookingId}}/confirm"
+  auth:
+    type: bearer
+    token: "{{staffToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("booking is confirmed", function() { expect(res.body.status).to.equal("CONFIRMED"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

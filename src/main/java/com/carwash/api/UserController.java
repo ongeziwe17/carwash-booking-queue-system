@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -91,7 +92,11 @@ public class UserController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Register a customer")
+    @SecurityRequirements
+    @Operation(
+            summary = "Register a customer",
+            description = "Public registration always creates a CUSTOMER; privileged roles cannot be selected here."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "User registered",
                     content = @Content(schema = @Schema(implementation = UserResponse.class))),

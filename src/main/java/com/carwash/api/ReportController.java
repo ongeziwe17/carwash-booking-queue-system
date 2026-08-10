@@ -4,6 +4,7 @@ import com.carwash.api.dto.ApiErrorResponse;
 import com.carwash.api.dto.DailySummaryReportResponse;
 import com.carwash.service.DailySummaryReportService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -33,7 +34,10 @@ public class ReportController {
 
     @GetMapping("/daily-summary")
     @PreAuthorize("hasAnyRole('BUSINESS_OWNER','PLATFORM_ADMIN')")
-    @Operation(summary = "Get daily summary report")
+    @Operation(
+            summary = "Get daily summary report",
+            description = "Returns booking and queue counts for the required ISO calendar date."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Daily summary returned"),
             @ApiResponse(responseCode = "400", description = "Missing or invalid ISO date",
@@ -48,6 +52,7 @@ public class ReportController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public DailySummaryReportResponse dailySummary(
+            @Parameter(description = "Required report date in yyyy-MM-dd format", example = "2026-08-09")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
     ) {
         return dailySummaryReportService.generateDailySummary(date);

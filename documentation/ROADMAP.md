@@ -15,27 +15,31 @@ Implemented on `staging`:
 - User record CRUD and duplicate-email validation.
 - Vehicle CRUD, user ownership, and duplicate plate validation during creation.
 - Global service catalogue CRUD with active/inactive workflows.
-- Booking creation, update, confirmation, cancellation, future-time validation, ownership validation, inactive-service rejection, and exact-slot capacity validation.
-- Queue entry creation, manual position update, call/start/complete transitions, and deletion.
+- Booking creation, guarded update, confirmation, queue-aware cancellation, future-time validation, ownership validation, inactive-service rejection, and exact-slot capacity validation.
+- Eligible queue entry creation with server-managed global ordering, cumulative wait estimates, full manual rebalance, synchronized call/start/complete transitions, and deletion.
 - In-app notification creation and recent lookup by user.
 - Basic daily booking and queue summary reporting.
-- Swagger/OpenAPI, Maven tests, Docker, and Docker Compose support.
-- Positive and negative service/API workflow coverage.
+- BCrypt credential storage, JWT authentication, RBAC, ownership authorization, and platform-admin role assignment.
+- Bounded user/request contracts and standardized safe API errors.
+- Validated runtime policy configuration for booking, notification, queue, and application-time behavior.
+- Swagger/OpenAPI with CI contract export/quality gates, Maven tests, Docker, Docker Compose, and Bruno HTTP acceptance coverage.
 
-Current limitations include direct domain-object API exposure, in-memory-only storage, manually managed queue positions, incomplete booking/queue lifecycle synchronization, no business/branch model, and no authentication, RBAC, tenant isolation, payments, external notification delivery, or production observability.
+Current limitations include some non-user domain response schemas, in-memory-only storage, a global single-location queue with no branch model or tenant isolation, no payments/external notification delivery, and no production observability platform. Authentication and RBAC are implemented but do not provide tenant isolation.
 
 ## Phase 0 — API, Data, Test, and Delivery Hardening
 
 Complete before major Marketplace domain expansion:
 
-1. **API-001** — Protect user registration and response contracts (#12).
-2. **SEC-001** — Store credentials securely (#24).
-3. **API-002** — Standardize request validation and error contracts (#106).
-4. **DATA-001** — Enforce aggregate and repository integrity (#107).
-5. **CI-001** — Align CI/CD and branch promotion with `staging` delivery (#109).
-6. **TEST-001** — Improve test isolation and quality gates (#110).
-7. **CONFIG-001** — Externalize runtime policy configuration (#111).
-8. **DOCS-001** — Align OpenAPI and written API contracts (#108).
+1. **API-001** — Protect user registration and response contracts (#12) — implemented.
+2. **SEC-001** — Store credentials securely (#24) — implemented.
+3. **API-002** — Standardize request validation and error contracts (#106) — implemented.
+4. **DATA-001** — Enforce aggregate and repository integrity (#107) — implemented.
+5. **CI-001** — Align CI/CD and branch promotion with `staging` delivery (#109) — implemented.
+6. **TEST-001** — Improve test isolation and quality gates (#110) — implemented.
+7. **CONFIG-001** — Externalize runtime policy configuration (#111) — implemented.
+8. **DOCS-001** — Align OpenAPI and written API contracts (#108) — implemented by this alignment change.
+
+**SEC-002** (#13) JWT authentication and **SEC-003** (#22) RBAC/ownership authorization were also completed ahead of their original Phase 4 sequencing. They are implemented foundations, not missing future capabilities.
 
 Expected outcome: safe bounded DTOs, predictable validation/errors, no silent ID overwrites, deterministic tests, documented configuration, and an integration pipeline that validates the active branch flow.
 
@@ -43,14 +47,16 @@ Expected outcome: safe bounded DTOs, predictable validation/errors, no silent ID
 
 The recommendation system must not be built before queue and availability behaviour is reliable.
 
-1. **QUEUE-001** — Enforce queue-entry eligibility and uniqueness (#16).
-2. **QUEUE-002** — Automate queue ordering, position recalculation, and wait estimates (#17).
-3. **WORKFLOW-001** — Synchronize booking and queue lifecycles (#20).
-4. **QUEUE-003** — Implement true call-next behaviour (#112).
-5. **BOOKING-001** — Add rescheduling and configurable cancellation windows (#113).
-6. **AVAIL-001** — Add a single-location service availability API (#114).
+1. **QUEUE-001** — Enforce queue-entry eligibility and uniqueness (#16) — implemented.
+2. **QUEUE-002** — Automate queue ordering, position recalculation, and wait estimates (#17) — implemented.
+3. **WORKFLOW-001** — Synchronize booking and queue lifecycles (#20) — implemented.
+4. **QUEUE-003** — Implement true call-next behaviour (#112) — implemented.
+5. **BOOKING-001** — Add focused booking rescheduling; reusing the CONFIG-001 cancellation cutoff (#113) — implemented.
+6. **AVAIL-001** — Add a single-location service availability API (#114) — implemented.
 
 Expected outcome: confirmed bookings enter one ordered queue, positions and ETAs are server-managed, queue transitions keep booking state consistent, and customers can check availability before attempting a booking.
+
+Phase 1 is complete. The next roadmap issue is **MKT-001** (#115); Marketplace business/branch work remains Phase 2 scope.
 
 ## Phase 2 — Marketplace Business, Branch, and Availability Foundation
 
@@ -77,18 +83,18 @@ The first recommendation release should:
 
 Machine learning is intentionally excluded from the first recommendation release.
 
-## Phase 4 — Persistence, Security, and Tenant Isolation
+## Phase 4 — Persistence, Tenant Isolation, and Production Security Hardening
 
 Required before public production use:
 
 1. **DATA-002** — Add PostgreSQL persistence, migrations, and transaction boundaries (#122).
 2. **TEST-002** — Add PostgreSQL integration tests with Testcontainers (#123).
-3. **SEC-002** — Authenticate users securely (#13).
-4. **SEC-003** — Enforce role-based access control (#22).
+3. **SEC-002** — Authenticate users securely (#13) — implemented foundation; retain and harden as the product evolves.
+4. **SEC-003** — Enforce role-based access control (#22) — implemented foundation; tenant-scoped authorization is still pending.
 5. **TENANT-001** — Enforce Marketplace tenant isolation (#124).
 6. **AUDIT-001** — Add security and operational audit logging (#125).
 
-Expected outcome: durable and transactionally safe data, protected APIs, explicit customer/staff/owner/admin roles, and verified separation between independent car wash businesses.
+Expected outcome: durable and transactionally safe data plus verified separation between independent car wash businesses, building on the existing protected API and customer/staff/owner/admin role foundation.
 
 ## Phase 5 — Product and Platform Expansion
 
@@ -127,7 +133,7 @@ API/data/test hardening
     -> Marketplace business and branch model
     -> branch services, capacity, discovery, and availability
     -> explainable rule-based recommendations
-    -> PostgreSQL, authentication, RBAC, and tenant isolation
+    -> PostgreSQL, tenant isolation, audit/security hardening
     -> payments, notifications, dashboards, real-time UX, and frontends
     -> predictive/ML optimisation after data exists
 ```

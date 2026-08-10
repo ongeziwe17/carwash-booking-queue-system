@@ -1,0 +1,39 @@
+info:
+  name: Reject update while booking is queued
+  type: http
+  seq: 7
+  tags:
+    - workflow
+    - customer
+    - integrity
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/bookings/{{workflowCancelCalledBookingId}}"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "vehicleId": "{{customerVehicleId}}",
+        "serviceId": "{{serviceId}}",
+        "specialRequest": "must not update"
+      }
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns HTTP 400", function() { expect(res.status).to.equal(400); });
+        test("uses BUSINESS_RULE_VIOLATION", function() { expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); });
+        test("reports active queue update rule", function() { expect(res.body.message).to.equal("Booking cannot be updated while it has an active queue entry"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

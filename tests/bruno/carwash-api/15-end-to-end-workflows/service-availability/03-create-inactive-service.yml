@@ -1,0 +1,33 @@
+info:
+  name: Create inactive availability fixture
+  type: http
+  seq: 3
+  tags: [availability, workflow]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/services"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "serviceId": "{{availabilityInactiveServiceId}}",
+        "serviceName": "Inactive Availability Wash",
+        "description": "Inactive availability fixture",
+        "price": 90.0,
+        "estimatedDurationMin": 30
+      }
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -1,0 +1,31 @@
+info:
+  name: Customer verifies reschedule notification
+  type: http
+  seq: 9
+  tags:
+    - customer
+    - workflow
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/notifications/user/{{customerUserId}}"
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("reschedule notification references the updated booking", function() {
+          const notification = res.body.find(n => n.type === "BOOKING_RESCHEDULED" && n.booking && n.booking.bookingId === bru.getVar("bookingId"));
+          expect(notification).to.exist;
+          expect(notification.booking.scheduledDateTime).to.equal(bru.getVar("future3"));
+          expect(notification.message).to.include(bru.getVar("future3").slice(0, 16));
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

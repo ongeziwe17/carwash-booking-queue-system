@@ -18,16 +18,16 @@ Priority guide:
 
 | Area | Implemented State | Notes |
 | --- | --- | --- |
-| Users | CRUD-style user record APIs and duplicate-email validation | API still exposes unsafe domain fields; tracked by API-001. |
-| Vehicles | CRUD, owner association, and duplicate plate validation during creation | Update/deletion integrity needs hardening. |
+| Users | Safe registration/profile responses, secure credentials, JWT authentication, RBAC and duplicate-email validation | Privileged role assignment is separate and platform-admin-only. |
+| Vehicles | CRUD, owner association, duplicate-plate validation, ownership authorization and deletion integrity | Marketplace tenant scoping is not implemented. |
 | Services | Global service catalogue CRUD and activate/deactivate workflows | Branch-specific offerings are not implemented. |
-| Bookings | Create, retrieve, update, confirm, cancel, future-time validation, ownership validation, inactive-service rejection, and exact-slot capacity | Rescheduling, cancellation windows, and branch context are not implemented. |
-| Queues | Create, retrieve, manual position update, call, start, complete, and delete | Ordering is client-managed and booking state is not fully synchronized. |
+| Bookings and availability | Create, retrieve, guarded non-schedule update, focused rescheduling, confirm, synchronized cancellation, shared future/grid/window/duration validation, global exact-start capacity, remaining-capacity availability, and shared booking-change cutoff | Branch-aware scheduling, staff/bay resources, and reservations are not implemented. |
+| Queues | Eligible creation, server-managed global ordering/waits, true call-next selection, explicit call override, full manual rebalance, synchronized call/start/complete workflow, and delete | Branch-scoped queues are not implemented. |
 | Notifications | In-app notification creation and recent lookup by user | Read APIs and external delivery are incomplete. |
 | Reports | Basic in-memory daily summary | Tenant/branch analytics and revenue reporting are future work. |
-| API/Docs | Swagger/OpenAPI and written API documentation | Contract mismatches remain. |
-| Testing | Service-layer and API workflow tests including negative booking/queue scenarios | Isolation and quality gates need improvement. |
-| Packaging | Maven, Docker, and Docker Compose | Production deployment and CI branch flow need hardening. |
+| API/Docs | Generated Swagger/OpenAPI plus human-readable API documentation and contract quality gates | DOCS-001 keeps written and generated contracts aligned. |
+| Testing | Unit/integration suites plus deterministic repeatability, OpenAPI gates, and Bruno HTTP acceptance | Production persistence testing remains future work. |
+| Packaging | Maven, Docker, Docker Compose, and staging-aligned GitHub Actions | Production deployment hardening remains future work. |
 
 Completed issue cleanup:
 
@@ -35,19 +35,34 @@ Completed issue cleanup:
 - #19 — Service catalogue management.
 - #102 — Implemented/planned documentation alignment.
 - #103 — Booking time-slot and capacity validation.
+- #12 — Safe user registration/response contracts (API-001).
+- #24 — Secure credential storage (SEC-001).
+- #13 — JWT authentication (SEC-002).
+- #22 — RBAC and ownership authorization (SEC-003).
+- #106 — Standardized validation/error contracts (API-002).
+- #107 — In-memory aggregate/repository integrity (DATA-001).
+- #109 — Staging CI/CD and branch promotion (CI-001).
+- #110 — Test isolation and quality gates (TEST-001).
+- #111 — Runtime policy configuration (CONFIG-001).
+- #16 — Queue-entry eligibility and active uniqueness (QUEUE-001).
+- #17 — Server-managed queue ordering and wait estimates (QUEUE-002).
+- #20 — Synchronized booking and queue lifecycles (WORKFLOW-001).
+- #112 — True server-selected call-next queue behaviour (QUEUE-003).
+- #113 — Focused booking rescheduling with status preservation and cutoff enforcement (BOOKING-001).
+- #114 — Single-location service availability with shared scheduling rules (AVAIL-001).
 
 ## 3. Phase 0 — Immediate Hardening
 
 | ID | GitHub | Backlog Item | Priority | Status |
 | --- | ---: | --- | --- | --- |
-| API-001 | #12 | Protect user registration and response contracts | P0 | Open |
-| SEC-001 | #24 | Store credentials securely | P0 | Open |
-| API-002 | #106 | Standardize request validation and error contracts | P0 | Open |
-| DATA-001 | #107 | Enforce aggregate and repository integrity | P0 | Open |
-| CI-001 | #109 | Align CI/CD and branch promotion with staging delivery | P0 | Open |
-| TEST-001 | #110 | Improve test isolation and quality gates | P1 | Open |
-| CONFIG-001 | #111 | Externalize runtime policy configuration | P1 | Open |
-| DOCS-001 | #108 | Align OpenAPI and written API contracts | P1 | Open |
+| API-001 | #12 | Protect user registration and response contracts | P0 | Complete |
+| SEC-001 | #24 | Store credentials securely | P0 | Complete |
+| API-002 | #106 | Standardize request validation and error contracts | P0 | Complete |
+| DATA-001 | #107 | Enforce aggregate and repository integrity | P0 | Complete |
+| CI-001 | #109 | Align CI/CD and branch promotion with staging delivery | P0 | Complete |
+| TEST-001 | #110 | Improve test isolation and quality gates | P1 | Complete |
+| CONFIG-001 | #111 | Externalize runtime policy configuration | P1 | Complete |
+| DOCS-001 | #108 | Align OpenAPI and written API contracts | P1 | Complete with #108 |
 
 ## 4. Phase 1 — Complete Booking and Queue Management
 
@@ -55,10 +70,10 @@ Completed issue cleanup:
 | --- | ---: | --- | --- | --- |
 | QUEUE-001 | #16 | Enforce queue-entry eligibility and uniqueness | P0 | API-002, DATA-001 |
 | QUEUE-002 | #17 | Automate queue ordering, recalculation, and wait estimates | P0 | QUEUE-001 |
-| WORKFLOW-001 | #20 | Synchronize booking and queue lifecycles | P0 | QUEUE-001 |
-| QUEUE-003 | #112 | Implement true call-next queue behaviour | P1 | QUEUE-001, QUEUE-002 |
-| BOOKING-001 | #113 | Add rescheduling and configurable cancellation windows | P1 | CONFIG-001, WORKFLOW-001 |
-| AVAIL-001 | #114 | Add single-location service availability API | P1 | CONFIG-001, DATA-001 |
+| WORKFLOW-001 | #20 | Synchronize booking and queue lifecycles — implemented | P0 | QUEUE-001 |
+| QUEUE-003 | #112 | Implement true call-next queue behaviour — implemented | P1 | QUEUE-001, QUEUE-002 |
+| BOOKING-001 | #113 | Add focused booking rescheduling; reuses the CONFIG-001 cancellation cutoff — implemented | P1 | CONFIG-001, WORKFLOW-001 |
+| AVAIL-001 | #114 | Add single-location service availability API — implemented | P1 | CONFIG-001, DATA-001 |
 
 Phase exit criteria:
 
@@ -66,6 +81,8 @@ Phase exit criteria:
 - Queue positions and estimates are server-managed.
 - Booking and queue states remain consistent.
 - Customers can query availability before booking.
+
+Phase 1 is complete. The next planned issue is MKT-001 (#115); no Phase 2 capability is implemented by AVAIL-001.
 
 ## 5. Phase 2 — Marketplace Business and Branch Foundation
 
@@ -109,14 +126,14 @@ Recommendation MVP outputs:
 - Price and capacity remaining.
 - Score breakdown and human-readable reason.
 
-## 7. Phase 4 — Persistence, Security, and Multi-Tenancy
+## 7. Phase 4 — Persistence, Tenant Isolation, and Production Security Hardening
+
+SEC-002 (#13) authentication and SEC-003 (#22) RBAC/ownership authorization were completed ahead of this original phase. The remaining security boundary here is tenant isolation plus production/audit hardening.
 
 | ID | GitHub | Backlog Item | Priority | Depends On |
 | --- | ---: | --- | --- | --- |
 | DATA-002 | #122 | Add PostgreSQL persistence, migrations, and transaction boundaries | P1 | Stable Marketplace domain |
 | TEST-002 | #123 | Add PostgreSQL integration tests with Testcontainers | P1 | DATA-002 |
-| SEC-002 | #13 | Authenticate users securely | P1 | SEC-001, API-001 |
-| SEC-003 | #22 | Enforce role-based access control | P1 | SEC-001, SEC-002 |
 | TENANT-001 | #124 | Enforce Marketplace tenant isolation | P0 before production | MKT-001, DATA-002, SEC-002, SEC-003 |
 | AUDIT-001 | #125 | Add security and operational audit logging | P2 | DATA-002, SEC-002, SEC-003, TENANT-001 |
 
@@ -157,5 +174,5 @@ Potential later outcomes:
 - Build a rule-based, explainable recommendation engine before considering ML.
 - Treat availability eligibility and recommendation ranking as separate concerns.
 - Keep all new issues as top-level issues unless the project intentionally adopts sub-issues later.
-- Use `staging` as the current source of truth until CI-001 changes the branch strategy.
-- Do not claim production readiness until persistence, authentication, RBAC, tenant isolation, observability, and deployment hardening are complete.
+- Use `staging` as the current integration source of truth under the CI-001 branch strategy.
+- Do not claim production readiness until persistence, tenant isolation, audit/security hardening, observability, and deployment hardening are complete.

@@ -1,0 +1,22 @@
+info:
+  name: Cross-service booking fills global slot
+  type: http
+  seq: 7
+  tags: [availability, workflow]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/availability?serviceId={{availabilityServiceId}}&date={{availabilityDate}}"
+  auth:
+    type: bearer
+    token: "{{staffToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("full exact-start slot is omitted globally", function() { expect(res.body.slots.some(s => s.startDateTime === bru.getVar("availabilitySlot"))).to.equal(false); });
+        test("no zero or negative remaining capacity is exposed", function() { expect(res.body.slots.every(s => s.capacityRemaining > 0)).to.equal(true); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

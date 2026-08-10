@@ -1,0 +1,20 @@
+info:
+  name: Reschedule rejects customer vehicle conflict
+  type: http
+  seq: 6
+  tags: [workflow, customer, integrity]
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings/{{rescheduleConflictMovingId}}/reschedule"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body:
+    type: json
+    data: '{ "scheduledDateTime": "{{future36}}" }'
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 400", function() { expect(res.status).to.equal(400); });
+        test("reports customer vehicle conflict", function() { expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); expect(res.body.message).to.include("Customer vehicle"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

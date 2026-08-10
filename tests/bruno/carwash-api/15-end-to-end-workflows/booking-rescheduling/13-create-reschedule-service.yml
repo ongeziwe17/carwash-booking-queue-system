@@ -1,0 +1,25 @@
+info:
+  name: Create dedicated reschedule service
+  type: http
+  seq: 13
+  tags: [workflow, owner]
+http:
+  method: POST
+  url: "{{baseUrl}}/api/services"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body:
+    type: json
+    data: |-
+      {
+        "serviceId": "{{rescheduleServiceId}}",
+        "serviceName": "Reschedule Wash",
+        "description": "Dedicated rescheduling workflow service",
+        "price": 120.00,
+        "estimatedDurationMin": 20
+      }
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("returns 201 active service", function() { expect(res.status).to.equal(201); expect(res.body.active).to.equal(true); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

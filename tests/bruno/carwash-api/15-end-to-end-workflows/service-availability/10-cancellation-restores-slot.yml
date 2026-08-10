@@ -1,0 +1,21 @@
+info:
+  name: Cancellation restores availability
+  type: http
+  seq: 10
+  tags: [availability, workflow]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/availability?serviceId={{availabilityServiceId}}&date={{availabilityDate}}"
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("cancelled booking releases capacity", function() { const slot = res.body.slots.find(s => s.startDateTime === bru.getVar("availabilitySlot")); expect(slot).to.be.an("object"); expect(slot.capacityRemaining).to.equal(1); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

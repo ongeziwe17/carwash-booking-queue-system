@@ -1,15 +1,12 @@
 package com.carwash.api.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 public record CreateQueueEntryRequest(
         @NotBlank @Size(max = 64) String queueEntryId,
         @NotBlank @Size(max = 64) String bookingId,
-        @NotBlank @Size(max = 64) String serviceId,
-        @NotNull @Positive Integer position
+        @NotBlank @Size(max = 64) String serviceId
 ) {
     public CreateQueueEntryRequest {
         queueEntryId = trim(queueEntryId);

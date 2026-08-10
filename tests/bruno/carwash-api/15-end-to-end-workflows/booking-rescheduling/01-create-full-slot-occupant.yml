@@ -1,0 +1,26 @@
+info:
+  name: Create reschedule full-slot occupant
+  type: http
+  seq: 1
+  tags: [workflow, customer]
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body:
+    type: json
+    data: |-
+      {
+        "bookingId": "{{rescheduleFullOccupantId}}",
+        "userId": "{{otherCustomerUserId}}",
+        "vehicleId": "{{otherCustomerVehicleId}}",
+        "serviceId": "{{serviceId}}",
+        "scheduledDateTime": "{{future34}}",
+        "specialRequest": "reschedule capacity occupant"
+      }
+  auth: { type: bearer, token: "{{otherCustomerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("returns 201", function() { expect(res.status).to.equal(201); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

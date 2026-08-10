@@ -1,0 +1,43 @@
+info:
+  name: Create booking for duplicate queue ID check
+  type: http
+  seq: 24
+  tags:
+    - integrity
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "bookingId": "{{duplicateQueueBookingId}}",
+        "userId": "{{customerUserId}}",
+        "vehicleId": "{{customerVehicleId}}",
+        "serviceId": "{{serviceId}}",
+        "scheduledDateTime": "{{future24}}",
+        "specialRequest": "Duplicate queue ID integrity fixture"
+      }
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("booking starts CREATED", function() { expect(res.body.status).to.equal("CREATED"); });
+        const lower = JSON.stringify(res.body ?? {}).toLowerCase();
+        for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password", "accesstoken"]) {
+          expect(lower, `response leaked ${forbidden}`).to.not.include(forbidden);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

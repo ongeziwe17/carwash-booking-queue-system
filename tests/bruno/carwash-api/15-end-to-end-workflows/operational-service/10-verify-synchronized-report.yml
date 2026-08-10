@@ -1,0 +1,29 @@
+info:
+  name: Operational report counts synchronized completion
+  type: http
+  seq: 10
+  tags:
+    - workflow
+    - report
+    - integrity
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/reports/daily-summary?date={{opsReportDate}}"
+  auth:
+    type: bearer
+    token: "{{adminToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("booking completion increments", function() { expect(Number(res.body.completedBookings)).to.equal(Number(bru.getVar("opsBaselineCompletedBookings")) + 1); });
+        test("queue completion increments", function() { expect(Number(res.body.completedQueueEntries)).to.equal(Number(bru.getVar("opsBaselineCompletedQueueEntries")) + 1); });
+        test("completed workflow leaves no pending work", function() { expect(Number(res.body.pendingWorkload)).to.equal(Number(bru.getVar("opsBaselinePendingWorkload"))); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

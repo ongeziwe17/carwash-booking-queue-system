@@ -9,6 +9,7 @@ Spring Boot backend foundation for car wash booking and queue management. The cu
 - Vehicle management with ownership and duplicate-plate validation.
 - Service catalogue management with activation workflows.
 - Booking management with ownership, lifecycle, time, capacity, and vehicle validation.
+- Read-only single-location service availability with configured operating hours, interval slots, service duration, and remaining global capacity.
 - Queue lifecycle operations.
 - In-app notification lookup.
 - Daily summary reporting.
@@ -31,7 +32,7 @@ Spring Boot backend foundation for car wash booking and queue management. The cu
 - Spring Web MVC and Validation
 - Spring Security OAuth2 Resource Server
 - Springdoc OpenAPI / Swagger UI
-- JUnit 5 and JaCoCo
+- JUnit Jupiter and JaCoCo
 - Docker / Docker Compose
 - GitHub Actions
 
@@ -111,26 +112,71 @@ docker compose down --remove-orphans
 
 The Compose file intentionally contains only the API. PostgreSQL remains tracked under DATA-002.
 
+## Runtime policy configuration
+
+Booking, availability, notification, queue, and application-time policies use validated typed Spring configuration with safe defaults and environment-variable overrides. See [Runtime Policy Configuration](documentation/CONFIGURATION.md) for the supported properties, scheduling-window rules, validation, cancellation cutoff semantics, duration syntax, and override examples.
+
 ## Testing
 
-Run tests:
+The test suite has two Maven responsibilities:
+
+- **Surefire** runs unit, repository, security, and service tests named `*Test` or `*Tests`.
+- **Failsafe** runs Spring/API integration tests named `*IntegrationTest` during `integration-test` and `verify`.
+
+Run only the Surefire test category:
 
 ```bash
-./mvnw clean test
+./mvnw test
 ```
 
-Run the full verification lifecycle, including the JaCoCo report and coverage gate:
+Run unit tests followed by all integration tests, the JaCoCo report, and the 80% line-coverage gate:
+
+```bash
+./mvnw verify
+```
+
+Start from a clean build directory and run the complete release-gate verification:
 
 ```bash
 ./mvnw clean verify
 ```
 
+Tests use the dedicated `test` Spring profile from `src/test/resources/application-test.properties`. It contains only deterministic test-safe configuration, disables bootstrap administration, lowers BCrypt cost for test execution, and uses a clearly test-only signing key. Tests do **not** require a developer `.env` file.
+
+Every Spring API integration test inherits the shared test foundation and begins with empty in-memory application data. Cleanup happens inside one `InMemoryDataCoordinator` write operation in dependency order: notifications, queue entries, bookings, vehicles, services, then users. The Spring application context is reused; `@DirtiesContext` is not the default isolation mechanism.
+
+Integration fixtures use a fresh `TestIdFactory` per test method. IDs are readable and local to that test, for example `bookingworkflowintegrationtest-create-user-001`, rather than global IDs such as `u1` or timestamp-only values. Notification IDs are generated through an injectable abstraction; integration tests reset only the test implementation before each method while production exposes no reset operation.
+
+JUnit class and method order are randomized deterministically. CI verifies the full suite with seeds `11001` and `11002`. Reproduce an order-specific failure with the recorded seed:
+
+```bash
+./mvnw --batch-mode -Dtest.order.seed=11001 clean verify
+```
+
+Selected tests can be executed independently with Maven selectors:
+
+```bash
+./mvnw --batch-mode -Dtest=UserManagementServiceTest test
+./mvnw --batch-mode -Djacoco.skip=true -Dit.test=BookingWorkflowIntegrationTest verify
+./mvnw --batch-mode -Djacoco.skip=true -Dit.test=RbacAuthorizationIntegrationTest verify
+```
+
+The JaCoCo HTML report is generated at `target/site/jacoco/index.html`. The enforced line-coverage minimum is **80%**; CI artifacts contain the measured report for each verified commit.
+
 Generated outputs include:
 
 - `target/surefire-reports/`
-- `target/failsafe-reports/` when integration-test executions are added
+- `target/failsafe-reports/`
 - `target/site/jacoco/`
 - `target/carwash-api.jar`
+
+GitHub Actions uploads Surefire/Failsafe reports, JaCoCo coverage, the verified application JAR, OpenAPI JSON, and Docker vulnerability results from the main verification path. The repeatability matrix uploads seed-labelled test reports when a seed fails, making the failing order reproducible without rerunning Docker validation for each seed.
+
+## API Acceptance Testing with Bruno
+
+The repository includes a Git-versioned Bruno OpenCollection suite for external HTTP acceptance, RBAC, ownership, validation, security, data-integrity, and end-to-end workflow testing. It complements the Java unit and Spring integration tests and runs against a real application process.
+
+See [Bruno API Acceptance Suite](tests/bruno/carwash-api/README.md) for local setup, secret handling, targeted tags, reports, endpoint coverage, and the RBAC matrix.
 
 ## Branch and delivery workflow
 
@@ -148,7 +194,7 @@ master
 v* release tag
 ```
 
-Pull requests into `staging`, `develop`, and `master` run Maven, workflow, Docker Compose, Docker image, smoke-test, and vulnerability validation. Registry login and publishing run only for approved branch or tag pushes.
+Pull requests into `staging`, `develop`, and `master` run Maven, workflow, test-repeatability, Docker Compose, Docker image, smoke-test, and vulnerability validation. Registry login and publishing run only for approved branch or tag pushes.
 
 See [Delivery and Docker Workflow](documentation/DELIVERY-AND-DOCKER.md) for branch protection recommendations, image tags, required secrets, CI jobs, artifacts, and local Docker guidance.
 
@@ -175,7 +221,6 @@ Bootstrap administration is disabled by default. Configure all `SECURE_BOOTSTRAP
 - `/api/notifications`
 - `/api/reports/daily-summary`
 
-
 ## API validation and errors
 
 All JSON request bodies use explicit request DTOs and Bean Validation. Unknown JSON properties are rejected,
@@ -188,7 +233,7 @@ sorted field entries. Malformed JSON uses `MALFORMED_REQUEST`; missing resources
 missing or invalid authentication remains 401; authenticated authorization failures remain 403; unexpected
 failures use `INTERNAL_ERROR` with the generic message `An unexpected error occurred`.
 
-See [API Documentation](documentation/API-DOCUMENTATION.md#standard-error-contract) for the full code table
+See [API Documentation](documentation/API-DOCUMENTATION.md#standard-response-and-error-conventions) for the full code table
 and representative 400, 401, 403, 404, and 500 responses.
 
 ## Product documentation
@@ -197,8 +242,12 @@ and representative 400, 401, 403, 404, and 500 responses.
 - [Product Specification](documentation/SPECIFICATION.md)
 - [Roadmap](documentation/ROADMAP.md)
 - [API Documentation](documentation/API-DOCUMENTATION.md)
+- [Runtime Policy Configuration](documentation/CONFIGURATION.md)
+- [Testing](documentation/TESTING.md)
+- [Bruno API Acceptance Suite](tests/bruno/carwash-api/README.md)
 - [Domain Model](documentation/DOMAIN-MODEL.md)
 - [System Requirements](documentation/SYSTEM-REQUIREMENTS.md)
 - [User Stories](documentation/USER-STORIES.md)
 - [Product Backlog](documentation/PRODUCT-BACKLOG.md)
 - [Delivery and Docker Workflow](documentation/DELIVERY-AND-DOCKER.md)
+- [Coverage Baseline](documentation/COVERAGE.md)

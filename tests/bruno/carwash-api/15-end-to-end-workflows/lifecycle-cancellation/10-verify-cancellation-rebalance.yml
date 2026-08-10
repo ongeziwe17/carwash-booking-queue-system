@@ -1,0 +1,28 @@
+info:
+  name: Waiting cancellation rebalances later queue entry
+  type: http
+  seq: 10
+  tags:
+    - workflow
+    - staff
+    - integrity
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/queue-entries/{{workflowCancelCalledQueueId}}"
+  auth:
+    type: bearer
+    token: "{{staffToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("position gap closes", function() { expect(Number(res.body.position)).to.equal(Number(bru.getVar("workflowCancelBaselinePosition"))); });
+        test("wait is recalculated", function() { expect(Number(res.body.estimatedWaitMin)).to.equal(Number(bru.getVar("workflowCancelBaselineWait"))); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

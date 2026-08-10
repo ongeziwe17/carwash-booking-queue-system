@@ -22,16 +22,12 @@ import tools.jackson.databind.ObjectMapper;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
-import java.time.Clock;
 import java.util.Base64;
 
 @Configuration
 @EnableMethodSecurity
 @EnableConfigurationProperties(JwtSecurityProperties.class)
 public class ApiSecurityConfig {
-    @Bean
-    Clock securityClock() { return Clock.systemUTC(); }
-
     @Bean
     SecretKey jwtSigningKey(JwtSecurityProperties properties) {
         final byte[] decoded;

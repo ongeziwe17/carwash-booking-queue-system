@@ -1,0 +1,40 @@
+info:
+  name: Create 10 minute ordering service
+  type: http
+  seq: 13
+  tags:
+    - workflow
+    - integrity
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/services"
+  headers:
+    - name: Content-Type
+      value: "application/json"
+  body:
+    type: json
+    data: |-
+      {
+        "serviceId": "{{queueOrderingService10Id}}",
+        "serviceName": "Queue Ordering 10",
+        "description": "QUEUE-002 cumulative wait fixture",
+        "price": 100.0,
+        "estimatedDurationMin": 10
+      }
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("stores 10 minute duration", function() { expect(res.body.estimatedDurationMin).to.equal(10); expect(res.body.active).to.equal(true); });
+        test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
+
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

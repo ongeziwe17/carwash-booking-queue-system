@@ -5,5 +5,9 @@ public enum QueueStatus {
     CALLED,
     IN_PROGRESS,
     COMPLETED,
-    EXITED
+    EXITED;
+
+    public boolean isActive() {
+        return this == WAITING || this == CALLED || this == IN_PROGRESS;
+    }
 }

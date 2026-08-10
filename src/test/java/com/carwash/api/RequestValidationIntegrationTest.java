@@ -1,177 +1,116 @@
 package com.carwash.api;
 
-import org.junit.jupiter.api.BeforeEach;
+import com.carwash.api.dto.CreateBookingRequest;
+import com.carwash.api.dto.CreateQueueEntryRequest;
+import com.carwash.api.dto.CreateServiceRequest;
+import com.carwash.api.dto.CreateUserRequest;
+import com.carwash.api.dto.CreateVehicleRequest;
+import com.carwash.testsupport.ApiContractAssertions;
+import com.carwash.testsupport.ApiIntegrationTestSupport;
+import com.carwash.testsupport.BookingFixtureBuilder;
+import com.carwash.testsupport.QueueFixtureBuilder;
+import com.carwash.testsupport.ServiceFixtureBuilder;
+import com.carwash.testsupport.TestDates;
+import com.carwash.testsupport.UserFixtureBuilder;
+import com.carwash.testsupport.VehicleFixtureBuilder;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
-import tools.jackson.databind.ObjectMapper;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
-class RequestValidationIntegrationTest {
-
-    private MockMvc mockMvc;
-
-    @Autowired
-    private WebApplicationContext context;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @BeforeEach
-    void configureMockMvc() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context)
-                .defaultRequest(get("/").with(jwt()
-                        .jwt(jwt -> jwt.subject("request-validation-admin").claim("role", "PLATFORM_ADMIN"))
-                        .authorities(
-                                new SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN"),
-                                new SimpleGrantedAuthority("PERM_SERVICE_READ"),
-                                new SimpleGrantedAuthority("PERM_SERVICE_MANAGE"),
-                                new SimpleGrantedAuthority("PERM_QUEUE_OPERATE"))))
-                .apply(springSecurity())
-                .build();
-    }
+class RequestValidationIntegrationTest extends ApiIntegrationTestSupport {
 
     @Test
     void everyRequestContractRejectsInvalidInput() throws Exception {
-        String prefix = "validation-" + UUID.randomUUID();
-        String userId = prefix + "-user";
-        String vehicleId = prefix + "-vehicle";
-        String serviceId = prefix + "-service";
-        String bookingId = prefix + "-booking";
-        String queueId = prefix + "-queue";
-        LocalDateTime scheduled = LocalDateTime.now().plusDays(30).withNano(0);
-
         assertValidation(post("/api/users").with(anonymous()), Map.of(
-                "userId", prefix + "-invalid-user", "fullName", "User", "email", "not-email",
-                "phone", "1", "password", "LocalTestPassword123!"), "email");
+                "userId", ids.user(), "fullName", "User", "email", "not-email",
+                "phone", "1", "password", UserFixtureBuilder.DEFAULT_PASSWORD), "email");
         assertValidation(post("/api/auth/login").with(anonymous()), Map.of(
-                "email", "not-email", "password", "LocalTestPassword123!"), "email");
+                "email", "not-email", "password", UserFixtureBuilder.DEFAULT_PASSWORD), "email");
 
-        createUser(userId, prefix + "@example.com");
+        CreateUserRequest user = UserFixtureBuilder.valid(ids).build();
+        api.createUser(user).andExpect(status().isCreated());
 
         Map<String, Object> invalidVehicle = new HashMap<>();
-        invalidVehicle.put("userId", userId);
-        invalidVehicle.put("vehicleId", prefix + "-invalid-vehicle");
+        invalidVehicle.put("userId", user.userId());
+        invalidVehicle.put("vehicleId", ids.vehicle());
         invalidVehicle.put("plateNumber", " ");
         invalidVehicle.put("vehicleType", "SUV");
         invalidVehicle.put("brand", "Toyota");
         invalidVehicle.put("model", "RAV4");
         invalidVehicle.put("notes", "x".repeat(501));
-        assertValidation(post("/api/vehicles"), invalidVehicle, "notes");
+        assertValidation(post("/api/vehicles").with(authentication.platformAdminJwt()), invalidVehicle, "notes");
 
-        createVehicle(userId, vehicleId, "VAL-" + UUID.randomUUID().toString().substring(0, 8));
-        assertValidation(put("/api/vehicles/{id}", vehicleId), Map.of(
-                "plateNumber", prefix + "-plate", "vehicleType", "SUV", "brand", "Toyota",
+        CreateVehicleRequest vehicle = VehicleFixtureBuilder.valid(ids, user.userId()).build();
+        api.createVehicle(vehicle).andExpect(status().isCreated());
+        assertValidation(put("/api/vehicles/{id}", vehicle.vehicleId()).with(authentication.platformAdminJwt()), Map.of(
+                "plateNumber", ids.plate(), "vehicleType", "SUV", "brand", "Toyota",
                 "model", " ", "color", "Black", "notes", "ok"), "model");
 
-        assertValidation(post("/api/services"), Map.of(
-                "serviceId", prefix + "-invalid-service", "serviceName", "Wash",
+        assertValidation(post("/api/services").with(authentication.platformAdminJwt()), Map.of(
+                "serviceId", ids.service(), "serviceName", "Wash",
                 "description", "", "price", 0, "estimatedDurationMin", 0), "estimatedDurationMin");
 
-        createService(serviceId);
-        assertValidation(put("/api/services/{id}", serviceId), Map.of(
+        CreateServiceRequest service = ServiceFixtureBuilder.valid(ids).build();
+        api.createService(service).andExpect(status().isCreated());
+        assertValidation(put("/api/services/{id}", service.serviceId()).with(authentication.platformAdminJwt()), Map.of(
                 "serviceName", "Wash", "description", "", "price", -1,
                 "estimatedDurationMin", 30), "price");
 
         Map<String, Object> invalidBooking = new HashMap<>();
-        invalidBooking.put("bookingId", prefix + "-invalid-booking");
-        invalidBooking.put("userId", userId);
-        invalidBooking.put("vehicleId", vehicleId);
-        invalidBooking.put("serviceId", serviceId);
+        invalidBooking.put("bookingId", ids.booking());
+        invalidBooking.put("userId", user.userId());
+        invalidBooking.put("vehicleId", vehicle.vehicleId());
+        invalidBooking.put("serviceId", service.serviceId());
         invalidBooking.put("specialRequest", "x".repeat(1001));
-        assertValidation(post("/api/bookings"), invalidBooking, "scheduledDateTime");
+        assertValidation(post("/api/bookings").with(authentication.platformAdminJwt()), invalidBooking, "scheduledDateTime");
 
-        createBooking(bookingId, userId, vehicleId, serviceId, scheduled);
+        CreateBookingRequest booking = BookingFixtureBuilder.valid(ids, user.userId(), vehicle.vehicleId(), service.serviceId())
+                .scheduledDateTime(TestDates.futureDays(30)).build();
+        api.createBooking(booking).andExpect(status().isCreated());
         Map<String, Object> invalidBookingUpdate = new HashMap<>();
-        invalidBookingUpdate.put("vehicleId", vehicleId);
+        invalidBookingUpdate.put("vehicleId", vehicle.vehicleId());
         invalidBookingUpdate.put("serviceId", " ");
-        invalidBookingUpdate.put("scheduledDateTime", scheduled.plusDays(1).toString());
         invalidBookingUpdate.put("specialRequest", "ok");
-        assertValidation(put("/api/bookings/{id}", bookingId), invalidBookingUpdate, "serviceId");
+        assertValidation(put("/api/bookings/{id}", booking.bookingId()).with(authentication.platformAdminJwt()),
+                invalidBookingUpdate, "serviceId");
+        assertValidation(post("/api/bookings/{id}/reschedule", booking.bookingId())
+                .with(authentication.platformAdminJwt()), Map.of(), "scheduledDateTime");
 
-        assertValidation(post("/api/queue-entries"), Map.of(
-                "queueEntryId", prefix + "-invalid-queue", "bookingId", bookingId,
-                "serviceId", serviceId, "position", 0), "position");
+        assertValidation(post("/api/queue-entries").with(authentication.platformAdminJwt()), Map.of(
+                "queueEntryId", " ", "bookingId", booking.bookingId(),
+                "serviceId", service.serviceId()), "queueEntryId");
 
-        createQueueEntry(queueId, bookingId, serviceId);
-        assertValidation(put("/api/queue-entries/{id}/position", queueId), Map.of("position", -1), "position");
+        mockMvc.perform(post("/api/bookings/{id}/confirm", booking.bookingId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk());
+        CreateQueueEntryRequest queue = QueueFixtureBuilder.valid(ids, booking.bookingId(), service.serviceId()).build();
+        api.createQueueEntry(queue).andExpect(status().isCreated());
+        assertValidation(put("/api/queue-entries/{id}/position", queue.queueEntryId())
+                .with(authentication.platformAdminJwt()), Map.of("position", -1), "position");
 
-        assertValidation(put("/api/admin/users/{userId}/role", userId), Map.of(), "roleName");
-    }
-
-    private void createUser(String userId, String email) throws Exception {
-        mockMvc.perform(post("/api/users").with(anonymous()).contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "userId", userId, "fullName", "Validation User", "email", email,
-                                "phone", "123", "password", "LocalTestPassword123!"))))
-                .andExpect(status().isCreated());
-    }
-
-    private void createVehicle(String userId, String vehicleId, String plate) throws Exception {
-        mockMvc.perform(post("/api/vehicles").contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "userId", userId, "vehicleId", vehicleId, "plateNumber", plate,
-                                "vehicleType", "SUV", "brand", "Toyota", "model", "RAV4",
-                                "color", "Black", "notes", ""))))
-                .andExpect(status().isCreated());
-    }
-
-    private void createService(String serviceId) throws Exception {
-        mockMvc.perform(post("/api/services").contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "serviceId", serviceId, "serviceName", "Validation Wash",
-                                "description", "", "price", 100, "estimatedDurationMin", 30))))
-                .andExpect(status().isCreated());
-    }
-
-    private void createBooking(
-            String bookingId,
-            String userId,
-            String vehicleId,
-            String serviceId,
-            LocalDateTime scheduled
-    ) throws Exception {
-        mockMvc.perform(post("/api/bookings").contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "bookingId", bookingId, "userId", userId, "vehicleId", vehicleId,
-                                "serviceId", serviceId, "scheduledDateTime", scheduled.toString(),
-                                "specialRequest", ""))))
-                .andExpect(status().isCreated());
-    }
-
-    private void createQueueEntry(String queueId, String bookingId, String serviceId) throws Exception {
-        mockMvc.perform(post("/api/queue-entries").contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "queueEntryId", queueId, "bookingId", bookingId,
-                                "serviceId", serviceId, "position", 1))))
-                .andExpect(status().isCreated());
+        assertValidation(put("/api/admin/users/{userId}/role", user.userId())
+                .with(authentication.platformAdminJwt()), Map.of(), "roleName");
     }
 
     private void assertValidation(MockHttpServletRequestBuilder request, Map<String, Object> body, String field)
             throws Exception {
-        mockMvc.perform(request.contentType(MediaType.APPLICATION_JSON)
+        var action = mockMvc.perform(request.contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.message").value("Request validation failed"))
+                .andExpect(jsonPath("$.timestamp").exists())
                 .andExpect(jsonPath("$.fieldErrors[?(@.field == '" + field + "')]").exists());
+        ApiContractAssertions.assertNoSensitiveData(action, false);
     }
 }

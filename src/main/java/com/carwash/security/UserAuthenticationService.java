@@ -3,9 +3,11 @@ package com.carwash.security;
 import com.carwash.domain.User;
 import com.carwash.enums.AccountStatus;
 import com.carwash.repository.UserRepository;
+import com.carwash.repository.inmemory.InMemoryDataCoordinator;
 import org.springframework.stereotype.Service;
 
 import java.util.Locale;
+import java.util.Objects;
 
 @Service
 public class UserAuthenticationService {
@@ -13,44 +15,75 @@ public class UserAuthenticationService {
     private final UserRepository users;
     private final UserCredentialService credentials;
     private final JwtTokenService tokens;
+    private final InMemoryDataCoordinator coordinator;
     private final String dummyEncodedPassword;
 
     public UserAuthenticationService(
             UserRepository users,
             UserCredentialService credentials,
-            JwtTokenService tokens
+            JwtTokenService tokens,
+            InMemoryDataCoordinator coordinator
     ) {
-        this.users = users;
-        this.credentials = credentials;
-        this.tokens = tokens;
+        this.users = Objects.requireNonNull(users, "User repository is required");
+        this.credentials = Objects.requireNonNull(credentials, "Credential service is required");
+        this.tokens = Objects.requireNonNull(tokens, "JWT token service is required");
+        this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
         this.dummyEncodedPassword = credentials.createDummyEncoding();
     }
 
     public AuthenticationResult authenticate(String email, String rawPassword) {
-        String normalizedEmail = email == null
-                ? ""
-                : email.trim().toLowerCase(Locale.ROOT);
+        String normalizedEmail = normalizeEmail(email);
+        AuthenticationCandidate candidate = coordinator.read(() -> authenticationCandidate(normalizedEmail));
 
-        User user = users.findByEmail(normalizedEmail).orElse(null);
-        String encodedPassword = user == null
-                ? dummyEncodedPassword
-                : user.getEncodedPassword();
-
-        boolean credentialMatches = credentials.matches(rawPassword, encodedPassword);
-        boolean activeUser = user != null && user.getAccountStatus() == AccountStatus.ACTIVE;
-
-        if (!activeUser || !credentialMatches) {
+        boolean credentialMatches = credentials.matches(rawPassword, candidate.encodedPassword());
+        if (!candidate.active() || !credentialMatches) {
             throw new InvalidCredentialsException();
         }
 
-        JwtTokenService.IssuedToken token = tokens.issue(user);
-        user.recordSuccessfulLogin();
-        users.save(user);
+        return coordinator.write(() -> completeAuthentication(candidate, normalizedEmail));
+    }
+
+    private AuthenticationCandidate authenticationCandidate(String normalizedEmail) {
+        User user = users.findByEmail(normalizedEmail).orElse(null);
+        if (user == null) {
+            return new AuthenticationCandidate(null, dummyEncodedPassword, false);
+        }
+        return new AuthenticationCandidate(
+                user.getUserId(),
+                user.getEncodedPassword(),
+                user.getAccountStatus() == AccountStatus.ACTIVE
+        );
+    }
+
+    private AuthenticationResult completeAuthentication(AuthenticationCandidate candidate, String normalizedEmail) {
+        User currentUser = users.findById(candidate.userId())
+                .orElseThrow(InvalidCredentialsException::new);
+
+        boolean stillValid = currentUser.getAccountStatus() == AccountStatus.ACTIVE
+                && normalizedEmail.equals(normalizeEmail(currentUser.getEmail()))
+                && Objects.equals(candidate.encodedPassword(), currentUser.getEncodedPassword());
+        if (!stillValid) {
+            throw new InvalidCredentialsException();
+        }
+
+        currentUser.recordSuccessfulLogin();
+        if (!users.update(currentUser)) {
+            throw new InvalidCredentialsException();
+        }
+
+        JwtTokenService.IssuedToken token = tokens.issue(currentUser);
         return new AuthenticationResult(
-                user,
+                currentUser,
                 token.value(),
                 token.expiresAt(),
                 token.expiresInSeconds()
         );
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private record AuthenticationCandidate(String userId, String encodedPassword, boolean active) {
     }
 }

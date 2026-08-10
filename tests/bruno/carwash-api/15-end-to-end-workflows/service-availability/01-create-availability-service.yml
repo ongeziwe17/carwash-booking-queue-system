@@ -1,0 +1,34 @@
+info:
+  name: Create 60-minute availability service
+  type: http
+  seq: 1
+  tags: [availability, workflow]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/services"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "serviceId": "{{availabilityServiceId}}",
+        "serviceName": "Availability Full Wash",
+        "description": "Run-scoped availability service",
+        "price": 180.0,
+        "estimatedDurationMin": 60
+      }
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("creates active service", function() { expect(res.body.serviceId).to.equal(bru.getVar("availabilityServiceId")); expect(res.body.active).to.equal(true); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

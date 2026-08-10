@@ -1,0 +1,26 @@
+info:
+  name: Create reschedule conflict occupant
+  type: http
+  seq: 4
+  tags: [workflow, customer]
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body:
+    type: json
+    data: |-
+      {
+        "bookingId": "{{rescheduleConflictOccupantId}}",
+        "userId": "{{customerUserId}}",
+        "vehicleId": "{{customerVehicleId}}",
+        "serviceId": "{{serviceId}}",
+        "scheduledDateTime": "{{future36}}",
+        "specialRequest": "reschedule conflict occupant"
+      }
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("returns 201", function() { expect(res.status).to.equal(201); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

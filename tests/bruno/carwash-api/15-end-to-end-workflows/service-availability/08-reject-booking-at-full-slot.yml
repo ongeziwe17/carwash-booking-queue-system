@@ -1,0 +1,35 @@
+info:
+  name: Authoritative booking rejects full advertised slot
+  type: http
+  seq: 8
+  tags: [availability, workflow]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "bookingId": "{{availabilityRejectedBookingId}}",
+        "userId": "{{otherCustomerUserId}}",
+        "vehicleId": "{{otherCustomerVehicleId}}",
+        "serviceId": "{{availabilityServiceId}}",
+        "scheduledDateTime": "{{availabilitySlot}}",
+        "specialRequest": "must remain rejected"
+      }
+  auth:
+    type: bearer
+    token: "{{otherCustomerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 400", function() { expect(res.status).to.equal(400); });
+        test("reports full-slot rule", function() { expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); expect(res.body.message).to.equal("Booking time slot is already full"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

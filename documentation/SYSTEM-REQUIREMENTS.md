@@ -29,17 +29,19 @@ The current backend includes:
 - In-app notification record lookup.
 - Basic daily summary reporting from in-memory data.
 - Swagger/OpenAPI documentation.
+- Secure BCrypt credential storage, JWT authentication, RBAC, and ownership authorization.
+- Standardized API errors and validated runtime/business policy configuration.
 - Docker/local development support.
 
-The current backend does not include a frontend application, authentication, RBAC enforcement, durable PostgreSQL persistence, payments, external notifications, multi-tenancy, or production SaaS hardening.
+The current backend does not include a frontend application, durable PostgreSQL persistence, payments, external notifications, multi-tenancy, or production SaaS hardening. Authentication and RBAC are implemented but are not a substitute for Marketplace tenant isolation.
 
 ## 2. Stakeholder Analysis Summary
 
 | Stakeholder          | Role                            | Current Concerns                                                    | Future Concerns                                          |
 |----------------------|---------------------------------|---------------------------------------------------------------------|----------------------------------------------------------|
-| Customer             | Books services and joins queues | Accurate booking, vehicle, queue, and notification-record workflows | Secure login, external notifications, payments, feedback |
+| Customer             | Books services and joins queues | Secure login plus accurate booking, vehicle, queue, and notification-record workflows | External notifications, payments, feedback |
 | Business Owner       | Manages services and operations | Service, booking, queue, and basic report visibility                | Tenant management, reports, payments, dashboards         |
-| Service Staff        | Performs car wash services      | Clear queue and booking status flow                                 | RBAC-protected staff workflows                           |
+| Service Staff        | Performs car wash services      | RBAC-protected queue and booking status flow                         | Tenant-scoped operational workflows                     |
 | System Administrator | Maintains system                | Local reliability and maintainable APIs                             | Security, observability, production operations           |
 | Platform Owner       | Oversees system direction       | Clear implementation status                                         | SaaS readiness and tenant isolation                      |
 
@@ -85,9 +87,9 @@ The current backend does not include a frontend application, authentication, RBA
 
 | Requirement                                        | Status                                       |
 |----------------------------------------------------|----------------------------------------------|
-| User registration/login with secure authentication | Planned; not implemented                     |
-| Secure credential hashing and storage              | Planned; not implemented                     |
-| Role-based access control                          | Planned; not implemented                     |
+| Refresh-token/logout/revocation lifecycle, if specified | Future security work                     |
+| Security and operational audit logging                 | Future security hardening                |
+| Marketplace tenant-scoped authorization                | Future SaaS hardening                    |
 | PostgreSQL persistence and migrations              | Planned; not implemented for the running app |
 | Business registration and multi-tenancy            | Future SaaS hardening                        |
 | External email/SMS notification delivery           | Future product/platform work                 |
@@ -115,8 +117,8 @@ The current backend does not include a frontend application, authentication, RBA
 
 ### 5.4 Security
 
-- Authentication, RBAC, and secure credential storage are required before production use but are not currently implemented.
-- Current APIs should be treated as local-development/backend-foundation endpoints.
+- BCrypt credential storage, JWT authentication, RBAC, ownership authorization, and safe API errors are implemented.
+- Tenant isolation, audit logging, durable persistence, observability, and deployment hardening remain required before production SaaS use.
 
 ### 5.5 Persistence and Reliability
 

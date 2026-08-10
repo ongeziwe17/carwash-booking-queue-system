@@ -1,0 +1,21 @@
+info:
+  name: Reject unknown service availability
+  type: http
+  seq: 12
+  tags: [availability, workflow]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/availability?serviceId=missing-availability-{{runId}}&date={{availabilityDate}}"
+  auth:
+    type: bearer
+    token: "{{adminToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 404", function() { expect(res.status).to.equal(404); });
+        test("reports missing resource", function() { expect(res.body.code).to.equal("RESOURCE_NOT_FOUND"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
