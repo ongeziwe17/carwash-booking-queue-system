@@ -1,0 +1,7 @@
+info: { name: "401 GET /api/marketplace/businesses/{id}", type: http, seq: 41, tags: [auth, security, marketplace] }
+http: { method: GET, url: "{{baseUrl}}/api/marketplace/businesses/{{marketplaceBusinessId}}", auth: { type: none } }
+runtime:
+  scripts:
+    - type: tests
+      code: 'test("returns standard 401", function() { expect(res.status).to.equal(401); expect(res.body.code).to.equal("AUTHENTICATION_REQUIRED"); });'
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

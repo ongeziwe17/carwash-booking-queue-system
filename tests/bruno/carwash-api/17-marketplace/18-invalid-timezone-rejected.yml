@@ -1,0 +1,39 @@
+info:
+  name: Unknown branch timezone is rejected
+  type: http
+  seq: 18
+  tags: [marketplace, validation]
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "branchName": "Invalid Timezone Branch",
+        "addressLine1": "2 Dock Road",
+        "addressLine2": null,
+        "city": "Cape Town",
+        "province": "Western Cape",
+        "postalCode": "8001",
+        "countryCode": "ZA",
+        "latitude": -33.908,
+        "longitude": 18.42,
+        "timezone": "Africa/Unknown",
+        "publicDiscoveryEnabled": true
+      }
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("uses business rule contract", function() { expect(res.status).to.equal(400); expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); expect(res.body.message).to.equal("Timezone identifier is invalid"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

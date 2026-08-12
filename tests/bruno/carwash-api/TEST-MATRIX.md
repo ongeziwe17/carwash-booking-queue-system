@@ -44,16 +44,29 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 | `DELETE` | `/api/vehicles/{id}` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | ✅ | ✅ | N/A — not needed in multi-step journey |
 | `GET` | `/api/vehicles/{id}` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | ✅ | N/A — no state/dependency mutation | ✅ |
 | `PUT` | `/api/vehicles/{id}` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | N/A — not needed in multi-step journey |
+| `GET` | `/api/marketplace/businesses` | ✅ | N/A — no typed input | ✅ | ✅ | N/A — tenant isolation pending | N/A — read only | ✅ |
+| `POST` | `/api/marketplace/businesses` | ✅ | ✅ | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
+| `GET` | `/api/marketplace/businesses/{businessId}` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | N/A — read only | ✅ |
+| `PUT` | `/api/marketplace/businesses/{businessId}` | ✅ | ✅ | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
+| `POST` | `/api/marketplace/businesses/{businessId}/activate` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
+| `POST` | `/api/marketplace/businesses/{businessId}/deactivate` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
+| `GET` | `/api/marketplace/businesses/{businessId}/branches` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
+| `POST` | `/api/marketplace/businesses/{businessId}/branches` | ✅ | ✅ | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
+| `GET` | `/api/marketplace/branches/discoverable` | ✅ | N/A — no typed input | ✅ | N/A — all roles have read permission | N/A — public discovery view | ✅ | ✅ |
+| `GET` | `/api/marketplace/branches/{branchId}` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | N/A — read only | ✅ |
+| `PUT` | `/api/marketplace/branches/{branchId}` | ✅ | ✅ | ✅ | ✅ | ✅ — business ownership preserved | ✅ | ✅ |
+| `POST` | `/api/marketplace/branches/{branchId}/activate` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
+| `POST` | `/api/marketplace/branches/{branchId}/deactivate` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
 
 ## Totals
 
-- API operations: **40**
-- Happy-path functional coverage: **40/40**
-- 401 coverage: **38/38 protected operations** (2 public operations are N/A)
-- RBAC/403 applicability covered: **34 operations/capabilities**
+- API operations: **53**
+- Happy-path functional coverage: **53/53**
+- 401 coverage: **51/51 protected operations** (2 public operations are N/A)
+- RBAC/403 applicability covered: **46 operations/capabilities**
 - Ownership applicability covered: **15 operations**
-- Validation applicability covered: **16 operations**
-- HTTP-visible integrity applicability covered: **24 operations**
-- Operations used in multi-step workflows: **25**
+- Validation applicability covered: **20 operations**
+- HTTP-visible integrity applicability covered: **33 operations**
+- Operations used in multi-step workflows: **38**
 
 The full authorization suite also exercises each significant role/capability allow/deny cell rather than relying only on per-operation counts.

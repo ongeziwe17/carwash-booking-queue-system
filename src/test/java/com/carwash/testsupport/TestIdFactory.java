@@ -16,6 +16,8 @@ public final class TestIdFactory {
     private int queueSequence;
     private int notificationSequence;
     private int plateSequence;
+    private int businessSequence;
+    private int branchSequence;
 
     public TestIdFactory(String testName) {
         this.prefix = sanitizePrefix(testName);
@@ -43,6 +45,14 @@ public final class TestIdFactory {
 
     public String notification() {
         return next("notification", ++notificationSequence);
+    }
+
+    public String business() {
+        return next("business", ++businessSequence);
+    }
+
+    public String branch() {
+        return next("branch", ++branchSequence);
     }
 
     public String emailFor(String id) {

@@ -1,6 +1,6 @@
 # Car Wash Booking Queue System
 
-Spring Boot backend foundation for car wash booking and queue management. The code is organized as a capability-based modular monolith with explicit `bootstrap`, `shared`, `identity`, `access`, `vehicle`, `catalog`, `booking`, `queue`, `notification`, and `reporting` boundaries enforced by ArchUnit. The current codebase exposes APIs for users, vehicles, services, bookings, queues, notifications, and daily reporting over in-memory repositories.
+Spring Boot backend foundation for car wash booking, queue management, and Marketplace onboarding. The code is organized as a capability-based modular monolith with explicit `bootstrap`, `shared`, `identity`, `access`, `vehicle`, `catalog`, `booking`, `queue`, `notification`, `reporting`, and `marketplace` boundaries enforced by ArchUnit. The current codebase exposes APIs for users, vehicles, services, bookings, queues, notifications, daily reporting, Marketplace businesses, and physical branches over in-memory repositories.
 
 ## Current backend foundation
 
@@ -13,6 +13,7 @@ Spring Boot backend foundation for car wash booking and queue management. The co
 - Queue lifecycle operations.
 - In-app notification lookup.
 - Daily summary reporting.
+- Marketplace business/branch registration, bounded lifecycle management, coordinates, timezones, and basic active/public branch discovery.
 - Swagger/OpenAPI documentation.
 - Java 21 Maven, Docker, Docker Compose, and GitHub Actions delivery support.
 
@@ -21,7 +22,7 @@ Spring Boot backend foundation for car wash booking and queue management. The co
 - Storage is in-memory and is lost when the application restarts.
 - Staff and business-owner operational access remains global until tenant isolation is implemented.
 - External SMS/email delivery is not implemented.
-- Payments, business registration, PostgreSQL, production observability, and deployment hardening remain future work.
+- Payments, branch-aware operations, PostgreSQL, production observability, and deployment hardening remain future work.
 - The application does not yet expose dedicated Actuator liveness or readiness endpoints.
 
 ## Tech stack
@@ -143,7 +144,7 @@ Start from a clean build directory and run the complete release-gate verificatio
 
 Tests use the dedicated `test` Spring profile from `src/test/resources/application-test.properties`. It contains only deterministic test-safe configuration, disables bootstrap administration, lowers BCrypt cost for test execution, and uses a clearly test-only signing key. Tests do **not** require a developer `.env` file.
 
-Every Spring API integration test inherits the shared test foundation and begins with empty in-memory application data. Cleanup happens inside one `InMemoryDataCoordinator` write operation in dependency order: notifications, queue entries, bookings, vehicles, services, then users. The Spring application context is reused; `@DirtiesContext` is not the default isolation mechanism.
+Every Spring API integration test inherits the shared test foundation and begins with empty in-memory application data. Cleanup happens inside one `InMemoryDataCoordinator` write operation in dependency order: Marketplace branches/businesses, notifications, queue entries, bookings, vehicles, services, then users. The Spring application context is reused; `@DirtiesContext` is not the default isolation mechanism.
 
 Integration fixtures use a fresh `TestIdFactory` per test method. IDs are readable and local to that test, for example `bookingworkflowintegrationtest-create-user-001`, rather than global IDs such as `u1` or timestamp-only values. Notification IDs are generated through an injectable abstraction; integration tests reset only the test implementation before each method while production exposes no reset operation.
 
@@ -218,6 +219,8 @@ Bootstrap administration is disabled by default. Configure all `SECURE_BOOTSTRAP
 - `/api/services`
 - `/api/bookings`
 - `/api/queue-entries`
+- `/api/marketplace/businesses`
+- `/api/marketplace/branches`
 - `/api/notifications`
 - `/api/reports/daily-summary`
 

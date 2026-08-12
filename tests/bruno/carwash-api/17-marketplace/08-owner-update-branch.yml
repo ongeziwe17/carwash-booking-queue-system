@@ -1,0 +1,39 @@
+info:
+  name: Business owner updates Marketplace branch
+  type: http
+  seq: 8
+  tags: [marketplace, owner, workflow]
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "branchName": "Updated Bruno Branch",
+        "addressLine1": "2 Dock Road",
+        "addressLine2": "Unit 5",
+        "city": "Cape Town",
+        "province": "Western Cape",
+        "postalCode": "8001",
+        "countryCode": "ZA",
+        "latitude": -33.908,
+        "longitude": 18.42,
+        "timezone": "Africa/Johannesburg",
+        "publicDiscoveryEnabled": true
+      }
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("preserves branch identity and ownership", function() { expect(res.status).to.equal(200); expect(res.body.branchId).to.equal(bru.getVar("marketplaceBranchId")); expect(res.body.businessId).to.equal(bru.getVar("marketplaceBusinessId")); expect(res.body.branchName).to.equal("Updated Bruno Branch"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

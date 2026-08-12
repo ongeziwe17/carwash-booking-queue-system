@@ -24,7 +24,7 @@ Implemented on `staging`:
 - Validated runtime policy configuration for booking, notification, queue, and application-time behavior.
 - Swagger/OpenAPI with CI contract export/quality gates, Maven tests, Docker, Docker Compose, and Bruno HTTP acceptance coverage.
 
-Current limitations include some non-user domain response schemas, in-memory-only storage, a global single-location queue with no branch model or tenant isolation, no payments/external notification delivery, and no production observability platform. Authentication and RBAC are implemented but do not provide tenant isolation.
+Current limitations include some non-user domain response schemas, in-memory-only storage, Marketplace businesses/branches without tenant isolation, global single-location booking/queue operations that are not branch-scoped, no payments/external notification delivery, and no production observability platform. Authentication and RBAC are implemented but do not provide tenant isolation.
 
 ## Phase 0 — API, Data, Test, and Delivery Hardening
 
@@ -62,11 +62,11 @@ Phase 1 is complete.
 
 1. **ARCH-001** — Establish explicit modular-monolith boundaries (#164) — implemented.
 
-The capability modules and automated dependency rules are the prerequisite for Phase 2. The next roadmap issue is **MKT-001** (#115); Marketplace business/branch work remains Phase 2 scope.
+The capability modules and automated dependency rules are the prerequisite for Phase 2. **MKT-001** (#115) is implemented on those boundaries; the next roadmap issue is **MKT-002** (#116).
 
 ## Phase 2 — Marketplace Business, Branch, and Availability Foundation
 
-1. **MKT-001** — Add Marketplace business and branch registration (#115).
+1. **MKT-001** — Add Marketplace business and branch registration (#115) — implemented.
 2. **MKT-002** — Add branch operating hours and temporary closures (#116).
 3. **SERVICE-001** — Add branch-specific service offerings, prices, durations, and capacity (#117).
 4. **OPS-001** — Scope bookings, queues, notifications, and reports to branches (#118).

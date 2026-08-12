@@ -15,6 +15,8 @@ import com.carwash.queue.domain.QueueEntryRepository;
 import com.carwash.catalog.domain.ServiceRepository;
 import com.carwash.identity.domain.UserRepository;
 import com.carwash.vehicle.domain.VehicleRepository;
+import com.carwash.marketplace.domain.CarWashBranchRepository;
+import com.carwash.marketplace.domain.CarWashBusinessRepository;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,7 +54,17 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
             "GET /api/bookings", "POST /api/bookings", "POST /api/bookings/{id}/confirm",
             "POST /api/bookings/{id}/cancel", "POST /api/auth/login", "GET /api/reports/daily-summary",
             "GET /api/queue-entries/{id}", "DELETE /api/queue-entries/{id}",
-            "GET /api/notifications/user/{userId}", "GET /api/auth/me"
+            "GET /api/notifications/user/{userId}", "GET /api/auth/me",
+            "GET /api/marketplace/businesses", "POST /api/marketplace/businesses",
+            "GET /api/marketplace/businesses/{businessId}", "PUT /api/marketplace/businesses/{businessId}",
+            "POST /api/marketplace/businesses/{businessId}/activate",
+            "POST /api/marketplace/businesses/{businessId}/deactivate",
+            "GET /api/marketplace/businesses/{businessId}/branches",
+            "POST /api/marketplace/businesses/{businessId}/branches",
+            "GET /api/marketplace/branches/discoverable",
+            "GET /api/marketplace/branches/{branchId}", "PUT /api/marketplace/branches/{branchId}",
+            "POST /api/marketplace/branches/{branchId}/activate",
+            "POST /api/marketplace/branches/{branchId}/deactivate"
     );
 
     @Autowired UserRepository users;
@@ -61,6 +73,8 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
     @Autowired BookingRepository bookings;
     @Autowired QueueEntryRepository queues;
     @Autowired NotificationRepository notifications;
+    @Autowired CarWashBusinessRepository businesses;
+    @Autowired CarWashBranchRepository branches;
 
     @Test
     void openApiDocsEndpointAvailableWithoutBusinessData() throws Exception {
@@ -167,6 +181,34 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         for (String response : Set.of("200", "400", "401", "403", "404", "405", "500")) {
             assertTrue(operation.path("responses").has(response), "Missing availability response " + response);
         }
+    }
+
+    @Test
+    void marketplaceContractUsesBoundedDtosAndDocumentsEffectiveDiscoveryState() throws Exception {
+        JsonNode document = openApi();
+        JsonNode schemas = document.path("components").path("schemas");
+
+        assertEquals(Set.of("businessId", "businessName", "contactEmail", "contactPhone", "registrationNumber",
+                        "status", "registeredAt", "updatedAt"),
+                propertyNames(schemas.path("BusinessResponse")));
+        assertEquals(Set.of("branchId", "businessId", "branchName", "addressLine1", "addressLine2", "city",
+                        "province", "postalCode", "countryCode", "latitude", "longitude", "timezone", "status",
+                        "publicDiscoveryEnabled", "effectiveActive", "discoverable", "createdAt", "updatedAt"),
+                propertyNames(schemas.path("BranchResponse")));
+        assertFalse(schemas.path("BusinessResponse").path("properties").has("branches"));
+        assertFalse(schemas.path("BranchResponse").path("properties").has("business"));
+
+        JsonNode discovery = document.path("paths").path("/api/marketplace/branches/discoverable").path("get");
+        assertTrue(discovery.path("description").asText().contains("owning business are both active"));
+        assertTrue(discovery.path("description").asText().contains("No distance ranking"));
+
+        assertEquals("#/components/schemas/CreateBusinessRequest",
+                document.path("paths").path("/api/marketplace/businesses").path("post")
+                        .path("requestBody").path("content").path("application/json").path("schema").path("$ref").asText());
+        assertEquals("#/components/schemas/CreateBranchRequest",
+                document.path("paths").path("/api/marketplace/businesses/{businessId}/branches").path("post")
+                        .path("requestBody").path("content").path("application/json").path("schema").path("$ref").asText());
+        assertEquals(53, EXPECTED_OPERATIONS.size());
     }
 
     @Test
@@ -328,6 +370,8 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         assertTrue(bookings.findAll().isEmpty());
         assertTrue(queues.findAll().isEmpty());
         assertTrue(notifications.findAll().isEmpty());
+        assertTrue(branches.findAll().isEmpty());
+        assertTrue(businesses.findAll().isEmpty());
     }
 
     @FunctionalInterface

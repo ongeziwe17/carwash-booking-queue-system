@@ -5,6 +5,8 @@ import com.carwash.booking.application.BookingPolicyProperties;
 import com.carwash.queue.application.QueuePolicyProperties;
 import com.carwash.notification.application.NotificationPolicyProperties;
 import com.carwash.notification.domain.NotificationRepository;
+import com.carwash.marketplace.domain.CarWashBranchRepository;
+import com.carwash.marketplace.domain.CarWashBusinessRepository;
 import com.carwash.queue.domain.QueueEntryRepository;
 import com.carwash.catalog.domain.ServiceRepository;
 import com.carwash.identity.domain.UserRepository;
@@ -12,6 +14,8 @@ import com.carwash.vehicle.domain.VehicleRepository;
 import com.carwash.booking.infrastructure.InMemoryBookingRepository;
 import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
 import com.carwash.notification.infrastructure.InMemoryNotificationRepository;
+import com.carwash.marketplace.infrastructure.InMemoryCarWashBranchRepository;
+import com.carwash.marketplace.infrastructure.InMemoryCarWashBusinessRepository;
 import com.carwash.queue.infrastructure.InMemoryQueueEntryRepository;
 import com.carwash.catalog.infrastructure.InMemoryServiceRepository;
 import com.carwash.identity.infrastructure.InMemoryUserRepository;
@@ -24,6 +28,7 @@ import com.carwash.booking.application.BookingSlotPolicyService;
 import com.carwash.reporting.application.DailySummaryReportService;
 import com.carwash.notification.application.NotificationIdGenerator;
 import com.carwash.notification.application.NotificationManagementService;
+import com.carwash.marketplace.application.MarketplaceManagementService;
 import com.carwash.queue.application.QueueManagementService;
 import com.carwash.queue.application.QueueOrderingService;
 import com.carwash.catalog.application.ServiceCatalogService;
@@ -73,8 +78,28 @@ public class ApplicationCompositionConfig {
     }
 
     @Bean
+    public CarWashBusinessRepository carWashBusinessRepository() {
+        return new InMemoryCarWashBusinessRepository();
+    }
+
+    @Bean
+    public CarWashBranchRepository carWashBranchRepository() {
+        return new InMemoryCarWashBranchRepository();
+    }
+
+    @Bean
     public NotificationIdGenerator notificationIdGenerator() {
         return new AtomicNotificationIdGenerator();
+    }
+
+    @Bean
+    public MarketplaceManagementService marketplaceManagementService(
+            CarWashBusinessRepository businessRepository,
+            CarWashBranchRepository branchRepository,
+            InMemoryDataCoordinator coordinator,
+            Clock clock
+    ) {
+        return new MarketplaceManagementService(businessRepository, branchRepository, coordinator, clock);
     }
 
     @Bean

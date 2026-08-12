@@ -83,6 +83,22 @@ class ModularMonolithArchitectureTest {
                 .check(APPLICATION);
     }
 
+    @Test
+    void marketplace_isolated_foundation_does_not_depend_on_existing_business_capabilities() {
+        noClasses().that().resideInAPackage("com.carwash.marketplace..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.carwash.access..",
+                        "com.carwash.booking..",
+                        "com.carwash.catalog..",
+                        "com.carwash.identity..",
+                        "com.carwash.notification..",
+                        "com.carwash.queue..",
+                        "com.carwash.reporting..",
+                        "com.carwash.vehicle.."
+                )
+                .check(APPLICATION);
+    }
+
     private static String[] businessPackages() {
         return java.util.Arrays.stream(BUSINESS_MODULES)
                 .map(module -> "com.carwash." + module + "..")

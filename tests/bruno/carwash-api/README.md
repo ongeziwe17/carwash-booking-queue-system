@@ -101,6 +101,7 @@ bru run --env local --tags=smoke
 bru run --env local --tags=rbac
 bru run --env local --tags=security
 bru run --env local --tags=availability
+bru run --env local --tags=marketplace
 ```
 
 Bruno executes sequentially by default; do **not** use `--parallel` for the full stateful workflow suite.
@@ -149,6 +150,7 @@ The collection verifies:
 - QUEUE-003 true server-selected call-next ordering, non-waiting skip, explicit by-ID call override, and no-waiting 404 behavior;
 - BOOKING-001 focused CREATED/CONFIRMED rescheduling, shared cutoff enforcement, status preservation, target-slot validation, queue/service-state rejection, notification creation, and generic-update bypass prevention;
 - AVAIL-001 generated service/date slots, duration/closing fit, deterministic ordering, global remaining capacity, full-slot booking consistency, cancellation release, inactive/unknown/past rejection, and authenticated service-read access;
+- MKT-001 business/branch registration, bounded responses, immutable ownership, coordinates/timezone validation, lifecycle actions, effective activity/public discovery, Marketplace RBAC, and complete unauthenticated-operation coverage;
 - current queue states (`WAITING`, `CALLED`, `IN_PROGRESS`, `COMPLETED`);
 - real role changes and token acquisition;
 - final-platform-administrator protection without deleting or demoting the bootstrap admin.
@@ -164,6 +166,8 @@ repository-failure rollback, notification-failure handling, and final-slot concu
 responsibilities because the acceptance environment does not expose test-only clock or failure controls.
 
 The run-scoped availability workflow uses an isolated future date and services. It proves that an appointment for a different service consumes the same global exact-start capacity, the full slot disappears and cannot be booked, cancellation restores it, and a 60-minute service is never advertised past the closing boundary. Availability reads remain point-in-time snapshots and do not reserve capacity.
+
+The run-scoped Marketplace workflow registers one business and branch, exercises every management operation, proves business deactivation suppresses otherwise active branch discovery without deleting it, validates coordinate/timezone rejection, and checks customer read/management-denial behavior. It does not imply tenant isolation, distance discovery, branch hours, or branch-scoped operations.
 
 ## Cleanup
 

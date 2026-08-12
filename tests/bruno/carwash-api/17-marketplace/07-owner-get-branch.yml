@@ -1,0 +1,20 @@
+info:
+  name: Business owner retrieves Marketplace branch
+  type: http
+  seq: 7
+  tags: [marketplace, owner]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}"
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns requested branch", function() { expect(res.status).to.equal(200); expect(res.body.branchId).to.equal(bru.getVar("marketplaceBranchId")); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

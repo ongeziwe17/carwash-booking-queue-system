@@ -1,0 +1,41 @@
+info:
+  name: Business owner creates Marketplace branch
+  type: http
+  seq: 5
+  tags: [marketplace, owner, workflow]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/businesses/{{marketplaceBusinessId}}/branches"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "branchId": "{{marketplaceBranchId}}",
+        "branchName": "Bruno City Bowl Branch",
+        "addressLine1": "1 Main Road",
+        "addressLine2": null,
+        "city": "Cape Town",
+        "province": "Western Cape",
+        "postalCode": "8001",
+        "countryCode": "ZA",
+        "latitude": -33.9249,
+        "longitude": 18.4241,
+        "timezone": "Africa/Johannesburg",
+        "publicDiscoveryEnabled": true
+      }
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("branch belongs to exactly one business", function() { expect(res.body.branchId).to.equal(bru.getVar("marketplaceBranchId")); expect(res.body.businessId).to.equal(bru.getVar("marketplaceBusinessId")); expect(res.body.effectiveActive).to.equal(true); expect(res.body.discoverable).to.equal(true); expect(res.body.business).to.equal(undefined); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

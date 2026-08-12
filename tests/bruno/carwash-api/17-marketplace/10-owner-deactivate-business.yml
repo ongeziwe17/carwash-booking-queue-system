@@ -1,0 +1,20 @@
+info:
+  name: Business owner deactivates Marketplace business
+  type: http
+  seq: 10
+  tags: [marketplace, owner, workflow]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/businesses/{{marketplaceBusinessId}}/deactivate"
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("deactivates without deletion", function() { expect(res.status).to.equal(200); expect(res.body.status).to.equal("INACTIVE"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

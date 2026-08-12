@@ -1,0 +1,34 @@
+info:
+  name: Business owner registers Marketplace business
+  type: http
+  seq: 1
+  tags: [marketplace, workflow, owner, rbac]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/businesses"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "businessId": "{{marketplaceBusinessId}}",
+        "businessName": "Bruno Marketplace Wash Group",
+        "contactEmail": "marketplace-{{runId}}@example.test",
+        "contactPhone": "+27 82 123 4567",
+        "registrationNumber": "REG-{{runId}}"
+      }
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("returns bounded active business", function() { expect(res.body.businessId).to.equal(bru.getVar("marketplaceBusinessId")); expect(res.body.status).to.equal("ACTIVE"); expect(res.body.branches).to.equal(undefined); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
