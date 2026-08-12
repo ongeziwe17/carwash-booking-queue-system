@@ -1,0 +1,19 @@
+info:
+  name: Unauthenticated open status lookup is rejected
+  type: http
+  seq: 39
+  tags: [marketplace, auth, security]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}/open-status?at=2030-01-07T08:00:00Z"
+  auth:
+    type: none
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 401", function() { expect(res.status).to.equal(401); expect(res.body.code).to.equal("AUTHENTICATION_REQUIRED"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

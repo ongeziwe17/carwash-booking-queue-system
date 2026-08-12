@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Added Marketplace branch weekly operating schedules, temporary closure lifecycle, timezone-aware open-status decisions, six protected APIs, and matching Java/OpenAPI/Bruno coverage.
 - Aligned README and product documentation to clearly separate implemented backend workflows, partially implemented foundations, planned near-term work, and future SaaS hardening.
 - Removed unused design-pattern example code that was not part of the running backend workflows.
 - Refocused README and product documentation toward SaaS product readiness.

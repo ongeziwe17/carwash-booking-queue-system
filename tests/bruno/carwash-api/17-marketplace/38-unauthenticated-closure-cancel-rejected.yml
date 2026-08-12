@@ -1,0 +1,19 @@
+info:
+  name: Unauthenticated closure cancellation is rejected
+  type: http
+  seq: 38
+  tags: [marketplace, auth, security]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/closures/{{marketplaceClosureId}}/cancel"
+  auth:
+    type: none
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 401", function() { expect(res.status).to.equal(401); expect(res.body.code).to.equal("AUTHENTICATION_REQUIRED"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

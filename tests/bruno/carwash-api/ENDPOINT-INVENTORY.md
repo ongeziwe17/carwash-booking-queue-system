@@ -1,8 +1,8 @@
 # Current Endpoint Inventory
 
-Inventory source: the controllers and OpenAPI quality gate on the MKT-001 branch based on `staging` merge `72735e3`. Generated `/v3/api-docs` is authoritative when wording differs.
+Inventory source: the controllers and OpenAPI quality gate on the MKT-002 branch based on `staging` merge `f471579`. Generated `/v3/api-docs` is authoritative when wording differs.
 
-**Total HTTP operations: 53.**
+**Total HTTP operations: 59.**
 
 | Method | Path | Authentication | Role / permission | Ownership | Request DTO | Success | 400/401/403/404 | Important rules |
 |---|---|---|---|---|---|---:|---|---|
@@ -59,3 +59,9 @@ Inventory source: the controllers and OpenAPI quality gate on the MKT-001 branch
 | `PUT` | `/api/marketplace/branches/{branchId}` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Ownership cannot change | `UpdateBranchRequest` | 200 | 400,401,403,404 | Preserves branch/business IDs and status. |
 | `POST` | `/api/marketplace/branches/{branchId}/activate` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Effective activity still requires active owner business. |
 | `POST` | `/api/marketplace/branches/{branchId}/deactivate` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Retains branch record and ownership. |
+| `GET` | `/api/marketplace/branches/{branchId}/operating-hours` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN via MARKETPLACE_MANAGE | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Returns a bounded complete weekly schedule and current branch timezone; missing schedule is empty/closed. |
+| `PUT` | `/api/marketplace/branches/{branchId}/operating-hours` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN via MARKETPLACE_MANAGE | Tenant ownership not yet enforced | `ReplaceOperatingHoursRequest` | 200 | 400,401,403,404 | Atomically replaces all half-open weekly intervals; duplicate/overlapping/weekly-wrap intervals rejected. |
+| `GET` | `/api/marketplace/branches/{branchId}/closures` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN via MARKETPLACE_MANAGE | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Lists active and cancelled closure history in deterministic ID order. |
+| `POST` | `/api/marketplace/branches/{branchId}/closures` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN via MARKETPLACE_MANAGE | Tenant ownership not yet enforced | `CreateTemporaryClosureRequest` | 201 | 400,401,403,404 | Creates one absolute half-open closure; duplicate IDs and overlapping active closures rejected. |
+| `POST` | `/api/marketplace/closures/{closureId}/cancel` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN via MARKETPLACE_MANAGE | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Cancels without physical deletion; cancelled records no longer close the branch. |
+| `GET` | `/api/marketplace/branches/{branchId}/open-status` | Bearer | All roles via MARKETPLACE_READ | Operational status independent of public discovery | Required query `at` | 200 | 400,401,403,404 | Converts the required RFC 3339 instant into the current branch timezone, then applies active state, weekly hours, and active closures. |

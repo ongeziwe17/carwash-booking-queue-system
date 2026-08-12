@@ -48,7 +48,7 @@ Stories are grouped by delivery phase so planned capabilities are not confused w
 | Story ID | GitHub | User Story | Acceptance Summary |
 | --- | ---: | --- | --- |
 | US-MKT-001 | #115 | As a business owner, I want to register a business and its branches on the Marketplace. | Implemented: valid business/branch data, coordinates, timezone, immutable ownership, lifecycle state, and effective discovery filtering. |
-| US-MKT-002 | #116 | As a business owner, I want to configure branch operating hours and closures. | Weekly schedules, temporary closures, timezone-aware open/closed decisions. |
+| US-MKT-002 | #116 | As a business owner, I want to configure branch operating hours and closures. | Implemented: atomic weekly schedules, multiple/overnight intervals, absolute temporary closures with cancellation history, and timezone-aware explicit-instant open/closed decisions. |
 | US-SERVICE-001 | #117 | As a business owner, I want each branch to define its own service offerings, prices, durations, and capacity. | Branch-specific offering lifecycle and validated capacity. |
 | US-OPS-001 | #118 | As an operator, I want bookings, queues, notifications, and reports scoped to the correct branch. | No cross-branch mismatch; branch-specific operational views and reports. |
 | US-GEO-001 | #119 | As a customer, I want to discover active branches near my location. | Valid coordinates, distance in kilometres, radius/service filters, deterministic sorting. |

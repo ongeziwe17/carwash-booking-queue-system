@@ -7,6 +7,8 @@ import com.carwash.notification.application.NotificationPolicyProperties;
 import com.carwash.notification.domain.NotificationRepository;
 import com.carwash.marketplace.domain.CarWashBranchRepository;
 import com.carwash.marketplace.domain.CarWashBusinessRepository;
+import com.carwash.marketplace.domain.BranchOperatingScheduleRepository;
+import com.carwash.marketplace.domain.TemporaryBranchClosureRepository;
 import com.carwash.queue.domain.QueueEntryRepository;
 import com.carwash.catalog.domain.ServiceRepository;
 import com.carwash.identity.domain.UserRepository;
@@ -16,6 +18,8 @@ import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
 import com.carwash.notification.infrastructure.InMemoryNotificationRepository;
 import com.carwash.marketplace.infrastructure.InMemoryCarWashBranchRepository;
 import com.carwash.marketplace.infrastructure.InMemoryCarWashBusinessRepository;
+import com.carwash.marketplace.infrastructure.InMemoryBranchOperatingScheduleRepository;
+import com.carwash.marketplace.infrastructure.InMemoryTemporaryBranchClosureRepository;
 import com.carwash.queue.infrastructure.InMemoryQueueEntryRepository;
 import com.carwash.catalog.infrastructure.InMemoryServiceRepository;
 import com.carwash.identity.infrastructure.InMemoryUserRepository;
@@ -29,6 +33,7 @@ import com.carwash.reporting.application.DailySummaryReportService;
 import com.carwash.notification.application.NotificationIdGenerator;
 import com.carwash.notification.application.NotificationManagementService;
 import com.carwash.marketplace.application.MarketplaceManagementService;
+import com.carwash.marketplace.application.BranchSchedulingService;
 import com.carwash.queue.application.QueueManagementService;
 import com.carwash.queue.application.QueueOrderingService;
 import com.carwash.catalog.application.ServiceCatalogService;
@@ -88,6 +93,16 @@ public class ApplicationCompositionConfig {
     }
 
     @Bean
+    public BranchOperatingScheduleRepository branchOperatingScheduleRepository() {
+        return new InMemoryBranchOperatingScheduleRepository();
+    }
+
+    @Bean
+    public TemporaryBranchClosureRepository temporaryBranchClosureRepository() {
+        return new InMemoryTemporaryBranchClosureRepository();
+    }
+
+    @Bean
     public NotificationIdGenerator notificationIdGenerator() {
         return new AtomicNotificationIdGenerator();
     }
@@ -100,6 +115,25 @@ public class ApplicationCompositionConfig {
             Clock clock
     ) {
         return new MarketplaceManagementService(businessRepository, branchRepository, coordinator, clock);
+    }
+
+    @Bean
+    public BranchSchedulingService branchSchedulingService(
+            CarWashBusinessRepository businessRepository,
+            CarWashBranchRepository branchRepository,
+            BranchOperatingScheduleRepository scheduleRepository,
+            TemporaryBranchClosureRepository closureRepository,
+            InMemoryDataCoordinator coordinator,
+            Clock clock
+    ) {
+        return new BranchSchedulingService(
+                businessRepository,
+                branchRepository,
+                scheduleRepository,
+                closureRepository,
+                coordinator,
+                clock
+        );
     }
 
     @Bean

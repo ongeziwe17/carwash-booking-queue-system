@@ -1,0 +1,32 @@
+info:
+  name: Weekly boundary overlap is rejected
+  type: http
+  seq: 28
+  tags: [marketplace, validation]
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}/operating-hours"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "intervals": [
+          { "dayOfWeek": "SUNDAY", "opensAt": "20:00:00", "closesAt": "02:00:00" },
+          { "dayOfWeek": "MONDAY", "opensAt": "01:00:00", "closesAt": "06:00:00" }
+        ]
+      }
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("rejects Sunday-to-Monday overlap", function() { expect(res.status).to.equal(400); expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); expect(res.body.message).to.equal("Weekly operating intervals must not overlap"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

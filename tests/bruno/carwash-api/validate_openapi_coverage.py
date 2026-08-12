@@ -24,6 +24,9 @@ def normalize_bruno_path(url: str) -> str:
     if path.startswith("/api/marketplace/branches/") and not path.endswith("/discoverable"):
         return re.sub(r"^/api/marketplace/branches/\{\{[^}]+\}\}",
                       "/api/marketplace/branches/{branchId}", path)
+    if path.startswith("/api/marketplace/closures/") and path.endswith("/cancel"):
+        return re.sub(r"^/api/marketplace/closures/\{\{[^}]+\}\}",
+                      "/api/marketplace/closures/{closureId}", path)
     return re.sub(r"/\{\{[^}]+\}\}", "/{id}", path)
 
 

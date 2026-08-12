@@ -20,7 +20,8 @@ This matrix is derived from `RoleCatalog`, controller `@PreAuthorize` expression
 | Read another user's notifications | ❌ | ❌ | ❌ | ✅ |
 | Read daily reports | ❌ | ❌ | ✅ | ✅ |
 | Read discoverable Marketplace branches | ✅ | ✅ | ✅ | ✅ |
-| Manage Marketplace businesses/branches | ❌ | ❌ | ✅ | ✅ |
+| Read Marketplace branch open status | ✅ | ✅ | ✅ | ✅ |
+| Manage Marketplace businesses/branches/hours/closures | ❌ | ❌ | ✅ | ✅ |
 | Assign roles | ❌ | ❌ | ❌ | ✅ |
 
 ## Permission catalogue
@@ -32,4 +33,4 @@ This matrix is derived from `RoleCatalog`, controller `@PreAuthorize` expression
 
 Operational roles are STAFF, BUSINESS_OWNER, and PLATFORM_ADMIN for vehicle, booking, and queue resource authorization. Notifications are stricter: only the user themselves or PLATFORM_ADMIN may read them.
 
-Marketplace management is intentionally global for BUSINESS_OWNER and PLATFORM_ADMIN until TENANT-001 introduces owner/business scoping. `MARKETPLACE_READ` exposes only the bounded effective-active/public discovery list.
+Marketplace management is intentionally global for BUSINESS_OWNER and PLATFORM_ADMIN until TENANT-001 introduces owner/business scoping. `MARKETPLACE_READ` exposes bounded discovery and operational open-status decisions; the public-discovery flag does not change whether a branch is operationally open.

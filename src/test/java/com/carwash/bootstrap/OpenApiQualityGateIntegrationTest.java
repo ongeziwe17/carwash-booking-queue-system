@@ -17,6 +17,8 @@ import com.carwash.identity.domain.UserRepository;
 import com.carwash.vehicle.domain.VehicleRepository;
 import com.carwash.marketplace.domain.CarWashBranchRepository;
 import com.carwash.marketplace.domain.CarWashBusinessRepository;
+import com.carwash.marketplace.domain.BranchOperatingScheduleRepository;
+import com.carwash.marketplace.domain.TemporaryBranchClosureRepository;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,7 +66,13 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
             "GET /api/marketplace/branches/discoverable",
             "GET /api/marketplace/branches/{branchId}", "PUT /api/marketplace/branches/{branchId}",
             "POST /api/marketplace/branches/{branchId}/activate",
-            "POST /api/marketplace/branches/{branchId}/deactivate"
+            "POST /api/marketplace/branches/{branchId}/deactivate",
+            "GET /api/marketplace/branches/{branchId}/operating-hours",
+            "PUT /api/marketplace/branches/{branchId}/operating-hours",
+            "GET /api/marketplace/branches/{branchId}/closures",
+            "POST /api/marketplace/branches/{branchId}/closures",
+            "POST /api/marketplace/closures/{closureId}/cancel",
+            "GET /api/marketplace/branches/{branchId}/open-status"
     );
 
     @Autowired UserRepository users;
@@ -75,6 +83,8 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
     @Autowired NotificationRepository notifications;
     @Autowired CarWashBusinessRepository businesses;
     @Autowired CarWashBranchRepository branches;
+    @Autowired BranchOperatingScheduleRepository schedules;
+    @Autowired TemporaryBranchClosureRepository closures;
 
     @Test
     void openApiDocsEndpointAvailableWithoutBusinessData() throws Exception {
@@ -147,7 +157,6 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         assertTrue(callNext.path("responses").has("404"));
         assertTrue(explicitCall.path("description").asText().contains("specified WAITING"));
         assertTrue(document.path("paths").path("/api/queue-entries/{id}/call-next").isMissingNode());
-        assertEquals(53, EXPECTED_OPERATIONS.size());
     }
 
     @Test
@@ -208,7 +217,42 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         assertEquals("#/components/schemas/CreateBranchRequest",
                 document.path("paths").path("/api/marketplace/businesses/{businessId}/branches").path("post")
                         .path("requestBody").path("content").path("application/json").path("schema").path("$ref").asText());
-        assertEquals(53, EXPECTED_OPERATIONS.size());
+    }
+
+    @Test
+    void marketplaceSchedulingContractIsBoundedOffsetAwareAndRequiresRequestedInstant() throws Exception {
+        JsonNode document = openApi();
+        JsonNode schemas = document.path("components").path("schemas");
+
+        assertEquals(Set.of("intervals"), propertyNames(schemas.path("ReplaceOperatingHoursRequest")));
+        assertEquals(Set.of("dayOfWeek", "opensAt", "closesAt"),
+                propertyNames(schemas.path("WeeklyOperatingIntervalRequest")));
+        assertFalse(schemas.path("ReplaceOperatingHoursRequest").path("properties").has("timezone"));
+        assertEquals(Set.of("closureId", "startAt", "endAt", "reason"),
+                propertyNames(schemas.path("CreateTemporaryClosureRequest")));
+        assertEquals("date-time",
+                schemas.path("CreateTemporaryClosureRequest").path("properties").path("startAt").path("format").asText());
+        assertEquals(Set.of("branchId", "timezone", "intervals", "createdAt", "updatedAt"),
+                propertyNames(schemas.path("BranchOperatingHoursResponse")));
+        assertEquals(Set.of("closureId", "branchId", "startAt", "endAt", "reason", "status",
+                        "createdAt", "updatedAt"),
+                propertyNames(schemas.path("TemporaryClosureResponse")));
+        assertEquals(Set.of("branchId", "requestedAt", "timezone", "branchLocalDateTime", "effectiveActive",
+                        "withinWeeklyHours", "temporarilyClosed", "open", "applicableClosureId",
+                        "applicableClosureReason"),
+                propertyNames(schemas.path("BranchOpenStatusResponse")));
+
+        JsonNode operation = document.path("paths")
+                .path("/api/marketplace/branches/{branchId}/open-status").path("get");
+        JsonNode atParameter = findParameter(operation.path("parameters"), "query", "at");
+        assertFalse(atParameter.isMissingNode());
+        assertTrue(atParameter.path("required").asBoolean());
+        assertEquals("date-time", atParameter.path("schema").path("format").asText());
+        assertTrue(operation.path("description").asText().contains("Public discovery does not affect"));
+
+        for (String forbidden : Set.of("business", "branch", "repository", "schedule", "closures")) {
+            assertFalse(schemas.path("BranchOpenStatusResponse").path("properties").has(forbidden));
+        }
     }
 
     @Test
@@ -313,9 +357,14 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
     }
 
     private JsonNode findPathParameter(JsonNode parameters, String name) {
+        return findParameter(parameters, "path", name);
+    }
+
+    private JsonNode findParameter(JsonNode parameters, String location, String name) {
         if (parameters.isArray()) {
             for (JsonNode parameter : parameters) {
-                if ("path".equals(parameter.path("in").asText()) && name.equals(parameter.path("name").asText())) {
+                if (location.equals(parameter.path("in").asText())
+                        && name.equals(parameter.path("name").asText())) {
                     return parameter;
                 }
             }
@@ -372,6 +421,8 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         assertTrue(notifications.findAll().isEmpty());
         assertTrue(branches.findAll().isEmpty());
         assertTrue(businesses.findAll().isEmpty());
+        assertTrue(schedules.findAll().isEmpty());
+        assertTrue(closures.findAll().isEmpty());
     }
 
     @FunctionalInterface

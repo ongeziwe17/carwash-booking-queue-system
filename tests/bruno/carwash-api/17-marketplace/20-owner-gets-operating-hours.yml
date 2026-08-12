@@ -1,0 +1,21 @@
+info:
+  name: Business owner gets branch operating hours
+  type: http
+  seq: 20
+  tags: [marketplace, owner]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}/operating-hours"
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("returns current timezone and deterministic intervals", function() { expect(res.body.timezone).to.equal("Africa/Johannesburg"); expect(res.body.intervals.map(i => i.dayOfWeek)).to.deep.equal(["MONDAY", "FRIDAY"]); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -31,7 +31,7 @@ Negative booking cancellation windows, zero/negative/sub-minute booking interval
 
 For a requested date, candidate starts begin at `operating-start` and advance by `slot-interval` while remaining before `operating-end`. A candidate is advertised or accepted only when its service-specific estimated duration finishes at or before closing. Booking creation, focused rescheduling, generic service changes, and availability all reuse this same policy. The current capacity model remains global per exact start time across all services; cancelled bookings do not consume capacity.
 
-These settings describe one global same-day window. Overnight hours, holidays, branch hours, staff/bay calendars, and overlapping-resource scheduling remain out of scope.
+These settings describe one global same-day booking/AVAIL-001 window and do not configure Marketplace branches. MKT-002 branch hours are managed through the Marketplace API and support overnight recurrence; branch-aware booking availability, external holiday calendars, staff/bay calendars, and overlapping-resource scheduling remain out of scope.
 
 ## Booking-change boundary
 
