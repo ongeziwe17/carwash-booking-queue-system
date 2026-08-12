@@ -1,0 +1,21 @@
+info:
+  name: Business owner lists temporary closures
+  type: http
+  seq: 24
+  tags: [marketplace, owner]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}/closures"
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("returns active closure in deterministic bounded list", function() { const closure = res.body.find(c => c.closureId === bru.getVar("marketplaceClosureId")); expect(closure).to.not.equal(undefined); expect(closure.status).to.equal("ACTIVE"); expect(closure).to.not.have.property("branch"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -27,6 +27,7 @@ Implemented in the current backend:
 - RBAC and ownership authorization for customer, staff, business-owner, and platform-admin workflows.
 - Validated runtime policy configuration and standardized safe API errors.
 - Local Docker and Maven workflows.
+- In-memory Marketplace business/branch registration plus timezone-aware weekly hours, temporary closures, and explicit-instant open-status decisions.
 
 ## Partially Implemented Foundation
 
@@ -48,6 +49,7 @@ Implemented in the current backend:
 | FR-07 | Return consistent error responses for invalid requests and missing resources.                | Implemented           |
 | FR-08 | Provide a basic daily summary report from current data.                                      | Partially implemented |
 | FR-09 | Authenticate users with JWT and enforce current RBAC/ownership rules.                          | Implemented           |
+| FR-10 | Manage Marketplace businesses/branches and evaluate branch operating status from weekly hours and temporary closures. | Implemented |
 
 ## Functional Requirements: Planned/Future
 
@@ -57,7 +59,7 @@ Implemented in the current backend:
 | Security and operational audit logging.                            | Future security hardening       |
 | Tenant-scoped authorization for Marketplace businesses/branches.  | Future SaaS hardening           |
 | PostgreSQL persistence and migrations.                             | Planned persistence work        |
-| Business registration and tenant isolation.                        | Future SaaS hardening           |
+| Branch service offerings, branch-scoped operations, and tenant isolation. | Future SaaS hardening      |
 | External email/SMS notification delivery.                          | Future product/platform work    |
 | Payments.                                                          | Future product/platform work    |
 | Ratings and feedback.                                              | Future product capability       |
@@ -84,7 +86,8 @@ Implemented in the current backend:
 - Queue entries must reference valid booking/service context as supported by the API workflow.
 - Queue positions should remain positive and drive estimated wait calculations.
 - Notification records preserve channel, message, user, booking, and delivery-status metadata, but external delivery is future work.
+- Branch open status requires active business/branch state, a matching half-open weekly interval in the branch timezone, and no active covering temporary closure; public discovery is a separate decision.
 
 ## Out of Current Scope
 
-The current backend implements in-memory Marketplace business/branch registration, but does not implement PostgreSQL persistence, payments, tenant isolation, branch-scoped operations, external notification delivery, observability, frontend applications, or production SaaS readiness. Authentication, RBAC, ownership authorization, and secure credential storage are implemented foundations.
+The current backend implements in-memory Marketplace business/branch registration and branch scheduling, but does not implement PostgreSQL persistence, payments, tenant isolation, branch offerings, branch-scoped booking/queue operations, branch-aware availability, external notification delivery, observability, frontend applications, or production SaaS readiness. Authentication, RBAC, ownership authorization, and secure credential storage are implemented foundations.

@@ -7,6 +7,8 @@ import com.carwash.queue.api.dto.CreateQueueEntryRequest;
 import com.carwash.catalog.api.dto.CreateServiceRequest;
 import com.carwash.identity.api.dto.CreateUserRequest;
 import com.carwash.vehicle.api.dto.CreateVehicleRequest;
+import com.carwash.marketplace.api.dto.CreateBranchRequest;
+import com.carwash.marketplace.api.dto.CreateBusinessRequest;
 import com.carwash.testsupport.ApiContractAssertions;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.BookingFixtureBuilder;
@@ -21,6 +23,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 import java.util.HashMap;
 import java.util.Map;
+import java.math.BigDecimal;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -101,6 +104,18 @@ class RequestValidationIntegrationTest extends ApiIntegrationTestSupport {
 
         assertValidation(put("/api/admin/users/{userId}/role", user.userId())
                 .with(authentication.platformAdminJwt()), Map.of(), "roleName");
+
+        CreateBusinessRequest business = new CreateBusinessRequest(
+                ids.business(), "Validation Wash", "validation@example.test", "+27 82 123 4567", null);
+        CreateBranchRequest branch = new CreateBranchRequest(
+                ids.branch(), "Validation Branch", "1 Main Road", null, "Cape Town", "Western Cape", "8001", "ZA",
+                BigDecimal.valueOf(-33.9249), BigDecimal.valueOf(18.4241), "Africa/Johannesburg", true);
+        api.createBusiness(business).andExpect(status().isCreated());
+        api.createBranch(business.businessId(), branch).andExpect(status().isCreated());
+        assertValidation(put("/api/marketplace/branches/{branchId}/operating-hours", branch.branchId())
+                .with(authentication.platformAdminJwt()), Map.of(), "intervals");
+        assertValidation(post("/api/marketplace/branches/{branchId}/closures", branch.branchId())
+                .with(authentication.platformAdminJwt()), Map.of("closureId", " ", "reason", " "), "closureId");
     }
 
     private void assertValidation(MockHttpServletRequestBuilder request, Map<String, Object> body, String field)

@@ -57,16 +57,22 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 | `PUT` | `/api/marketplace/branches/{branchId}` | ✅ | ✅ | ✅ | ✅ | ✅ — business ownership preserved | ✅ | ✅ |
 | `POST` | `/api/marketplace/branches/{branchId}/activate` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
 | `POST` | `/api/marketplace/branches/{branchId}/deactivate` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
+| `GET` | `/api/marketplace/branches/{branchId}/operating-hours` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | N/A — read only | ✅ |
+| `PUT` | `/api/marketplace/branches/{branchId}/operating-hours` | ✅ | ✅ | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
+| `GET` | `/api/marketplace/branches/{branchId}/closures` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | N/A — read only | ✅ |
+| `POST` | `/api/marketplace/branches/{branchId}/closures` | ✅ | ✅ | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
+| `POST` | `/api/marketplace/closures/{closureId}/cancel` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
+| `GET` | `/api/marketplace/branches/{branchId}/open-status` | ✅ | ✅ | ✅ | N/A — all roles have read permission | N/A — operational view | ✅ | ✅ |
 
 ## Totals
 
-- API operations: **53**
-- Happy-path functional coverage: **53/53**
-- 401 coverage: **51/51 protected operations** (2 public operations are N/A)
-- RBAC/403 applicability covered: **46 operations/capabilities**
+- API operations: **59**
+- Happy-path functional coverage: **59/59**
+- 401 coverage: **57/57 protected operations** (2 public operations are N/A)
+- RBAC/403 applicability covered: **51 operations/capabilities**
 - Ownership applicability covered: **15 operations**
-- Validation applicability covered: **20 operations**
-- HTTP-visible integrity applicability covered: **33 operations**
-- Operations used in multi-step workflows: **38**
+- Validation applicability covered: **23 operations**
+- HTTP-visible integrity applicability covered: **37 operations**
+- Operations used in multi-step workflows: **44**
 
 The full authorization suite also exercises each significant role/capability allow/deny cell rather than relying only on per-operation counts.

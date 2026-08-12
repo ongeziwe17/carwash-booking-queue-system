@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The application is a Spring Boot modular monolith organized by the identity, access, vehicle, catalog, booking, queue, notification, reporting, and marketplace capabilities. Repository contracts and implementations belong to their owning capabilities, while narrow application queries expose authorization/reporting/Marketplace reads and one shared coordinator protects the in-memory repositories. Identity owns roles, permissions, and the credential contract; Access implements authentication, BCrypt/JWT infrastructure, and authorization. The current domain covers users, roles, vehicles, services, bookings, queue entries, in-app notifications, car wash businesses, and physical branches. PostgreSQL persistence, tenant isolation, branch-aware operations, payments, and external notification delivery remain future work.
+The application is a Spring Boot modular monolith organized by the identity, access, vehicle, catalog, booking, queue, notification, reporting, and marketplace capabilities. Repository contracts and implementations belong to their owning capabilities, while narrow application queries expose authorization/reporting/Marketplace reads and one shared coordinator protects the in-memory repositories. Identity owns roles, permissions, and the credential contract; Access implements authentication, BCrypt/JWT infrastructure, and authorization. The current domain covers users, roles, vehicles, services, bookings, queue entries, in-app notifications, car wash businesses, physical branches, weekly branch schedules, and temporary closures. PostgreSQL persistence, tenant isolation, branch-scoped operations, payments, and external notification delivery remain future work.
 
 ## 2. Current Entities
 
@@ -17,6 +17,9 @@ The application is a Spring Boot modular monolith organized by the identity, acc
 | `Notification` | In-app notification record for a user and optional booking | User and booking references are resolved to canonical repository objects before insertion. |
 | `CarWashBusiness` | Independent Marketplace business identity, contact/onboarding metadata, and active/inactive lifecycle | Identity is immutable; updates preserve registration time and lifecycle state; deactivation retains the record. |
 | `CarWashBranch` | Physical business-owned location, address, coordinates, timezone, discovery preference, and lifecycle | `businessId` is immutable, coordinates/timezone are validated, and effective activity requires both branch and owner business to be active. |
+| `BranchOperatingSchedule` | One branch's complete recurring weekly interval set | Intervals are immutable, bounded, deterministically ordered, and atomically replaced; duplicate and overlapping ranges are invalid. |
+| `WeeklyOperatingInterval` | One local-time weekly opening period anchored to a `DayOfWeek` | Uses half-open boundaries, supports overnight continuation, and rejects equal opening/closing times. |
+| `TemporaryBranchClosure` | Absolute branch closure with reason and lifecycle history | Uses half-open instant boundaries; active same-branch records may not overlap; cancellation is retained rather than deleted. |
 
 ## 3. Repository Contract
 
@@ -38,7 +41,7 @@ boolean existsById(ID id);
 - Queue repositories additionally expose active operational ordering by position, joined time, and queue-entry ID; public queue lists place active records before terminal history.
 - In-memory storage uses `ConcurrentHashMap`; callers cannot access the mutable backing map.
 
-Duplicate IDs for users, vehicles, services, bookings, queue entries, notifications, businesses, and branches are rejected as `BUSINESS_RULE_VIOLATION` errors without replacing the existing record.
+Duplicate IDs for users, vehicles, services, bookings, queue entries, notifications, businesses, branches, and temporary closures are rejected as `BUSINESS_RULE_VIOLATION` errors without replacing the existing record. The schedule repository is keyed by `branchId`; PUT explicitly inserts when absent and updates when present rather than silently upserting.
 
 ## 4. Single-JVM Coordination Boundary
 
@@ -112,6 +115,14 @@ Each `CarWashBranch` stores exactly one immutable `businessId`; update DTOs and 
 
 Businesses and branches each have their own `ACTIVE`/`INACTIVE` lifecycle. Deactivating a business does not rewrite or cascade-delete its branches. A branch is effective active only when both records are active, and discoverable only when effective active plus `publicDiscoveryEnabled`. The basic discoverable list performs no distance ranking, service filtering, hours evaluation, or availability calculation.
 
+### Marketplace branch scheduling
+
+`BranchOperatingSchedule` stores zero or more local recurring intervals anchored to `DayOfWeek`. An interval is open at its start and closed at its end. An end earlier than the start means the interval continues into the following day; Sunday-to-Monday wrapping uses the same rule. Validation projects intervals onto a cyclic seven-day timeline, splits the weekly wrap where necessary, and rejects every true intersection while allowing exact adjacency.
+
+`TemporaryBranchClosure` stores `startAt`/`endAt` as absolute instants even though the HTTP request is offset-aware. Active closures use `[startAt, endAt)` and override weekly hours; cancelled records remain queryable but do not affect decisions. Creation and overlap validation run under the single coordinator write lock, so an active overlap cannot pass concurrently in this single-JVM runtime.
+
+`BranchSchedulingService` converts the required requested instant into the branch's current `ZoneId` before applying weekly recurrence. `BranchScheduleQuery` returns a detached bounded decision containing the requested instant, resolved zoned local time, effective active state, weekly-hours result, closure result, final open state, and applicable closure metadata. A branch is open only when its business and branch are active, the local time is within weekly hours, and no active closure covers the instant. Public discovery preference is intentionally independent. Existing single-location booking availability does not consume this contract until AVAIL-002.
+
 ### User and notifications
 
 Notification creation resolves the canonical user and optional booking, inserts the notification, and adds it once to `User.notifications`.
@@ -129,6 +140,8 @@ Notifications may be cascade-deleted when their user or cancelled booking is phy
 | Queue entry | Allowed only while status is `WAITING`; successful deletion clears the booking link. |
 | Notification | Internal cleanup operation only; no broad public delete API is introduced. |
 | Marketplace business/branch | No public physical delete operation; use activate/deactivate lifecycle actions. |
+| Branch schedule | No delete operation; replace with an empty complete schedule to make every day closed. |
+| Temporary closure | No physical delete operation; use cancellation and retain history. |
 
 ## 7. Lifecycle Integrity
 
@@ -149,7 +162,7 @@ COMPLETED
 
 Queue position updates are allowed only while the entry is `WAITING`. The requested target must be within the current active queue size; movement reorders the full active list and recalculates all affected positions and waits. Called, in-progress, completed, or exited entries cannot be repositioned or physically deleted.
 
-Queue entry eligibility, active uniqueness, global ordering, recalculation, cumulative wait estimates, true server-selected call-next, focused booking rescheduling, single-location availability, and booking/queue lifecycle synchronization are implemented. Queue creation and call keep the booking `CONFIRMED`; start and completion synchronize both aggregates. Valid booking cancellation removes `WAITING`/`CALLED` queue work, while in-service cancellation is rejected. Generic booking updates and rescheduling are blocked whenever an active queue entry exists. Creation, rescheduling, and service changes reuse the same operating-window/slot policy; cancellation and rescheduling share the deployment-configurable booking-change cutoff documented in [CONFIGURATION.md](CONFIGURATION.md).
+Queue entry eligibility, active uniqueness, global ordering, recalculation, cumulative wait estimates, true server-selected call-next, focused booking rescheduling, single-location availability, Marketplace branch scheduling, and booking/queue lifecycle synchronization are implemented. Queue creation and call keep the booking `CONFIRMED`; start and completion synchronize both aggregates. Valid booking cancellation removes `WAITING`/`CALLED` queue work, while in-service cancellation is rejected. Generic booking updates and rescheduling are blocked whenever an active queue entry exists. Creation, rescheduling, and service changes reuse the same single-location operating-window/slot policy; cancellation and rescheduling share the deployment-configurable booking-change cutoff documented in [CONFIGURATION.md](CONFIGURATION.md). Marketplace branch hours remain a separate future-facing decision and do not retrofit AVAIL-001.
 
 ## 8. Mutable Reference Limitation
 

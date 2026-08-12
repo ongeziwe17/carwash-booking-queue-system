@@ -1,0 +1,21 @@
+info:
+  name: Overnight interval remains open after midnight
+  type: http
+  seq: 27
+  tags: [marketplace, customer, workflow]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}/open-status?at=2030-01-11T23:00:00Z"
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("Friday interval covers Saturday local time", function() { expect(res.body.branchLocalDateTime).to.include("2030-01-12T01:00"); expect(res.body.withinWeeklyHours).to.equal(true); expect(res.body.open).to.equal(true); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

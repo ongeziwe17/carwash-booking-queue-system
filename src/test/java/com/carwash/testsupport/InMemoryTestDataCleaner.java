@@ -8,6 +8,8 @@ import com.carwash.identity.domain.User;
 import com.carwash.vehicle.domain.Vehicle;
 import com.carwash.marketplace.domain.CarWashBranch;
 import com.carwash.marketplace.domain.CarWashBusiness;
+import com.carwash.marketplace.domain.BranchOperatingSchedule;
+import com.carwash.marketplace.domain.TemporaryBranchClosure;
 import com.carwash.booking.domain.BookingRepository;
 import com.carwash.notification.domain.NotificationRepository;
 import com.carwash.queue.domain.QueueEntryRepository;
@@ -16,6 +18,8 @@ import com.carwash.identity.domain.UserRepository;
 import com.carwash.vehicle.domain.VehicleRepository;
 import com.carwash.marketplace.domain.CarWashBranchRepository;
 import com.carwash.marketplace.domain.CarWashBusinessRepository;
+import com.carwash.marketplace.domain.BranchOperatingScheduleRepository;
+import com.carwash.marketplace.domain.TemporaryBranchClosureRepository;
 import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
 
 public final class InMemoryTestDataCleaner {
@@ -29,6 +33,8 @@ public final class InMemoryTestDataCleaner {
     private final NotificationRepository notifications;
     private final CarWashBusinessRepository businesses;
     private final CarWashBranchRepository branches;
+    private final BranchOperatingScheduleRepository schedules;
+    private final TemporaryBranchClosureRepository closures;
     private final DeterministicTestNotificationIdGenerator notificationIds;
 
     public InMemoryTestDataCleaner(
@@ -41,6 +47,8 @@ public final class InMemoryTestDataCleaner {
             NotificationRepository notifications,
             CarWashBusinessRepository businesses,
             CarWashBranchRepository branches,
+            BranchOperatingScheduleRepository schedules,
+            TemporaryBranchClosureRepository closures,
             DeterministicTestNotificationIdGenerator notificationIds
     ) {
         this.coordinator = coordinator;
@@ -52,11 +60,17 @@ public final class InMemoryTestDataCleaner {
         this.notifications = notifications;
         this.businesses = businesses;
         this.branches = branches;
+        this.schedules = schedules;
+        this.closures = closures;
         this.notificationIds = notificationIds;
     }
 
     public void clean() {
         coordinator.write(() -> {
+            closures.findAll().stream().map(TemporaryBranchClosure::getClosureId)
+                    .forEach(closures::deleteById);
+            schedules.findAll().stream().map(BranchOperatingSchedule::getBranchId)
+                    .forEach(schedules::deleteById);
             branches.findAll().stream().map(CarWashBranch::getBranchId)
                     .forEach(branches::deleteById);
             businesses.findAll().stream().map(CarWashBusiness::getBusinessId)

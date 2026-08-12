@@ -1,0 +1,33 @@
+info:
+  name: Business owner replaces branch operating hours
+  type: http
+  seq: 19
+  tags: [marketplace, owner, workflow]
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}/operating-hours"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "intervals": [
+          { "dayOfWeek": "MONDAY", "opensAt": "08:00:00", "closesAt": "17:00:00" },
+          { "dayOfWeek": "FRIDAY", "opensAt": "20:00:00", "closesAt": "02:00:00" }
+        ]
+      }
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("atomically stores bounded weekly hours", function() { expect(res.body.branchId).to.equal(bru.getVar("marketplaceBranchId")); expect(res.body.timezone).to.equal("Africa/Johannesburg"); expect(res.body.intervals).to.have.length(2); expect(res.body).to.not.have.property("business"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

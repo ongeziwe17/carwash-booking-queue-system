@@ -151,6 +151,7 @@ The collection verifies:
 - BOOKING-001 focused CREATED/CONFIRMED rescheduling, shared cutoff enforcement, status preservation, target-slot validation, queue/service-state rejection, notification creation, and generic-update bypass prevention;
 - AVAIL-001 generated service/date slots, duration/closing fit, deterministic ordering, global remaining capacity, full-slot booking consistency, cancellation release, inactive/unknown/past rejection, and authenticated service-read access;
 - MKT-001 business/branch registration, bounded responses, immutable ownership, coordinates/timezone validation, lifecycle actions, effective activity/public discovery, Marketplace RBAC, and complete unauthenticated-operation coverage;
+- MKT-002 atomic weekly schedules, multiple/overnight intervals, timezone-aware open status, temporary-closure override/cancellation, overlap rejection, Marketplace scheduling RBAC, and complete unauthenticated-operation coverage;
 - current queue states (`WAITING`, `CALLED`, `IN_PROGRESS`, `COMPLETED`);
 - real role changes and token acquisition;
 - final-platform-administrator protection without deleting or demoting the bootstrap admin.
@@ -167,7 +168,7 @@ responsibilities because the acceptance environment does not expose test-only cl
 
 The run-scoped availability workflow uses an isolated future date and services. It proves that an appointment for a different service consumes the same global exact-start capacity, the full slot disappears and cannot be booked, cancellation restores it, and a 60-minute service is never advertised past the closing boundary. Availability reads remain point-in-time snapshots and do not reserve capacity.
 
-The run-scoped Marketplace workflow registers one business and branch, exercises every management operation, proves business deactivation suppresses otherwise active branch discovery without deleting it, validates coordinate/timezone rejection, and checks customer read/management-denial behavior. It does not imply tenant isolation, distance discovery, branch hours, or branch-scoped operations.
+The run-scoped Marketplace workflow registers one business and branch, exercises every onboarding and scheduling operation, proves business deactivation suppresses otherwise active branch discovery without deleting it, validates coordinate/timezone rejection, and checks customer read/management-denial behavior. It then atomically creates weekly hours, proves normal and overnight opening, proves an active closure overrides those hours, cancels that closure to restore opening, and rejects a Sunday-to-Monday overlap. It does not imply tenant isolation, distance discovery, branch offerings, or branch-scoped booking/queue operations.
 
 ## Cleanup
 

@@ -1,0 +1,21 @@
+info:
+  name: Business owner cancels temporary closure
+  type: http
+  seq: 25
+  tags: [marketplace, owner, workflow]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/closures/{{marketplaceClosureId}}/cancel"
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("cancels without deleting history", function() { expect(res.body.closureId).to.equal(bru.getVar("marketplaceClosureId")); expect(res.body.status).to.equal("CANCELLED"); expect(res.body.updatedAt).to.be.a("string"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

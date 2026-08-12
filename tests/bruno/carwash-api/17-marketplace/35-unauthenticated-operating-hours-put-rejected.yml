@@ -1,0 +1,26 @@
+info:
+  name: Unauthenticated operating hours replacement is rejected
+  type: http
+  seq: 35
+  tags: [marketplace, auth, security]
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}/operating-hours"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      { "intervals": [] }
+  auth:
+    type: none
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 401", function() { expect(res.status).to.equal(401); expect(res.body.code).to.equal("AUTHENTICATION_REQUIRED"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

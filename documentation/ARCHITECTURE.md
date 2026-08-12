@@ -23,13 +23,13 @@ flowchart TD
 | `queue` | Queue domain, `QueueQuery`, ordering/lifecycle policies, persistence, and queue HTTP API |
 | `notification` | Notification records, ID generation, policy, persistence, and HTTP API |
 | `reporting` | Daily summary reads and report HTTP API |
-| `marketplace` | Business and branch aggregates, `MarketplaceQuery`, lifecycle/validation service, module-owned repositories, bounded DTO mapping, and Marketplace HTTP APIs |
+| `marketplace` | Business/branch aggregates, weekly schedules, temporary closures, `MarketplaceQuery`/`BranchScheduleQuery`, lifecycle/scheduling services, module-owned repositories, bounded DTO mapping, and Marketplace HTTP APIs |
 | `shared` | Standard API errors, common exceptions, generic repository primitives, runtime settings, and the single in-memory coordinator |
 | `bootstrap` | Explicit Spring bean composition and runtime/OpenAPI configuration |
 
 A module publishes its domain types and repository/application contracts only where another capability genuinely needs them. Infrastructure implementations are internal. Existing aggregate references (for example Booking to User, Vehicle, and Service) remain intentional published-domain dependencies; this refactor does not duplicate them into snapshots.
 
-The narrow cross-module read contracts are `UserQuery`, `VehicleQuery`, `BookingQuery`, `QueueQuery`, and `MarketplaceQuery`. Reporting consumes booking/queue queries; resource authorization consumes vehicle/booking/queue ownership queries; JWT validation consumes the identity query. Marketplace currently consumes only shared primitives and publishes detached business/branch snapshots for later branch-aware capabilities. Identity owns the role/permission catalogue and its credential contract, while Access implements that contract with BCrypt. Workflows that must update foreign canonical aggregates still use the owning module's published repository contract under the one shared coordinator.
+The narrow cross-module read contracts are `UserQuery`, `VehicleQuery`, `BookingQuery`, `QueueQuery`, `MarketplaceQuery`, and `BranchScheduleQuery`. Reporting consumes booking/queue queries; resource authorization consumes vehicle/booking/queue ownership queries; JWT validation consumes the identity query. Marketplace consumes only shared primitives and publishes detached business/branch snapshots plus an explicit-instant operational open-status decision for later availability/recommendation capabilities. Identity owns the role/permission catalogue and its credential contract, while Access implements that contract with BCrypt. Workflows that must update foreign canonical aggregates still use the owning module's published repository contract under the one shared coordinator.
 
 ## Composition and dependencies
 
@@ -108,8 +108,9 @@ The rules apply to the implemented `com.carwash.marketplace` capability. An addi
 - **ArchUnit:** package intent needs executable regression protection rather than documentation alone.
 - **Global coordinator:** it preserves existing cross-aggregate atomicity in the single JVM.
 - **Marketplace as a module:** business and branch onboarding now extends the architecture without placing feature code in global technical packages.
+- **Scheduling stays inside Marketplace:** weekly local-time recurrence, absolute temporary closures, and the open-status query are one capability; no calendar, event, or shared-module abstraction is introduced.
 - **Spring Modulith deferred:** package conventions plus ArchUnit meet the current need without adding a second architecture framework.
 
 ## Current limitations
 
-Persistence is in memory, elevated Marketplace management access remains global until tenant isolation, notifications are in-app only, and reporting is a basic snapshot. Branch operating hours, offerings, branch-scoped operations, PostgreSQL, messaging, and distributed transactions are intentionally absent.
+Persistence is in memory, elevated Marketplace management access remains global until tenant isolation, notifications are in-app only, and reporting is a basic snapshot. Branch offerings, branch-scoped bookings/queues/reports, branch-aware availability, PostgreSQL, messaging, and distributed transactions are intentionally absent. Weekly schedules and temporary closures are evaluated synchronously in the current branch timezone and are not external calendar integrations.

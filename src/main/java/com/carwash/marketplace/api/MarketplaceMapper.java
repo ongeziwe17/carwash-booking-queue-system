@@ -1,9 +1,18 @@
 package com.carwash.marketplace.api;
 
 import com.carwash.marketplace.api.dto.BranchResponse;
+import com.carwash.marketplace.api.dto.BranchOpenStatusResponse;
+import com.carwash.marketplace.api.dto.BranchOperatingHoursResponse;
 import com.carwash.marketplace.api.dto.BusinessResponse;
+import com.carwash.marketplace.api.dto.TemporaryClosureResponse;
+import com.carwash.marketplace.api.dto.WeeklyOperatingIntervalResponse;
+import com.carwash.marketplace.application.BranchOpenStatusSnapshot;
+import com.carwash.marketplace.application.BranchOperatingScheduleSnapshot;
 import com.carwash.marketplace.application.BranchSnapshot;
 import com.carwash.marketplace.application.BusinessSnapshot;
+import com.carwash.marketplace.application.TemporaryBranchClosureSnapshot;
+
+import java.time.ZoneOffset;
 
 final class MarketplaceMapper {
 
@@ -43,6 +52,47 @@ final class MarketplaceMapper {
                 branch.discoverable(),
                 branch.createdAt(),
                 branch.updatedAt()
+        );
+    }
+
+    static BranchOperatingHoursResponse toResponse(BranchOperatingScheduleSnapshot schedule) {
+        return new BranchOperatingHoursResponse(
+                schedule.branchId(),
+                schedule.timezone(),
+                schedule.intervals().stream()
+                        .map(interval -> new WeeklyOperatingIntervalResponse(
+                                interval.dayOfWeek(), interval.opensAt(), interval.closesAt()))
+                        .toList(),
+                schedule.createdAt(),
+                schedule.updatedAt()
+        );
+    }
+
+    static TemporaryClosureResponse toResponse(TemporaryBranchClosureSnapshot closure) {
+        return new TemporaryClosureResponse(
+                closure.closureId(),
+                closure.branchId(),
+                closure.startAt().atOffset(ZoneOffset.UTC),
+                closure.endAt().atOffset(ZoneOffset.UTC),
+                closure.reason(),
+                closure.status(),
+                closure.createdAt(),
+                closure.updatedAt()
+        );
+    }
+
+    static BranchOpenStatusResponse toResponse(BranchOpenStatusSnapshot status) {
+        return new BranchOpenStatusResponse(
+                status.branchId(),
+                status.requestedAt().atOffset(ZoneOffset.UTC),
+                status.timezone(),
+                status.branchLocalDateTime(),
+                status.effectiveActive(),
+                status.withinWeeklyHours(),
+                status.temporarilyClosed(),
+                status.open(),
+                status.applicableClosureId(),
+                status.applicableClosureReason()
         );
     }
 }
