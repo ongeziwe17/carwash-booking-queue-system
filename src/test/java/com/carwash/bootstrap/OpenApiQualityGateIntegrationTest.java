@@ -147,7 +147,7 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         assertTrue(callNext.path("responses").has("404"));
         assertTrue(explicitCall.path("description").asText().contains("specified WAITING"));
         assertTrue(document.path("paths").path("/api/queue-entries/{id}/call-next").isMissingNode());
-        assertEquals(40, EXPECTED_OPERATIONS.size());
+        assertEquals(53, EXPECTED_OPERATIONS.size());
     }
 
     @Test
