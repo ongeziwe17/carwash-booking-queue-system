@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The application is a Spring Boot modular monolith using in-memory repositories. The current domain covers users, roles, vehicles, services, bookings, queue entries, and in-app notifications. JWT authentication, role-based authorization, bounded API DTOs, and the standard API error contract are implemented. PostgreSQL persistence, tenant isolation, payments, and external notification delivery remain future work.
+The application is a Spring Boot modular monolith organized by the identity, access, vehicle, catalog, booking, queue, notification, and reporting capabilities. Repository contracts and implementations belong to their owning capabilities, while narrow application queries expose authorization/reporting reads and one shared coordinator protects the in-memory repositories. Identity owns roles, permissions, and the credential contract; Access implements authentication, BCrypt/JWT infrastructure, and authorization. The current domain covers users, roles, vehicles, services, bookings, queue entries, and in-app notifications. PostgreSQL persistence, tenant isolation, payments, and external notification delivery remain future work.
 
 ## 2. Current Entities
 
@@ -44,6 +44,7 @@ Duplicate IDs for users, vehicles, services, bookings, queue entries, and notifi
 
 - Multi-repository and aggregate mutations run under the write lock.
 - Reads that require a consistent aggregate view run under the read lock.
+- Cross-module query composition may re-enter the same read lock; write workflows do not perform read-to-write lock upgrades.
 - The last-active-platform-administrator rule uses the same write boundary.
 - The lock protects one application process only.
 - It is not a database transaction or distributed lock.

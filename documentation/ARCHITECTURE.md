@@ -1,57 +1,112 @@
-# Architecture
+# Modular Monolith Architecture
 
-## Overview
+## Deployment view
 
-The Car Wash Booking Queue System is a Spring Boot backend that exposes REST APIs for authentication, users, vehicles, services, bookings, queues, notifications, administration, and reporting. The current architecture is intentionally simple: JWT authentication, RBAC/ownership authorization, and safe API contracts are implemented, while durable persistence, tenant isolation, and production observability remain future concerns.
+The system remains one repository, one Maven project, one Spring Boot application, one JVM, and one deployment unit. No module is independently deployed.
 
-## Runtime View
+```mermaid
+flowchart TD
+    Client[Web or mobile client] --> App[Single Spring Boot application]
+    App --> Modules[Capability-based modular monolith]
+    Modules --> Memory[Shared in-memory persistence coordinator]
+```
+
+## Module ownership
+
+| Module | Published/owned surface |
+| --- | --- |
+| `identity` | Users, roles/permissions, user lifecycle, `UserQuery`/`CredentialService`, repository contracts, and user/admin HTTP API |
+| `access` | Authentication HTTP API, JWT/BCrypt infrastructure, the identity credential-contract implementation, and resource authorization |
+| `vehicle` | Vehicles, lifecycle service, `VehicleQuery`, repository contract/implementation, and HTTP API |
+| `catalog` | Service catalogue domain, lifecycle service, repository contract/implementation, and HTTP API |
+| `booking` | Bookings, `BookingQuery`, scheduling and availability policies, persistence, and booking/availability HTTP APIs |
+| `queue` | Queue domain, `QueueQuery`, ordering/lifecycle policies, persistence, and queue HTTP API |
+| `notification` | Notification records, ID generation, policy, persistence, and HTTP API |
+| `reporting` | Daily summary reads and report HTTP API |
+| `shared` | Standard API errors, common exceptions, generic repository primitives, runtime settings, and the single in-memory coordinator |
+| `bootstrap` | Explicit Spring bean composition and runtime/OpenAPI configuration |
+
+A module publishes its domain types and repository/application contracts only where another capability genuinely needs them. Infrastructure implementations are internal. Existing aggregate references (for example Booking to User, Vehicle, and Service) remain intentional published-domain dependencies; this refactor does not duplicate them into snapshots.
+
+The narrow cross-module read contracts are `UserQuery`, `VehicleQuery`, `BookingQuery`, and `QueueQuery`. Reporting consumes booking/queue queries; resource authorization consumes vehicle/booking/queue ownership queries; JWT validation consumes the identity query. Identity owns the role/permission catalogue and its credential contract, while Access implements that contract with BCrypt. Workflows that must update foreign canonical aggregates still use the owning module's published repository contract under the one shared coordinator.
+
+## Composition and dependencies
+
+`bootstrap.ApplicationCompositionConfig` remains the explicit composition root. It creates repositories and services and is therefore allowed to see every module. Business modules never depend on bootstrap. Broad component scanning was not introduced.
 
 ```mermaid
 flowchart LR
-    Client[Web or Mobile Client] --> API[Spring Boot REST API]
-    API --> Controllers[API Controllers]
-    Controllers --> Services[Application Services]
-    Services --> Repositories[Repository Interfaces]
-    Repositories --> Memory[In-Memory Repositories]
-    API --> OpenAPI[Swagger / OpenAPI]
+    Bootstrap --> Access
+    Bootstrap --> Identity
+    Bootstrap --> Vehicle
+    Bootstrap --> Catalog
+    Bootstrap --> Booking
+    Bootstrap --> Queue
+    Bootstrap --> Notification
+    Bootstrap --> Reporting
+    Access --> Identity
+    Access --> Vehicle
+    Access --> Booking
+    Access --> Queue
+    Identity --> Vehicle
+    Identity --> Booking
+    Identity --> Notification
+    Vehicle --> Identity
+    Vehicle --> Booking
+    Catalog --> Booking
+    Catalog --> Queue
+    Booking --> Identity
+    Booking --> Vehicle
+    Booking --> Catalog
+    Booking <--> Queue
+    Booking --> Notification
+    Queue --> Catalog
+    Queue --> Notification
+    Notification --> Identity
+    Notification --> Booking
+    Reporting --> Booking
+    Reporting --> Queue
+    Shared --> Runtime[Low-level runtime only]
+    Access --> Shared
+    Identity --> Shared
+    Vehicle --> Shared
+    Catalog --> Shared
+    Booking --> Shared
+    Queue --> Shared
+    Notification --> Shared
+    Reporting --> Shared
 ```
 
-## Layering
+Cross-capability workflows depend on owning-module repository or application contracts and stable domain types, never a foreign module's `infrastructure` package. Each in-memory repository implementation resides in its owning capability. `insert` remains create-only and `update` remains existing-only; no upsert-style `save` abstraction is introduced.
 
-- **API layer**: Controllers accept HTTP requests, validate request DTOs, and return structured responses.
-- **Service layer**: Application services enforce business rules for bookings, queues, notifications, service catalog operations, users, and vehicles.
-- **Repository layer**: Repository interfaces isolate storage concerns from business workflows.
-- **In-memory storage**: Current repository implementations support local development and automated tests without external infrastructure.
-- **Configuration**: Spring configuration wires repository and service implementations for the running application.
+## Consistency and rollback
 
-## Domain Areas
+There is deliberately one `shared.infrastructure.InMemoryDataCoordinator`. Existing booking cancellation/queue rebalance and queue start/completion workflows retain a single-JVM write-lock boundary. Cross-module reporting and ownership queries may re-enter the same reentrant read lock; no read-to-write upgrade is performed. Write workflows do not delegate to another coordinator or introduce an independent lock. Existing package-private, module-owned state snapshots and restoration remain in the Booking and Queue lifecycle services because repositories retain mutable canonical references.
 
-- **Users and roles**: Customer and operational account records.
-- **Vehicles**: Customer-owned vehicles that can be associated with bookings.
-- **Services**: Car wash service catalog entries with price and duration information.
-- **Bookings**: Scheduled service requests with lifecycle status.
-- **Queue entries**: Operational queue positions and estimated wait information.
-- **Notifications**: Customer communication records for booking and queue updates.
+## Enforced rules
 
-## Current Limitations
+ArchUnit runs with the normal Maven test suite and enforces:
 
-- Runtime storage is currently in-memory only; durable PostgreSQL persistence is not configured for the application.
-- JWT authentication, BCrypt credential storage, Spring Security, RBAC, and ownership authorization are implemented; Marketplace tenant isolation is not, so elevated operational access is global.
-- Notification records are in-app data only; no external SMS/email provider delivery is implemented.
-- Daily summary reporting is basic and computed from current in-memory data.
-- Multi-tenancy, payments, observability, and production SaaS hardening are future work.
+- domain packages do not depend on API, infrastructure, or bootstrap;
+- modules do not use another capability's infrastructure;
+- shared does not depend on a business capability;
+- business modules do not depend on bootstrap;
+- REST controllers live under an owning `api` package; and
+- all concrete repository implementations live under shared or module `infrastructure` packages; and
+- the former global technical packages remain empty.
 
-## SaaS Readiness Direction
+The rules are convention-based so a future `com.carwash.marketplace` capability naturally receives the same boundaries without modifying the foundation.
 
-The current application is a backend foundation, not a production-ready SaaS platform. Planned architecture improvements include:
+## Decisions
 
-1. Durable database persistence behind existing repository interfaces.
-2. Tenant-aware data boundaries for multiple car wash businesses, building on the existing authentication/RBAC foundation.
-3. Security/operational audit logging and continued production security hardening.
-4. Background notification delivery for email/SMS providers.
-5. Observability through structured logs, metrics, traces, and health checks.
-6. Deployment hardening for cloud and container platforms.
+- **Modular monolith now:** capability ownership makes the next Marketplace phase safer without changing operational topology.
+- **Not microservices:** current workflows require atomic in-memory changes and have no demonstrated independent scaling/deployment need.
+- **Package by capability:** related API, policy, domain, and persistence code changes together and is easier to discover.
+- **ArchUnit:** package intent needs executable regression protection rather than documentation alone.
+- **Global coordinator:** it preserves existing cross-aggregate atomicity in the single JVM.
+- **Marketplace later:** business/branch concepts remain out of scope until these boundaries are established.
+- **Spring Modulith deferred:** package conventions plus ArchUnit meet the current need without adding a second architecture framework.
 
-## Local Deployment
+## Current limitations
 
-The service can be run directly with Maven or through Docker Compose. Swagger UI and the OpenAPI document are available during local development for API exploration and contract review.
+Persistence is in memory, elevated operational access remains global until tenant isolation, notifications are in-app only, and reporting is a basic snapshot. PostgreSQL, messaging, Marketplace concepts, and distributed transactions are intentionally absent.

@@ -1,6 +1,6 @@
 package com.carwash.testsupport;
 
-import com.carwash.api.dto.CreateQueueEntryRequest;
+import com.carwash.queue.api.dto.CreateQueueEntryRequest;
 
 public final class QueueFixtureBuilder {
 

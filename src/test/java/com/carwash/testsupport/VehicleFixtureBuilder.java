@@ -1,6 +1,6 @@
 package com.carwash.testsupport;
 
-import com.carwash.api.dto.CreateVehicleRequest;
+import com.carwash.vehicle.api.dto.CreateVehicleRequest;
 
 public final class VehicleFixtureBuilder {
 

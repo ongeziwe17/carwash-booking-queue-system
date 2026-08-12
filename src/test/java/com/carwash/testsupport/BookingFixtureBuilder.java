@@ -1,6 +1,6 @@
 package com.carwash.testsupport;
 
-import com.carwash.api.dto.CreateBookingRequest;
+import com.carwash.booking.api.dto.CreateBookingRequest;
 
 import java.time.LocalDateTime;
 

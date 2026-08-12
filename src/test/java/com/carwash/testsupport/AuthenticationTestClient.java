@@ -1,7 +1,7 @@
 package com.carwash.testsupport;
 
-import com.carwash.api.dto.CreateUserRequest;
-import com.carwash.api.dto.LoginRequest;
+import com.carwash.identity.api.dto.CreateUserRequest;
+import com.carwash.access.api.dto.LoginRequest;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
