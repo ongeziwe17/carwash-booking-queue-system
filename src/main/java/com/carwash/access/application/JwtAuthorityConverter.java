@@ -1,5 +1,7 @@
 package com.carwash.access.application;
 
+import com.carwash.identity.domain.RoleCatalog;
+import com.carwash.identity.domain.RoleName;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;

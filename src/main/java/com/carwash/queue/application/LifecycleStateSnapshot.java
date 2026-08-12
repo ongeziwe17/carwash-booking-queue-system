@@ -12,20 +12,20 @@ import java.util.List;
  * Focused mutable-state snapshots used to roll back coordinated in-memory
  * booking and queue lifecycle mutations.
  */
-public final class LifecycleStateSnapshot {
+final class LifecycleStateSnapshot {
 
     private LifecycleStateSnapshot() {
     }
 
-    public static BookingState booking(Booking booking) {
+    static BookingState booking(Booking booking) {
         return new BookingState(booking, booking.getStatus(), booking.getQueueEntry());
     }
 
-    public static List<QueueEntryState> queueEntries(List<QueueEntry> queueEntries) {
+    static List<QueueEntryState> queueEntries(List<QueueEntry> queueEntries) {
         return queueEntries.stream().map(LifecycleStateSnapshot::queueEntry).toList();
     }
 
-    public static QueueEntryState queueEntry(QueueEntry queueEntry) {
+    static QueueEntryState queueEntry(QueueEntry queueEntry) {
         return new QueueEntryState(
                 queueEntry,
                 queueEntry.getBooking(),
@@ -38,9 +38,9 @@ public final class LifecycleStateSnapshot {
         );
     }
 
-    public record BookingState(Booking booking, BookingStatus status, QueueEntry queueEntry) {
+    record BookingState(Booking booking, BookingStatus status, QueueEntry queueEntry) {
 
-        public void restore() {
+        void restore() {
             booking.setStatus(status);
             QueueEntry current = booking.getQueueEntry();
             if (current != null && queueEntry == null) {
@@ -54,7 +54,7 @@ public final class LifecycleStateSnapshot {
         }
     }
 
-    public record QueueEntryState(
+    record QueueEntryState(
             QueueEntry queueEntry,
             Booking booking,
             QueueStatus status,
@@ -65,7 +65,7 @@ public final class LifecycleStateSnapshot {
             LocalDateTime completedAt
     ) {
 
-        public void restore() {
+        void restore() {
             queueEntry.setBooking(booking);
             queueEntry.setQueueStatus(status);
             queueEntry.setPosition(position);

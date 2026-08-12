@@ -1,0 +1,61 @@
+package com.carwash.architecture;
+
+import com.carwash.booking.application.BookingQuery;
+import com.carwash.booking.domain.Booking;
+import com.carwash.catalog.domain.Service;
+import com.carwash.identity.application.UserQuery;
+import com.carwash.identity.domain.User;
+import com.carwash.queue.application.QueueQuery;
+import com.carwash.queue.domain.QueueEntry;
+import com.carwash.testsupport.ServiceTestSupport;
+import com.carwash.vehicle.application.VehicleQuery;
+import com.carwash.vehicle.domain.Vehicle;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class ModuleContractTest extends ServiceTestSupport {
+
+    @Test
+    void published_queries_resolve_canonical_ownership_without_exposing_infrastructure() {
+        User user = registerUser();
+        Vehicle vehicle = createVehicle(user);
+        Service service = createService();
+        Booking booking = bookingService.createBooking(
+                ids.booking(), user.getUserId(), vehicle.getVehicleId(), service.getServiceId(),
+                com.carwash.testsupport.TestDates.future(), "none");
+        bookingService.confirmBooking(booking.getBookingId());
+        QueueEntry queueEntry = queueService.createQueueEntry(
+                ids.queueEntry(), booking.getBookingId(), service.getServiceId());
+
+        UserQuery users = userService;
+        VehicleQuery vehicles = vehicleService;
+        BookingQuery bookings = bookingService;
+        QueueQuery queues = queueService;
+
+        assertEquals(user.getUserId(), users.findOptionalById(user.getUserId()).orElseThrow().getUserId());
+        assertEquals(user.getUserId(), vehicles.findOwnerId(vehicle.getVehicleId()).orElseThrow());
+        assertEquals(user.getUserId(), bookings.findOwnerId(booking.getBookingId()).orElseThrow());
+        assertEquals(user.getUserId(), queues.findOwnerId(queueEntry.getQueueEntryId()).orElseThrow());
+        assertTrue(bookings.existsByUserId(user.getUserId()));
+        assertTrue(bookings.existsByVehicleId(vehicle.getVehicleId()));
+        assertTrue(bookings.existsByServiceId(service.getServiceId()));
+        assertTrue(queues.existsByServiceId(service.getServiceId()));
+    }
+
+    @Test
+    void reporting_queries_publish_the_existing_booking_and_detached_queue_views() {
+        Booking booking = createConfirmedBooking();
+        QueueEntry queueEntry = queueService.createQueueEntry(
+                ids.queueEntry(), booking.getBookingId(), booking.getService().getServiceId());
+
+        assertTrue(((BookingQuery) bookingService).findAll().stream()
+                .anyMatch(item -> booking.getBookingId().equals(item.getBookingId())));
+        QueueEntry publishedQueueEntry = ((QueueQuery) queueService).findAll().stream()
+                .filter(item -> queueEntry.getQueueEntryId().equals(item.getQueueEntryId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(booking.getBookingId(), publishedQueueEntry.getBooking().getBookingId());
+    }
+}

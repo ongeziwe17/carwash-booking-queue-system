@@ -7,9 +7,8 @@ import com.carwash.notification.domain.NotificationRepository;
 import com.carwash.identity.domain.UserRepository;
 import com.carwash.vehicle.domain.VehicleRepository;
 import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
-import com.carwash.access.application.RoleCatalog;
-import com.carwash.access.application.RoleName;
-import com.carwash.access.application.UserCredentialService;
+import com.carwash.identity.domain.RoleCatalog;
+import com.carwash.identity.domain.RoleName;
 import com.carwash.identity.application.CreateUserCommand;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
@@ -17,11 +16,12 @@ import com.carwash.shared.exception.ResourceNotFoundException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 
-public class UserManagementService {
+public class UserManagementService implements UserQuery {
 
     private final UserRepository userRepository;
-    private final UserCredentialService credentialService;
+    private final CredentialService credentialService;
     private final VehicleRepository vehicleRepository;
     private final BookingRepository bookingRepository;
     private final NotificationRepository notificationRepository;
@@ -30,7 +30,7 @@ public class UserManagementService {
 
     public UserManagementService(
             UserRepository userRepository,
-            UserCredentialService credentialService,
+            CredentialService credentialService,
             VehicleRepository vehicleRepository,
             BookingRepository bookingRepository,
             NotificationRepository notificationRepository,
@@ -68,6 +68,11 @@ public class UserManagementService {
 
     public User findById(String userId) {
         return coordinator.read(() -> requireUser(userId));
+    }
+
+    @Override
+    public Optional<User> findOptionalById(String userId) {
+        return coordinator.read(() -> userRepository.findById(userId));
     }
 
     public List<User> findAll() {

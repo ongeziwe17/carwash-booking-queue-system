@@ -11,8 +11,9 @@ import com.carwash.shared.exception.ResourceNotFoundException;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
-public class VehicleManagementService {
+public class VehicleManagementService implements VehicleQuery {
 
     private final VehicleRepository vehicleRepository;
     private final UserRepository userRepository;
@@ -70,6 +71,16 @@ public class VehicleManagementService {
             requireUser(userId);
             return vehicleRepository.findByUserId(userId);
         });
+    }
+
+    @Override
+    public Optional<String> findOwnerId(String vehicleId) {
+        return coordinator.read(() -> vehicleRepository.findById(vehicleId).map(Vehicle::getUserId));
+    }
+
+    @Override
+    public boolean existsByUserId(String userId) {
+        return coordinator.read(() -> !vehicleRepository.findByUserId(userId).isEmpty());
     }
 
     public Vehicle updateVehicle(String vehicleId, String plateNumber, String vehicleType,

@@ -24,8 +24,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
-public class QueueManagementService {
+public class QueueManagementService implements QueueQuery {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(QueueManagementService.class);
 
@@ -97,6 +98,19 @@ public class QueueManagementService {
         return coordinator.read(() -> queueEntryRepository.findAllOrdered().stream()
                 .map(this::snapshotQueueEntry)
                 .toList());
+    }
+
+    @Override
+    public Optional<String> findOwnerId(String queueEntryId) {
+        return coordinator.read(() -> queueEntryRepository.findById(queueEntryId)
+                .map(QueueEntry::getBooking)
+                .map(Booking::getUser)
+                .map(User::getUserId));
+    }
+
+    @Override
+    public boolean existsByServiceId(String serviceId) {
+        return coordinator.read(() -> queueEntryRepository.existsByServiceId(serviceId));
     }
 
     public List<QueueEntry> findByServiceId(String serviceId) {

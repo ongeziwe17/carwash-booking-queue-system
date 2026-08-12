@@ -1,0 +1,78 @@
+package com.carwash.booking.application;
+
+import com.carwash.booking.domain.Booking;
+import com.carwash.booking.domain.BookingStatus;
+import com.carwash.queue.domain.QueueEntry;
+import com.carwash.queue.domain.QueueStatus;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * Booking-owned mutable-state snapshots used to restore coordinated
+ * cancellation changes when an in-memory operation fails.
+ */
+final class LifecycleStateSnapshot {
+
+    private LifecycleStateSnapshot() {
+    }
+
+    static BookingState booking(Booking booking) {
+        return new BookingState(booking, booking.getStatus(), booking.getQueueEntry());
+    }
+
+    static List<QueueEntryState> queueEntries(List<QueueEntry> queueEntries) {
+        return queueEntries.stream().map(LifecycleStateSnapshot::queueEntry).toList();
+    }
+
+    private static QueueEntryState queueEntry(QueueEntry queueEntry) {
+        return new QueueEntryState(
+                queueEntry,
+                queueEntry.getBooking(),
+                queueEntry.getQueueStatus(),
+                queueEntry.getPosition(),
+                queueEntry.getEstimatedWaitMin(),
+                queueEntry.getCalledAt(),
+                queueEntry.getStartedAt(),
+                queueEntry.getCompletedAt()
+        );
+    }
+
+    record BookingState(Booking booking, BookingStatus status, QueueEntry queueEntry) {
+
+        void restore() {
+            booking.setStatus(status);
+            QueueEntry current = booking.getQueueEntry();
+            if (current != null && queueEntry == null) {
+                booking.detachQueueEntry(current.getQueueEntryId());
+            } else if (queueEntry != null) {
+                if (current != null && !queueEntry.getQueueEntryId().equals(current.getQueueEntryId())) {
+                    booking.detachQueueEntry(current.getQueueEntryId());
+                }
+                booking.attachQueueEntry(queueEntry);
+            }
+        }
+    }
+
+    record QueueEntryState(
+            QueueEntry queueEntry,
+            Booking booking,
+            QueueStatus status,
+            int position,
+            int estimatedWaitMin,
+            LocalDateTime calledAt,
+            LocalDateTime startedAt,
+            LocalDateTime completedAt
+    ) {
+
+        void restore() {
+            queueEntry.setBooking(booking);
+            queueEntry.setQueueStatus(status);
+            queueEntry.setPosition(position);
+            queueEntry.setEstimatedWaitMin(estimatedWaitMin);
+            queueEntry.setCalledAt(calledAt);
+            queueEntry.setStartedAt(startedAt);
+            queueEntry.setCompletedAt(completedAt);
+        }
+    }
+}

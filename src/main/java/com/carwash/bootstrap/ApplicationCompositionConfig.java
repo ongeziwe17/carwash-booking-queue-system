@@ -236,13 +236,13 @@ public class ApplicationCompositionConfig {
 
     @Bean
     public DailySummaryReportService dailySummaryReportService(
-            BookingRepository bookingRepository,
-            QueueEntryRepository queueEntryRepository,
+            BookingManagementService bookingManagementService,
+            QueueManagementService queueManagementService,
             InMemoryDataCoordinator coordinator
     ) {
         return new DailySummaryReportService(
-                bookingRepository,
-                queueEntryRepository,
+                bookingManagementService,
+                queueManagementService,
                 coordinator
         );
     }

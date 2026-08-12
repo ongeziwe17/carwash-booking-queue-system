@@ -5,8 +5,8 @@ import com.carwash.booking.domain.Booking;
 import com.carwash.queue.domain.QueueEntry;
 import com.carwash.booking.domain.BookingStatus;
 import com.carwash.queue.domain.QueueStatus;
-import com.carwash.booking.domain.BookingRepository;
-import com.carwash.queue.domain.QueueEntryRepository;
+import com.carwash.booking.application.BookingQuery;
+import com.carwash.queue.application.QueueQuery;
 import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
 
 import java.time.LocalDate;
@@ -15,26 +15,26 @@ import java.util.Objects;
 
 public class DailySummaryReportService {
 
-    private final BookingRepository bookingRepository;
-    private final QueueEntryRepository queueEntryRepository;
+    private final BookingQuery bookingQuery;
+    private final QueueQuery queueQuery;
     private final InMemoryDataCoordinator coordinator;
 
 
-    public DailySummaryReportService(BookingRepository bookingRepository,
-                                     QueueEntryRepository queueEntryRepository,
+    public DailySummaryReportService(BookingQuery bookingQuery,
+                                     QueueQuery queueQuery,
                                      InMemoryDataCoordinator coordinator) {
-        this.bookingRepository = Objects.requireNonNull(bookingRepository, "Booking repository is required");
-        this.queueEntryRepository = Objects.requireNonNull(queueEntryRepository, "Queue repository is required");
+        this.bookingQuery = Objects.requireNonNull(bookingQuery, "Booking query is required");
+        this.queueQuery = Objects.requireNonNull(queueQuery, "Queue query is required");
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
     }
 
     public DailySummaryReportResponse generateDailySummary(LocalDate reportDate) {
         if (reportDate == null) throw new IllegalArgumentException("Report date is required");
         return coordinator.read(() -> {
-            List<Booking> bookingsForDate = bookingRepository.findAll().stream()
+            List<Booking> bookingsForDate = bookingQuery.findAll().stream()
                     .filter(booking -> booking.getScheduledDateTime() != null)
                     .filter(booking -> booking.getScheduledDateTime().toLocalDate().equals(reportDate)).toList();
-            List<QueueEntry> queueEntriesForDate = queueEntryRepository.findAll().stream()
+            List<QueueEntry> queueEntriesForDate = queueQuery.findAll().stream()
                     .filter(queueEntry -> queueEntry.getBooking() != null)
                     .filter(queueEntry -> queueEntry.getBooking().getScheduledDateTime() != null)
                     .filter(queueEntry -> queueEntry.getBooking().getScheduledDateTime().toLocalDate().equals(reportDate))

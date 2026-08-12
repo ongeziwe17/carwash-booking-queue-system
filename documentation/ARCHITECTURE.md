@@ -15,18 +15,20 @@ flowchart TD
 
 | Module | Published/owned surface |
 | --- | --- |
-| `identity` | Users, roles, user lifecycle, repository contracts, and user/admin HTTP API |
-| `access` | Authentication HTTP API, JWT/BCrypt infrastructure, RBAC, and resource authorization |
-| `vehicle` | Vehicles, lifecycle service, repository contract/implementation, and HTTP API |
+| `identity` | Users, roles/permissions, user lifecycle, `UserQuery`/`CredentialService`, repository contracts, and user/admin HTTP API |
+| `access` | Authentication HTTP API, JWT/BCrypt infrastructure, the identity credential-contract implementation, and resource authorization |
+| `vehicle` | Vehicles, lifecycle service, `VehicleQuery`, repository contract/implementation, and HTTP API |
 | `catalog` | Service catalogue domain, lifecycle service, repository contract/implementation, and HTTP API |
-| `booking` | Bookings, scheduling and availability policies, persistence, and booking/availability HTTP APIs |
-| `queue` | Queue domain, ordering/lifecycle policies, persistence, and queue HTTP API |
+| `booking` | Bookings, `BookingQuery`, scheduling and availability policies, persistence, and booking/availability HTTP APIs |
+| `queue` | Queue domain, `QueueQuery`, ordering/lifecycle policies, persistence, and queue HTTP API |
 | `notification` | Notification records, ID generation, policy, persistence, and HTTP API |
 | `reporting` | Daily summary reads and report HTTP API |
 | `shared` | Standard API errors, common exceptions, generic repository primitives, runtime settings, and the single in-memory coordinator |
 | `bootstrap` | Explicit Spring bean composition and runtime/OpenAPI configuration |
 
 A module publishes its domain types and repository/application contracts only where another capability genuinely needs them. Infrastructure implementations are internal. Existing aggregate references (for example Booking to User, Vehicle, and Service) remain intentional published-domain dependencies; this refactor does not duplicate them into snapshots.
+
+The narrow cross-module read contracts are `UserQuery`, `VehicleQuery`, `BookingQuery`, and `QueueQuery`. Reporting consumes booking/queue queries; resource authorization consumes vehicle/booking/queue ownership queries; JWT validation consumes the identity query. Identity owns the role/permission catalogue and its credential contract, while Access implements that contract with BCrypt. Workflows that must update foreign canonical aggregates still use the owning module's published repository contract under the one shared coordinator.
 
 ## Composition and dependencies
 
@@ -45,6 +47,14 @@ flowchart LR
     Access --> Identity
     Access --> Vehicle
     Access --> Booking
+    Access --> Queue
+    Identity --> Vehicle
+    Identity --> Booking
+    Identity --> Notification
+    Vehicle --> Identity
+    Vehicle --> Booking
+    Catalog --> Booking
+    Catalog --> Queue
     Booking --> Identity
     Booking --> Vehicle
     Booking --> Catalog
@@ -52,6 +62,8 @@ flowchart LR
     Booking --> Notification
     Queue --> Catalog
     Queue --> Notification
+    Notification --> Identity
+    Notification --> Booking
     Reporting --> Booking
     Reporting --> Queue
     Shared --> Runtime[Low-level runtime only]
@@ -69,7 +81,7 @@ Cross-capability workflows depend on owning-module repository or application con
 
 ## Consistency and rollback
 
-There is deliberately one `shared.infrastructure.InMemoryDataCoordinator`. Existing booking cancellation/queue rebalance and queue start/completion workflows retain a single-JVM read/write-lock boundary. Module extraction did not add nested coordinator calls. Existing state snapshots and restoration remain in the lifecycle services because repositories retain mutable canonical references.
+There is deliberately one `shared.infrastructure.InMemoryDataCoordinator`. Existing booking cancellation/queue rebalance and queue start/completion workflows retain a single-JVM write-lock boundary. Cross-module reporting and ownership queries may re-enter the same reentrant read lock; no read-to-write upgrade is performed. Write workflows do not delegate to another coordinator or introduce an independent lock. Existing package-private, module-owned state snapshots and restoration remain in the Booking and Queue lifecycle services because repositories retain mutable canonical references.
 
 ## Enforced rules
 
@@ -80,7 +92,8 @@ ArchUnit runs with the normal Maven test suite and enforces:
 - shared does not depend on a business capability;
 - business modules do not depend on bootstrap;
 - REST controllers live under an owning `api` package; and
-- concrete in-memory repositories live under module `infrastructure` packages.
+- all concrete repository implementations live under shared or module `infrastructure` packages; and
+- the former global technical packages remain empty.
 
 The rules are convention-based so a future `com.carwash.marketplace` capability naturally receives the same boundaries without modifying the foundation.
 

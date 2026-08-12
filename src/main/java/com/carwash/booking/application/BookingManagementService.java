@@ -1,7 +1,6 @@
 package com.carwash.booking.application;
 
 import com.carwash.notification.application.NotificationManagementService;
-import com.carwash.queue.application.LifecycleStateSnapshot;
 import com.carwash.queue.application.QueueOrderingService;
 
 import com.carwash.booking.application.BookingPolicyProperties;
@@ -28,8 +27,9 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
-public class BookingManagementService {
+public class BookingManagementService implements BookingQuery {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(BookingManagementService.class);
 
@@ -117,6 +117,28 @@ public class BookingManagementService {
 
     public List<Booking> findAll() {
         return coordinator.read(bookingRepository::findAll);
+    }
+
+    @Override
+    public Optional<String> findOwnerId(String bookingId) {
+        return coordinator.read(() -> bookingRepository.findById(bookingId)
+                .map(Booking::getUser)
+                .map(User::getUserId));
+    }
+
+    @Override
+    public boolean existsByUserId(String userId) {
+        return coordinator.read(() -> bookingRepository.existsByUserId(userId));
+    }
+
+    @Override
+    public boolean existsByVehicleId(String vehicleId) {
+        return coordinator.read(() -> bookingRepository.existsByVehicleId(vehicleId));
+    }
+
+    @Override
+    public boolean existsByServiceId(String serviceId) {
+        return coordinator.read(() -> bookingRepository.existsByServiceId(serviceId));
     }
 
     public Booking updateBooking(String bookingId, String vehicleId, String serviceId, String specialRequest) {

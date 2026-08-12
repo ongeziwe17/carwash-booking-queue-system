@@ -4,7 +4,6 @@ import com.carwash.shared.api.error.ApiErrorResponse;
 import com.carwash.shared.api.error.ApiFieldError;
 import com.carwash.shared.api.error.ApiErrorCode;
 import com.carwash.shared.api.error.ApiErrorResponseFactory;
-import com.carwash.access.application.InvalidCredentialsException;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
 import jakarta.validation.ConstraintViolationException;
@@ -46,15 +45,6 @@ public class ApiExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiErrorResponse> handleAccessDenied(AccessDeniedException ex, ServletWebRequest request) {
         return response(HttpStatus.FORBIDDEN, ApiErrorCode.ACCESS_DENIED, "Access denied", request);
-    }
-
-    @ExceptionHandler(InvalidCredentialsException.class)
-    public ResponseEntity<ApiErrorResponse> handleInvalidCredentials(
-            InvalidCredentialsException ex,
-            ServletWebRequest request
-    ) {
-        return response(HttpStatus.UNAUTHORIZED, ApiErrorCode.INVALID_CREDENTIALS,
-                InvalidCredentialsException.SAFE_MESSAGE, request);
     }
 
     @ExceptionHandler({ResourceNotFoundException.class})

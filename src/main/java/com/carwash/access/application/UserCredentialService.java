@@ -1,6 +1,7 @@
 package com.carwash.access.application;
 
 import com.carwash.access.infrastructure.PasswordSecurityProperties;
+import com.carwash.identity.application.CredentialService;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -9,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 @Service
-public class UserCredentialService {
+public class UserCredentialService implements CredentialService {
 
     private static final String INVALID_AUTHENTICATION_CANDIDATE = "invalid-authentication-candidate";
 

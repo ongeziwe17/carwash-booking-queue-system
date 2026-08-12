@@ -1,26 +1,22 @@
 package com.carwash.access.application;
 
-import com.carwash.booking.domain.BookingRepository;
-import com.carwash.queue.domain.QueueEntryRepository;
-import com.carwash.vehicle.domain.VehicleRepository;
-import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.booking.application.BookingQuery;
+import com.carwash.queue.application.QueueQuery;
+import com.carwash.vehicle.application.VehicleQuery;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
 @Service("resourceAuthorization")
 public class ResourceAuthorizationService {
 
-    private final VehicleRepository vehicles;
-    private final BookingRepository bookings;
-    private final QueueEntryRepository queues;
-    private final InMemoryDataCoordinator coordinator;
+    private final VehicleQuery vehicles;
+    private final BookingQuery bookings;
+    private final QueueQuery queues;
 
-    public ResourceAuthorizationService(VehicleRepository vehicles, BookingRepository bookings,
-                                        QueueEntryRepository queues, InMemoryDataCoordinator coordinator) {
+    public ResourceAuthorizationService(VehicleQuery vehicles, BookingQuery bookings, QueueQuery queues) {
         this.vehicles = vehicles;
         this.bookings = bookings;
         this.queues = queues;
-        this.coordinator = coordinator;
     }
 
     public boolean isSelf(Authentication authentication, String id) {
@@ -32,24 +28,21 @@ public class ResourceAuthorizationService {
     }
 
     public boolean canAccessVehicle(Authentication authentication, String id) {
-        return coordinator.read(() -> operational(authentication) || vehicles.findById(id)
-                .map(vehicle -> authentication != null && authentication.getName().equals(vehicle.getUserId()))
-                .orElse(true));
+        return operational(authentication) || vehicles.findOwnerId(id)
+                .map(ownerId -> authentication != null && authentication.getName().equals(ownerId))
+                .orElse(true);
     }
 
     public boolean canAccessBooking(Authentication authentication, String id) {
-        return coordinator.read(() -> operational(authentication) || bookings.findById(id)
-                .map(booking -> authentication != null && booking.getUser() != null
-                        && authentication.getName().equals(booking.getUser().getUserId()))
-                .orElse(true));
+        return operational(authentication) || bookings.findOwnerId(id)
+                .map(ownerId -> authentication != null && authentication.getName().equals(ownerId))
+                .orElse(true);
     }
 
     public boolean canAccessQueueEntry(Authentication authentication, String id) {
-        return coordinator.read(() -> operational(authentication) || queues.findById(id)
-                .map(queue -> authentication != null && queue.getBooking() != null
-                        && queue.getBooking().getUser() != null
-                        && authentication.getName().equals(queue.getBooking().getUser().getUserId()))
-                .orElse(true));
+        return operational(authentication) || queues.findOwnerId(id)
+                .map(ownerId -> authentication != null && authentication.getName().equals(ownerId))
+                .orElse(true);
     }
 
     public boolean canAccessNotifications(Authentication authentication, String id) {

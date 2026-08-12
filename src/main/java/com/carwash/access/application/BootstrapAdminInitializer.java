@@ -2,6 +2,7 @@ package com.carwash.access.application;
 
 import com.carwash.identity.application.UserManagementService;
 import com.carwash.identity.application.CreateUserCommand;
+import com.carwash.identity.domain.RoleName;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;

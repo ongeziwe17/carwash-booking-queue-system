@@ -3,7 +3,8 @@ package com.carwash.access.infrastructure;
 import com.carwash.shared.api.error.ApiErrorCode;
 import com.carwash.shared.api.error.ApiErrorResponseFactory;
 import com.carwash.identity.domain.AccountStatus;
-import com.carwash.identity.domain.UserRepository;
+import com.carwash.identity.domain.RoleCatalog;
+import com.carwash.identity.application.UserQuery;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -44,15 +45,15 @@ public class ApiSecurityConfig {
     JwtEncoder jwtEncoder(SecretKey key) { return NimbusJwtEncoder.withSecretKey(key).build(); }
 
     @Bean
-    JwtDecoder jwtDecoder(SecretKey key, JwtSecurityProperties properties, UserRepository users) {
+    JwtDecoder jwtDecoder(SecretKey key, JwtSecurityProperties properties, UserQuery users) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
         OAuth2TokenValidator<Jwt> standard = JwtValidators.createDefaultWithIssuer(properties.issuer());
         OAuth2TokenValidator<Jwt> activeUser = jwt -> {
             String subject = jwt.getSubject();
             boolean valid = subject != null && !subject.isBlank() && jwt.getIssuedAt() != null && jwt.getExpiresAt() != null
-                    && users.findById(subject).filter(u -> u.getAccountStatus() == AccountStatus.ACTIVE)
+                    && users.findOptionalById(subject).filter(u -> u.getAccountStatus() == AccountStatus.ACTIVE)
                     .filter(u -> {
-                        try { return com.carwash.access.application.RoleCatalog.name(u.getRole()).name().equals(jwt.getClaimAsString("role")); }
+                        try { return RoleCatalog.name(u.getRole()).name().equals(jwt.getClaimAsString("role")); }
                         catch (RuntimeException ex) { return false; }
                     }).isPresent();
             return valid ? OAuth2TokenValidatorResult.success()
