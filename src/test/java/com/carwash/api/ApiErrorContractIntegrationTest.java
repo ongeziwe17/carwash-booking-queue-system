@@ -1,5 +1,7 @@
 package com.carwash.api;
 
+import com.carwash.identity.domain.User;
+
 import com.carwash.testsupport.ApiContractAssertions;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import org.junit.jupiter.api.Test;

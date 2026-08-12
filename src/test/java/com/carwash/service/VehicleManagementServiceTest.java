@@ -1,9 +1,9 @@
 package com.carwash.service;
 
-import com.carwash.domain.User;
-import com.carwash.domain.Vehicle;
-import com.carwash.service.exception.BusinessRuleViolationException;
-import com.carwash.service.exception.ResourceNotFoundException;
+import com.carwash.identity.domain.User;
+import com.carwash.vehicle.domain.Vehicle;
+import com.carwash.shared.exception.BusinessRuleViolationException;
+import com.carwash.shared.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

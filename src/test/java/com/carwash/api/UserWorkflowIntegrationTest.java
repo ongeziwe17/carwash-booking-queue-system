@@ -1,6 +1,6 @@
 package com.carwash.api;
 
-import com.carwash.api.dto.CreateUserRequest;
+import com.carwash.identity.api.dto.CreateUserRequest;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.UserFixtureBuilder;
 import org.junit.jupiter.api.Test;

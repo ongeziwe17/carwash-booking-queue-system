@@ -1,10 +1,10 @@
 package com.carwash.service;
 
-import com.carwash.domain.Role;
-import com.carwash.domain.User;
-import com.carwash.enums.AccountStatus;
-import com.carwash.service.exception.BusinessRuleViolationException;
-import com.carwash.service.exception.ResourceNotFoundException;
+import com.carwash.identity.domain.Role;
+import com.carwash.identity.domain.User;
+import com.carwash.identity.domain.AccountStatus;
+import com.carwash.shared.exception.BusinessRuleViolationException;
+import com.carwash.shared.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;

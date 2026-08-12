@@ -1,12 +1,17 @@
 package com.carwash.repository.inmemory;
 
-import com.carwash.domain.Booking;
-import com.carwash.domain.QueueEntry;
-import com.carwash.domain.Role;
-import com.carwash.domain.Service;
-import com.carwash.domain.User;
-import com.carwash.domain.Vehicle;
-import com.carwash.enums.QueueStatus;
+import com.carwash.booking.infrastructure.InMemoryBookingRepository;
+import com.carwash.catalog.infrastructure.InMemoryServiceRepository;
+import com.carwash.identity.infrastructure.InMemoryUserRepository;
+import com.carwash.queue.infrastructure.InMemoryQueueEntryRepository;
+
+import com.carwash.booking.domain.Booking;
+import com.carwash.queue.domain.QueueEntry;
+import com.carwash.identity.domain.Role;
+import com.carwash.catalog.domain.Service;
+import com.carwash.identity.domain.User;
+import com.carwash.vehicle.domain.Vehicle;
+import com.carwash.queue.domain.QueueStatus;
 import com.carwash.testsupport.TestDates;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

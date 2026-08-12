@@ -1,6 +1,6 @@
 package com.carwash.testsupport;
 
-import com.carwash.api.dto.CreateServiceRequest;
+import com.carwash.catalog.api.dto.CreateServiceRequest;
 
 import java.math.BigDecimal;
 

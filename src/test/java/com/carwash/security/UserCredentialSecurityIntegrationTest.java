@@ -1,10 +1,12 @@
 package com.carwash.security;
 
-import com.carwash.domain.User;
-import com.carwash.repository.UserRepository;
-import com.carwash.service.UserManagementService;
-import com.carwash.service.command.CreateUserCommand;
-import com.carwash.service.exception.BusinessRuleViolationException;
+import com.carwash.access.application.UserCredentialService;
+
+import com.carwash.identity.domain.User;
+import com.carwash.identity.domain.UserRepository;
+import com.carwash.identity.application.UserManagementService;
+import com.carwash.identity.application.CreateUserCommand;
+import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.UserFixtureBuilder;
 import org.junit.jupiter.api.Test;

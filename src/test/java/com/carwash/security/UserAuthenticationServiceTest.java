@@ -1,9 +1,17 @@
 package com.carwash.security;
 
-import com.carwash.domain.User;
-import com.carwash.enums.AccountStatus;
-import com.carwash.repository.UserRepository;
-import com.carwash.repository.inmemory.InMemoryDataCoordinator;
+import com.carwash.access.application.AuthenticationResult;
+import com.carwash.access.application.InvalidCredentialsException;
+import com.carwash.access.application.JwtTokenService;
+import com.carwash.access.application.RoleCatalog;
+import com.carwash.access.application.RoleName;
+import com.carwash.access.application.UserAuthenticationService;
+import com.carwash.access.application.UserCredentialService;
+
+import com.carwash.identity.domain.User;
+import com.carwash.identity.domain.AccountStatus;
+import com.carwash.identity.domain.UserRepository;
+import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

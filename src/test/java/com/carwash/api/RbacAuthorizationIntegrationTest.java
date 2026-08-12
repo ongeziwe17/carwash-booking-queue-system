@@ -1,16 +1,16 @@
 package com.carwash.api;
 
-import com.carwash.config.JwtSecurityProperties;
-import com.carwash.domain.Booking;
-import com.carwash.domain.QueueEntry;
-import com.carwash.domain.Service;
-import com.carwash.domain.Vehicle;
-import com.carwash.security.RoleName;
-import com.carwash.service.BookingManagementService;
-import com.carwash.service.QueueManagementService;
-import com.carwash.service.ServiceCatalogService;
-import com.carwash.service.UserManagementService;
-import com.carwash.service.VehicleManagementService;
+import com.carwash.access.infrastructure.JwtSecurityProperties;
+import com.carwash.booking.domain.Booking;
+import com.carwash.queue.domain.QueueEntry;
+import com.carwash.catalog.domain.Service;
+import com.carwash.vehicle.domain.Vehicle;
+import com.carwash.access.application.RoleName;
+import com.carwash.booking.application.BookingManagementService;
+import com.carwash.queue.application.QueueManagementService;
+import com.carwash.catalog.application.ServiceCatalogService;
+import com.carwash.identity.application.UserManagementService;
+import com.carwash.vehicle.application.VehicleManagementService;
 import com.carwash.testsupport.ApiContractAssertions;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.TestDates;

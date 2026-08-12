@@ -1,6 +1,8 @@
 package com.carwash.testsupport;
 
-import com.carwash.api.dto.CreateUserRequest;
+import com.carwash.identity.domain.User;
+
+import com.carwash.identity.api.dto.CreateUserRequest;
 
 public final class UserFixtureBuilder {
 

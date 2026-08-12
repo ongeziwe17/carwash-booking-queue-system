@@ -1,6 +1,8 @@
 package com.carwash.api;
 
-import com.carwash.api.dto.CreateUserRequest;
+import com.carwash.identity.domain.User;
+
+import com.carwash.identity.api.dto.CreateUserRequest;
 import com.carwash.testsupport.ApiContractAssertions;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.UserFixtureBuilder;

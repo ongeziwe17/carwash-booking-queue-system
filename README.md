@@ -1,6 +1,6 @@
 # Car Wash Booking Queue System
 
-Spring Boot backend foundation for car wash booking and queue management. The current codebase exposes APIs for users, vehicles, services, bookings, queues, notifications, and daily reporting over in-memory repositories.
+Spring Boot backend foundation for car wash booking and queue management. The code is organized as a capability-based modular monolith with explicit `bootstrap`, `shared`, `identity`, `access`, `vehicle`, `catalog`, `booking`, `queue`, `notification`, and `reporting` boundaries enforced by ArchUnit. The current codebase exposes APIs for users, vehicles, services, bookings, queues, notifications, and daily reporting over in-memory repositories.
 
 ## Current backend foundation
 

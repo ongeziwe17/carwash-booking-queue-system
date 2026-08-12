@@ -1,6 +1,8 @@
 package com.carwash.repository.database;
 
-import com.carwash.domain.User;
+import com.carwash.identity.infrastructure.DatabaseUserRepository;
+
+import com.carwash.identity.domain.User;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;

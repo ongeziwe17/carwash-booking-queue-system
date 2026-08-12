@@ -1,5 +1,7 @@
 package com.carwash.api;
 
+import com.carwash.booking.domain.Booking;
+
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.BookingApiFixture;
 import org.junit.jupiter.api.Test;

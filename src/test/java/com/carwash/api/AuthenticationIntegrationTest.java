@@ -1,9 +1,9 @@
 package com.carwash.api;
 
-import com.carwash.api.dto.CreateUserRequest;
-import com.carwash.domain.User;
-import com.carwash.enums.AccountStatus;
-import com.carwash.repository.UserRepository;
+import com.carwash.identity.api.dto.CreateUserRequest;
+import com.carwash.identity.domain.User;
+import com.carwash.identity.domain.AccountStatus;
+import com.carwash.identity.domain.UserRepository;
 import com.carwash.testsupport.ApiContractAssertions;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.UserFixtureBuilder;
@@ -34,7 +34,7 @@ class AuthenticationIntegrationTest extends ApiIntegrationTestSupport {
 
         String response = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new com.carwash.api.dto.LoginRequest(
+                        .content(objectMapper.writeValueAsString(new com.carwash.access.api.dto.LoginRequest(
                                 " " + user.email().toUpperCase() + " ", user.password()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
@@ -96,7 +96,7 @@ class AuthenticationIntegrationTest extends ApiIntegrationTestSupport {
     private void assertInvalid(String email, String password) throws Exception {
         var action = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new com.carwash.api.dto.LoginRequest(email, password))))
+                        .content(objectMapper.writeValueAsString(new com.carwash.access.api.dto.LoginRequest(email, password))))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.message").value("Invalid email or password"))
                 .andExpect(jsonPath("$.path").value("/api/auth/login"));

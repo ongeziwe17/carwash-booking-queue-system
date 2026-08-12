@@ -1,18 +1,20 @@
 package com.carwash.repository;
 
-import com.carwash.domain.Booking;
-import com.carwash.domain.Notification;
-import com.carwash.domain.QueueEntry;
-import com.carwash.domain.Role;
-import com.carwash.domain.Service;
-import com.carwash.domain.User;
-import com.carwash.domain.Vehicle;
-import com.carwash.repository.inmemory.InMemoryBookingRepository;
-import com.carwash.repository.inmemory.InMemoryNotificationRepository;
-import com.carwash.repository.inmemory.InMemoryQueueEntryRepository;
-import com.carwash.repository.inmemory.InMemoryServiceRepository;
-import com.carwash.repository.inmemory.InMemoryUserRepository;
-import com.carwash.repository.inmemory.InMemoryVehicleRepository;
+import com.carwash.shared.domain.Repository;
+
+import com.carwash.booking.domain.Booking;
+import com.carwash.notification.domain.Notification;
+import com.carwash.queue.domain.QueueEntry;
+import com.carwash.identity.domain.Role;
+import com.carwash.catalog.domain.Service;
+import com.carwash.identity.domain.User;
+import com.carwash.vehicle.domain.Vehicle;
+import com.carwash.booking.infrastructure.InMemoryBookingRepository;
+import com.carwash.notification.infrastructure.InMemoryNotificationRepository;
+import com.carwash.queue.infrastructure.InMemoryQueueEntryRepository;
+import com.carwash.catalog.infrastructure.InMemoryServiceRepository;
+import com.carwash.identity.infrastructure.InMemoryUserRepository;
+import com.carwash.vehicle.infrastructure.InMemoryVehicleRepository;
 import com.carwash.testsupport.TestDates;
 import org.junit.jupiter.api.Test;
 

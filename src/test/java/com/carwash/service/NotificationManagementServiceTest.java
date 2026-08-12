@@ -1,14 +1,18 @@
 package com.carwash.service;
 
-import com.carwash.config.BookingPolicyProperties;
-import com.carwash.config.NotificationPolicyProperties;
-import com.carwash.domain.Booking;
-import com.carwash.domain.Notification;
-import com.carwash.domain.QueueEntry;
-import com.carwash.domain.User;
-import com.carwash.enums.BookingStatus;
-import com.carwash.enums.QueueStatus;
-import com.carwash.service.exception.ResourceNotFoundException;
+import com.carwash.booking.application.BookingManagementService;
+import com.carwash.notification.application.NotificationManagementService;
+import com.carwash.queue.application.QueueManagementService;
+
+import com.carwash.booking.application.BookingPolicyProperties;
+import com.carwash.notification.application.NotificationPolicyProperties;
+import com.carwash.booking.domain.Booking;
+import com.carwash.notification.domain.Notification;
+import com.carwash.queue.domain.QueueEntry;
+import com.carwash.identity.domain.User;
+import com.carwash.booking.domain.BookingStatus;
+import com.carwash.queue.domain.QueueStatus;
+import com.carwash.shared.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;

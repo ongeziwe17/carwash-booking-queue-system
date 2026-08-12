@@ -1,5 +1,9 @@
 package com.carwash.security;
 
+import com.carwash.access.application.Permission;
+import com.carwash.access.application.RoleCatalog;
+import com.carwash.access.application.RoleName;
+
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 

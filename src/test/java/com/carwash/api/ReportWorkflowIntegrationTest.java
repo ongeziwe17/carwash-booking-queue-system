@@ -1,6 +1,6 @@
 package com.carwash.api;
 
-import com.carwash.api.dto.CreateQueueEntryRequest;
+import com.carwash.queue.api.dto.CreateQueueEntryRequest;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.BookingApiFixture;
 import com.carwash.testsupport.QueueFixtureBuilder;

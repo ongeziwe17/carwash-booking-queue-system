@@ -1,6 +1,6 @@
 package com.carwash.api;
 
-import com.carwash.api.dto.CreateServiceRequest;
+import com.carwash.catalog.api.dto.CreateServiceRequest;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.ServiceFixtureBuilder;
 import org.junit.jupiter.api.Test;

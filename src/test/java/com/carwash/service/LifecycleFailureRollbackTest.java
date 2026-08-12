@@ -1,22 +1,26 @@
 package com.carwash.service;
 
-import com.carwash.config.BookingPolicyProperties;
-import com.carwash.config.QueuePolicyProperties;
-import com.carwash.domain.Booking;
-import com.carwash.domain.QueueEntry;
-import com.carwash.domain.Service;
-import com.carwash.domain.User;
-import com.carwash.domain.Vehicle;
-import com.carwash.enums.BookingStatus;
-import com.carwash.enums.QueueStatus;
-import com.carwash.repository.inmemory.InMemoryBookingRepository;
-import com.carwash.repository.inmemory.InMemoryDataCoordinator;
-import com.carwash.repository.inmemory.InMemoryNotificationRepository;
-import com.carwash.repository.inmemory.InMemoryQueueEntryRepository;
-import com.carwash.repository.inmemory.InMemoryServiceRepository;
-import com.carwash.repository.inmemory.InMemoryUserRepository;
-import com.carwash.repository.inmemory.InMemoryVehicleRepository;
-import com.carwash.service.exception.ResourceNotFoundException;
+import com.carwash.booking.application.BookingManagementService;
+import com.carwash.queue.application.QueueManagementService;
+import com.carwash.queue.application.QueueOrderingService;
+
+import com.carwash.booking.application.BookingPolicyProperties;
+import com.carwash.queue.application.QueuePolicyProperties;
+import com.carwash.booking.domain.Booking;
+import com.carwash.queue.domain.QueueEntry;
+import com.carwash.catalog.domain.Service;
+import com.carwash.identity.domain.User;
+import com.carwash.vehicle.domain.Vehicle;
+import com.carwash.booking.domain.BookingStatus;
+import com.carwash.queue.domain.QueueStatus;
+import com.carwash.booking.infrastructure.InMemoryBookingRepository;
+import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.notification.infrastructure.InMemoryNotificationRepository;
+import com.carwash.queue.infrastructure.InMemoryQueueEntryRepository;
+import com.carwash.catalog.infrastructure.InMemoryServiceRepository;
+import com.carwash.identity.infrastructure.InMemoryUserRepository;
+import com.carwash.vehicle.infrastructure.InMemoryVehicleRepository;
+import com.carwash.shared.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

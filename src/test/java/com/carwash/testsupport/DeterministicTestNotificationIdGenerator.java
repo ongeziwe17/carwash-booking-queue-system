@@ -1,6 +1,6 @@
 package com.carwash.testsupport;
 
-import com.carwash.service.NotificationIdGenerator;
+import com.carwash.notification.application.NotificationIdGenerator;
 
 /** Test-only generator reset by the integration-test data cleaner. */
 public final class DeterministicTestNotificationIdGenerator implements NotificationIdGenerator {

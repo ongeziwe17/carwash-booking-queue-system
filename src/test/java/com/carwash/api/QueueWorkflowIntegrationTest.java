@@ -1,13 +1,15 @@
 package com.carwash.api;
 
-import com.carwash.api.dto.CreateBookingRequest;
-import com.carwash.api.dto.CreateQueueEntryRequest;
-import com.carwash.api.dto.CreateServiceRequest;
-import com.carwash.api.dto.CreateUserRequest;
-import com.carwash.api.dto.CreateVehicleRequest;
-import com.carwash.domain.Booking;
-import com.carwash.enums.BookingStatus;
-import com.carwash.repository.BookingRepository;
+import com.carwash.catalog.domain.Service;
+
+import com.carwash.booking.api.dto.CreateBookingRequest;
+import com.carwash.queue.api.dto.CreateQueueEntryRequest;
+import com.carwash.catalog.api.dto.CreateServiceRequest;
+import com.carwash.identity.api.dto.CreateUserRequest;
+import com.carwash.vehicle.api.dto.CreateVehicleRequest;
+import com.carwash.booking.domain.Booking;
+import com.carwash.booking.domain.BookingStatus;
+import com.carwash.booking.domain.BookingRepository;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.BookingApiFixture;
 import com.carwash.testsupport.BookingFixtureBuilder;

@@ -1,8 +1,10 @@
 package com.carwash.service;
 
-import com.carwash.config.BookingPolicyProperties;
-import com.carwash.domain.Service;
-import com.carwash.service.exception.BusinessRuleViolationException;
+import com.carwash.booking.application.BookingSlotPolicyService;
+
+import com.carwash.booking.application.BookingPolicyProperties;
+import com.carwash.catalog.domain.Service;
+import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.testsupport.TestDates;
 import org.junit.jupiter.api.Test;
 

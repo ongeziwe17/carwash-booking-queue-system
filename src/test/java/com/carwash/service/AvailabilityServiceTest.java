@@ -1,11 +1,15 @@
 package com.carwash.service;
 
-import com.carwash.api.dto.ServiceAvailabilityResponse;
-import com.carwash.config.BookingPolicyProperties;
-import com.carwash.domain.Booking;
-import com.carwash.domain.Service;
-import com.carwash.service.exception.BusinessRuleViolationException;
-import com.carwash.service.exception.ResourceNotFoundException;
+import com.carwash.booking.application.AvailabilityService;
+import com.carwash.booking.application.BookingManagementService;
+import com.carwash.booking.application.BookingSlotPolicyService;
+
+import com.carwash.booking.api.dto.ServiceAvailabilityResponse;
+import com.carwash.booking.application.BookingPolicyProperties;
+import com.carwash.booking.domain.Booking;
+import com.carwash.catalog.domain.Service;
+import com.carwash.shared.exception.BusinessRuleViolationException;
+import com.carwash.shared.exception.ResourceNotFoundException;
 import com.carwash.testsupport.TestDates;
 import org.junit.jupiter.api.Test;
 

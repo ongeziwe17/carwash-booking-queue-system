@@ -1,6 +1,12 @@
 package com.carwash.config;
 
-import com.carwash.api.dto.CreateBookingRequest;
+import com.carwash.booking.application.BookingPolicyProperties;
+import com.carwash.bootstrap.RuntimePolicyConfig;
+import com.carwash.notification.application.NotificationPolicyProperties;
+import com.carwash.queue.application.QueuePolicyProperties;
+import com.carwash.shared.config.RuntimeProperties;
+
+import com.carwash.booking.api.dto.CreateBookingRequest;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;

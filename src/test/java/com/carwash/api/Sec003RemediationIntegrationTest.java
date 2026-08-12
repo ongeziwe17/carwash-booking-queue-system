@@ -1,13 +1,16 @@
 package com.carwash.api;
 
-import com.carwash.domain.Booking;
-import com.carwash.domain.Service;
-import com.carwash.domain.Vehicle;
-import com.carwash.service.BookingManagementService;
-import com.carwash.service.ServiceCatalogService;
-import com.carwash.service.UserManagementService;
-import com.carwash.service.VehicleManagementService;
-import com.carwash.service.command.CreateUserCommand;
+import com.carwash.access.application.RoleName;
+import com.carwash.identity.domain.User;
+
+import com.carwash.booking.domain.Booking;
+import com.carwash.catalog.domain.Service;
+import com.carwash.vehicle.domain.Vehicle;
+import com.carwash.booking.application.BookingManagementService;
+import com.carwash.catalog.application.ServiceCatalogService;
+import com.carwash.identity.application.UserManagementService;
+import com.carwash.vehicle.application.VehicleManagementService;
+import com.carwash.identity.application.CreateUserCommand;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.TestDates;
 import com.carwash.testsupport.UserFixtureBuilder;

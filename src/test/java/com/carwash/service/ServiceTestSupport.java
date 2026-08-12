@@ -1,24 +1,35 @@
 package com.carwash.service;
 
-import com.carwash.config.BookingPolicyProperties;
-import com.carwash.config.NotificationPolicyProperties;
-import com.carwash.config.PasswordSecurityProperties;
-import com.carwash.config.QueuePolicyProperties;
-import com.carwash.domain.Booking;
-import com.carwash.domain.QueueEntry;
-import com.carwash.domain.User;
-import com.carwash.domain.Vehicle;
-import com.carwash.enums.BookingStatus;
-import com.carwash.enums.QueueStatus;
-import com.carwash.repository.inmemory.InMemoryBookingRepository;
-import com.carwash.repository.inmemory.InMemoryDataCoordinator;
-import com.carwash.repository.inmemory.InMemoryNotificationRepository;
-import com.carwash.repository.inmemory.InMemoryQueueEntryRepository;
-import com.carwash.repository.inmemory.InMemoryServiceRepository;
-import com.carwash.repository.inmemory.InMemoryUserRepository;
-import com.carwash.repository.inmemory.InMemoryVehicleRepository;
-import com.carwash.security.UserCredentialService;
-import com.carwash.service.command.CreateUserCommand;
+import com.carwash.booking.application.AvailabilityService;
+import com.carwash.booking.application.BookingManagementService;
+import com.carwash.booking.application.BookingSlotPolicyService;
+import com.carwash.catalog.application.ServiceCatalogService;
+import com.carwash.identity.application.UserManagementService;
+import com.carwash.notification.application.NotificationManagementService;
+import com.carwash.queue.application.QueueManagementService;
+import com.carwash.queue.application.QueueOrderingService;
+import com.carwash.reporting.application.DailySummaryReportService;
+import com.carwash.vehicle.application.VehicleManagementService;
+
+import com.carwash.booking.application.BookingPolicyProperties;
+import com.carwash.notification.application.NotificationPolicyProperties;
+import com.carwash.access.infrastructure.PasswordSecurityProperties;
+import com.carwash.queue.application.QueuePolicyProperties;
+import com.carwash.booking.domain.Booking;
+import com.carwash.queue.domain.QueueEntry;
+import com.carwash.identity.domain.User;
+import com.carwash.vehicle.domain.Vehicle;
+import com.carwash.booking.domain.BookingStatus;
+import com.carwash.queue.domain.QueueStatus;
+import com.carwash.booking.infrastructure.InMemoryBookingRepository;
+import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.notification.infrastructure.InMemoryNotificationRepository;
+import com.carwash.queue.infrastructure.InMemoryQueueEntryRepository;
+import com.carwash.catalog.infrastructure.InMemoryServiceRepository;
+import com.carwash.identity.infrastructure.InMemoryUserRepository;
+import com.carwash.vehicle.infrastructure.InMemoryVehicleRepository;
+import com.carwash.access.application.UserCredentialService;
+import com.carwash.identity.application.CreateUserCommand;
 import com.carwash.testsupport.DeterministicTestNotificationIdGenerator;
 import com.carwash.testsupport.TestDates;
 import com.carwash.testsupport.TestIdFactory;
@@ -120,15 +131,15 @@ abstract class ServiceTestSupport {
                 ids.vehicle(), ids.plate(), "SUV", "Toyota", "Rav4", "Black", ""), owner.getUserId());
     }
 
-    protected com.carwash.domain.Service createService() {
-        return catalogService.createService(new com.carwash.domain.Service(
+    protected com.carwash.catalog.domain.Service createService() {
+        return catalogService.createService(new com.carwash.catalog.domain.Service(
                 ids.service(), "Premium Wash", "integration test", BigDecimal.TEN, 30));
     }
 
     protected Booking newBookingWithFixture(LocalDateTime scheduledDateTime) {
         User user = registerUser();
         Vehicle vehicle = createVehicle(user);
-        com.carwash.domain.Service service = createService();
+        com.carwash.catalog.domain.Service service = createService();
         return new Booking(ids.booking(), user, vehicle, service, scheduledDateTime, "none");
     }
 

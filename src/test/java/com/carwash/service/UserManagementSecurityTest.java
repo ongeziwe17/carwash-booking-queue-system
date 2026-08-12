@@ -1,14 +1,16 @@
 package com.carwash.service;
 
-import com.carwash.config.PasswordSecurityProperties;
-import com.carwash.domain.User;
-import com.carwash.enums.AccountStatus;
-import com.carwash.repository.inmemory.InMemoryDataCoordinator;
-import com.carwash.repository.inmemory.InMemoryUserRepository;
-import com.carwash.security.RoleName;
-import com.carwash.security.UserCredentialService;
-import com.carwash.service.command.CreateUserCommand;
-import com.carwash.service.exception.BusinessRuleViolationException;
+import com.carwash.identity.application.UserManagementService;
+
+import com.carwash.access.infrastructure.PasswordSecurityProperties;
+import com.carwash.identity.domain.User;
+import com.carwash.identity.domain.AccountStatus;
+import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.identity.infrastructure.InMemoryUserRepository;
+import com.carwash.access.application.RoleName;
+import com.carwash.access.application.UserCredentialService;
+import com.carwash.identity.application.CreateUserCommand;
+import com.carwash.shared.exception.BusinessRuleViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;

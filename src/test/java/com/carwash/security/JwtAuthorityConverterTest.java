@@ -1,5 +1,10 @@
 package com.carwash.security;
 
+import com.carwash.access.application.JwtAuthorityConverter;
+import com.carwash.access.application.Permission;
+import com.carwash.access.application.RoleCatalog;
+import com.carwash.access.application.RoleName;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;

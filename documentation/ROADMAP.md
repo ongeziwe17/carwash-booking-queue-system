@@ -56,7 +56,13 @@ The recommendation system must not be built before queue and availability behavi
 
 Expected outcome: confirmed bookings enter one ordered queue, positions and ETAs are server-managed, queue transitions keep booking state consistent, and customers can check availability before attempting a booking.
 
-Phase 1 is complete. The next roadmap issue is **MKT-001** (#115); Marketplace business/branch work remains Phase 2 scope.
+Phase 1 is complete.
+
+## Architecture Transition
+
+1. **ARCH-001** — Establish explicit modular-monolith boundaries (#164) — implemented.
+
+The capability modules and automated dependency rules are the prerequisite for Phase 2. The next roadmap issue is **MKT-001** (#115); Marketplace business/branch work remains Phase 2 scope.
 
 ## Phase 2 — Marketplace Business, Branch, and Availability Foundation
 

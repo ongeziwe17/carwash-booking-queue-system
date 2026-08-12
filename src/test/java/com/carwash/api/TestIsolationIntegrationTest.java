@@ -1,11 +1,11 @@
 package com.carwash.api;
 
-import com.carwash.repository.BookingRepository;
-import com.carwash.repository.NotificationRepository;
-import com.carwash.repository.QueueEntryRepository;
-import com.carwash.repository.ServiceRepository;
-import com.carwash.repository.UserRepository;
-import com.carwash.repository.VehicleRepository;
+import com.carwash.booking.domain.BookingRepository;
+import com.carwash.notification.domain.NotificationRepository;
+import com.carwash.queue.domain.QueueEntryRepository;
+import com.carwash.catalog.domain.ServiceRepository;
+import com.carwash.identity.domain.UserRepository;
+import com.carwash.vehicle.domain.VehicleRepository;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.BookingApiFixture;
 import com.carwash.testsupport.TestDates;

@@ -1,18 +1,21 @@
 package com.carwash.service;
 
-import com.carwash.config.BookingPolicyProperties;
-import com.carwash.config.NotificationPolicyProperties;
-import com.carwash.domain.Booking;
-import com.carwash.domain.Notification;
-import com.carwash.domain.QueueEntry;
-import com.carwash.domain.Service;
-import com.carwash.domain.User;
-import com.carwash.domain.Vehicle;
-import com.carwash.enums.BookingStatus;
-import com.carwash.enums.QueueStatus;
-import com.carwash.repository.BookingRepository;
-import com.carwash.service.exception.BusinessRuleViolationException;
-import com.carwash.service.exception.ResourceNotFoundException;
+import com.carwash.booking.application.BookingManagementService;
+import com.carwash.notification.application.NotificationManagementService;
+
+import com.carwash.booking.application.BookingPolicyProperties;
+import com.carwash.notification.application.NotificationPolicyProperties;
+import com.carwash.booking.domain.Booking;
+import com.carwash.notification.domain.Notification;
+import com.carwash.queue.domain.QueueEntry;
+import com.carwash.catalog.domain.Service;
+import com.carwash.identity.domain.User;
+import com.carwash.vehicle.domain.Vehicle;
+import com.carwash.booking.domain.BookingStatus;
+import com.carwash.queue.domain.QueueStatus;
+import com.carwash.booking.domain.BookingRepository;
+import com.carwash.shared.exception.BusinessRuleViolationException;
+import com.carwash.shared.exception.ResourceNotFoundException;
 import com.carwash.testsupport.TestDates;
 import org.junit.jupiter.api.Test;
 

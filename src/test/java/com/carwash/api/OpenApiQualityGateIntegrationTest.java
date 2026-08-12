@@ -1,11 +1,20 @@
 package com.carwash.api;
 
-import com.carwash.repository.BookingRepository;
-import com.carwash.repository.NotificationRepository;
-import com.carwash.repository.QueueEntryRepository;
-import com.carwash.repository.ServiceRepository;
-import com.carwash.repository.UserRepository;
-import com.carwash.repository.VehicleRepository;
+import com.carwash.access.api.dto.LoginRequest;
+import com.carwash.booking.api.dto.AvailabilitySlotResponse;
+import com.carwash.booking.api.dto.RescheduleBookingRequest;
+import com.carwash.booking.api.dto.ServiceAvailabilityResponse;
+import com.carwash.booking.api.dto.UpdateBookingRequest;
+import com.carwash.identity.api.dto.CreateUserRequest;
+import com.carwash.queue.api.dto.CreateQueueEntryRequest;
+import com.carwash.shared.api.error.ApiErrorResponse;
+
+import com.carwash.booking.domain.BookingRepository;
+import com.carwash.notification.domain.NotificationRepository;
+import com.carwash.queue.domain.QueueEntryRepository;
+import com.carwash.catalog.domain.ServiceRepository;
+import com.carwash.identity.domain.UserRepository;
+import com.carwash.vehicle.domain.VehicleRepository;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

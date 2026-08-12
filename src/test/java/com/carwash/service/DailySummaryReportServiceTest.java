@@ -1,10 +1,10 @@
 package com.carwash.service;
 
-import com.carwash.api.dto.DailySummaryReportResponse;
-import com.carwash.domain.Booking;
-import com.carwash.domain.QueueEntry;
-import com.carwash.enums.BookingStatus;
-import com.carwash.enums.QueueStatus;
+import com.carwash.reporting.api.dto.DailySummaryReportResponse;
+import com.carwash.booking.domain.Booking;
+import com.carwash.queue.domain.QueueEntry;
+import com.carwash.booking.domain.BookingStatus;
+import com.carwash.queue.domain.QueueStatus;
 import com.carwash.testsupport.TestDates;
 import org.junit.jupiter.api.Test;
 

@@ -50,6 +50,7 @@ Completed issue cleanup:
 - #112 — True server-selected call-next queue behaviour (QUEUE-003).
 - #113 — Focused booking rescheduling with status preservation and cutoff enforcement (BOOKING-001).
 - #114 — Single-location service availability with shared scheduling rules (AVAIL-001).
+- #164 — Explicit capability-based modular-monolith boundaries with ArchUnit enforcement (ARCH-001).
 
 ## 3. Phase 0 — Immediate Hardening
 
@@ -82,7 +83,7 @@ Phase exit criteria:
 - Booking and queue states remain consistent.
 - Customers can query availability before booking.
 
-Phase 1 is complete. The next planned issue is MKT-001 (#115); no Phase 2 capability is implemented by AVAIL-001.
+Phase 1 is complete. ARCH-001 (#164) is the implemented architecture transition before MKT-001 (#115); no Phase 2 capability is implemented by this refactor.
 
 ## 5. Phase 2 — Marketplace Business and Branch Foundation
 

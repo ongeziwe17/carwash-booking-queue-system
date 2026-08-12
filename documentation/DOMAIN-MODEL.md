@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The application is a Spring Boot modular monolith using in-memory repositories. The current domain covers users, roles, vehicles, services, bookings, queue entries, and in-app notifications. JWT authentication, role-based authorization, bounded API DTOs, and the standard API error contract are implemented. PostgreSQL persistence, tenant isolation, payments, and external notification delivery remain future work.
+The application is a Spring Boot modular monolith organized by the identity, access, vehicle, catalog, booking, queue, notification, and reporting capabilities. Repository contracts and implementations belong to their owning capabilities, while one shared coordinator protects the in-memory repositories. The current domain covers users, roles, vehicles, services, bookings, queue entries, and in-app notifications. JWT authentication, role-based authorization, bounded API DTOs, and the standard API error contract are implemented. PostgreSQL persistence, tenant isolation, payments, and external notification delivery remain future work.
 
 ## 2. Current Entities
 
