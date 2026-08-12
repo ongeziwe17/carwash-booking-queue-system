@@ -1,7 +1,5 @@
 package com.carwash.access.application;
 
-import com.carwash.catalog.domain.Service;
-
 import com.carwash.access.infrastructure.PasswordSecurityProperties;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;

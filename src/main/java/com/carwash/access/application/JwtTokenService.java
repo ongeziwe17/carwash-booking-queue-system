@@ -1,7 +1,5 @@
 package com.carwash.access.application;
 
-import com.carwash.catalog.domain.Service;
-
 import com.carwash.access.infrastructure.JwtSecurityProperties;
 import com.carwash.identity.domain.User;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;

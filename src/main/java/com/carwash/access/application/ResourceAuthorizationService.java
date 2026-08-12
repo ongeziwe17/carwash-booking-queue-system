@@ -1,7 +1,5 @@
 package com.carwash.access.application;
 
-import com.carwash.catalog.domain.Service;
-
 import com.carwash.booking.domain.BookingRepository;
 import com.carwash.queue.domain.QueueEntryRepository;
 import com.carwash.vehicle.domain.VehicleRepository;

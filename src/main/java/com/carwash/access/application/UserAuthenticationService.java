@@ -1,7 +1,5 @@
 package com.carwash.access.application;
 
-import com.carwash.catalog.domain.Service;
-
 import com.carwash.identity.domain.User;
 import com.carwash.identity.domain.AccountStatus;
 import com.carwash.identity.domain.UserRepository;
