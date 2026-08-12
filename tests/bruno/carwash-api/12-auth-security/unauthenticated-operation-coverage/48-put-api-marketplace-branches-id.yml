@@ -1,0 +1,12 @@
+info: { name: "401 PUT /api/marketplace/branches/{id}", type: http, seq: 48, tags: [auth, security, marketplace] }
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}"
+  headers: [{ name: Content-Type, value: application/json }]
+  body: { type: json, data: '{}' }
+  auth: { type: none }
+runtime:
+  scripts:
+    - type: tests
+      code: 'test("returns standard 401", function() { expect(res.status).to.equal(401); expect(res.body.code).to.equal("AUTHENTICATION_REQUIRED"); });'
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

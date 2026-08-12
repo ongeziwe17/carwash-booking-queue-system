@@ -1,0 +1,39 @@
+info:
+  name: Invalid branch coordinates are rejected
+  type: http
+  seq: 17
+  tags: [marketplace, validation]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/businesses/{{marketplaceBusinessId}}/branches"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "branchId": "{{marketplaceInvalidBranchId}}",
+        "branchName": "Invalid Coordinates",
+        "addressLine1": "1 Main Road",
+        "city": "Cape Town",
+        "province": "Western Cape",
+        "postalCode": "8001",
+        "countryCode": "ZA",
+        "latitude": 91,
+        "longitude": 18.4241,
+        "timezone": "Africa/Johannesburg",
+        "publicDiscoveryEnabled": true
+      }
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("uses validation contract", function() { expect(res.status).to.equal(400); expect(res.body.code).to.equal("VALIDATION_FAILED"); expect(res.body.fieldErrors.some(e => e.field === "latitude")).to.equal(true); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -87,4 +87,4 @@ Implemented in the current backend:
 
 ## Out of Current Scope
 
-The current backend does not implement PostgreSQL persistence, payments, business registration, multi-tenancy, external notification delivery, observability, frontend applications, or production SaaS readiness. Authentication, RBAC, ownership authorization, and secure credential storage are implemented foundations.
+The current backend implements in-memory Marketplace business/branch registration, but does not implement PostgreSQL persistence, payments, tenant isolation, branch-scoped operations, external notification delivery, observability, frontend applications, or production SaaS readiness. Authentication, RBAC, ownership authorization, and secure credential storage are implemented foundations.

@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The application is a Spring Boot modular monolith organized by the identity, access, vehicle, catalog, booking, queue, notification, and reporting capabilities. Repository contracts and implementations belong to their owning capabilities, while narrow application queries expose authorization/reporting reads and one shared coordinator protects the in-memory repositories. Identity owns roles, permissions, and the credential contract; Access implements authentication, BCrypt/JWT infrastructure, and authorization. The current domain covers users, roles, vehicles, services, bookings, queue entries, and in-app notifications. PostgreSQL persistence, tenant isolation, payments, and external notification delivery remain future work.
+The application is a Spring Boot modular monolith organized by the identity, access, vehicle, catalog, booking, queue, notification, reporting, and marketplace capabilities. Repository contracts and implementations belong to their owning capabilities, while narrow application queries expose authorization/reporting/Marketplace reads and one shared coordinator protects the in-memory repositories. Identity owns roles, permissions, and the credential contract; Access implements authentication, BCrypt/JWT infrastructure, and authorization. The current domain covers users, roles, vehicles, services, bookings, queue entries, in-app notifications, car wash businesses, and physical branches. PostgreSQL persistence, tenant isolation, branch-aware operations, payments, and external notification delivery remain future work.
 
 ## 2. Current Entities
 
@@ -15,6 +15,8 @@ The application is a Spring Boot modular monolith organized by the identity, acc
 | `Booking` | Customer, vehicle, service, schedule, status, and optional queue link | Owner is preserved; only future `CREATED` and unqueued `CONFIRMED` bookings are editable or reschedulable. |
 | `QueueEntry` | Booking queue state, global active position, and estimated wait | Requires a confirmed booking and active matching service; one active entry is allowed per booking and active metrics are server managed. |
 | `Notification` | In-app notification record for a user and optional booking | User and booking references are resolved to canonical repository objects before insertion. |
+| `CarWashBusiness` | Independent Marketplace business identity, contact/onboarding metadata, and active/inactive lifecycle | Identity is immutable; updates preserve registration time and lifecycle state; deactivation retains the record. |
+| `CarWashBranch` | Physical business-owned location, address, coordinates, timezone, discovery preference, and lifecycle | `businessId` is immutable, coordinates/timezone are validated, and effective activity requires both branch and owner business to be active. |
 
 ## 3. Repository Contract
 
@@ -36,7 +38,7 @@ boolean existsById(ID id);
 - Queue repositories additionally expose active operational ordering by position, joined time, and queue-entry ID; public queue lists place active records before terminal history.
 - In-memory storage uses `ConcurrentHashMap`; callers cannot access the mutable backing map.
 
-Duplicate IDs for users, vehicles, services, bookings, queue entries, and notifications are rejected as `BUSINESS_RULE_VIOLATION` errors without replacing the existing record.
+Duplicate IDs for users, vehicles, services, bookings, queue entries, notifications, businesses, and branches are rejected as `BUSINESS_RULE_VIOLATION` errors without replacing the existing record.
 
 ## 4. Single-JVM Coordination Boundary
 
@@ -77,7 +79,7 @@ Focused rescheduling changes only `Booking.scheduledDateTime` and preserves its 
 
 `AvailabilityService` resolves one canonical active service and computes the complete response inside the coordinator read lock. Candidate starts are generated in ascending interval order; past/current starts and full slots are omitted, and response DTOs contain only start, estimated end, and remaining capacity values. Capacity is global across services at an exact start, while service duration is used only for estimated end and closing-time fit—not adjacent-slot overlap. `CANCELLED` bookings release capacity immediately.
 
-Availability does not mutate or reserve domain state. Booking creation remains the authoritative write operation and rechecks capacity plus customer/vehicle rules under the coordinator write lock. The current model has no branch, staff, bay, holiday, overlap, recommendation, or temporary-hold aggregate.
+Availability does not mutate or reserve domain state. Booking creation remains the authoritative write operation and rechecks capacity plus customer/vehicle rules under the coordinator write lock. Marketplace branches now exist, but booking/availability do not yet consume them; there is still no staff, bay, holiday, overlap, recommendation, or temporary-hold aggregate.
 
 ### Booking and queue entry
 
@@ -104,6 +106,12 @@ Start and completion resolve the canonical booking from `BookingRepository`, val
 
 Queue calling retains strict `QUEUE_CALLED` notification semantics. A notification failure restores the selected entry's `WAITING` status, prior call timestamp, position, and ETA before the original failure is rethrown, so retry does not advance to a later customer.
 
+### Marketplace business and branches
+
+Each `CarWashBranch` stores exactly one immutable `businessId`; update DTOs and commands intentionally omit both branch identity and business ownership. Business and branch creation/update/lifecycle transitions run under the shared coordinator and use explicit repository `insert`/`update` semantics. No public delete operation is exposed because these records may later be referenced by operational history.
+
+Businesses and branches each have their own `ACTIVE`/`INACTIVE` lifecycle. Deactivating a business does not rewrite or cascade-delete its branches. A branch is effective active only when both records are active, and discoverable only when effective active plus `publicDiscoveryEnabled`. The basic discoverable list performs no distance ranking, service filtering, hours evaluation, or availability calculation.
+
 ### User and notifications
 
 Notification creation resolves the canonical user and optional booking, inserts the notification, and adds it once to `User.notifications`.
@@ -120,6 +128,7 @@ Notifications may be cascade-deleted when their user or cancelled booking is phy
 | Booking | Allowed only for a cancelled booking with no queue entry. Active and completed history is retained. |
 | Queue entry | Allowed only while status is `WAITING`; successful deletion clears the booking link. |
 | Notification | Internal cleanup operation only; no broad public delete API is introduced. |
+| Marketplace business/branch | No public physical delete operation; use activate/deactivate lifecycle actions. |
 
 ## 7. Lifecycle Integrity
 

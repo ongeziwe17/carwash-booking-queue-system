@@ -1,0 +1,21 @@
+info:
+  name: Customer discovers active public branch
+  type: http
+  seq: 9
+  tags: [marketplace, customer, rbac, workflow]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/discoverable"
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("contains active public branch", function() { expect(res.body.some(b => b.branchId === bru.getVar("marketplaceBranchId") && b.discoverable === true)).to.equal(true); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

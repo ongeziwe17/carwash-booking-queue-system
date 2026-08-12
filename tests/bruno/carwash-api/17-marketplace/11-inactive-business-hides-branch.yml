@@ -1,0 +1,21 @@
+info:
+  name: Inactive business hides otherwise active branch
+  type: http
+  seq: 11
+  tags: [marketplace, customer, workflow]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/discoverable"
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("inactive owner suppresses discovery", function() { expect(res.body.some(b => b.branchId === bru.getVar("marketplaceBranchId"))).to.equal(false); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

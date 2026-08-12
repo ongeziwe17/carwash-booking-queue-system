@@ -1,8 +1,8 @@
 # Current Endpoint Inventory
 
-Inventory source: the controllers and OpenAPI quality gate based on `staging` at `836baac`. Generated `/v3/api-docs` is authoritative when wording differs.
+Inventory source: the controllers and OpenAPI quality gate on the MKT-001 branch based on `staging` merge `72735e3`. Generated `/v3/api-docs` is authoritative when wording differs.
 
-**Total HTTP operations: 40.**
+**Total HTTP operations: 53.**
 
 | Method | Path | Authentication | Role / permission | Ownership | Request DTO | Success | 400/401/403/404 | Important rules |
 |---|---|---|---|---|---|---:|---|---|
@@ -46,3 +46,16 @@ Inventory source: the controllers and OpenAPI quality gate based on `staging` at
 | `DELETE` | `/api/vehicles/{id}` | Bearer | CUSTOMER: owner; STAFF/OWNER/ADMIN: operational | Vehicle owner for CUSTOMER | `—` | 204 | 400,401,403,404 | Referenced vehicle deletion rejected. |
 | `GET` | `/api/vehicles/{id}` | Bearer | CUSTOMER: owner; STAFF/OWNER/ADMIN: operational | Vehicle owner for CUSTOMER | `—` | 200 | 400,401,403,404 | Missing resources remain 404. |
 | `PUT` | `/api/vehicles/{id}` | Bearer | CUSTOMER: owner; STAFF/OWNER/ADMIN: operational | Vehicle owner for CUSTOMER | `UpdateVehicleRequest` | 200 | 400,401,403,404 | Owner cannot be transferred; plate uniqueness rechecked. |
+| `GET` | `/api/marketplace/businesses` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN via MARKETPLACE_MANAGE | Tenant ownership not yet enforced | `—` | 200 | 401,403 | Lists bounded business records. |
+| `POST` | `/api/marketplace/businesses` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN via MARKETPLACE_MANAGE | Tenant ownership not yet enforced | `CreateBusinessRequest` | 201 | 400,401,403 | Duplicate IDs rejected; initial status active. |
+| `GET` | `/api/marketplace/businesses/{businessId}` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Returns a bounded business response. |
+| `PUT` | `/api/marketplace/businesses/{businessId}` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Tenant ownership not yet enforced | `UpdateBusinessRequest` | 200 | 400,401,403,404 | Path identity/status preserved. |
+| `POST` | `/api/marketplace/businesses/{businessId}/activate` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Reactivates without recreating. |
+| `POST` | `/api/marketplace/businesses/{businessId}/deactivate` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Branch records remain but become ineffective/undiscoverable. |
+| `GET` | `/api/marketplace/businesses/{businessId}/branches` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Lists branches owned by the exact business. |
+| `POST` | `/api/marketplace/businesses/{businessId}/branches` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Tenant ownership not yet enforced | `CreateBranchRequest` | 201 | 400,401,403,404 | Validates coordinates/timezone; duplicate ID rejected. |
+| `GET` | `/api/marketplace/branches/discoverable` | Bearer | All roles via MARKETPLACE_READ | Public-discovery view | `—` | 200 | 401,403 | Active owner + active branch + discovery enabled; no ranking/distance. |
+| `GET` | `/api/marketplace/branches/{branchId}` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Bounded branch response. |
+| `PUT` | `/api/marketplace/branches/{branchId}` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Ownership cannot change | `UpdateBranchRequest` | 200 | 400,401,403,404 | Preserves branch/business IDs and status. |
+| `POST` | `/api/marketplace/branches/{branchId}/activate` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Effective activity still requires active owner business. |
+| `POST` | `/api/marketplace/branches/{branchId}/deactivate` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Retains branch record and ownership. |

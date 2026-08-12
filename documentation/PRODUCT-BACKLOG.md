@@ -25,6 +25,7 @@ Priority guide:
 | Queues | Eligible creation, server-managed global ordering/waits, true call-next selection, explicit call override, full manual rebalance, synchronized call/start/complete workflow, and delete | Branch-scoped queues are not implemented. |
 | Notifications | In-app notification creation and recent lookup by user | Read APIs and external delivery are incomplete. |
 | Reports | Basic in-memory daily summary | Tenant/branch analytics and revenue reporting are future work. |
+| Marketplace | Business/branch registration, validated location metadata, lifecycle management, and basic effective-active/public discovery | Tenant isolation, distance, hours, offerings, and branch-scoped operations remain future work. |
 | API/Docs | Generated Swagger/OpenAPI plus human-readable API documentation and contract quality gates | DOCS-001 keeps written and generated contracts aligned. |
 | Testing | Unit/integration suites plus deterministic repeatability, OpenAPI gates, and Bruno HTTP acceptance | Production persistence testing remains future work. |
 | Packaging | Maven, Docker, Docker Compose, and staging-aligned GitHub Actions | Production deployment hardening remains future work. |
@@ -51,6 +52,7 @@ Completed issue cleanup:
 - #113 — Focused booking rescheduling with status preservation and cutoff enforcement (BOOKING-001).
 - #114 — Single-location service availability with shared scheduling rules (AVAIL-001).
 - #164 — Explicit capability-based modular-monolith boundaries with ArchUnit enforcement (ARCH-001).
+- #115 — Marketplace business and branch registration (MKT-001).
 
 ## 3. Phase 0 — Immediate Hardening
 
@@ -83,13 +85,13 @@ Phase exit criteria:
 - Booking and queue states remain consistent.
 - Customers can query availability before booking.
 
-Phase 1 is complete. ARCH-001 (#164) is the implemented architecture transition before MKT-001 (#115); no Phase 2 capability is implemented by this refactor.
+Phase 1 and the ARCH-001 transition are complete. MKT-001 (#115) is the first implemented Phase 2 foundation; MKT-002 (#116) is next.
 
 ## 5. Phase 2 — Marketplace Business and Branch Foundation
 
 | ID | GitHub | Backlog Item | Priority | Depends On |
 | --- | ---: | --- | --- | --- |
-| MKT-001 | #115 | Add Marketplace business and branch registration | P1 | Phase 0 |
+| MKT-001 | #115 | Add Marketplace business and branch registration — implemented | P1 | Phase 0, ARCH-001, AVAIL-001 |
 | MKT-002 | #116 | Add branch operating hours and temporary closures | P1 | MKT-001, CONFIG-001 |
 | SERVICE-001 | #117 | Add branch-specific service offerings and capacity | P1 | MKT-001, MKT-002, DATA-001 |
 | OPS-001 | #118 | Scope bookings, queues, notifications, and reports to branches | P1 | SERVICE-001, WORKFLOW-001, QUEUE-002 |

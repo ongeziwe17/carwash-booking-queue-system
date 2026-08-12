@@ -6,12 +6,16 @@ import com.carwash.queue.domain.QueueEntry;
 import com.carwash.catalog.domain.Service;
 import com.carwash.identity.domain.User;
 import com.carwash.vehicle.domain.Vehicle;
+import com.carwash.marketplace.domain.CarWashBranch;
+import com.carwash.marketplace.domain.CarWashBusiness;
 import com.carwash.booking.domain.BookingRepository;
 import com.carwash.notification.domain.NotificationRepository;
 import com.carwash.queue.domain.QueueEntryRepository;
 import com.carwash.catalog.domain.ServiceRepository;
 import com.carwash.identity.domain.UserRepository;
 import com.carwash.vehicle.domain.VehicleRepository;
+import com.carwash.marketplace.domain.CarWashBranchRepository;
+import com.carwash.marketplace.domain.CarWashBusinessRepository;
 import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
 
 public final class InMemoryTestDataCleaner {
@@ -23,6 +27,8 @@ public final class InMemoryTestDataCleaner {
     private final BookingRepository bookings;
     private final QueueEntryRepository queueEntries;
     private final NotificationRepository notifications;
+    private final CarWashBusinessRepository businesses;
+    private final CarWashBranchRepository branches;
     private final DeterministicTestNotificationIdGenerator notificationIds;
 
     public InMemoryTestDataCleaner(
@@ -33,6 +39,8 @@ public final class InMemoryTestDataCleaner {
             BookingRepository bookings,
             QueueEntryRepository queueEntries,
             NotificationRepository notifications,
+            CarWashBusinessRepository businesses,
+            CarWashBranchRepository branches,
             DeterministicTestNotificationIdGenerator notificationIds
     ) {
         this.coordinator = coordinator;
@@ -42,11 +50,17 @@ public final class InMemoryTestDataCleaner {
         this.bookings = bookings;
         this.queueEntries = queueEntries;
         this.notifications = notifications;
+        this.businesses = businesses;
+        this.branches = branches;
         this.notificationIds = notificationIds;
     }
 
     public void clean() {
         coordinator.write(() -> {
+            branches.findAll().stream().map(CarWashBranch::getBranchId)
+                    .forEach(branches::deleteById);
+            businesses.findAll().stream().map(CarWashBusiness::getBusinessId)
+                    .forEach(businesses::deleteById);
             notifications.findAll().stream().map(Notification::getNotificationId)
                     .forEach(notifications::deleteById);
             queueEntries.findAll().stream().map(QueueEntry::getQueueEntryId)

@@ -23,12 +23,13 @@ flowchart TD
 | `queue` | Queue domain, `QueueQuery`, ordering/lifecycle policies, persistence, and queue HTTP API |
 | `notification` | Notification records, ID generation, policy, persistence, and HTTP API |
 | `reporting` | Daily summary reads and report HTTP API |
+| `marketplace` | Business and branch aggregates, `MarketplaceQuery`, lifecycle/validation service, module-owned repositories, bounded DTO mapping, and Marketplace HTTP APIs |
 | `shared` | Standard API errors, common exceptions, generic repository primitives, runtime settings, and the single in-memory coordinator |
 | `bootstrap` | Explicit Spring bean composition and runtime/OpenAPI configuration |
 
 A module publishes its domain types and repository/application contracts only where another capability genuinely needs them. Infrastructure implementations are internal. Existing aggregate references (for example Booking to User, Vehicle, and Service) remain intentional published-domain dependencies; this refactor does not duplicate them into snapshots.
 
-The narrow cross-module read contracts are `UserQuery`, `VehicleQuery`, `BookingQuery`, and `QueueQuery`. Reporting consumes booking/queue queries; resource authorization consumes vehicle/booking/queue ownership queries; JWT validation consumes the identity query. Identity owns the role/permission catalogue and its credential contract, while Access implements that contract with BCrypt. Workflows that must update foreign canonical aggregates still use the owning module's published repository contract under the one shared coordinator.
+The narrow cross-module read contracts are `UserQuery`, `VehicleQuery`, `BookingQuery`, `QueueQuery`, and `MarketplaceQuery`. Reporting consumes booking/queue queries; resource authorization consumes vehicle/booking/queue ownership queries; JWT validation consumes the identity query. Marketplace currently consumes only shared primitives and publishes detached business/branch snapshots for later branch-aware capabilities. Identity owns the role/permission catalogue and its credential contract, while Access implements that contract with BCrypt. Workflows that must update foreign canonical aggregates still use the owning module's published repository contract under the one shared coordinator.
 
 ## Composition and dependencies
 
@@ -44,6 +45,7 @@ flowchart LR
     Bootstrap --> Queue
     Bootstrap --> Notification
     Bootstrap --> Reporting
+    Bootstrap --> Marketplace
     Access --> Identity
     Access --> Vehicle
     Access --> Booking
@@ -66,6 +68,7 @@ flowchart LR
     Notification --> Booking
     Reporting --> Booking
     Reporting --> Queue
+    Marketplace --> Shared
     Shared --> Runtime[Low-level runtime only]
     Access --> Shared
     Identity --> Shared
@@ -95,7 +98,7 @@ ArchUnit runs with the normal Maven test suite and enforces:
 - all concrete repository implementations live under shared or module `infrastructure` packages; and
 - the former global technical packages remain empty.
 
-The rules are convention-based so a future `com.carwash.marketplace` capability naturally receives the same boundaries without modifying the foundation.
+The rules apply to the implemented `com.carwash.marketplace` capability. An additional Marketplace-specific rule prevents this initial foundation from depending on any pre-existing business capability.
 
 ## Decisions
 
@@ -104,9 +107,9 @@ The rules are convention-based so a future `com.carwash.marketplace` capability 
 - **Package by capability:** related API, policy, domain, and persistence code changes together and is easier to discover.
 - **ArchUnit:** package intent needs executable regression protection rather than documentation alone.
 - **Global coordinator:** it preserves existing cross-aggregate atomicity in the single JVM.
-- **Marketplace later:** business/branch concepts remain out of scope until these boundaries are established.
+- **Marketplace as a module:** business and branch onboarding now extends the architecture without placing feature code in global technical packages.
 - **Spring Modulith deferred:** package conventions plus ArchUnit meet the current need without adding a second architecture framework.
 
 ## Current limitations
 
-Persistence is in memory, elevated operational access remains global until tenant isolation, notifications are in-app only, and reporting is a basic snapshot. PostgreSQL, messaging, Marketplace concepts, and distributed transactions are intentionally absent.
+Persistence is in memory, elevated Marketplace management access remains global until tenant isolation, notifications are in-app only, and reporting is a basic snapshot. Branch operating hours, offerings, branch-scoped operations, PostgreSQL, messaging, and distributed transactions are intentionally absent.

@@ -19,13 +19,17 @@ This matrix is derived from `RoleCatalog`, controller `@PreAuthorize` expression
 | Read own notifications | ✅ | ✅ | ✅ | ✅ |
 | Read another user's notifications | ❌ | ❌ | ❌ | ✅ |
 | Read daily reports | ❌ | ❌ | ✅ | ✅ |
+| Read discoverable Marketplace branches | ✅ | ✅ | ✅ | ✅ |
+| Manage Marketplace businesses/branches | ❌ | ❌ | ✅ | ✅ |
 | Assign roles | ❌ | ❌ | ❌ | ✅ |
 
 ## Permission catalogue
 
-- **CUSTOMER:** `USER_SELF_MANAGE`, `VEHICLE_SELF_MANAGE`, `SERVICE_READ`, `BOOKING_SELF_MANAGE`, `QUEUE_SELF_READ`, `NOTIFICATION_SELF_READ`
+- **CUSTOMER:** `USER_SELF_MANAGE`, `VEHICLE_SELF_MANAGE`, `SERVICE_READ`, `BOOKING_SELF_MANAGE`, `QUEUE_SELF_READ`, `NOTIFICATION_SELF_READ`, `MARKETPLACE_READ`
 - **STAFF:** all CUSTOMER permissions plus `VEHICLE_OPERATE`, `BOOKING_OPERATE`, `QUEUE_OPERATE`
-- **BUSINESS_OWNER:** all STAFF permissions plus `SERVICE_MANAGE`, `REPORT_READ`
+- **BUSINESS_OWNER:** all STAFF permissions plus `SERVICE_MANAGE`, `REPORT_READ`, `MARKETPLACE_MANAGE`
 - **PLATFORM_ADMIN:** all current permissions, including `USER_ADMIN` and `ROLE_ASSIGN`
 
 Operational roles are STAFF, BUSINESS_OWNER, and PLATFORM_ADMIN for vehicle, booking, and queue resource authorization. Notifications are stricter: only the user themselves or PLATFORM_ADMIN may read them.
+
+Marketplace management is intentionally global for BUSINESS_OWNER and PLATFORM_ADMIN until TENANT-001 introduces owner/business scoping. `MARKETPLACE_READ` exposes only the bounded effective-active/public discovery list.

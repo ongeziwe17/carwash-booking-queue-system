@@ -1,0 +1,20 @@
+info:
+  name: Business owner lists owned branches
+  type: http
+  seq: 6
+  tags: [marketplace, owner]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/businesses/{{marketplaceBusinessId}}/branches"
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns owned branch", function() { expect(res.status).to.equal(200); expect(res.body.some(b => b.branchId === bru.getVar("marketplaceBranchId") && b.businessId === bru.getVar("marketplaceBusinessId"))).to.equal(true); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

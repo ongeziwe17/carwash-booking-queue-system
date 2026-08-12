@@ -17,6 +17,7 @@ Stories are grouped by delivery phase so planned capabilities are not confused w
 | US-CUR-005 | As staff, I want to manage queue entries. | Create, retrieve, server-order, manually rebalance, call, start, complete, and delete entries. | Implemented as one global single-location queue with synchronized booking lifecycle. |
 | US-CUR-006 | As a customer, I want to see recent in-app notifications. | Booking/queue events create records that can be listed by user. | Partially implemented. |
 | US-CUR-007 | As an operator, I want a daily operational summary. | Return booking and queue counts for a supplied date. | Partially implemented and in-memory only. |
+| US-CUR-008 | As a business owner, I want to register Marketplace businesses and branches. | Valid contact/location data, immutable branch ownership, lifecycle actions, and bounded discovery views. | Implemented in memory; tenant isolation and branch operations remain future work. |
 
 ## 3. Phase 0 — API, Data, Security, Test, and Delivery Hardening
 
@@ -46,7 +47,7 @@ Stories are grouped by delivery phase so planned capabilities are not confused w
 
 | Story ID | GitHub | User Story | Acceptance Summary |
 | --- | ---: | --- | --- |
-| US-MKT-001 | #115 | As a business owner, I want to register a business and its branches on the Marketplace. | Valid business/branch data, coordinates, timezone, status, and ownership. |
+| US-MKT-001 | #115 | As a business owner, I want to register a business and its branches on the Marketplace. | Implemented: valid business/branch data, coordinates, timezone, immutable ownership, lifecycle state, and effective discovery filtering. |
 | US-MKT-002 | #116 | As a business owner, I want to configure branch operating hours and closures. | Weekly schedules, temporary closures, timezone-aware open/closed decisions. |
 | US-SERVICE-001 | #117 | As a business owner, I want each branch to define its own service offerings, prices, durations, and capacity. | Branch-specific offering lifecycle and validated capacity. |
 | US-OPS-001 | #118 | As an operator, I want bookings, queues, notifications, and reports scoped to the correct branch. | No cross-branch mismatch; branch-specific operational views and reports. |

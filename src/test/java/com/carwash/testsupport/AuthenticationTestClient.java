@@ -45,7 +45,8 @@ public final class AuthenticationTestClient {
 
     public RequestPostProcessor platformAdminJwt() {
         return roleJwt("test-platform-admin", "PLATFORM_ADMIN",
-                "ROLE_PLATFORM_ADMIN", "PERM_SERVICE_READ", "PERM_SERVICE_MANAGE", "PERM_QUEUE_OPERATE");
+                "ROLE_PLATFORM_ADMIN", "PERM_SERVICE_READ", "PERM_SERVICE_MANAGE", "PERM_QUEUE_OPERATE",
+                "PERM_MARKETPLACE_READ", "PERM_MARKETPLACE_MANAGE");
     }
 
     public RequestPostProcessor customerJwt(String userId) {

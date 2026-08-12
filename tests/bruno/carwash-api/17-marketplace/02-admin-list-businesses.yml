@@ -1,0 +1,21 @@
+info:
+  name: Platform admin lists Marketplace businesses
+  type: http
+  seq: 2
+  tags: [marketplace, admin, rbac]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/businesses"
+  auth:
+    type: bearer
+    token: "{{adminToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("contains run-scoped business", function() { expect(res.body.some(b => b.businessId === bru.getVar("marketplaceBusinessId"))).to.equal(true); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -1,0 +1,32 @@
+info:
+  name: Business owner updates Marketplace business
+  type: http
+  seq: 4
+  tags: [marketplace, owner, workflow]
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/marketplace/businesses/{{marketplaceBusinessId}}"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "businessName": "Updated Bruno Wash Group",
+        "contactEmail": "updated-marketplace-{{runId}}@example.test",
+        "contactPhone": "+27 21 555 0100",
+        "registrationNumber": "REG-UPDATED-{{runId}}"
+      }
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("preserves identity", function() { expect(res.status).to.equal(200); expect(res.body.businessId).to.equal(bru.getVar("marketplaceBusinessId")); expect(res.body.businessName).to.equal("Updated Bruno Wash Group"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
