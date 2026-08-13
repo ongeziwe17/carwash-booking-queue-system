@@ -12,8 +12,9 @@ import java.util.Set;
 public final class BranchOperatingSchedule {
 
     public static final int MAX_INTERVALS = 100;
-    private static final long SECONDS_PER_DAY = 24L * 60L * 60L;
-    private static final long SECONDS_PER_WEEK = 7L * SECONDS_PER_DAY;
+    private static final long NANOS_PER_SECOND = 1_000_000_000L;
+    private static final long NANOS_PER_DAY = 24L * 60L * 60L * NANOS_PER_SECOND;
+    private static final long NANOS_PER_WEEK = 7L * NANOS_PER_DAY;
 
     private final String branchId;
     private final List<WeeklyOperatingInterval> intervals;
@@ -85,13 +86,13 @@ public final class BranchOperatingSchedule {
         List<WeeklyRange> ranges = new ArrayList<>();
         for (int index = 0; index < ordered.size(); index++) {
             WeeklyOperatingInterval interval = ordered.get(index);
-            long start = startSecond(interval);
-            long end = endSecond(interval, start);
-            if (end <= SECONDS_PER_WEEK) {
+            long start = startNano(interval);
+            long end = endNano(interval, start);
+            if (end <= NANOS_PER_WEEK) {
                 ranges.add(new WeeklyRange(start, end, index));
             } else {
-                ranges.add(new WeeklyRange(start, SECONDS_PER_WEEK, index));
-                ranges.add(new WeeklyRange(0, end - SECONDS_PER_WEEK, index));
+                ranges.add(new WeeklyRange(start, NANOS_PER_WEEK, index));
+                ranges.add(new WeeklyRange(0, end - NANOS_PER_WEEK, index));
             }
         }
 
@@ -107,16 +108,16 @@ public final class BranchOperatingSchedule {
         return List.copyOf(ordered);
     }
 
-    private static long startSecond(WeeklyOperatingInterval interval) {
-        return (interval.dayOfWeek().getValue() - 1L) * SECONDS_PER_DAY
-                + interval.opensAt().toSecondOfDay();
+    private static long startNano(WeeklyOperatingInterval interval) {
+        return (interval.dayOfWeek().getValue() - 1L) * NANOS_PER_DAY
+                + interval.opensAt().toNanoOfDay();
     }
 
-    private static long endSecond(WeeklyOperatingInterval interval, long start) {
-        long dayStart = start - interval.opensAt().toSecondOfDay();
-        long end = dayStart + interval.closesAt().toSecondOfDay();
+    private static long endNano(WeeklyOperatingInterval interval, long start) {
+        long dayStart = start - interval.opensAt().toNanoOfDay();
+        long end = dayStart + interval.closesAt().toNanoOfDay();
         if (interval.isOvernight()) {
-            end += SECONDS_PER_DAY;
+            end += NANOS_PER_DAY;
         }
         return end;
     }
