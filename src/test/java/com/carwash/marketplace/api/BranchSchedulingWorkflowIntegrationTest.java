@@ -7,6 +7,7 @@ import com.carwash.marketplace.api.dto.ReplaceOperatingHoursRequest;
 import com.carwash.marketplace.api.dto.WeeklyOperatingIntervalRequest;
 import com.carwash.marketplace.domain.BranchOperatingScheduleRepository;
 import com.carwash.marketplace.domain.TemporaryBranchClosureRepository;
+import com.carwash.marketplace.domain.WeeklyOperatingInterval;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
@@ -157,6 +158,40 @@ class BranchSchedulingWorkflowIntegrationTest extends ApiIntegrationTestSupport 
     }
 
     @Test
+    void fractionalSecondApiInputRejectsOverlapAndAcceptsExactAdjacency() throws Exception {
+        String branchId = createBranch("Africa/Johannesburg");
+
+        replaceHoursJson(branchId, """
+                {
+                  "intervals": [
+                    { "dayOfWeek": "MONDAY", "opensAt": "08:00:00.100", "closesAt": "09:00:00.900" },
+                    { "dayOfWeek": "MONDAY", "opensAt": "09:00:00.100", "closesAt": "10:00:00" }
+                  ]
+                }
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.message").value("Weekly operating intervals must not overlap"));
+        assertTrue(schedules.findAll().isEmpty());
+
+        replaceHoursJson(branchId, """
+                {
+                  "intervals": [
+                    { "dayOfWeek": "MONDAY", "opensAt": "08:00:00.100", "closesAt": "09:00:00.900" },
+                    { "dayOfWeek": "MONDAY", "opensAt": "09:00:00.900", "closesAt": "10:00:00" }
+                  ]
+                }
+                """)
+                .andExpect(status().isOk());
+
+        List<WeeklyOperatingInterval> stored = schedules.findById(branchId)
+                .orElseThrow()
+                .getIntervals();
+        assertEquals(LocalTime.parse("09:00:00.900"), stored.get(0).closesAt());
+        assertEquals(LocalTime.parse("09:00:00.900"), stored.get(1).opensAt());
+    }
+
+    @Test
     void malformedInputsAndMissingResourcesUseExisting400And404Contracts() throws Exception {
         String branchId = createBranch("America/New_York");
 
@@ -209,6 +244,14 @@ class BranchSchedulingWorkflowIntegrationTest extends ApiIntegrationTestSupport 
                 .with(authentication.platformAdminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions replaceHoursJson(String branchId, String request)
+            throws Exception {
+        return mockMvc.perform(put("/api/marketplace/branches/{branchId}/operating-hours", branchId)
+                .with(authentication.platformAdminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
     }
 
     private org.springframework.test.web.servlet.ResultActions createClosure(

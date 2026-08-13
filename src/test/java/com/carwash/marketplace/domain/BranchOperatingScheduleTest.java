@@ -24,13 +24,32 @@ class BranchOperatingScheduleTest {
     }
 
     @Test
-    void sameDayIntervalUsesHalfOpenBoundaries() {
+    void wholeSecondSameDayIntervalUsesHalfOpenBoundaries() {
         BranchOperatingSchedule schedule = schedule(List.of(interval(DayOfWeek.MONDAY, "08:00", "17:00")));
 
         assertTrue(schedule.isOpenAt(LocalDateTime.of(2030, 1, 7, 8, 0)));
         assertTrue(schedule.isOpenAt(LocalDateTime.of(2030, 1, 7, 16, 59, 59)));
         assertFalse(schedule.isOpenAt(LocalDateTime.of(2030, 1, 7, 17, 0)));
         assertFalse(schedule.isOpenAt(LocalDateTime.of(2030, 1, 7, 7, 59, 59)));
+    }
+
+    @Test
+    void sameDayFractionalSecondOverlapIsRejected() {
+        assertThrows(BusinessRuleViolationException.class, () -> schedule(List.of(
+                interval(DayOfWeek.MONDAY, "08:00:00.100", "09:00:00.900"),
+                interval(DayOfWeek.MONDAY, "09:00:00.100", "10:00:00")
+        )));
+    }
+
+    @Test
+    void adjacentFractionalSecondIntervalsAreAllowedWithHalfOpenBoundaries() {
+        BranchOperatingSchedule schedule = schedule(List.of(
+                interval(DayOfWeek.MONDAY, "08:00:00.100", "09:00:00.900"),
+                interval(DayOfWeek.MONDAY, "09:00:00.900", "10:00:00")
+        ));
+
+        assertTrue(schedule.isOpenAt(LocalDateTime.parse("2030-01-07T09:00:00.900")));
+        assertFalse(schedule.isOpenAt(LocalDateTime.parse("2030-01-07T10:00:00")));
     }
 
     @Test
@@ -84,6 +103,14 @@ class BranchOperatingScheduleTest {
     }
 
     @Test
+    void overnightFractionalSecondOverlapIsRejected() {
+        assertThrows(BusinessRuleViolationException.class, () -> schedule(List.of(
+                interval(DayOfWeek.FRIDAY, "20:00:00.100", "02:00:00.900"),
+                interval(DayOfWeek.SATURDAY, "02:00:00.100", "04:00:00")
+        )));
+    }
+
+    @Test
     void sundayOvernightWrapsIntoMondayAndDetectsWeeklyBoundaryOverlap() {
         BranchOperatingSchedule schedule = schedule(List.of(
                 interval(DayOfWeek.SUNDAY, "20:00", "02:00"),
@@ -95,6 +122,14 @@ class BranchOperatingScheduleTest {
         assertThrows(BusinessRuleViolationException.class, () -> schedule(List.of(
                 interval(DayOfWeek.SUNDAY, "20:00", "02:00"),
                 interval(DayOfWeek.MONDAY, "01:00", "06:00")
+        )));
+    }
+
+    @Test
+    void sundayToMondayFractionalSecondOverlapIsRejected() {
+        assertThrows(BusinessRuleViolationException.class, () -> schedule(List.of(
+                interval(DayOfWeek.SUNDAY, "20:00:00.100", "02:00:00.900"),
+                interval(DayOfWeek.MONDAY, "02:00:00.100", "06:00:00")
         )));
     }
 
