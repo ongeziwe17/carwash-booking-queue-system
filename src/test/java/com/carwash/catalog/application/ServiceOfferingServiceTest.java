@@ -73,7 +73,7 @@ class ServiceOfferingServiceTest {
         offeringService.createOffering(
                 "branch-001", command("offering-b", "service-001", "100.00", 30, 2));
         ServiceOfferingSnapshot second = offeringService.createOffering(
-                "branch-002", command("offering-a", "service-001", "175.00", 60, 5));
+                "branch-002", command("offering-c", "service-001", "175.00", 60, 5));
         services.insert(service("service-002"));
         offeringService.createOffering(
                 "branch-001", command("offering-a", "service-002", "50.00", 15, 1));
