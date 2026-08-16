@@ -52,7 +52,7 @@ import java.util.List;
         @ApiResponse(responseCode = "500", description = "Internal server error",
                 content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
 })
-public final class ServiceOfferingController {
+public class ServiceOfferingController {
 
     private final ServiceOfferingService offerings;
 
