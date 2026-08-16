@@ -1,0 +1,22 @@
+info:
+  name: Inactive branch hides offering
+  type: http
+  seq: 61
+  tags: [marketplace, offering, customer, workflow]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}/offerings/discoverable"
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("inactive branch suppresses offering discovery", function() { expect(res.body).to.have.length(0); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
+

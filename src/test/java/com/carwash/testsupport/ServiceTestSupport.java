@@ -26,6 +26,7 @@ import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
 import com.carwash.notification.infrastructure.InMemoryNotificationRepository;
 import com.carwash.queue.infrastructure.InMemoryQueueEntryRepository;
 import com.carwash.catalog.infrastructure.InMemoryServiceRepository;
+import com.carwash.catalog.infrastructure.InMemoryServiceOfferingRepository;
 import com.carwash.identity.infrastructure.InMemoryUserRepository;
 import com.carwash.vehicle.infrastructure.InMemoryVehicleRepository;
 import com.carwash.access.application.UserCredentialService;
@@ -46,6 +47,7 @@ public abstract class ServiceTestSupport {
     protected InMemoryUserRepository userRepository;
     protected InMemoryVehicleRepository vehicleRepository;
     protected InMemoryServiceRepository serviceRepository;
+    protected InMemoryServiceOfferingRepository serviceOfferingRepository;
     protected InMemoryBookingRepository bookingRepository;
     protected InMemoryQueueEntryRepository queueRepository;
     protected InMemoryNotificationRepository notificationRepository;
@@ -75,6 +77,7 @@ public abstract class ServiceTestSupport {
         userRepository = new InMemoryUserRepository();
         vehicleRepository = new InMemoryVehicleRepository();
         serviceRepository = new InMemoryServiceRepository();
+        serviceOfferingRepository = new InMemoryServiceOfferingRepository();
         bookingRepository = new InMemoryBookingRepository();
         queueRepository = new InMemoryQueueEntryRepository();
         notificationRepository = new InMemoryNotificationRepository();
@@ -90,7 +93,7 @@ public abstract class ServiceTestSupport {
         queueOrdering = new QueueOrderingService(
                 queueRepository, coordinator, new QueuePolicyProperties(Duration.ofMinutes(10)));
         catalogService = new ServiceCatalogService(
-                serviceRepository, bookingRepository, queueRepository, coordinator, queueOrdering);
+                serviceRepository, serviceOfferingRepository, bookingRepository, queueRepository, coordinator, queueOrdering);
         notificationService = new NotificationManagementService(
                 notificationRepository, userRepository, bookingRepository, coordinator, notificationIds,
                 new NotificationPolicyProperties(10), clock);

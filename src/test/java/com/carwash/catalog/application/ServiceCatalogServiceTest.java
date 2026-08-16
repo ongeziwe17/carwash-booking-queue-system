@@ -5,11 +5,14 @@ import com.carwash.testsupport.ServiceTestSupport;
 import com.carwash.booking.domain.Booking;
 import com.carwash.queue.domain.QueueEntry;
 import com.carwash.catalog.domain.Service;
+import com.carwash.catalog.domain.ServiceOffering;
+import com.carwash.catalog.domain.ServiceOfferingStatus;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.testsupport.TestDates;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -39,6 +42,24 @@ class ServiceCatalogServiceTest extends ServiceTestSupport {
     void deactivateServiceSucceeds() {
         Service service = createService();
         assertFalse(catalogService.deactivateService(service.getServiceId()).isActive());
+    }
+
+    @Test
+    void serviceReferencedByInactiveBranchOfferingCannotBeDeleted() {
+        Service service = createService();
+        LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), clock.getZone());
+        ServiceOffering inactiveOffering = new ServiceOffering(
+                "offering-001", "branch-001", service.getServiceId(), BigDecimal.TEN, 30, 2,
+                ServiceOfferingStatus.INACTIVE, now, now);
+        assertTrue(serviceOfferingRepository.insert(inactiveOffering));
+
+        BusinessRuleViolationException failure = assertThrows(
+                BusinessRuleViolationException.class,
+                () -> catalogService.deleteService(service.getServiceId()));
+
+        assertEquals("Service referenced by a branch offering cannot be deleted; deactivate it instead",
+                failure.getMessage());
+        assertTrue(serviceRepository.findById(service.getServiceId()).isPresent());
     }
 
     @Test

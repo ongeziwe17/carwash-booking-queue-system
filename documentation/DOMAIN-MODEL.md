@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The application is a Spring Boot modular monolith organized by the identity, access, vehicle, catalog, booking, queue, notification, reporting, and marketplace capabilities. Repository contracts and implementations belong to their owning capabilities, while narrow application queries expose authorization/reporting/Marketplace reads and one shared coordinator protects the in-memory repositories. Identity owns roles, permissions, and the credential contract; Access implements authentication, BCrypt/JWT infrastructure, and authorization. The current domain covers users, roles, vehicles, services, bookings, queue entries, in-app notifications, car wash businesses, physical branches, weekly branch schedules, and temporary closures. PostgreSQL persistence, tenant isolation, branch-scoped operations, payments, and external notification delivery remain future work.
+The application is a Spring Boot modular monolith organized by the identity, access, vehicle, catalog, booking, queue, notification, reporting, and marketplace capabilities. Repository contracts and implementations belong to their owning capabilities, while narrow application queries expose authorization/reporting/Marketplace/Catalog reads and one shared coordinator protects the in-memory repositories. Identity owns roles, permissions, and the credential contract; Access implements authentication, BCrypt/JWT infrastructure, and authorization. The current domain covers users, roles, vehicles, reusable services, branch service offerings, bookings, queue entries, in-app notifications, car wash businesses, physical branches, weekly branch schedules, and temporary closures. PostgreSQL persistence, tenant isolation, branch-scoped operations, payments, and external notification delivery remain future work.
 
 ## 2. Current Entities
 
@@ -11,7 +11,8 @@ The application is a Spring Boot modular monolith organized by the identity, acc
 | `User` | Profile, encoded credential, account state, role, and owned aggregate collections | Vehicles, bookings, and notifications are managed through focused add/remove methods. |
 | `Role` | Built-in role identity and permission catalogue | Runtime authorization derives permissions from the server-side role catalogue. |
 | `Vehicle` | Customer-owned vehicle details | Ownership cannot change through an ordinary update; plate uniqueness is enforced per owner on create and update. |
-| `Service` | Global service-catalogue entry | Referenced services must be deactivated rather than physically deleted. |
+| `Service` | Reusable global service/wash-type definition | Booking/queue references and branch offerings prevent physical deletion; deactivate instead. Legacy global price/duration remain transitional defaults for existing single-location workflows. |
+| `ServiceOffering` | One branch's price, estimated duration, configured concurrent capacity, and activation state for one reusable service | Offering/branch/service identity is immutable; one record per branch/service pair; inactive records are reactivated, not recreated or deleted. |
 | `Booking` | Customer, vehicle, service, schedule, status, and optional queue link | Owner is preserved; only future `CREATED` and unqueued `CONFIRMED` bookings are editable or reschedulable. |
 | `QueueEntry` | Booking queue state, global active position, and estimated wait | Requires a confirmed booking and active matching service; one active entry is allowed per booking and active metrics are server managed. |
 | `Notification` | In-app notification record for a user and optional booking | User and booking references are resolved to canonical repository objects before insertion. |
@@ -41,7 +42,7 @@ boolean existsById(ID id);
 - Queue repositories additionally expose active operational ordering by position, joined time, and queue-entry ID; public queue lists place active records before terminal history.
 - In-memory storage uses `ConcurrentHashMap`; callers cannot access the mutable backing map.
 
-Duplicate IDs for users, vehicles, services, bookings, queue entries, notifications, businesses, branches, and temporary closures are rejected as `BUSINESS_RULE_VIOLATION` errors without replacing the existing record. The schedule repository is keyed by `branchId`; PUT explicitly inserts when absent and updates when present rather than silently upserting.
+Duplicate IDs for users, vehicles, services, service offerings, bookings, queue entries, notifications, businesses, branches, and temporary closures are rejected as `BUSINESS_RULE_VIOLATION` errors without replacing the existing record. Offering queries are branch-scoped and offering-ID ordered; the application also rejects a second record for the same branch/service pair. The schedule repository is keyed by `branchId`; PUT explicitly inserts when absent and updates when present rather than silently upserting.
 
 ## 4. Single-JVM Coordination Boundary
 
@@ -163,6 +164,21 @@ COMPLETED
 Queue position updates are allowed only while the entry is `WAITING`. The requested target must be within the current active queue size; movement reorders the full active list and recalculates all affected positions and waits. Called, in-progress, completed, or exited entries cannot be repositioned or physically deleted.
 
 Queue entry eligibility, active uniqueness, global ordering, recalculation, cumulative wait estimates, true server-selected call-next, focused booking rescheduling, single-location availability, Marketplace branch scheduling, and booking/queue lifecycle synchronization are implemented. Queue creation and call keep the booking `CONFIRMED`; start and completion synchronize both aggregates. Valid booking cancellation removes `WAITING`/`CALLED` queue work, while in-service cancellation is rejected. Generic booking updates and rescheduling are blocked whenever an active queue entry exists. Creation, rescheduling, and service changes reuse the same single-location operating-window/slot policy; cancellation and rescheduling share the deployment-configurable booking-change cutoff documented in [CONFIGURATION.md](CONFIGURATION.md). Marketplace branch hours remain a separate future-facing decision and do not retrofit AVAIL-001.
+
+### Reusable services and branch offerings
+
+Catalog owns both the reusable `Service` definition and immutable `ServiceOffering` aggregate. Each offering stores immutable `offeringId`, `branchId`, and `serviceId`, plus its own non-negative two-decimal price, `1..1440` minute estimate, `1..1000` configured concurrent capacity, active/inactive status, and creation/update metadata. Only one record may exist for a branch/service pair; deactivation/reactivation preserves that relationship.
+
+Catalog application code resolves the branch exclusively through the published `MarketplaceQuery` and resolves the reusable service inside Catalog. Its detached projection derives:
+
+```text
+effectiveActive = offering.active AND service.active AND branch.effectiveActive
+discoverable    = effectiveActive AND branch.publicDiscoveryEnabled
+```
+
+Parent changes never rewrite offering status. The customer discovery DTO omits lifecycle/metadata and internal object graphs, while the published `ServiceOfferingQuery` retains bounded immutable state and configured capacity for future branch-aware consumers. Operating hours and temporary closures are deliberately not part of offering discovery. `concurrentCapacity` is configured capacity—not remaining capacity—and no booking, queue, staff, or bay data is inspected.
+
+Existing global `Service.price` and `Service.estimatedDurationMin` remain transitional defaults for legacy booking/queue/AVAIL-001 behavior. Offering endpoints require explicit terms and never copy or fall back to them. Any offering, including an inactive one, blocks physical deletion of its reusable service definition.
 
 ## 8. Mutable Reference Limitation
 

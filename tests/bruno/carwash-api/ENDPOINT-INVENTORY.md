@@ -1,8 +1,8 @@
 # Current Endpoint Inventory
 
-Inventory source: the controllers and OpenAPI quality gate on the MKT-002 branch based on `staging` merge `f471579`. Generated `/v3/api-docs` is authoritative when wording differs.
+Inventory source: the controllers and OpenAPI quality gate for SERVICE-001 on current `staging`. Generated `/v3/api-docs` is authoritative when wording differs.
 
-**Total HTTP operations: 59.**
+**Total HTTP operations: 66.**
 
 | Method | Path | Authentication | Role / permission | Ownership | Request DTO | Success | 400/401/403/404 | Important rules |
 |---|---|---|---|---|---|---:|---|---|
@@ -31,7 +31,7 @@ Inventory source: the controllers and OpenAPI quality gate on the MKT-002 branch
 | `GET` | `/api/reports/daily-summary` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | N/A | `—` | 200 | 400,401,403 | ISO date required; STAFF and CUSTOMER forbidden. |
 | `GET` | `/api/services` | Bearer | All roles via SERVICE_READ | N/A | `—` | 200 | 400,401,403 | Optional active Boolean filter. |
 | `POST` | `/api/services` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | N/A | `CreateServiceRequest` | 201 | 400,401,403 | Duplicate ID rejected; server controls active/createdAt. |
-| `DELETE` | `/api/services/{id}` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | N/A | `—` | 204 | 400,401,403,404 | Referenced service cannot be deleted; deactivate instead. |
+| `DELETE` | `/api/services/{id}` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | N/A | `—` | 204 | 400,401,403,404 | Booking, queue, or active/inactive offering references prevent deletion; deactivate instead. |
 | `GET` | `/api/services/{id}` | Bearer | All roles via SERVICE_READ | N/A | `—` | 200 | 400,401,403,404 | Missing service returns 404. |
 | `PUT` | `/api/services/{id}` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | N/A | `UpdateServiceRequest` | 200 | 400,401,403,404 | Path ID authoritative; activation is separate. |
 | `POST` | `/api/services/{id}/activate` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | N/A | `—` | 200 | 400,401,403,404 | Dedicated activation transition. |
@@ -65,3 +65,10 @@ Inventory source: the controllers and OpenAPI quality gate on the MKT-002 branch
 | `POST` | `/api/marketplace/branches/{branchId}/closures` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN via MARKETPLACE_MANAGE | Tenant ownership not yet enforced | `CreateTemporaryClosureRequest` | 201 | 400,401,403,404 | Creates one absolute half-open closure; duplicate IDs and overlapping active closures rejected. |
 | `POST` | `/api/marketplace/closures/{closureId}/cancel` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN via MARKETPLACE_MANAGE | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Cancels without physical deletion; cancelled records no longer close the branch. |
 | `GET` | `/api/marketplace/branches/{branchId}/open-status` | Bearer | All roles via MARKETPLACE_READ | Operational status independent of public discovery | Required query `at` | 200 | 400,401,403,404 | Converts the required RFC 3339 instant into the current branch timezone, then applies active state, weekly hours, and active closures. |
+| `GET` | `/api/marketplace/branches/{branchId}/offerings` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN via MARKETPLACE_MANAGE | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Lists active/inactive and effective/ineffective records in offering-ID order. |
+| `POST` | `/api/marketplace/branches/{branchId}/offerings` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN via MARKETPLACE_MANAGE | Branch comes from path; tenant ownership pending | `CreateServiceOfferingRequest` | 201 | 400,401,403,404 | Explicit price/duration/configured capacity; duplicate ID and branch/service pair rejected. |
+| `GET` | `/api/marketplace/offerings/{offeringId}` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN via MARKETPLACE_MANAGE | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Bounded management response with reusable service metadata and derived state. |
+| `PUT` | `/api/marketplace/offerings/{offeringId}` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN via MARKETPLACE_MANAGE | Identity, branch, and service immutable | `UpdateServiceOfferingRequest` | 200 | 400,401,403,404 | Updates only price, estimated duration, and configured concurrent capacity. |
+| `POST` | `/api/marketplace/offerings/{offeringId}/activate` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN via MARKETPLACE_MANAGE | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Reactivates the retained branch/service relationship. |
+| `POST` | `/api/marketplace/offerings/{offeringId}/deactivate` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN via MARKETPLACE_MANAGE | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Deactivates without physical deletion. |
+| `GET` | `/api/marketplace/branches/{branchId}/offerings/discoverable` | Bearer | All roles via MARKETPLACE_READ | Public-discovery view | `—` | 200 | 400,401,403,404 | Customer fields only; requires active offering/service/branch/business and public branch discovery; ignores operating hours. |

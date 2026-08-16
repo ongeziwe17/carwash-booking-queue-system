@@ -1,6 +1,6 @@
 # Car Wash Booking Queue System
 
-Spring Boot backend foundation for car wash booking, queue management, and Marketplace onboarding/scheduling. The code is organized as a capability-based modular monolith with explicit `bootstrap`, `shared`, `identity`, `access`, `vehicle`, `catalog`, `booking`, `queue`, `notification`, `reporting`, and `marketplace` boundaries enforced by ArchUnit. The current codebase exposes APIs for users, vehicles, services, bookings, queues, notifications, daily reporting, Marketplace businesses, physical branches, weekly branch hours, temporary closures, and timezone-aware open-status decisions over in-memory repositories.
+Spring Boot backend foundation for car wash booking, queue management, and Marketplace onboarding/scheduling. The code is organized as a capability-based modular monolith with explicit `bootstrap`, `shared`, `identity`, `access`, `vehicle`, `catalog`, `booking`, `queue`, `notification`, `reporting`, and `marketplace` boundaries enforced by ArchUnit. The current codebase exposes APIs for users, vehicles, reusable global services, branch-specific offerings, bookings, queues, notifications, daily reporting, Marketplace businesses, physical branches, weekly branch hours, temporary closures, and timezone-aware open-status decisions over in-memory repositories.
 
 ## Current backend foundation
 
@@ -15,6 +15,7 @@ Spring Boot backend foundation for car wash booking, queue management, and Marke
 - Daily summary reporting.
 - Marketplace business/branch registration, bounded lifecycle management, coordinates, timezones, and basic active/public branch discovery.
 - Marketplace branch scheduling with atomic weekly intervals, overnight/week-boundary support, temporary closure history, and explicit-instant open-status decisions.
+- Catalog-owned branch service offerings with independent price, duration, configured concurrent capacity, lifecycle, and parent-aware discovery.
 - Swagger/OpenAPI documentation.
 - Java 21 Maven, Docker, Docker Compose, and GitHub Actions delivery support.
 
@@ -23,7 +24,7 @@ Spring Boot backend foundation for car wash booking, queue management, and Marke
 - Storage is in-memory and is lost when the application restarts.
 - Staff and business-owner operational access remains global until tenant isolation is implemented.
 - External SMS/email delivery is not implemented.
-- Payments, branch-aware operations, PostgreSQL, production observability, and deployment hardening remain future work.
+- Payments, branch-aware booking/availability/queue operations, PostgreSQL, production observability, and deployment hardening remain future work.
 - The application does not yet expose dedicated Actuator liveness or readiness endpoints.
 
 ## Tech stack
@@ -145,7 +146,7 @@ Start from a clean build directory and run the complete release-gate verificatio
 
 Tests use the dedicated `test` Spring profile from `src/test/resources/application-test.properties`. It contains only deterministic test-safe configuration, disables bootstrap administration, lowers BCrypt cost for test execution, and uses a clearly test-only signing key. Tests do **not** require a developer `.env` file.
 
-Every Spring API integration test inherits the shared test foundation and begins with empty in-memory application data. Cleanup happens inside one `InMemoryDataCoordinator` write operation in dependency order: Marketplace closures/schedules, branches/businesses, notifications, queue entries, bookings, vehicles, services, then users. The Spring application context is reused; `@DirtiesContext` is not the default isolation mechanism.
+Every Spring API integration test inherits the shared test foundation and begins with empty in-memory application data. Cleanup happens inside one `InMemoryDataCoordinator` write operation in dependency order: Catalog offerings, Marketplace closures/schedules, branches/businesses, notifications, queue entries, bookings, vehicles, services, then users. The Spring application context is reused; `@DirtiesContext` is not the default isolation mechanism.
 
 Integration fixtures use a fresh `TestIdFactory` per test method. IDs are readable and local to that test, for example `bookingworkflowintegrationtest-create-user-001`, rather than global IDs such as `u1` or timestamp-only values. Notification IDs are generated through an injectable abstraction; integration tests reset only the test implementation before each method while production exposes no reset operation.
 
@@ -222,6 +223,7 @@ Bootstrap administration is disabled by default. Configure all `SECURE_BOOTSTRAP
 - `/api/queue-entries`
 - `/api/marketplace/businesses`
 - `/api/marketplace/branches`
+- `/api/marketplace/offerings`
 - `/api/notifications`
 - `/api/reports/daily-summary`
 

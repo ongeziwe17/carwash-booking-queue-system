@@ -1,0 +1,35 @@
+info:
+  name: Invalid offering concurrent capacity is rejected
+  type: http
+  seq: 52
+  tags: [marketplace, offering, validation]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}/offerings"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "offeringId": "{{marketplaceInvalidOfferingId}}",
+        "serviceId": "{{serviceId}}",
+        "price": 100.00,
+        "estimatedDurationMin": 30,
+        "concurrentCapacity": 0
+      }
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 400 validation error", function() { expect(res.status).to.equal(400); expect(res.body.code).to.equal("VALIDATION_FAILED"); });
+        test("identifies configured capacity", function() { expect(JSON.stringify(res.body.fieldErrors)).to.include("concurrentCapacity"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
+

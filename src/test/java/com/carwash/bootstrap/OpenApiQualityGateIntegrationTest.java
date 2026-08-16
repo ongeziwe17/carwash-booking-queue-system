@@ -13,6 +13,7 @@ import com.carwash.booking.domain.BookingRepository;
 import com.carwash.notification.domain.NotificationRepository;
 import com.carwash.queue.domain.QueueEntryRepository;
 import com.carwash.catalog.domain.ServiceRepository;
+import com.carwash.catalog.domain.ServiceOfferingRepository;
 import com.carwash.identity.domain.UserRepository;
 import com.carwash.vehicle.domain.VehicleRepository;
 import com.carwash.marketplace.domain.CarWashBranchRepository;
@@ -72,12 +73,20 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
             "GET /api/marketplace/branches/{branchId}/closures",
             "POST /api/marketplace/branches/{branchId}/closures",
             "POST /api/marketplace/closures/{closureId}/cancel",
-            "GET /api/marketplace/branches/{branchId}/open-status"
+            "GET /api/marketplace/branches/{branchId}/open-status",
+            "GET /api/marketplace/branches/{branchId}/offerings",
+            "POST /api/marketplace/branches/{branchId}/offerings",
+            "GET /api/marketplace/offerings/{offeringId}",
+            "PUT /api/marketplace/offerings/{offeringId}",
+            "POST /api/marketplace/offerings/{offeringId}/activate",
+            "POST /api/marketplace/offerings/{offeringId}/deactivate",
+            "GET /api/marketplace/branches/{branchId}/offerings/discoverable"
     );
 
     @Autowired UserRepository users;
     @Autowired VehicleRepository vehicles;
     @Autowired ServiceRepository services;
+    @Autowired ServiceOfferingRepository offerings;
     @Autowired BookingRepository bookings;
     @Autowired QueueEntryRepository queues;
     @Autowired NotificationRepository notifications;
@@ -256,6 +265,42 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
     }
 
     @Test
+    void marketplaceOfferingContractUsesBoundedDtosAndDocumentsDerivedState() throws Exception {
+        JsonNode document = openApi();
+        JsonNode schemas = document.path("components").path("schemas");
+
+        assertEquals(Set.of("offeringId", "serviceId", "price", "estimatedDurationMin", "concurrentCapacity"),
+                propertyNames(schemas.path("CreateServiceOfferingRequest")));
+        assertEquals(Set.of("price", "estimatedDurationMin", "concurrentCapacity"),
+                propertyNames(schemas.path("UpdateServiceOfferingRequest")));
+        assertFalse(schemas.path("CreateServiceOfferingRequest").path("properties").has("branchId"));
+        assertFalse(schemas.path("UpdateServiceOfferingRequest").path("properties").has("offeringId"));
+        assertFalse(schemas.path("UpdateServiceOfferingRequest").path("properties").has("branchId"));
+        assertFalse(schemas.path("UpdateServiceOfferingRequest").path("properties").has("serviceId"));
+        assertFalse(schemas.path("UpdateServiceOfferingRequest").path("properties").has("status"));
+
+        assertEquals(Set.of("offeringId", "branchId", "serviceId", "serviceName", "serviceDescription",
+                        "price", "estimatedDurationMin", "concurrentCapacity", "status", "effectiveActive",
+                        "discoverable", "createdAt", "updatedAt"),
+                propertyNames(schemas.path("ServiceOfferingResponse")));
+        assertEquals(Set.of("offeringId", "branchId", "serviceId", "serviceName", "serviceDescription",
+                        "price", "estimatedDurationMin", "concurrentCapacity"),
+                propertyNames(schemas.path("DiscoverableServiceOfferingResponse")));
+        for (String forbidden : Set.of("status", "effectiveActive", "discoverable", "createdAt", "updatedAt",
+                "service", "branch", "repository")) {
+            assertFalse(schemas.path("DiscoverableServiceOfferingResponse").path("properties").has(forbidden));
+        }
+
+        JsonNode creation = document.path("paths")
+                .path("/api/marketplace/branches/{branchId}/offerings").path("post");
+        assertTrue(creation.path("description").asText().contains("never copied"));
+        JsonNode discovery = document.path("paths")
+                .path("/api/marketplace/branches/{branchId}/offerings/discoverable").path("get");
+        assertTrue(discovery.path("description").asText().contains("Operating hours"));
+        assertTrue(discovery.path("description").asText().contains("remaining capacity"));
+    }
+
+    @Test
     void bookingUpdateAndRescheduleSchemasKeepScheduleMutationSeparate() throws Exception {
         JsonNode document = openApi();
         JsonNode schemas = document.path("components").path("schemas");
@@ -423,6 +468,7 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         assertTrue(businesses.findAll().isEmpty());
         assertTrue(schedules.findAll().isEmpty());
         assertTrue(closures.findAll().isEmpty());
+        assertTrue(offerings.findAll().isEmpty());
     }
 
     @FunctionalInterface

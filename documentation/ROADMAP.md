@@ -62,13 +62,13 @@ Phase 1 is complete.
 
 1. **ARCH-001** — Establish explicit modular-monolith boundaries (#164) — implemented.
 
-The capability modules and automated dependency rules are the prerequisite for Phase 2. **MKT-001** (#115) and **MKT-002** (#116) are implemented on those boundaries; the next roadmap issue is **SERVICE-001** (#117).
+The capability modules and automated dependency rules are the prerequisite for Phase 2. **MKT-001** (#115), **MKT-002** (#116), and **SERVICE-001** (#117) are implemented on those boundaries; the next roadmap issue is **OPS-001** (#118).
 
 ## Phase 2 — Marketplace Business, Branch, and Availability Foundation
 
 1. **MKT-001** — Add Marketplace business and branch registration (#115) — implemented.
 2. **MKT-002** — Add branch operating hours and temporary closures (#116) — implemented.
-3. **SERVICE-001** — Add branch-specific service offerings, prices, durations, and capacity (#117).
+3. **SERVICE-001** — Add branch-specific service offerings, prices, durations, and capacity (#117) — implemented.
 4. **OPS-001** — Scope bookings, queues, notifications, and reports to branches (#118).
 5. **GEO-001** — Add branch distance calculation and public discovery (#119).
 6. **AVAIL-002** — Add branch-aware availability search (#120).

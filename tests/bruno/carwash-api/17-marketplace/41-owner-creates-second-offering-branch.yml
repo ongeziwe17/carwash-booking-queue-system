@@ -1,0 +1,42 @@
+info:
+  name: Business owner creates second offering branch
+  type: http
+  seq: 41
+  tags: [marketplace, offering, owner, workflow]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/businesses/{{marketplaceSecondBusinessId}}/branches"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "branchId": "{{marketplaceSecondBranchId}}",
+        "branchName": "Bruno Sea Point Branch",
+        "addressLine1": "10 Beach Road",
+        "addressLine2": null,
+        "city": "Cape Town",
+        "province": "Western Cape",
+        "postalCode": "8005",
+        "countryCode": "ZA",
+        "latitude": -33.9173,
+        "longitude": 18.3884,
+        "timezone": "Africa/Johannesburg",
+        "publicDiscoveryEnabled": true
+      }
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("branch belongs to second business", function() { expect(res.body.branchId).to.equal(bru.getVar("marketplaceSecondBranchId")); expect(res.body.businessId).to.equal(bru.getVar("marketplaceSecondBusinessId")); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
+

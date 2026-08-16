@@ -11,6 +11,7 @@ import com.carwash.marketplace.domain.BranchOperatingScheduleRepository;
 import com.carwash.marketplace.domain.TemporaryBranchClosureRepository;
 import com.carwash.queue.domain.QueueEntryRepository;
 import com.carwash.catalog.domain.ServiceRepository;
+import com.carwash.catalog.domain.ServiceOfferingRepository;
 import com.carwash.identity.domain.UserRepository;
 import com.carwash.vehicle.domain.VehicleRepository;
 import com.carwash.booking.infrastructure.InMemoryBookingRepository;
@@ -22,6 +23,7 @@ import com.carwash.marketplace.infrastructure.InMemoryBranchOperatingScheduleRep
 import com.carwash.marketplace.infrastructure.InMemoryTemporaryBranchClosureRepository;
 import com.carwash.queue.infrastructure.InMemoryQueueEntryRepository;
 import com.carwash.catalog.infrastructure.InMemoryServiceRepository;
+import com.carwash.catalog.infrastructure.InMemoryServiceOfferingRepository;
 import com.carwash.identity.infrastructure.InMemoryUserRepository;
 import com.carwash.vehicle.infrastructure.InMemoryVehicleRepository;
 import com.carwash.access.application.UserCredentialService;
@@ -37,6 +39,8 @@ import com.carwash.marketplace.application.BranchSchedulingService;
 import com.carwash.queue.application.QueueManagementService;
 import com.carwash.queue.application.QueueOrderingService;
 import com.carwash.catalog.application.ServiceCatalogService;
+import com.carwash.catalog.application.ServiceOfferingService;
+import com.carwash.marketplace.application.MarketplaceQuery;
 import com.carwash.identity.application.UserManagementService;
 import com.carwash.vehicle.application.VehicleManagementService;
 import org.springframework.context.annotation.Bean;
@@ -65,6 +69,11 @@ public class ApplicationCompositionConfig {
     @Bean
     public ServiceRepository serviceRepository() {
         return new InMemoryServiceRepository();
+    }
+
+    @Bean
+    public ServiceOfferingRepository serviceOfferingRepository() {
+        return new InMemoryServiceOfferingRepository();
     }
 
     @Bean
@@ -206,6 +215,7 @@ public class ApplicationCompositionConfig {
     @Bean
     public ServiceCatalogService serviceCatalogService(
             ServiceRepository serviceRepository,
+            ServiceOfferingRepository serviceOfferingRepository,
             BookingRepository bookingRepository,
             QueueEntryRepository queueEntryRepository,
             InMemoryDataCoordinator coordinator,
@@ -213,10 +223,28 @@ public class ApplicationCompositionConfig {
     ) {
         return new ServiceCatalogService(
                 serviceRepository,
+                serviceOfferingRepository,
                 bookingRepository,
                 queueEntryRepository,
                 coordinator,
                 queueOrderingService
+        );
+    }
+
+    @Bean
+    public ServiceOfferingService serviceOfferingService(
+            ServiceOfferingRepository serviceOfferingRepository,
+            ServiceRepository serviceRepository,
+            MarketplaceQuery marketplaceQuery,
+            InMemoryDataCoordinator coordinator,
+            Clock clock
+    ) {
+        return new ServiceOfferingService(
+                serviceOfferingRepository,
+                serviceRepository,
+                marketplaceQuery,
+                coordinator,
+                clock
         );
     }
 

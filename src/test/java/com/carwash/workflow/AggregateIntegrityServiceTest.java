@@ -22,6 +22,7 @@ import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
 import com.carwash.notification.infrastructure.InMemoryNotificationRepository;
 import com.carwash.queue.infrastructure.InMemoryQueueEntryRepository;
 import com.carwash.catalog.infrastructure.InMemoryServiceRepository;
+import com.carwash.catalog.infrastructure.InMemoryServiceOfferingRepository;
 import com.carwash.identity.infrastructure.InMemoryUserRepository;
 import com.carwash.vehicle.infrastructure.InMemoryVehicleRepository;
 import com.carwash.access.application.UserCredentialService;
@@ -77,7 +78,8 @@ class AggregateIntegrityServiceTest {
         QueueOrderingService queueOrdering = new QueueOrderingService(
                 queues, coordinator, new QueuePolicyProperties(Duration.ofMinutes(10)));
         vehicleManagement = new VehicleManagementService(vehicles, users, bookings, coordinator);
-        serviceCatalog = new ServiceCatalogService(services, bookings, queues, coordinator, queueOrdering);
+        serviceCatalog = new ServiceCatalogService(
+                services, new InMemoryServiceOfferingRepository(), bookings, queues, coordinator, queueOrdering);
         bookingManagement = new BookingManagementService(bookings, users, vehicles, services, queues,
                 notifications, notificationManagement, queueOrdering, coordinator,
                 new BookingPolicyProperties(1, Duration.ZERO), clock);

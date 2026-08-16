@@ -1,0 +1,22 @@
+info:
+  name: Business owner gets branch service offering
+  type: http
+  seq: 45
+  tags: [marketplace, offering, owner]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/offerings/{{marketplaceOfferingId}}"
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("returns reusable definition metadata and branch terms", function() { expect(res.body.serviceName).to.equal("Bruno Exterior Wash"); expect(res.body.serviceDescription).to.equal("Bruno acceptance service"); expect(res.body.price).to.equal(125.5); expect(res.body.createdAt).to.be.a("string"); expect(res.body.updatedAt).to.be.a("string"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
+

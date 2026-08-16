@@ -19,6 +19,7 @@ public final class TestIdFactory {
     private int businessSequence;
     private int branchSequence;
     private int closureSequence;
+    private int offeringSequence;
 
     public TestIdFactory(String testName) {
         this.prefix = sanitizePrefix(testName);
@@ -58,6 +59,10 @@ public final class TestIdFactory {
 
     public String closure() {
         return next("closure", ++closureSequence);
+    }
+
+    public String offering() {
+        return next("offering", ++offeringSequence);
     }
 
     public String emailFor(String id) {

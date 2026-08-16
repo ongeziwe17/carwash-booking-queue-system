@@ -1,0 +1,35 @@
+info:
+  name: Business owner offers same service at second branch
+  type: http
+  seq: 43
+  tags: [marketplace, offering, owner, workflow]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceSecondBranchId}}/offerings"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "offeringId": "{{marketplaceSecondOfferingId}}",
+        "serviceId": "{{serviceId}}",
+        "price": 189.99,
+        "estimatedDurationMin": 60,
+        "concurrentCapacity": 6
+      }
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("same service has independent second-branch terms", function() { expect(res.body.serviceId).to.equal(bru.getVar("serviceId")); expect(res.body.branchId).to.equal(bru.getVar("marketplaceSecondBranchId")); expect(res.body.price).to.equal(189.99); expect(res.body.estimatedDurationMin).to.equal(60); expect(res.body.concurrentCapacity).to.equal(6); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
+

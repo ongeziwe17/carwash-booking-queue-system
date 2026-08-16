@@ -1,0 +1,36 @@
+info:
+  name: Business owner creates first branch service offering
+  type: http
+  seq: 42
+  tags: [marketplace, offering, owner, workflow]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}/offerings"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "offeringId": "{{marketplaceOfferingId}}",
+        "serviceId": "{{serviceId}}",
+        "price": 125.50,
+        "estimatedDurationMin": 45,
+        "concurrentCapacity": 3
+      }
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("uses explicit branch terms", function() { expect(res.body.offeringId).to.equal(bru.getVar("marketplaceOfferingId")); expect(res.body.branchId).to.equal(bru.getVar("marketplaceBranchId")); expect(res.body.serviceId).to.equal(bru.getVar("serviceId")); expect(res.body.price).to.equal(125.5); expect(res.body.estimatedDurationMin).to.equal(45); expect(res.body.concurrentCapacity).to.equal(3); });
+        test("starts active and discoverable", function() { expect(res.body.status).to.equal("ACTIVE"); expect(res.body.effectiveActive).to.equal(true); expect(res.body.discoverable).to.equal(true); expect(res.body).to.not.have.property("service"); expect(res.body).to.not.have.property("branch"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
+

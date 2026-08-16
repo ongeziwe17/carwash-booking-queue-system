@@ -54,6 +54,7 @@ Completed issue cleanup:
 - #164 — Explicit capability-based modular-monolith boundaries with ArchUnit enforcement (ARCH-001).
 - #115 — Marketplace business and branch registration (MKT-001).
 - #116 — Branch operating hours and temporary closures (MKT-002).
+- #117 — Branch-specific service offerings and configured capacity (SERVICE-001).
 
 ## 3. Phase 0 — Immediate Hardening
 
@@ -86,7 +87,7 @@ Phase exit criteria:
 - Booking and queue states remain consistent.
 - Customers can query availability before booking.
 
-Phase 1 and the ARCH-001 transition are complete. MKT-001 (#115) and MKT-002 (#116) are implemented Phase 2 foundations; SERVICE-001 (#117) is next.
+Phase 1 and the ARCH-001 transition are complete. MKT-001 (#115), MKT-002 (#116), and SERVICE-001 (#117) are implemented Phase 2 foundations; OPS-001 (#118) is next.
 
 ## 5. Phase 2 — Marketplace Business and Branch Foundation
 
@@ -94,7 +95,7 @@ Phase 1 and the ARCH-001 transition are complete. MKT-001 (#115) and MKT-002 (#1
 | --- | ---: | --- | --- | --- |
 | MKT-001 | #115 | Add Marketplace business and branch registration — implemented | P1 | Phase 0, ARCH-001, AVAIL-001 |
 | MKT-002 | #116 | Add branch operating hours and temporary closures — implemented | P1 | MKT-001, CONFIG-001 |
-| SERVICE-001 | #117 | Add branch-specific service offerings and capacity | P1 | MKT-001, MKT-002, DATA-001 |
+| SERVICE-001 | #117 | Add branch-specific service offerings and capacity — implemented | P1 | MKT-001, MKT-002, DATA-001 |
 | OPS-001 | #118 | Scope bookings, queues, notifications, and reports to branches | P1 | SERVICE-001, WORKFLOW-001, QUEUE-002 |
 | GEO-001 | #119 | Add branch distance calculation and public discovery | P1 | MKT-001, SERVICE-001 |
 | AVAIL-002 | #120 | Add branch-aware availability search | P1 | MKT-002, SERVICE-001, OPS-001, GEO-001 |

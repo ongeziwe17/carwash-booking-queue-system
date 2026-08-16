@@ -63,16 +63,24 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 | `POST` | `/api/marketplace/branches/{branchId}/closures` | ✅ | ✅ | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
 | `POST` | `/api/marketplace/closures/{closureId}/cancel` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
 | `GET` | `/api/marketplace/branches/{branchId}/open-status` | ✅ | ✅ | ✅ | N/A — all roles have read permission | N/A — operational view | ✅ | ✅ |
+| `GET` | `/api/marketplace/branches/{branchId}/offerings` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | N/A — read only | ✅ |
+| `POST` | `/api/marketplace/branches/{branchId}/offerings` | ✅ | ✅ | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
+| `GET` | `/api/marketplace/offerings/{offeringId}` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | N/A — read only | ✅ |
+| `PUT` | `/api/marketplace/offerings/{offeringId}` | ✅ | ✅ | ✅ | ✅ | ✅ — identities omitted | ✅ | ✅ |
+| `POST` | `/api/marketplace/offerings/{offeringId}/activate` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
+| `POST` | `/api/marketplace/offerings/{offeringId}/deactivate` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
+| `GET` | `/api/marketplace/branches/{branchId}/offerings/discoverable` | ✅ | N/A — path validation in Java | ✅ | N/A — all roles have read permission | N/A — public discovery view | ✅ | ✅ |
 
 ## Totals
 
-- API operations: **59**
-- Happy-path functional coverage: **59/59**
-- 401 coverage: **57/57 protected operations** (2 public operations are N/A)
-- RBAC/403 applicability covered: **51 operations/capabilities**
-- Ownership applicability covered: **15 operations**
-- Validation applicability covered: **23 operations**
-- HTTP-visible integrity applicability covered: **37 operations**
-- Operations used in multi-step workflows: **44**
+- API operations: **66**
+- Happy-path functional coverage: **66/66**
+- 401 coverage: **64/64 protected operations** (2 public operations are N/A)
+- RBAC/403 applicability covered: **57 operations/capabilities**
+- Ownership/identity applicability covered: **16 operations**
+- Validation applicability covered: **25 operations**
+- HTTP-visible integrity applicability covered: **42 operations**
+- Operations used in multi-step workflows: **51**
+- Bruno requests/tests: **451 requests / 1,577 tests**
 
 The full authorization suite also exercises each significant role/capability allow/deny cell rather than relying only on per-operation counts.
