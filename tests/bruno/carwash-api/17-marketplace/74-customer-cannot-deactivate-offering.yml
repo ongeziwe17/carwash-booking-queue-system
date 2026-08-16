@@ -1,0 +1,20 @@
+info:
+  name: Customer cannot deactivate offering
+  type: http
+  seq: 74
+  tags: [marketplace, offering, customer, rbac, security]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/offerings/{{marketplaceOfferingId}}/deactivate"
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 403", function() { expect(res.status).to.equal(403); expect(res.body.code).to.equal("ACCESS_DENIED"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

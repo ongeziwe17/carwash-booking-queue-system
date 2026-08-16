@@ -48,14 +48,17 @@ Every Spring/API integration test now extends `ApiIntegrationTestSupport`, which
 - focused API/authentication clients and fixture builders
 - reusable standard-error and privacy assertions
 
-Before every integration-test method, `InMemoryTestDataCleaner` performs one `InMemoryDataCoordinator.write(...)` operation and deletes current records through repository APIs in dependency order:
+Before every integration-test method, `InMemoryTestDataCleaner` performs one `InMemoryDataCoordinator.write(...)` operation and deletes current records through repository APIs in dependency order. The current order begins with Catalog offerings, Marketplace closures/schedules, branches/businesses, then notifications, queue entries, bookings, vehicles, reusable services, and users so no dependent outlives its owner.
 
-1. notifications
-2. queue entries
-3. bookings
-4. vehicles
-5. services
-6. users
+1. branch service offerings
+2. branch temporary closures and operating schedules
+3. Marketplace branches and businesses
+4. notifications
+5. queue entries
+6. bookings
+7. vehicles
+8. reusable global services
+9. users
 
 The cleaner also resets only the test implementation of `NotificationIdGenerator`. Production exposes no reset API, no reflection-based cleanup, and no public test endpoint. The cached Spring context is reused; `@DirtiesContext` is no longer an isolation strategy.
 

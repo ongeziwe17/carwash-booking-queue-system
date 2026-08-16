@@ -1,0 +1,34 @@
+info:
+  name: Duplicate branch and service offering is rejected
+  type: http
+  seq: 49
+  tags: [marketplace, offering, validation, integrity]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}/offerings"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "offeringId": "{{marketplaceDuplicateOfferingId}}",
+        "serviceId": "{{serviceId}}",
+        "price": 90.00,
+        "estimatedDurationMin": 20,
+        "concurrentCapacity": 1
+      }
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 400", function() { expect(res.status).to.equal(400); });
+        test("uses business-rule error", function() { expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); expect(res.body.message).to.include("already has an offering"); expect(res.body.fieldErrors).to.be.an("array"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

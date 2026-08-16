@@ -1,0 +1,21 @@
+info:
+  name: Business owner reactivates branch service offering
+  type: http
+  seq: 55
+  tags: [marketplace, offering, owner, workflow]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/offerings/{{marketplaceOfferingId}}/activate"
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("stored offering is active and discoverable", function() { expect(res.body.status).to.equal("ACTIVE"); expect(res.body.effectiveActive).to.equal(true); expect(res.body.discoverable).to.equal(true); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -3,6 +3,7 @@ package com.carwash.catalog.application;
 import com.carwash.queue.application.QueueOrderingService;
 
 import com.carwash.catalog.domain.Service;
+import com.carwash.catalog.domain.ServiceOfferingRepository;
 import com.carwash.booking.domain.BookingRepository;
 import com.carwash.queue.domain.QueueEntryRepository;
 import com.carwash.catalog.domain.ServiceRepository;
@@ -17,6 +18,7 @@ import java.util.Objects;
 public class ServiceCatalogService {
 
     private final ServiceRepository serviceRepository;
+    private final ServiceOfferingRepository serviceOfferingRepository;
     private final BookingRepository bookingRepository;
     private final QueueEntryRepository queueEntryRepository;
     private final InMemoryDataCoordinator coordinator;
@@ -25,12 +27,15 @@ public class ServiceCatalogService {
 
     public ServiceCatalogService(
             ServiceRepository serviceRepository,
+            ServiceOfferingRepository serviceOfferingRepository,
             BookingRepository bookingRepository,
             QueueEntryRepository queueEntryRepository,
             InMemoryDataCoordinator coordinator,
             QueueOrderingService queueOrdering
     ) {
         this.serviceRepository = Objects.requireNonNull(serviceRepository, "Service repository is required");
+        this.serviceOfferingRepository = Objects.requireNonNull(
+                serviceOfferingRepository, "Service offering repository is required");
         this.bookingRepository = bookingRepository;
         this.queueEntryRepository = queueEntryRepository;
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
@@ -115,6 +120,11 @@ public class ServiceCatalogService {
             requireService(serviceId);
             boolean referencedByBooking = bookingRepository != null && bookingRepository.existsByServiceId(serviceId);
             boolean referencedByQueue = queueEntryRepository != null && queueEntryRepository.existsByServiceId(serviceId);
+            boolean referencedByOffering = serviceOfferingRepository.existsByServiceId(serviceId);
+            if (referencedByOffering) {
+                throw new BusinessRuleViolationException(
+                        "Service referenced by a branch offering cannot be deleted; deactivate it instead");
+            }
             if (referencedByBooking || referencedByQueue) {
                 throw new BusinessRuleViolationException("Referenced service cannot be deleted; deactivate it instead");
             }

@@ -1,0 +1,21 @@
+info:
+  name: Business owner deactivates offering parent branch
+  type: http
+  seq: 60
+  tags: [marketplace, offering, owner, workflow]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}/deactivate"
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("branch becomes inactive", function() { expect(res.body.status).to.equal("INACTIVE"); expect(res.body.effectiveActive).to.equal(false); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

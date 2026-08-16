@@ -1,0 +1,21 @@
+info:
+  name: Parent reactivation restores offering discovery
+  type: http
+  seq: 63
+  tags: [marketplace, offering, customer, workflow]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}/offerings/discoverable"
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("stored active offering is restored", function() { expect(res.body).to.have.length(1); expect(res.body[0].offeringId).to.equal(bru.getVar("marketplaceOfferingId")); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

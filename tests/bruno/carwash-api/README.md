@@ -152,6 +152,7 @@ The collection verifies:
 - AVAIL-001 generated service/date slots, duration/closing fit, deterministic ordering, global remaining capacity, full-slot booking consistency, cancellation release, inactive/unknown/past rejection, and authenticated service-read access;
 - MKT-001 business/branch registration, bounded responses, immutable ownership, coordinates/timezone validation, lifecycle actions, effective activity/public discovery, Marketplace RBAC, and complete unauthenticated-operation coverage;
 - MKT-002 atomic weekly schedules, multiple/overnight intervals, timezone-aware open status, temporary-closure override/cancellation, overlap rejection, Marketplace scheduling RBAC, and complete unauthenticated-operation coverage;
+- SERVICE-001 branch-specific price/duration/configured-capacity terms, multi-branch reuse of global service definitions, offering and parent lifecycle discovery, public-discovery suppression, duplicate/reference validation, deletion integrity, Marketplace RBAC, and complete unauthenticated-operation coverage;
 - current queue states (`WAITING`, `CALLED`, `IN_PROGRESS`, `COMPLETED`);
 - real role changes and token acquisition;
 - final-platform-administrator protection without deleting or demoting the bootstrap admin.
@@ -168,7 +169,7 @@ responsibilities because the acceptance environment does not expose test-only cl
 
 The run-scoped availability workflow uses an isolated future date and services. It proves that an appointment for a different service consumes the same global exact-start capacity, the full slot disappears and cannot be booked, cancellation restores it, and a 60-minute service is never advertised past the closing boundary. Availability reads remain point-in-time snapshots and do not reserve capacity.
 
-The run-scoped Marketplace workflow registers one business and branch, exercises every onboarding and scheduling operation, proves business deactivation suppresses otherwise active branch discovery without deleting it, validates coordinate/timezone rejection, and checks customer read/management-denial behavior. It then atomically creates weekly hours, proves normal and overnight opening, proves an active closure overrides those hours, cancels that closure to restore opening, and rejects a Sunday-to-Monday overlap. It does not imply tenant isolation, distance discovery, branch offerings, or branch-scoped booking/queue operations.
+The run-scoped Marketplace workflow registers businesses and branches, exercises every onboarding, scheduling, and offering operation, proves parent lifecycle and public-discovery filtering without rewriting child state, validates coordinate/timezone and offering-term rules, and checks customer read/management-denial behavior. It atomically creates weekly hours, proves normal and overnight opening, proves and cancels a closure override, and rejects a Sunday-to-Monday overlap. It also offers one reusable service at two branches with independent terms and protects that referenced service from deletion. It does not imply tenant isolation, distance discovery, remaining-capacity calculation, or branch-scoped booking/queue operations.
 
 ## Cleanup
 

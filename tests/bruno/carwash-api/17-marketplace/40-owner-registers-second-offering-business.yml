@@ -1,0 +1,34 @@
+info:
+  name: Business owner registers second offering business
+  type: http
+  seq: 40
+  tags: [marketplace, offering, owner, workflow]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/businesses"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "businessId": "{{marketplaceSecondBusinessId}}",
+        "businessName": "Bruno Second Wash Group",
+        "contactEmail": "marketplace-second-{{runId}}@example.test",
+        "contactPhone": "+27 82 555 0101",
+        "registrationNumber": "REG-SECOND-{{runId}}"
+      }
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("creates independent active business", function() { expect(res.body.businessId).to.equal(bru.getVar("marketplaceSecondBusinessId")); expect(res.body.status).to.equal("ACTIVE"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

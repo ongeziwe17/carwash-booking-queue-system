@@ -1,0 +1,21 @@
+info:
+  name: Business owner deactivates offering parent service
+  type: http
+  seq: 57
+  tags: [marketplace, offering, owner, workflow]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/services/{{serviceId}}/deactivate"
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("global service is inactive", function() { expect(res.body.active).to.equal(false); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

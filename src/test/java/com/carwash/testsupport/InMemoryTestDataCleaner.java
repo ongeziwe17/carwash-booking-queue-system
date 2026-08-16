@@ -4,6 +4,7 @@ import com.carwash.booking.domain.Booking;
 import com.carwash.notification.domain.Notification;
 import com.carwash.queue.domain.QueueEntry;
 import com.carwash.catalog.domain.Service;
+import com.carwash.catalog.domain.ServiceOffering;
 import com.carwash.identity.domain.User;
 import com.carwash.vehicle.domain.Vehicle;
 import com.carwash.marketplace.domain.CarWashBranch;
@@ -14,6 +15,7 @@ import com.carwash.booking.domain.BookingRepository;
 import com.carwash.notification.domain.NotificationRepository;
 import com.carwash.queue.domain.QueueEntryRepository;
 import com.carwash.catalog.domain.ServiceRepository;
+import com.carwash.catalog.domain.ServiceOfferingRepository;
 import com.carwash.identity.domain.UserRepository;
 import com.carwash.vehicle.domain.VehicleRepository;
 import com.carwash.marketplace.domain.CarWashBranchRepository;
@@ -28,6 +30,7 @@ public final class InMemoryTestDataCleaner {
     private final UserRepository users;
     private final VehicleRepository vehicles;
     private final ServiceRepository services;
+    private final ServiceOfferingRepository offerings;
     private final BookingRepository bookings;
     private final QueueEntryRepository queueEntries;
     private final NotificationRepository notifications;
@@ -42,6 +45,7 @@ public final class InMemoryTestDataCleaner {
             UserRepository users,
             VehicleRepository vehicles,
             ServiceRepository services,
+            ServiceOfferingRepository offerings,
             BookingRepository bookings,
             QueueEntryRepository queueEntries,
             NotificationRepository notifications,
@@ -55,6 +59,7 @@ public final class InMemoryTestDataCleaner {
         this.users = users;
         this.vehicles = vehicles;
         this.services = services;
+        this.offerings = offerings;
         this.bookings = bookings;
         this.queueEntries = queueEntries;
         this.notifications = notifications;
@@ -67,6 +72,8 @@ public final class InMemoryTestDataCleaner {
 
     public void clean() {
         coordinator.write(() -> {
+            offerings.findAll().stream().map(ServiceOffering::getOfferingId)
+                    .forEach(offerings::deleteById);
             closures.findAll().stream().map(TemporaryBranchClosure::getClosureId)
                     .forEach(closures::deleteById);
             schedules.findAll().stream().map(BranchOperatingSchedule::getBranchId)

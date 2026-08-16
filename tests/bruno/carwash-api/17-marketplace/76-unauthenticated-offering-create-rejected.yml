@@ -1,0 +1,26 @@
+info:
+  name: Unauthenticated offering creation is rejected
+  type: http
+  seq: 76
+  tags: [marketplace, offering, auth, security]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}/offerings"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {"offeringId":"{{marketplaceUnauthOfferingId}}","serviceId":"{{serviceId}}","price":10.00,"estimatedDurationMin":10,"concurrentCapacity":1}
+  auth:
+    type: none
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 401", function() { expect(res.status).to.equal(401); expect(res.body.code).to.equal("AUTHENTICATION_REQUIRED"); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

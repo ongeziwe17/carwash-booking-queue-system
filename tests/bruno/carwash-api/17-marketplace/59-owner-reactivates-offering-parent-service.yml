@@ -1,0 +1,21 @@
+info:
+  name: Business owner reactivates offering parent service
+  type: http
+  seq: 59
+  tags: [marketplace, offering, owner, workflow]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/services/{{serviceId}}/activate"
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("global service is active again", function() { expect(res.body.active).to.equal(true); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

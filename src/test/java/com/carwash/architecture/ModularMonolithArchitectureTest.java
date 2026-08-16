@@ -99,6 +99,24 @@ class ModularMonolithArchitectureTest {
                 .check(APPLICATION);
     }
 
+    @Test
+    void catalog_domain_stays_independent_of_marketplace() {
+        noClasses().that().resideInAPackage("com.carwash.catalog.domain..")
+                .should().dependOnClassesThat().resideInAPackage("com.carwash.marketplace..")
+                .check(APPLICATION);
+    }
+
+    @Test
+    void catalog_uses_only_the_published_marketplace_application_contract() {
+        noClasses().that().resideInAPackage("com.carwash.catalog..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.carwash.marketplace.api..",
+                        "com.carwash.marketplace.domain..",
+                        "com.carwash.marketplace.infrastructure.."
+                )
+                .check(APPLICATION);
+    }
+
     private static String[] businessPackages() {
         return java.util.Arrays.stream(BUSINESS_MODULES)
                 .map(module -> "com.carwash." + module + "..")

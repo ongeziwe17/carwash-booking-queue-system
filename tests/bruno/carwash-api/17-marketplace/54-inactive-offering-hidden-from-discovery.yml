@@ -1,0 +1,21 @@
+info:
+  name: Inactive offering is hidden from discovery
+  type: http
+  seq: 54
+  tags: [marketplace, offering, customer, workflow]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}/offerings/discoverable"
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("inactive offering is absent", function() { expect(res.body).to.be.an("array").with.length(0); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
