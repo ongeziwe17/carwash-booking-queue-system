@@ -19,4 +19,3 @@ runtime:
         test("returns reusable definition metadata and branch terms", function() { expect(res.body.serviceName).to.equal("Bruno Exterior Wash"); expect(res.body.serviceDescription).to.equal("Bruno acceptance service"); expect(res.body.price).to.equal(125.5); expect(res.body.createdAt).to.be.a("string"); expect(res.body.updatedAt).to.be.a("string"); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

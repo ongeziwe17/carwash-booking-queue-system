@@ -32,4 +32,3 @@ runtime:
         test("identifies configured capacity", function() { expect(JSON.stringify(res.body.fieldErrors)).to.include("concurrentCapacity"); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

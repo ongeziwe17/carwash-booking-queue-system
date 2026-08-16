@@ -32,4 +32,3 @@ runtime:
         test("same service has independent second-branch terms", function() { expect(res.body.serviceId).to.equal(bru.getVar("serviceId")); expect(res.body.branchId).to.equal(bru.getVar("marketplaceSecondBranchId")); expect(res.body.price).to.equal(189.99); expect(res.body.estimatedDurationMin).to.equal(60); expect(res.body.concurrentCapacity).to.equal(6); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

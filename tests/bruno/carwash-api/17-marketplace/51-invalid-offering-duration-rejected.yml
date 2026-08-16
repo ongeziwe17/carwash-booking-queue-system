@@ -32,4 +32,3 @@ runtime:
         test("identifies estimated duration", function() { expect(JSON.stringify(res.body.fieldErrors)).to.include("estimatedDurationMin"); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

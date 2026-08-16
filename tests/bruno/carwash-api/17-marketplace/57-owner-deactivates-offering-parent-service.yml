@@ -19,4 +19,3 @@ runtime:
         test("global service is inactive", function() { expect(res.body.active).to.equal(false); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

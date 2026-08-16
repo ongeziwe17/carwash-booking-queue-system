@@ -32,4 +32,3 @@ runtime:
         test("uses business-rule error", function() { expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); expect(res.body.message).to.include("already has an offering"); expect(res.body.fieldErrors).to.be.an("array"); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

@@ -25,4 +25,3 @@ runtime:
         test("returns 403", function() { expect(res.status).to.equal(403); expect(res.body.code).to.equal("ACCESS_DENIED"); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

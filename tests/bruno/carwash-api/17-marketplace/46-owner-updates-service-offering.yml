@@ -30,4 +30,3 @@ runtime:
         test("updates terms without changing identity", function() { expect(res.body.offeringId).to.equal(bru.getVar("marketplaceOfferingId")); expect(res.body.branchId).to.equal(bru.getVar("marketplaceBranchId")); expect(res.body.serviceId).to.equal(bru.getVar("serviceId")); expect(res.body.price).to.equal(149.99); expect(res.body.estimatedDurationMin).to.equal(50); expect(res.body.concurrentCapacity).to.equal(4); expect(res.body.status).to.equal("ACTIVE"); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

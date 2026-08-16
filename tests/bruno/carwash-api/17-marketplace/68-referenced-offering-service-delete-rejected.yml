@@ -19,4 +19,3 @@ runtime:
         test("instructs deactivation instead of deletion", function() { expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); expect(res.body.message).to.include("branch offering"); expect(res.body.message).to.include("deactivate"); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

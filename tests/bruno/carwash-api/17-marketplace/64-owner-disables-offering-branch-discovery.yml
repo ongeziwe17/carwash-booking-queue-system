@@ -38,4 +38,3 @@ runtime:
         test("branch stays active but opts out of discovery", function() { expect(res.body.status).to.equal("ACTIVE"); expect(res.body.effectiveActive).to.equal(true); expect(res.body.publicDiscoveryEnabled).to.equal(false); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

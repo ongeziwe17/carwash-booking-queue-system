@@ -32,4 +32,3 @@ runtime:
         test("identifies price", function() { expect(JSON.stringify(res.body.fieldErrors)).to.include("price"); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

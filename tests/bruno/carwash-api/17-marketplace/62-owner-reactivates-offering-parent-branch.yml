@@ -19,4 +19,3 @@ runtime:
         test("branch becomes active again", function() { expect(res.body.status).to.equal("ACTIVE"); expect(res.body.effectiveActive).to.equal(true); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

@@ -19,4 +19,3 @@ runtime:
         test("parent service suppresses discovery", function() { expect(res.body).to.have.length(0); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

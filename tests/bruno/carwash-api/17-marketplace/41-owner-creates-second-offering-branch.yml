@@ -39,4 +39,3 @@ runtime:
         test("branch belongs to second business", function() { expect(res.body.branchId).to.equal(bru.getVar("marketplaceSecondBranchId")); expect(res.body.businessId).to.equal(bru.getVar("marketplaceSecondBusinessId")); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

@@ -24,4 +24,3 @@ runtime:
         test("returns 401", function() { expect(res.status).to.equal(401); expect(res.body.code).to.equal("AUTHENTICATION_REQUIRED"); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

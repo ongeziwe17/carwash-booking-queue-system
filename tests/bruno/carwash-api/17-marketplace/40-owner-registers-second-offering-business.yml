@@ -32,4 +32,3 @@ runtime:
         test("creates independent active business", function() { expect(res.body.businessId).to.equal(bru.getVar("marketplaceSecondBusinessId")); expect(res.body.status).to.equal("ACTIVE"); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

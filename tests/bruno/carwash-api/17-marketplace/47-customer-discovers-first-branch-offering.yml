@@ -20,4 +20,3 @@ runtime:
         test("omits management and object graph fields", function() { const item=res.body[0]; for (const field of ["status","effectiveActive","discoverable","createdAt","updatedAt","service","branch","repository"]) expect(item).to.not.have.property(field); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

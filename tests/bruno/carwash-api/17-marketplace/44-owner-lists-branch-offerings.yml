@@ -19,4 +19,3 @@ runtime:
         test("returns deterministic bounded management records", function() { expect(res.body).to.be.an("array").with.length(1); expect(res.body[0].offeringId).to.equal(bru.getVar("marketplaceOfferingId")); expect(res.body[0]).to.not.have.property("service"); expect(res.body[0]).to.not.have.property("branch"); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

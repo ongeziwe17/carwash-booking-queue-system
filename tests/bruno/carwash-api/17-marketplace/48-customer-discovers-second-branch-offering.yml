@@ -19,4 +19,3 @@ runtime:
         test("second branch keeps independent terms", function() { expect(res.body).to.have.length(1); expect(res.body[0].serviceId).to.equal(bru.getVar("serviceId")); expect(res.body[0].price).to.equal(189.99); expect(res.body[0].estimatedDurationMin).to.equal(60); expect(res.body[0].concurrentCapacity).to.equal(6); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

@@ -19,4 +19,3 @@ runtime:
         test("inactive offering is absent", function() { expect(res.body).to.be.an("array").with.length(0); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-

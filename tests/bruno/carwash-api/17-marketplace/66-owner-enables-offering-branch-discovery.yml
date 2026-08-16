@@ -38,4 +38,3 @@ runtime:
         test("branch opts back into discovery", function() { expect(res.body.publicDiscoveryEnabled).to.equal(true); expect(res.body.discoverable).to.equal(true); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
-
