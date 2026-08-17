@@ -1,4 +1,4 @@
-info: { name: Cross-branch booking creation is rejected, type: http, seq: 13, tags: [ops, booking, integrity] }
+info: { name: Cross-branch booking creation is rejected, type: http, seq: 14, tags: [ops, booking, integrity] }
 http:
   method: POST
   url: "{{baseUrl}}/api/bookings"

@@ -1,4 +1,4 @@
-info: { name: Call-next requires branch scope, type: http, seq: 18, tags: [ops, queue, validation] }
+info: { name: Call-next requires branch scope, type: http, seq: 19, tags: [ops, queue, validation] }
 http:
   method: POST
   url: "{{baseUrl}}/api/queue-entries/call-next"

@@ -1,4 +1,4 @@
-info: { name: Daily report rejects conflicting scopes, type: http, seq: 20, tags: [ops, report, validation] }
+info: { name: Daily report rejects conflicting scopes, type: http, seq: 21, tags: [ops, report, validation] }
 http:
   method: GET
   url: "{{baseUrl}}/api/reports/daily-summary?date={{branchOpsReportDate}}&branchId={{marketplaceBranchId}}&businessId={{marketplaceBusinessId}}"

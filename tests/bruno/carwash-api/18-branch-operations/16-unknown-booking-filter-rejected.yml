@@ -1,4 +1,4 @@
-info: { name: Unknown booking branch filter is rejected, type: http, seq: 16, tags: [ops, booking, validation] }
+info: { name: Unknown booking branch filter is rejected, type: http, seq: 17, tags: [ops, booking, validation] }
 http:
   method: GET
   url: "{{baseUrl}}/api/bookings?branchId=missing-branch-{{runId}}"

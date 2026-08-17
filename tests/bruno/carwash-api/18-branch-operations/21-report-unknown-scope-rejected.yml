@@ -1,4 +1,4 @@
-info: { name: Daily report rejects unknown scope, type: http, seq: 21, tags: [ops, report, integrity] }
+info: { name: Daily report rejects unknown scope, type: http, seq: 22, tags: [ops, report, integrity] }
 http:
   method: GET
   url: "{{baseUrl}}/api/reports/daily-summary?date={{branchOpsReportDate}}&businessId=missing-business-{{runId}}"

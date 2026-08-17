@@ -1,4 +1,4 @@
-info: { name: Queue consistency mismatch is rejected, type: http, seq: 12, tags: [ops, queue, integrity] }
+info: { name: Queue consistency mismatch is rejected, type: http, seq: 13, tags: [ops, queue, integrity] }
 http:
   method: POST
   url: "{{baseUrl}}/api/queue-entries"

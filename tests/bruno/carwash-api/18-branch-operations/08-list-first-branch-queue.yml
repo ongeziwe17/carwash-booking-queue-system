@@ -1,4 +1,4 @@
-info: { name: First branch queue is unaffected, type: http, seq: 8, tags: [ops, queue, branch, workflow] }
+info: { name: First branch queue is unaffected, type: http, seq: 9, tags: [ops, queue, branch, workflow] }
 http:
   method: GET
   url: "{{baseUrl}}/api/queue-entries?branchId={{marketplaceBranchId}}"

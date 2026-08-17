@@ -1,4 +1,4 @@
-info: { name: Blank queue branch filter is rejected, type: http, seq: 17, tags: [ops, queue, validation] }
+info: { name: Blank queue branch filter is rejected, type: http, seq: 18, tags: [ops, queue, validation] }
 http:
   method: GET
   url: "{{baseUrl}}/api/queue-entries?branchId="

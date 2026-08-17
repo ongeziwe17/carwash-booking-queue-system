@@ -1,5 +1,5 @@
 info:
-  name: Cleanup unreferenced inactive service
+  name: Preserve inactive service referenced by an offering
   type: http
   seq: 2
   tags:
@@ -16,7 +16,12 @@ runtime:
   scripts:
     - type: tests
       code: |-
-        test("returns 204", function() { expect(res.status).to.equal(204); });
+        test("rejects deletion of an offering-referenced service", function() {
+          expect(res.status).to.equal(400);
+          expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION");
+          expect(res.body.message).to.include("branch offering");
+          expect(res.body.message).to.include("deactivate it instead");
+        });
         const payload = JSON.stringify(res.body ?? {});
         const lower = payload.toLowerCase();
         for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password"]) {

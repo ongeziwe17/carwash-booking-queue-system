@@ -1,4 +1,4 @@
-info: { name: Queue second branch booking, type: http, seq: 6, tags: [ops, queue, branch, workflow] }
+info: { name: Queue second branch booking, type: http, seq: 7, tags: [ops, queue, branch, workflow] }
 http:
   method: POST
   url: "{{baseUrl}}/api/queue-entries"

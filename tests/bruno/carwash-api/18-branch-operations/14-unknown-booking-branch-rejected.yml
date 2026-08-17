@@ -1,4 +1,4 @@
-info: { name: Unknown booking branch is rejected, type: http, seq: 14, tags: [ops, booking, integrity] }
+info: { name: Unknown booking branch is rejected, type: http, seq: 15, tags: [ops, booking, integrity] }
 http:
   method: POST
   url: "{{baseUrl}}/api/bookings"
