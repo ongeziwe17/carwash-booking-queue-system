@@ -79,8 +79,10 @@ class QueueManagementServiceTest extends ServiceTestSupport {
     }
 
     @Test
-    void configuredFallbackDurationIsUsedForActivePredecessorWithoutDuration() {
-        Booking firstBooking = confirmedBookingWithDuration(0, 4);
+    void offeringDurationRemainsAuthoritativeWhenLegacyGlobalDurationChanges() {
+        Booking firstBooking = confirmedBookingWithDuration(10, 4);
+        firstBooking.getService().setEstimatedDurationMin(1);
+        assertTrue(serviceRepository.update(firstBooking.getService()));
         Booking secondBooking = confirmedBookingWithDuration(25, 5);
 
         QueueEntry first = createQueueEntry(firstBooking);
@@ -157,10 +159,11 @@ class QueueManagementServiceTest extends ServiceTestSupport {
 
     @Test
     void callNextReturnsNotFoundWhenQueueIsEmpty() {
+        String branchId = ensureDefaultBranch();
         ResourceNotFoundException exception = assertThrows(
-                ResourceNotFoundException.class, () -> queueService.callNext(defaultBranchId));
+                ResourceNotFoundException.class, () -> queueService.callNext(branchId));
 
-        assertEquals("No waiting queue entry available for branch: " + defaultBranchId, exception.getMessage());
+        assertEquals("No waiting queue entry available for branch: " + branchId, exception.getMessage());
     }
 
     @Test
@@ -333,7 +336,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         Service service = createService();
         User user = User.withEncodedPassword(ids.user(), "Missing", "missing@example.test", "123", "hash", null);
         Vehicle vehicle = new Vehicle(ids.vehicle(), ids.plate(), "Sedan", "Toyota", "Corolla", "Blue", "");
-        Booking missing = new Booking(ids.booking(), user, vehicle, defaultBranchId, createOffering(service),
+        Booking missing = new Booking(ids.booking(), user, vehicle, ensureDefaultBranch(), createOffering(service),
                 service, TestDates.future(), "none");
 
         assertThrows(ResourceNotFoundException.class,
@@ -518,7 +521,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         BusinessRuleViolationException exception = assertThrows(BusinessRuleViolationException.class,
                 () -> queueService.updatePosition(queueEntry.getQueueEntryId(), 2));
 
-        assertEquals("Queue position exceeds active queue size", exception.getMessage());
+        assertEquals("Queue position exceeds active branch queue size", exception.getMessage());
         assertQueueMetrics(queueEntry, 1, 0);
     }
 

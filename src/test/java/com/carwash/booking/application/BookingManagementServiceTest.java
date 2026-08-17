@@ -10,6 +10,7 @@ import com.carwash.notification.application.NotificationPolicyProperties;
 import com.carwash.booking.domain.Booking;
 import com.carwash.notification.domain.Notification;
 import com.carwash.queue.domain.QueueEntry;
+import com.carwash.catalog.application.UpdateServiceOfferingCommand;
 import com.carwash.catalog.domain.Service;
 import com.carwash.identity.domain.User;
 import com.carwash.vehicle.domain.Vehicle;
@@ -224,8 +225,8 @@ class BookingManagementServiceTest extends ServiceTestSupport {
     @Test
     void cancellationRemovesWaitingQueueEntryAndRebalancesRemainingQueue() {
         Booking firstBooking = createConfirmedBooking(TestDates.futureDays(20));
-        firstBooking.getService().setEstimatedDurationMin(10);
-        assertTrue(serviceRepository.update(firstBooking.getService()));
+        serviceOfferingService.updateOffering(firstBooking.getServiceOfferingId(),
+                new UpdateServiceOfferingCommand(firstBooking.getService().getPrice(), 10, 2));
         Booking secondBooking = createConfirmedBooking(TestDates.futureDays(21));
         QueueEntry first = canonicalQueue(queueService.createQueueEntry(
                 ids.queueEntry(), firstBooking.getBookingId(), firstBooking.getService().getServiceId()));
@@ -603,7 +604,7 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         Vehicle alternate = createVehicle(booking.getUser());
 
         Booking updated = bookingService.updateBooking(
-                booking.getBookingId(), alternate.getVehicleId(), booking.getService().getServiceId(), "updated");
+                booking.getBookingId(), alternate.getVehicleId(), booking.getServiceOfferingId(), "updated");
 
         assertEquals(original, updated.getScheduledDateTime());
         assertEquals(alternate.getVehicleId(), updated.getVehicle().getVehicleId());
@@ -616,8 +617,8 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         Booking booking = createSavedBooking(TestDates.futureDays(74), BookingStatus.CREATED);
         LocalDateTime original = booking.getScheduledDateTime();
         LocalDate targetDate = TestDates.futureDays(75).toLocalDate();
-        booking.getService().setEstimatedDurationMin(60);
-        assertTrue(serviceRepository.update(booking.getService()));
+        serviceOfferingService.updateOffering(booking.getServiceOfferingId(),
+                new UpdateServiceOfferingCommand(booking.getService().getPrice(), 60, 2));
 
         for (LocalDateTime invalid : List.of(
                 targetDate.atTime(7, 30),
@@ -633,15 +634,18 @@ class BookingManagementServiceTest extends ServiceTestSupport {
     }
 
     @Test
-    void genericServiceUpdateRejectsServiceThatWouldFinishAfterClosingWithoutMutation() {
+    void genericOfferingUpdateRejectsDurationThatWouldFinishAfterClosingWithoutMutation() {
         LocalDateTime schedule = TestDates.futureDays(76).toLocalDate().atTime(16, 30);
         Booking booking = bookingService.createBooking(newBookingWithFixture(schedule));
         Service originalService = booking.getService();
         Service longService = catalogService.createService(new Service(
                 ids.service(), "Long wash", "test", BigDecimal.TEN, 60));
+        String longOfferingId = createOffering(longService);
+        serviceOfferingService.updateOffering(longOfferingId,
+                new UpdateServiceOfferingCommand(BigDecimal.TEN, 60, 2));
 
         assertThrows(BusinessRuleViolationException.class, () -> bookingService.updateBooking(
-                booking.getBookingId(), booking.getVehicle().getVehicleId(), longService.getServiceId(), "changed"));
+                booking.getBookingId(), booking.getVehicle().getVehicleId(), longOfferingId, "changed"));
 
         assertSame(originalService, booking.getService());
         assertEquals(schedule, booking.getScheduledDateTime());

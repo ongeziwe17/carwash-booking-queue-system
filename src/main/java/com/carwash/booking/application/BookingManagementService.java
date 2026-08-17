@@ -247,16 +247,13 @@ public class BookingManagementService implements BookingQuery {
             );
 
             LocalDateTime originalScheduledDateTime = booking.getScheduledDateTime();
-            Service originalService = booking.getService();
             try {
-                booking.setService(resolved.service());
                 booking.setScheduledDateTime(scheduledDateTime);
                 if (!bookingRepository.update(booking)) {
                     throw new ResourceNotFoundException("Booking not found: " + bookingId);
                 }
             } catch (RuntimeException exception) {
                 booking.setScheduledDateTime(originalScheduledDateTime);
-                booking.setService(originalService);
                 throw exception;
             }
 
