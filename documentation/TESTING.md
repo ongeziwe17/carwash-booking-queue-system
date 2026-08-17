@@ -4,7 +4,7 @@ TEST-001 separates fast unit/repository/service tests from Spring API integratio
 
 ## Current OPS-001 inventory
 
-The OPS-001 suite executes **310 Surefire unit/repository/service tests** and **148 Failsafe Spring integration tests**. The generated OpenAPI contract remains exactly **66 operations** because OPS-001 evolves existing routes, and the complete Bruno collection contains **483 requests / 1,617 assertions**. CI repeats the complete Maven verification under deterministic seeds `11001` and `11002`; exact coverage and container evidence is recorded in the draft pull request for the change.
+The OPS-001 suite executes **310 Surefire unit/repository/service tests** and **148 Failsafe Spring integration tests**. The generated OpenAPI contract remains exactly **66 operations** because OPS-001 evolves existing routes, and the complete Bruno collection executes **483 requests / 1,616 tests**. CI repeats the complete Maven verification under deterministic seeds `11001` and `11002`; exact coverage and container evidence is recorded in the draft pull request for the change.
 
 ## Baseline inventory before TEST-001
 

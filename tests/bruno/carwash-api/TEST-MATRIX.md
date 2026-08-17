@@ -81,6 +81,6 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 - Validation applicability covered: **28 operations**
 - HTTP-visible integrity applicability covered: **46 operations**
 - Operations used in multi-step workflows: **55**
-- Bruno requests/tests: **483 requests / 1,617 tests**
+- Bruno requests/tests: **483 requests / 1,616 tests**
 
 The full authorization suite also exercises each significant role/capability allow/deny cell rather than relying only on per-operation counts.
