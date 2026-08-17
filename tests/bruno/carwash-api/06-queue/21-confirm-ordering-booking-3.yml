@@ -1,7 +1,7 @@
 info:
   name: Confirm third ordering booking
   type: http
-  seq: 21
+  seq: 24
   tags:
     - workflow
     - integrity

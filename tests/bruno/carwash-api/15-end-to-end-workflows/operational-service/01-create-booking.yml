@@ -19,7 +19,8 @@ http:
         "bookingId": "{{opsBookingId}}-e2e",
         "userId": "{{otherCustomerUserId}}",
         "vehicleId": "{{otherCustomerVehicleId}}",
-        "serviceId": "{{serviceId}}",
+        "branchId": "{{opsBranchId}}",
+        "serviceOfferingId": "{{opsOfferingId}}",
         "scheduledDateTime": "{{future21}}",
         "specialRequest": "Ops E2E"
       }

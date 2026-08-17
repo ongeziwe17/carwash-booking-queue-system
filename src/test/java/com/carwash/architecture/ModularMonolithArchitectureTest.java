@@ -117,6 +117,33 @@ class ModularMonolithArchitectureTest {
                 .check(APPLICATION);
     }
 
+    @Test
+    void operational_modules_use_published_marketplace_and_catalog_contracts() {
+        noClasses().that().resideInAnyPackage(
+                        "com.carwash.booking.application..",
+                        "com.carwash.queue.application..",
+                        "com.carwash.reporting.application.."
+                )
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.carwash.marketplace.api..",
+                        "com.carwash.marketplace.domain..",
+                        "com.carwash.marketplace.infrastructure..",
+                        "com.carwash.catalog.api..",
+                        "com.carwash.catalog.infrastructure.."
+                )
+                .check(APPLICATION);
+    }
+
+    @Test
+    void catalog_no_longer_reaches_into_booking_or_queue_modules() {
+        noClasses().that().resideInAPackage("com.carwash.catalog..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.carwash.booking..",
+                        "com.carwash.queue.."
+                )
+                .check(APPLICATION);
+    }
+
     private static String[] businessPackages() {
         return java.util.Arrays.stream(BUSINESS_MODULES)
                 .map(module -> "com.carwash." + module + "..")

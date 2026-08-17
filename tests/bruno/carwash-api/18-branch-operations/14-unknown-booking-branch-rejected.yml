@@ -1,0 +1,12 @@
+info: { name: Unknown booking branch is rejected, type: http, seq: 15, tags: [ops, booking, integrity] }
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body: { type: json, data: '{"bookingId":"branch-ops-unknown-branch-{{runId}}","userId":"{{customerUserId}}","vehicleId":"{{customerVehicleId}}","branchId":"missing-branch-{{runId}}","serviceOfferingId":"{{marketplaceOfferingId}}","scheduledDateTime":"{{future47}}"}' }
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("returns standard 404", function() { expect(res.status).to.equal(404); expect(res.body.code).to.equal("RESOURCE_NOT_FOUND"); expect(res.body.message).to.include("Branch not found"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

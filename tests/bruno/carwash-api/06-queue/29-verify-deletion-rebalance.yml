@@ -1,7 +1,7 @@
 info:
   name: Verify deletion closes active queue gap
   type: http
-  seq: 29
+  seq: 32
   tags:
     - workflow
     - integrity

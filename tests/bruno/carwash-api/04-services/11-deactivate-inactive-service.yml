@@ -1,7 +1,7 @@
 info:
   name: Deactivate booking-test service
   type: http
-  seq: 11
+  seq: 13
   tags:
     - owner
     - integrity

@@ -79,6 +79,37 @@ class InMemoryRepositoryCrudTest {
         assertTrue(queues.existsByServiceId("s-2"));
     }
 
+    @Test
+    void bookingAndQueueRepositoriesRetrieveAndOrderRecordsWithinOneBranch() {
+        InMemoryBookingRepository bookings = new InMemoryBookingRepository();
+        InMemoryQueueEntryRepository queues = new InMemoryQueueEntryRepository();
+        User user = user("u-branch", "branch@example.com");
+        Service service = service("s-branch", "Branch wash");
+        Booking branchAFirst = booking("b-a-1", user, service, "branch-a");
+        Booking branchASecond = booking("b-a-2", user, service, "branch-a");
+        Booking branchB = booking("b-b-1", user, service, "branch-b");
+        List.of(branchAFirst, branchASecond, branchB).forEach(booking -> assertTrue(bookings.insert(booking)));
+
+        QueueEntry branchASecondEntry = queue("q-a-2", branchASecond, service, 2,
+                QueueStatus.WAITING, LocalDateTime.of(2090, 5, 1, 8, 2));
+        QueueEntry branchBEntry = queue("q-b-1", branchB, service, 1,
+                QueueStatus.WAITING, LocalDateTime.of(2090, 5, 1, 8, 1));
+        QueueEntry branchAFirstEntry = queue("q-a-1", branchAFirst, service, 1,
+                QueueStatus.WAITING, LocalDateTime.of(2090, 5, 1, 8, 0));
+        List.of(branchASecondEntry, branchBEntry, branchAFirstEntry)
+                .forEach(entry -> assertTrue(queues.insert(entry)));
+
+        assertEquals(List.of(branchAFirst, branchASecond), bookings.findByBranchId("branch-a"));
+        assertEquals(List.of(branchAFirstEntry, branchASecondEntry), queues.findByBranchId("branch-a"));
+        assertEquals(List.of(branchAFirstEntry, branchASecondEntry),
+                queues.findActiveOrderedByBranch("branch-a"));
+        assertEquals(branchBEntry, queues.findNextWaitingByBranch("branch-b").orElseThrow());
+        assertTrue(bookings.existsByServiceOfferingId(branchAFirst.getServiceOfferingId()));
+        assertTrue(queues.existsByServiceOfferingId(branchB.getServiceOfferingId()));
+        assertThrows(UnsupportedOperationException.class,
+                () -> queues.findByBranchId("branch-a").clear());
+    }
+
     @ParameterizedTest
     @EnumSource(QueueStatus.class)
     void activeQueueLookupUsesCentralizedQueueStatusSemantics(QueueStatus status) {
@@ -242,9 +273,14 @@ class InMemoryRepositoryCrudTest {
     }
 
     private static Booking booking(String id, User user, Service service) {
+        return booking(id, user, service, "branch-test");
+    }
+
+    private static Booking booking(String id, User user, Service service, String branchId) {
         Vehicle vehicle = new Vehicle("v-1", "CA 123", "SEDAN", "Toyota", "Corolla", "White", "");
         vehicle.setUserId(user.getUserId());
-        return new Booking(id, user, vehicle, service, TestDates.future(), "none");
+        return new Booking(id, user, vehicle, branchId, "offering-" + id,
+                service, TestDates.future(), "none");
     }
 
     private static QueueEntry queue(String id, Booking booking, Service service, int position,

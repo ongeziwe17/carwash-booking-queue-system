@@ -5,6 +5,7 @@ import com.carwash.identity.domain.User;
 import com.carwash.booking.api.dto.CreateBookingRequest;
 import com.carwash.queue.api.dto.CreateQueueEntryRequest;
 import com.carwash.catalog.api.dto.CreateServiceRequest;
+import com.carwash.catalog.api.dto.CreateServiceOfferingRequest;
 import com.carwash.identity.api.dto.CreateUserRequest;
 import com.carwash.vehicle.api.dto.CreateVehicleRequest;
 import com.carwash.marketplace.api.dto.CreateBranchRequest;
@@ -70,23 +71,36 @@ class RequestValidationIntegrationTest extends ApiIntegrationTestSupport {
                 "serviceName", "Wash", "description", "", "price", -1,
                 "estimatedDurationMin", 30), "price");
 
+        CreateBusinessRequest business = new CreateBusinessRequest(
+                ids.business(), "Validation Wash", "validation@example.test", "+27 82 123 4567", null);
+        CreateBranchRequest branch = new CreateBranchRequest(
+                ids.branch(), "Validation Branch", "1 Main Road", null, "Cape Town", "Western Cape", "8001", "ZA",
+                BigDecimal.valueOf(-33.9249), BigDecimal.valueOf(18.4241), "Africa/Johannesburg", true);
+        api.createBusiness(business).andExpect(status().isCreated());
+        api.createBranch(business.businessId(), branch).andExpect(status().isCreated());
+        CreateServiceOfferingRequest offering = new CreateServiceOfferingRequest(
+                ids.offering(), service.serviceId(), service.price(), service.estimatedDurationMin(), 2);
+        api.createServiceOffering(branch.branchId(), offering).andExpect(status().isCreated());
+
         Map<String, Object> invalidBooking = new HashMap<>();
         invalidBooking.put("bookingId", ids.booking());
         invalidBooking.put("userId", user.userId());
         invalidBooking.put("vehicleId", vehicle.vehicleId());
-        invalidBooking.put("serviceId", service.serviceId());
+        invalidBooking.put("branchId", branch.branchId());
+        invalidBooking.put("serviceOfferingId", offering.offeringId());
         invalidBooking.put("specialRequest", "x".repeat(1001));
         assertValidation(post("/api/bookings").with(authentication.platformAdminJwt()), invalidBooking, "scheduledDateTime");
 
-        CreateBookingRequest booking = BookingFixtureBuilder.valid(ids, user.userId(), vehicle.vehicleId(), service.serviceId())
+        CreateBookingRequest booking = BookingFixtureBuilder.valid(
+                        ids, user.userId(), vehicle.vehicleId(), branch.branchId(), offering.offeringId())
                 .scheduledDateTime(TestDates.futureDays(30)).build();
         api.createBooking(booking).andExpect(status().isCreated());
         Map<String, Object> invalidBookingUpdate = new HashMap<>();
         invalidBookingUpdate.put("vehicleId", vehicle.vehicleId());
-        invalidBookingUpdate.put("serviceId", " ");
+        invalidBookingUpdate.put("serviceOfferingId", " ");
         invalidBookingUpdate.put("specialRequest", "ok");
         assertValidation(put("/api/bookings/{id}", booking.bookingId()).with(authentication.platformAdminJwt()),
-                invalidBookingUpdate, "serviceId");
+                invalidBookingUpdate, "serviceOfferingId");
         assertValidation(post("/api/bookings/{id}/reschedule", booking.bookingId())
                 .with(authentication.platformAdminJwt()), Map.of(), "scheduledDateTime");
 
@@ -105,13 +119,6 @@ class RequestValidationIntegrationTest extends ApiIntegrationTestSupport {
         assertValidation(put("/api/admin/users/{userId}/role", user.userId())
                 .with(authentication.platformAdminJwt()), Map.of(), "roleName");
 
-        CreateBusinessRequest business = new CreateBusinessRequest(
-                ids.business(), "Validation Wash", "validation@example.test", "+27 82 123 4567", null);
-        CreateBranchRequest branch = new CreateBranchRequest(
-                ids.branch(), "Validation Branch", "1 Main Road", null, "Cape Town", "Western Cape", "8001", "ZA",
-                BigDecimal.valueOf(-33.9249), BigDecimal.valueOf(18.4241), "Africa/Johannesburg", true);
-        api.createBusiness(business).andExpect(status().isCreated());
-        api.createBranch(business.businessId(), branch).andExpect(status().isCreated());
         assertValidation(put("/api/marketplace/branches/{branchId}/operating-hours", branch.branchId())
                 .with(authentication.platformAdminJwt()), Map.of(), "intervals");
         assertValidation(post("/api/marketplace/branches/{branchId}/closures", branch.branchId())

@@ -1,7 +1,7 @@
 info:
   name: Customer gets generated availability
   type: http
-  seq: 5
+  seq: 7
   tags: [availability, workflow, customer]
 
 http:

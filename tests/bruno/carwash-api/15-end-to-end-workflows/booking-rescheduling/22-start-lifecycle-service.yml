@@ -1,7 +1,7 @@
 info:
   name: Start lifecycle reschedule service
   type: http
-  seq: 22
+  seq: 23
   tags: [workflow, staff]
 http:
   method: POST

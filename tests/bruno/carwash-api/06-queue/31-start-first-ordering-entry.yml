@@ -1,7 +1,7 @@
 info:
   name: Start first ordering entry
   type: http
-  seq: 31
+  seq: 34
   tags:
     - workflow
     - integrity

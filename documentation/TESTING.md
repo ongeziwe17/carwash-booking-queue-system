@@ -2,6 +2,10 @@
 
 TEST-001 separates fast unit/repository/service tests from Spring API integration tests and makes isolation, test data, execution order, and release-gate behaviour explicit.
 
+## Current OPS-001 inventory
+
+The OPS-001 suite executes **310 Surefire unit/repository/service tests** and **148 Failsafe Spring integration tests**. The generated OpenAPI contract remains exactly **66 operations** because OPS-001 evolves existing routes, and the complete Bruno collection executes **483 requests / 1,616 tests**. CI repeats the complete Maven verification under deterministic seeds `11001` and `11002`; exact coverage and container evidence is recorded in the draft pull request for the change.
+
 ## Baseline inventory before TEST-001
 
 The prerequisite CI/CD run #163 executed **187 tests across 20 test classes**. The inventory below records the relevant isolation characteristics from the `staging` source used for TEST-001.
@@ -48,14 +52,14 @@ Every Spring/API integration test now extends `ApiIntegrationTestSupport`, which
 - focused API/authentication clients and fixture builders
 - reusable standard-error and privacy assertions
 
-Before every integration-test method, `InMemoryTestDataCleaner` performs one `InMemoryDataCoordinator.write(...)` operation and deletes current records through repository APIs in dependency order. The current order begins with Catalog offerings, Marketplace closures/schedules, branches/businesses, then notifications, queue entries, bookings, vehicles, reusable services, and users so no dependent outlives its owner.
+Before every integration-test method, `InMemoryTestDataCleaner` performs one `InMemoryDataCoordinator.write(...)` operation and deletes current records through repository APIs in dependency order so no dependent outlives its owner.
 
-1. branch service offerings
-2. branch temporary closures and operating schedules
-3. Marketplace branches and businesses
-4. notifications
-5. queue entries
-6. bookings
+1. notifications
+2. queue entries
+3. bookings
+4. branch service offerings
+5. branch temporary closures and operating schedules
+6. Marketplace branches and businesses
 7. vehicles
 8. reusable global services
 9. users
@@ -64,7 +68,7 @@ The cleaner also resets only the test implementation of `NotificationIdGenerator
 
 ## Post-refactor test ownership
 
-The current verification measures **216 tests across 34 classes**: **134 Surefire tests** and **82 Failsafe integration tests**.
+The original post-TEST-001 verification measured **216 tests across 34 classes**: **134 Surefire tests** and **82 Failsafe integration tests**. The class inventory below records that refactor baseline; the current aggregate is listed above.
 
 ### Surefire: unit, repository and service tests
 

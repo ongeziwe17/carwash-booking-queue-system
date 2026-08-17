@@ -14,7 +14,8 @@ public class InMemoryQueueEntryRepository extends InMemoryRepository<QueueEntry,
         implements QueueEntryRepository {
 
     private static final Comparator<QueueEntry> QUEUE_ORDER = Comparator
-            .comparing((QueueEntry queueEntry) -> !isActive(queueEntry))
+            .comparing(QueueEntry::getBranchId, Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparing((QueueEntry queueEntry) -> !isActive(queueEntry))
             .thenComparingInt(QueueEntry::getPosition)
             .thenComparing(QueueEntry::getJoinedAt, Comparator.nullsLast(Comparator.naturalOrder()))
             .thenComparing(QueueEntry::getQueueEntryId, Comparator.nullsLast(Comparator.naturalOrder()));
@@ -34,8 +35,23 @@ public class InMemoryQueueEntryRepository extends InMemoryRepository<QueueEntry,
     }
 
     @Override
+    public List<QueueEntry> findActiveOrderedByBranch(String branchId) {
+        return findMatching(queueEntry -> isActive(queueEntry)
+                        && branchId != null && branchId.equals(queueEntry.getBranchId())).stream()
+                .sorted(QUEUE_ORDER)
+                .toList();
+    }
+
+    @Override
     public Optional<QueueEntry> findNextWaiting() {
         return findActiveOrdered().stream()
+                .filter(queueEntry -> queueEntry.getQueueStatus() == QueueStatus.WAITING)
+                .findFirst();
+    }
+
+    @Override
+    public Optional<QueueEntry> findNextWaitingByBranch(String branchId) {
+        return findActiveOrderedByBranch(branchId).stream()
                 .filter(queueEntry -> queueEntry.getQueueStatus() == QueueStatus.WAITING)
                 .findFirst();
     }
@@ -52,6 +68,13 @@ public class InMemoryQueueEntryRepository extends InMemoryRepository<QueueEntry,
         return findMatching(queueEntry -> queueEntry.getService() != null
                 && serviceId != null
                 && serviceId.equals(queueEntry.getService().getServiceId())).stream()
+                .sorted(QUEUE_ORDER)
+                .toList();
+    }
+
+    @Override
+    public List<QueueEntry> findByBranchId(String branchId) {
+        return findMatching(queueEntry -> branchId != null && branchId.equals(queueEntry.getBranchId())).stream()
                 .sorted(QUEUE_ORDER)
                 .toList();
     }
@@ -77,6 +100,12 @@ public class InMemoryQueueEntryRepository extends InMemoryRepository<QueueEntry,
         return anyMatch(queueEntry -> queueEntry.getService() != null
                 && serviceId != null
                 && serviceId.equals(queueEntry.getService().getServiceId()));
+    }
+
+    @Override
+    public boolean existsByServiceOfferingId(String serviceOfferingId) {
+        return anyMatch(queueEntry -> serviceOfferingId != null
+                && serviceOfferingId.equals(queueEntry.getServiceOfferingId()));
     }
 
     @Override

@@ -40,6 +40,7 @@ runtime:
         const bootstrapPassword = bru.interpolate("{{process.env.BRUNO_BOOTSTRAP_ADMIN_PASSWORD}}");
         if (bootstrapPassword && !bootstrapPassword.includes("process.env")) expect(payload).to.not.include(bootstrapPassword);
         test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
+        test("queue inherits canonical booking scope", function() { expect(res.body.branchId).to.equal(bru.getVar("opsBranchId")); expect(res.body.serviceOfferingId).to.equal(bru.getVar("opsOfferingId")); expect(res.body.service.serviceId).to.equal(bru.getVar("serviceId")); });
         test("queue starts WAITING", function() { expect(res.body.queueStatus).to.equal("WAITING"); expect(res.body.queueEntryId).to.equal(bru.getVar("queueEntryId")); });
 
 settings:

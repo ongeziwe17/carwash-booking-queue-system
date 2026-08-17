@@ -1,7 +1,7 @@
 info:
   name: Confirm booking before service deactivation
   type: http
-  seq: 8
+  seq: 9
   tags:
     - queue-eligibility
     - workflow

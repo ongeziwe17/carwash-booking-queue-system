@@ -1,7 +1,7 @@
 info:
   name: Create third ordering booking
   type: http
-  seq: 18
+  seq: 21
   tags:
     - workflow
     - integrity
@@ -19,7 +19,8 @@ http:
         "bookingId": "{{queueOrderingBooking3Id}}",
         "userId": "{{customerUserId}}",
         "vehicleId": "{{customerVehicleId}}",
-        "serviceId": "{{queueOrderingService15Id}}",
+        "branchId": "{{opsBranchId}}",
+        "serviceOfferingId": "{{queueOrderingOffering15Id}}",
         "scheduledDateTime": "{{future29}}",
         "specialRequest": "QUEUE-002 third entry"
       }

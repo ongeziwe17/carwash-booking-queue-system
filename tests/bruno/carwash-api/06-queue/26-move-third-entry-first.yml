@@ -1,7 +1,7 @@
 info:
   name: Move third waiting entry to workflow start
   type: http
-  seq: 26
+  seq: 29
   tags:
     - workflow
     - integrity

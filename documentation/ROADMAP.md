@@ -15,16 +15,16 @@ Implemented on `staging`:
 - User record CRUD and duplicate-email validation.
 - Vehicle CRUD, user ownership, and duplicate plate validation during creation.
 - Global service catalogue CRUD with active/inactive workflows.
-- Booking creation, guarded update, confirmation, queue-aware cancellation, future-time validation, ownership validation, inactive-service rejection, and exact-slot capacity validation.
-- Eligible queue entry creation with server-managed global ordering, cumulative wait estimates, full manual rebalance, synchronized call/start/complete transitions, and deletion.
-- In-app notification creation and recent lookup by user.
-- Basic daily booking and queue summary reporting.
+- Branch/offering-scoped booking creation, guarded same-branch offering update, confirmation, queue-aware cancellation, future-time validation, ownership validation, inactive-parent rejection, and branch-partitioned exact-slot capacity validation.
+- Eligible queue entry creation with scope inherited from its booking, server-managed branch ordering, offering-duration wait estimates, branch rebalance/call-next, synchronized call/start/complete transitions, and deletion.
+- In-app notification creation and recent bounded lookup with branch/offering context.
+- Branch- or business-scoped daily booking and queue summary reporting using branch-local dates.
 - BCrypt credential storage, JWT authentication, RBAC, ownership authorization, and platform-admin role assignment.
 - Bounded user/request contracts and standardized safe API errors.
 - Validated runtime policy configuration for booking, notification, queue, and application-time behavior.
 - Swagger/OpenAPI with CI contract export/quality gates, Maven tests, Docker, Docker Compose, and Bruno HTTP acceptance coverage.
 
-Current limitations include some non-user domain response schemas, in-memory-only storage, Marketplace businesses/branches without tenant isolation, global single-location booking/queue operations that are not branch-scoped, no payments/external notification delivery, and no production observability platform. Authentication and RBAC are implemented but do not provide tenant isolation.
+Current limitations include some non-user domain response schemas, in-memory-only storage, Marketplace operations without tenant isolation, legacy single-location availability and operating-window rules, no payments/external notification delivery, and no production observability platform. Authentication and RBAC are implemented but branch filters and report scopes do not provide tenant isolation.
 
 ## Phase 0 — API, Data, Test, and Delivery Hardening
 
@@ -62,14 +62,14 @@ Phase 1 is complete.
 
 1. **ARCH-001** — Establish explicit modular-monolith boundaries (#164) — implemented.
 
-The capability modules and automated dependency rules are the prerequisite for Phase 2. **MKT-001** (#115), **MKT-002** (#116), and **SERVICE-001** (#117) are implemented on those boundaries; the next roadmap issue is **OPS-001** (#118).
+The capability modules and automated dependency rules are the prerequisite for Phase 2. **MKT-001** (#115), **MKT-002** (#116), **SERVICE-001** (#117), and **OPS-001** (#118) are implemented on those boundaries; **GEO-001** (#119) is next.
 
 ## Phase 2 — Marketplace Business, Branch, and Availability Foundation
 
 1. **MKT-001** — Add Marketplace business and branch registration (#115) — implemented.
 2. **MKT-002** — Add branch operating hours and temporary closures (#116) — implemented.
 3. **SERVICE-001** — Add branch-specific service offerings, prices, durations, and capacity (#117) — implemented.
-4. **OPS-001** — Scope bookings, queues, notifications, and reports to branches (#118).
+4. **OPS-001** — Scope bookings, queues, notifications, and reports to branches (#118) — implemented.
 5. **GEO-001** — Add branch distance calculation and public discovery (#119).
 6. **AVAIL-002** — Add branch-aware availability search (#120).
 

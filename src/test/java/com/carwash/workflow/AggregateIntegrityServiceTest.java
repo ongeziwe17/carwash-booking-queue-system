@@ -2,6 +2,12 @@ package com.carwash.workflow;
 
 import com.carwash.booking.application.BookingManagementService;
 import com.carwash.catalog.application.ServiceCatalogService;
+import com.carwash.catalog.application.CreateServiceOfferingCommand;
+import com.carwash.catalog.application.ServiceDefinitionUsageQuery;
+import com.carwash.catalog.application.ServiceOfferingService;
+import com.carwash.marketplace.application.CreateBranchCommand;
+import com.carwash.marketplace.application.MarketplaceManagementService;
+import com.carwash.marketplace.application.RegisterBusinessCommand;
 import com.carwash.identity.application.UserManagementService;
 import com.carwash.notification.application.NotificationManagementService;
 import com.carwash.notification.infrastructure.AtomicNotificationIdGenerator;
@@ -10,6 +16,7 @@ import com.carwash.queue.application.QueueOrderingService;
 import com.carwash.vehicle.application.VehicleManagementService;
 
 import com.carwash.booking.application.BookingPolicyProperties;
+import com.carwash.booking.application.BookingSlotPolicyService;
 import com.carwash.notification.application.NotificationPolicyProperties;
 import com.carwash.queue.application.QueuePolicyProperties;
 import com.carwash.booking.domain.Booking;
@@ -23,6 +30,8 @@ import com.carwash.notification.infrastructure.InMemoryNotificationRepository;
 import com.carwash.queue.infrastructure.InMemoryQueueEntryRepository;
 import com.carwash.catalog.infrastructure.InMemoryServiceRepository;
 import com.carwash.catalog.infrastructure.InMemoryServiceOfferingRepository;
+import com.carwash.marketplace.infrastructure.InMemoryCarWashBusinessRepository;
+import com.carwash.marketplace.infrastructure.InMemoryCarWashBranchRepository;
 import com.carwash.identity.infrastructure.InMemoryUserRepository;
 import com.carwash.vehicle.infrastructure.InMemoryVehicleRepository;
 import com.carwash.access.application.UserCredentialService;
@@ -56,6 +65,9 @@ class AggregateIntegrityServiceTest {
     private InMemoryBookingRepository bookings;
     private InMemoryQueueEntryRepository queues;
     private InMemoryNotificationRepository notifications;
+    private InMemoryServiceOfferingRepository serviceOfferings;
+    private MarketplaceManagementService marketplace;
+    private ServiceOfferingService offeringService;
     private VehicleManagementService vehicleManagement;
     private ServiceCatalogService serviceCatalog;
     private BookingManagementService bookingManagement;
@@ -71,20 +83,37 @@ class AggregateIntegrityServiceTest {
         bookings = new InMemoryBookingRepository();
         queues = new InMemoryQueueEntryRepository();
         notifications = new InMemoryNotificationRepository();
+        serviceOfferings = new InMemoryServiceOfferingRepository();
         Clock clock = Clock.fixed(Instant.parse("2089-01-15T12:00:00Z"), ZoneOffset.UTC);
         NotificationManagementService notificationManagement = new NotificationManagementService(
                 notifications, users, bookings, coordinator, new AtomicNotificationIdGenerator(),
                 new NotificationPolicyProperties(10), clock);
+        marketplace = new MarketplaceManagementService(
+                new InMemoryCarWashBusinessRepository(), new InMemoryCarWashBranchRepository(), coordinator, clock);
+        String businessId = "aggregate-business";
+        marketplace.registerBusiness(new RegisterBusinessCommand(
+                businessId, "Aggregate Wash", "aggregate-wash@example.test", "+27821234567", null));
+        marketplace.createBranch(businessId, new CreateBranchCommand(
+                "aggregate-branch", "Aggregate Branch", "1 Test Street", null, "Cape Town", "Western Cape",
+                "8001", "ZA", new BigDecimal("-33.9249"), new BigDecimal("18.4241"),
+                "Africa/Johannesburg", true));
+        ServiceDefinitionUsageQuery usage = new ServiceDefinitionUsageQuery() {
+            public boolean referencedByBooking(String serviceId) { return bookings.existsByServiceId(serviceId); }
+            public boolean referencedByQueue(String serviceId) { return queues.existsByServiceId(serviceId); }
+        };
+        serviceCatalog = new ServiceCatalogService(services, serviceOfferings, usage, coordinator);
+        offeringService = new ServiceOfferingService(
+                serviceOfferings, services, marketplace, coordinator, clock);
         QueueOrderingService queueOrdering = new QueueOrderingService(
-                queues, coordinator, new QueuePolicyProperties(Duration.ofMinutes(10)));
+                queues, coordinator, new QueuePolicyProperties(Duration.ofMinutes(10)), offeringService);
         vehicleManagement = new VehicleManagementService(vehicles, users, bookings, coordinator);
-        serviceCatalog = new ServiceCatalogService(
-                services, new InMemoryServiceOfferingRepository(), bookings, queues, coordinator, queueOrdering);
-        bookingManagement = new BookingManagementService(bookings, users, vehicles, services, queues,
+        BookingPolicyProperties bookingPolicy = new BookingPolicyProperties(1, Duration.ZERO);
+        bookingManagement = new BookingManagementService(
+                bookings, users, vehicles, serviceCatalog, offeringService, marketplace, queues,
                 notifications, notificationManagement, queueOrdering, coordinator,
-                new BookingPolicyProperties(1, Duration.ZERO), clock);
-        queueManagement = new QueueManagementService(queues, bookings, services, notificationManagement, coordinator,
-                queueOrdering, clock);
+                bookingPolicy, new BookingSlotPolicyService(bookings, bookingPolicy, clock), clock);
+        queueManagement = new QueueManagementService(
+                queues, bookings, offeringService, marketplace, notificationManagement, coordinator, queueOrdering, clock);
         userManagement = new UserManagementService(users, mock(UserCredentialService.class), vehicles,
                 bookings, notifications, coordinator);
     }
@@ -95,12 +124,14 @@ class AggregateIntegrityServiceTest {
         assertTrue(users.insert(user));
         Service service = service("aggregate-service", "Exterior");
         assertTrue(services.insert(service));
+        offeringService.createOffering("aggregate-branch", new CreateServiceOfferingCommand(
+                "aggregate-offering", service.getServiceId(), BigDecimal.TEN, 30, 2));
         Vehicle vehicle = vehicleManagement.createVehicle("aggregate-user", "aggregate-vehicle", "ABC123", "SEDAN",
                 "Toyota", "Corolla", "White", "");
         assertSame(vehicle, vehicles.findById("aggregate-vehicle").orElseThrow());
         assertEquals(1, user.getVehicles().size());
         Booking booking = bookingManagement.createBooking("aggregate-booking", "aggregate-user", "aggregate-vehicle",
-                "aggregate-service", TestDates.futureDays(1), "");
+                "aggregate-branch", "aggregate-offering", TestDates.futureDays(1), "");
         assertSame(booking, bookings.findById("aggregate-booking").orElseThrow());
         assertEquals(1, user.getBookings().size());
         bookingManagement.confirmBooking("aggregate-booking");
@@ -116,7 +147,7 @@ class AggregateIntegrityServiceTest {
         assertFalse(notifications.findByBookingId("aggregate-booking").isEmpty());
         bookingManagement.deleteBooking("aggregate-booking");
         vehicleManagement.deleteVehicle("aggregate-vehicle");
-        serviceCatalog.deleteService("aggregate-service");
+        serviceCatalog.deactivateService("aggregate-service");
         userManagement.deleteUser("aggregate-user");
         assertTrue(users.findById("aggregate-user").isEmpty());
     }
@@ -168,16 +199,21 @@ class AggregateIntegrityServiceTest {
     void terminalBookingsAndNonWaitingQueueEntriesRejectMutation() {
         User user = activeUser("state-user", "state@example.test");
         assertTrue(users.insert(user));
-        assertTrue(services.insert(service("state-service", "State")));
+        Service stateService = service("state-service", "State");
+        assertTrue(services.insert(stateService));
+        offeringService.createOffering("aggregate-branch", new CreateServiceOfferingCommand(
+                "state-offering", stateService.getServiceId(), BigDecimal.TEN, 30, 2));
         vehicleManagement.createVehicle(user.getUserId(), "state-vehicle", "STATE1", "SEDAN", "Brand", "Model", "White", "");
-        Booking booking = bookingManagement.createBooking("state-booking", user.getUserId(), "state-vehicle", "state-service",
+        Booking booking = bookingManagement.createBooking(
+                "state-booking", user.getUserId(), "state-vehicle", "aggregate-branch", "state-offering",
                 TestDates.futureDays(2), "");
         bookingManagement.confirmBooking("state-booking");
         assertTrue(booking.startService());
         assertTrue(bookings.update(booking));
         assertThrows(BusinessRuleViolationException.class,
-                () -> bookingManagement.updateBooking("state-booking", "state-vehicle", "state-service", ""));
-        Booking waiting = bookingManagement.createBooking("state-queue-booking", user.getUserId(), "state-vehicle", "state-service",
+                () -> bookingManagement.updateBooking("state-booking", "state-vehicle", "state-offering", ""));
+        Booking waiting = bookingManagement.createBooking(
+                "state-queue-booking", user.getUserId(), "state-vehicle", "aggregate-branch", "state-offering",
                 TestDates.futureDays(4), "");
         bookingManagement.confirmBooking(waiting.getBookingId());
         var queueEntry = queueManagement.createQueueEntry("state-queue", waiting.getBookingId(), "state-service");

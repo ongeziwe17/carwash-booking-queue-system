@@ -1,7 +1,7 @@
 info:
   name: Customer verifies reschedule notification
   type: http
-  seq: 9
+  seq: 10
   tags:
     - customer
     - workflow
@@ -19,9 +19,12 @@ runtime:
       code: |-
         test("returns 200", function() { expect(res.status).to.equal(200); });
         test("reschedule notification references the updated booking", function() {
-          const notification = res.body.find(n => n.type === "BOOKING_RESCHEDULED" && n.booking && n.booking.bookingId === bru.getVar("bookingId"));
+          const notification = res.body.find(n => n.type === "BOOKING_RESCHEDULED" && n.bookingId === bru.getVar("bookingId"));
           expect(notification).to.exist;
-          expect(notification.booking.scheduledDateTime).to.equal(bru.getVar("future3"));
+          expect(notification.branchId).to.equal(bru.getVar("opsBranchId"));
+          expect(notification.serviceOfferingId).to.equal(bru.getVar("opsOfferingId"));
+          expect(notification.user).to.equal(undefined);
+          expect(notification.booking).to.equal(undefined);
           expect(notification.message).to.include(bru.getVar("future3").slice(0, 16));
         });
 

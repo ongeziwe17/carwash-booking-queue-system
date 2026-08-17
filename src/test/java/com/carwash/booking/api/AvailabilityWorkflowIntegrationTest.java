@@ -2,8 +2,11 @@ package com.carwash.booking.api;
 
 import com.carwash.booking.api.dto.CreateBookingRequest;
 import com.carwash.catalog.api.dto.CreateServiceRequest;
+import com.carwash.catalog.api.dto.CreateServiceOfferingRequest;
 import com.carwash.identity.api.dto.CreateUserRequest;
 import com.carwash.vehicle.api.dto.CreateVehicleRequest;
+import com.carwash.marketplace.api.dto.CreateBranchRequest;
+import com.carwash.marketplace.api.dto.CreateBusinessRequest;
 import com.carwash.booking.domain.BookingRepository;
 import com.carwash.notification.domain.NotificationRepository;
 import com.carwash.queue.domain.QueueEntryRepository;
@@ -30,9 +33,11 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -54,6 +59,8 @@ class AvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSupport {
     @Autowired ServiceRepository services;
     @Autowired QueueEntryRepository queues;
     @Autowired NotificationRepository notifications;
+    private String operationalBranchId;
+    private final Map<String, String> offeringIdsByService = new HashMap<>();
 
     @Test
     void activeServiceWithoutBookingsReturnsDeterministicBoundedSlotsAndDoesNotMutateState() throws Exception {
@@ -199,14 +206,13 @@ class AvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         assertRejectedReschedule(bookingId, FUTURE_DATE.atTime(9, 10));
         assertRejectedReschedule(bookingId, FUTURE_DATE.atTime(7, 30));
 
-        mockMvc.perform(put("/api/services/{id}", serviceId)
+        mockMvc.perform(put("/api/marketplace/offerings/{id}", created.resources().offering().offeringId())
                         .with(authentication.platformAdminJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "serviceName", "Long integration wash",
-                                "description", "Duration compatibility fixture",
                                 "price", 150,
-                                "estimatedDurationMin", 60))))
+                                "estimatedDurationMin", 60,
+                                "concurrentCapacity", 2))))
                 .andExpect(status().isOk());
         assertRejectedReschedule(bookingId, FUTURE_DATE.atTime(16, 30));
 
@@ -227,13 +233,18 @@ class AvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         BookingApiFixture.CreatedBooking created = new BookingApiFixture(api, ids)
                 .createBooking(FUTURE_DATE.atTime(16, 30));
         CreateServiceRequest longService = createService(60);
+        CreateServiceOfferingRequest longOffering = new CreateServiceOfferingRequest(
+                ids.offering(), longService.serviceId(), BigDecimal.TEN, 60, 2);
+        api.createServiceOffering(created.resources().branch().branchId(), longOffering)
+                .andExpect(status().isCreated());
+        String longOfferingId = longOffering.offeringId();
 
         mockMvc.perform(put("/api/bookings/{id}", created.booking().bookingId())
                         .with(authentication.platformAdminJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "vehicleId", created.resources().vehicle().vehicleId(),
-                                "serviceId", longService.serviceId(),
+                                "serviceOfferingId", longOfferingId,
                                 "specialRequest", "must not persist"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
@@ -271,8 +282,36 @@ class AvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         api.createUser(user).andExpect(status().isCreated());
         CreateVehicleRequest vehicle = VehicleFixtureBuilder.valid(ids, user.userId()).build();
         api.createVehicle(vehicle).andExpect(status().isCreated());
-        return BookingFixtureBuilder.valid(ids, user.userId(), vehicle.vehicleId(), serviceId)
+        return BookingFixtureBuilder.valid(
+                        ids, user.userId(), vehicle.vehicleId(), ensureOperationalBranch(), offeringFor(serviceId))
                 .scheduledDateTime(start).build();
+    }
+
+    private String ensureOperationalBranch() throws Exception {
+        if (operationalBranchId != null) return operationalBranchId;
+        String businessId = ids.business();
+        api.createBusiness(new CreateBusinessRequest(
+                businessId, "Availability Wash", ids.emailFor(businessId), "+27821234567", null))
+                .andExpect(status().isCreated());
+        CreateBranchRequest branch = new CreateBranchRequest(
+                ids.branch(), "Availability Branch", "1 Test Street", null, "Cape Town", "Western Cape",
+                "8001", "ZA", new BigDecimal("-33.9249"), new BigDecimal("18.4241"),
+                "Africa/Johannesburg", true);
+        api.createBranch(businessId, branch).andExpect(status().isCreated());
+        operationalBranchId = branch.branchId();
+        return operationalBranchId;
+    }
+
+    private String offeringFor(String serviceId) throws Exception {
+        String existing = offeringIdsByService.get(serviceId);
+        if (existing != null) return existing;
+        String branchId = ensureOperationalBranch();
+        int duration = services.findById(serviceId).orElseThrow().getEstimatedDurationMin();
+        CreateServiceOfferingRequest offering = new CreateServiceOfferingRequest(
+                ids.offering(), serviceId, BigDecimal.TEN, duration, 2);
+        api.createServiceOffering(branchId, offering).andExpect(status().isCreated());
+        offeringIdsByService.put(serviceId, offering.offeringId());
+        return offering.offeringId();
     }
 
     private void cancel(String bookingId) throws Exception {

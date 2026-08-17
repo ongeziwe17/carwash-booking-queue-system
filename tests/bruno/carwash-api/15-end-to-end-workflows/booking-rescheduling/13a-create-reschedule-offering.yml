@@ -1,0 +1,18 @@
+info:
+  name: Create dedicated reschedule offering
+  type: http
+  seq: 14
+  tags: [workflow, owner, offering]
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/branches/{{opsBranchId}}/offerings"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body:
+    type: json
+    data: '{"offeringId":"{{rescheduleOfferingId}}","serviceId":"{{rescheduleServiceId}}","price":120.00,"estimatedDurationMin":20,"concurrentCapacity":2}'
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("returns 201", function() { expect(res.status).to.equal(201); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

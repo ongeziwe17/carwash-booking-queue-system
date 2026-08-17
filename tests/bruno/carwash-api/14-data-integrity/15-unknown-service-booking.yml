@@ -1,5 +1,5 @@
 info:
-  name: Unknown booking service returns 404
+  name: Unknown booking offering returns 404
   type: http
   seq: 15
   tags:
@@ -18,7 +18,8 @@ http:
         "bookingId": "{{conflictBookingId}}",
         "userId": "{{customerUserId}}",
         "vehicleId": "{{customerVehicleId}}",
-        "serviceId": "missing-service-{{runId}}",
+        "branchId": "{{opsBranchId}}",
+        "serviceOfferingId": "missing-offering-{{runId}}",
         "scheduledDateTime": "{{future14}}",
         "specialRequest": "Bruno acceptance booking"
       }
@@ -34,7 +35,7 @@ runtime:
         test("uses RESOURCE_NOT_FOUND", function() { expect(res.body.code).to.equal("RESOURCE_NOT_FOUND"); expect(res.body.status).to.equal(404); });
         test("reports request path", function() { expect(res.body.path).to.equal(String(req.getUrl()).replace(/^https?:\/\/[^/]+/, "").split("?")[0]); });
         test("has ISO timestamp and fieldErrors", function() { expect(Number.isNaN(Date.parse(res.body.timestamp))).to.equal(false); expect(Array.isArray(res.body.fieldErrors)).to.equal(true); });
-        test("uses safe business message", function() { expect(res.body.message).to.include("Service not found"); });
+        test("uses safe business message", function() { expect(res.body.message).to.include("Offering not found"); });
         const payload = JSON.stringify(res.body ?? {});
         const lower = payload.toLowerCase();
         for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password"]) {

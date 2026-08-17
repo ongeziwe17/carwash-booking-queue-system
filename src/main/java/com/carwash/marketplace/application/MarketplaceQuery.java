@@ -9,5 +9,7 @@ public interface MarketplaceQuery {
 
     Optional<BranchSnapshot> findBranchOptional(String branchId);
 
+    List<BranchSnapshot> findBranchesByBusiness(String businessId);
+
     List<BranchSnapshot> findDiscoverableBranches();
 }

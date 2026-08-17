@@ -1,0 +1,18 @@
+info:
+  name: Create offering for reusable-service lifecycle test
+  type: http
+  seq: 7
+  tags: [queue, eligibility, offering]
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/branches/{{opsBranchId}}/offerings"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body:
+    type: json
+    data: '{"offeringId":"{{queueEligibilityInactiveOfferingId}}","serviceId":"{{queueEligibilityInactiveServiceId}}","price":100.00,"estimatedDurationMin":20,"concurrentCapacity":1}'
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("returns 201", function() { expect(res.status).to.equal(201); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

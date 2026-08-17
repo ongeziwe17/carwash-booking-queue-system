@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Owns the exact-start scheduling rules for the current global, single-location model.
+ * Owns exact-start scheduling rules for legacy availability and branch-scoped booking commands.
  * Callers are responsible for invoking this service inside the appropriate coordinator boundary.
  */
 public final class BookingSlotPolicyService {
@@ -47,7 +47,33 @@ public final class BookingSlotPolicyService {
         requireFutureStart(scheduledDateTime);
         validateOperatingCompatibility(scheduledDateTime, service);
 
-        List<Booking> bookingsInSlot = activeBookingsAt(scheduledDateTime, excludedBookingId);
+        List<Booking> bookingsInSlot = activeBookingsAt(scheduledDateTime, excludedBookingId, null);
+        boolean conflict = bookingsInSlot.stream()
+                .anyMatch(existingBooking -> hasSameCustomerAndVehicle(existingBooking, user, vehicle));
+        if (conflict) {
+            throw new BusinessRuleViolationException(
+                    "Customer vehicle already has an active booking for this scheduled date/time");
+        }
+        if (bookingsInSlot.size() >= bookingPolicy.maxActiveBookingsPerSlot()) {
+            throw new BusinessRuleViolationException("Booking time slot is already full");
+        }
+    }
+
+    public void validateBookableSlot(
+            String excludedBookingId,
+            LocalDateTime scheduledDateTime,
+            int estimatedDurationMin,
+            String branchId,
+            User user,
+            Vehicle vehicle
+    ) {
+        requireFutureStart(scheduledDateTime);
+        validateOperatingCompatibility(scheduledDateTime, estimatedDurationMin);
+        if (branchId == null || branchId.isBlank()) {
+            throw new BusinessRuleViolationException("Branch ID is required for operational booking validation");
+        }
+
+        List<Booking> bookingsInSlot = activeBookingsAt(scheduledDateTime, excludedBookingId, branchId);
         boolean conflict = bookingsInSlot.stream()
                 .anyMatch(existingBooking -> hasSameCustomerAndVehicle(existingBooking, user, vehicle));
         if (conflict) {
@@ -107,6 +133,15 @@ public final class BookingSlotPolicyService {
         }
     }
 
+    public void validateOperatingCompatibility(LocalDateTime scheduledDateTime, int estimatedDurationMin) {
+        if (estimatedDurationMin <= 0) {
+            throw new BusinessRuleViolationException("Service offering duration must be positive");
+        }
+        Service durationProjection = new Service();
+        durationProjection.setEstimatedDurationMin(estimatedDurationMin);
+        validateOperatingCompatibility(scheduledDateTime, durationProjection);
+    }
+
     private void requireFutureStart(LocalDateTime scheduledDateTime) {
         if (scheduledDateTime == null || !scheduledDateTime.isAfter(LocalDateTime.now(clock))) {
             throw new BusinessRuleViolationException("Scheduled date/time must be in the future");
@@ -132,14 +167,19 @@ public final class BookingSlotPolicyService {
     }
 
     private Capacity capacityAt(LocalDateTime scheduledDateTime, String excludedBookingId) {
-        int activeCount = activeBookingsAt(scheduledDateTime, excludedBookingId).size();
+        int activeCount = activeBookingsAt(scheduledDateTime, excludedBookingId, null).size();
         int remaining = Math.max(0, bookingPolicy.maxActiveBookingsPerSlot() - activeCount);
         return new Capacity(remaining, remaining == 0);
     }
 
-    private List<Booking> activeBookingsAt(LocalDateTime scheduledDateTime, String excludedBookingId) {
+    private List<Booking> activeBookingsAt(
+            LocalDateTime scheduledDateTime,
+            String excludedBookingId,
+            String branchId
+    ) {
         return bookingRepository.findByScheduledDateTime(scheduledDateTime).stream()
                 .filter(booking -> !isSameBooking(booking, excludedBookingId))
+                .filter(booking -> branchId == null || branchId.equals(booking.getBranchId()))
                 .filter(this::occupiesCapacity)
                 .toList();
     }

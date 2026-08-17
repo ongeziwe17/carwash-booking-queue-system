@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -45,20 +46,29 @@ public class QueueController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
-    @Operation(summary = "List queue entries")
+    @Operation(
+            summary = "List queue entries",
+            description = "Optionally filters queue records by an existing branch."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Queue entries returned"),
+            @ApiResponse(responseCode = "400", description = "Invalid branch filter",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Authentication required",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "403", description = "Access denied",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Branch not found",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "405", description = "Method not allowed",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "500", description = "Internal server error",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public List<QueueEntry> getAll() {
-        return service.findAll();
+    public List<QueueEntry> getAll(
+            @RequestParam(required = false) @Size(max = 64) String branchId
+    ) {
+        return service.findAll(branchId);
     }
 
     @GetMapping("/{id}")
@@ -88,8 +98,9 @@ public class QueueController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(
             summary = "Create queue entry",
-            description = "Appends an eligible confirmed booking using its active matching service to the global "
-                    + "active queue. The server assigns its position and estimated wait; a booking cannot have more "
+            description = "Appends an eligible confirmed booking to its canonical branch queue. Branch and offering "
+                    + "scope are inherited from the booking; serviceId is only a consistency field. The server assigns "
+                    + "its position and offering-duration wait; a booking cannot have more "
                     + "than one active queue entry."
     )
     @ApiResponses({
@@ -121,8 +132,8 @@ public class QueueController {
     @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
     @Operation(
             summary = "Move queue entry",
-            description = "Moves a WAITING entry to the requested active position and rebalances positions and "
-                    + "estimated waits across the global active queue."
+            description = "Moves a WAITING entry to the requested position and rebalances positions and "
+                    + "estimated waits only within that entry's branch queue."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Queue position updated"),
@@ -152,24 +163,28 @@ public class QueueController {
     @PreAuthorize("hasAuthority('PERM_QUEUE_OPERATE')")
     @Operation(
             summary = "Call next queue entry",
-            description = "Selects the lowest-position WAITING entry from the global active queue and marks it "
+            description = "Selects the lowest-position WAITING entry from the required branch queue and marks it "
                     + "CALLED. CALLED and IN_PROGRESS entries are skipped."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Selected queue entry called"),
+            @ApiResponse(responseCode = "400", description = "Invalid or missing branch identifier",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Authentication required",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "403", description = "Insufficient permission",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "No waiting queue entry available",
+            @ApiResponse(responseCode = "404", description = "Branch or waiting queue entry not found",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "405", description = "Method not allowed",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "500", description = "Internal server error",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public QueueEntry callNext() {
-        return service.callNext();
+    public QueueEntry callNext(
+            @RequestParam @NotBlank @Size(max = 64) String branchId
+    ) {
+        return service.callNext(branchId);
     }
 
     @PostMapping("/{id}/call")

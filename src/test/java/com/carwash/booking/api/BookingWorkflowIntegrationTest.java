@@ -103,7 +103,7 @@ class BookingWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         createConfirmedQueue(booking);
         String request = objectMapper.writeValueAsString(java.util.Map.of(
                 "vehicleId", booking.resources().vehicle().vehicleId(),
-                "serviceId", booking.resources().service().serviceId(),
+                "serviceOfferingId", booking.resources().offering().offeringId(),
                 "specialRequest", "must not change"
         ));
 
@@ -151,7 +151,8 @@ class BookingWorkflowIntegrationTest extends ApiIntegrationTestSupport {
     void createBookingRejectsUnknownUser() throws Exception {
         BookingApiFixture.Resources resources = fixture().createResources();
         CreateBookingRequest request = BookingFixtureBuilder.valid(ids, ids.user(),
-                        resources.vehicle().vehicleId(), resources.service().serviceId())
+                        resources.vehicle().vehicleId(), resources.branch().branchId(),
+                        resources.offering().offeringId())
                 .scheduledDateTime(TestDates.futureDays(6)).build();
         api.createBooking(request)
                 .andExpect(status().isNotFound())
@@ -163,7 +164,7 @@ class BookingWorkflowIntegrationTest extends ApiIntegrationTestSupport {
     void createBookingRejectsUnknownVehicle() throws Exception {
         BookingApiFixture.Resources resources = fixture().createResources();
         CreateBookingRequest request = BookingFixtureBuilder.valid(ids, resources.user().userId(), ids.vehicle(),
-                        resources.service().serviceId())
+                        resources.branch().branchId(), resources.offering().offeringId())
                 .scheduledDateTime(TestDates.futureDays(7)).build();
         api.createBooking(request)
                 .andExpect(status().isNotFound())
@@ -172,14 +173,14 @@ class BookingWorkflowIntegrationTest extends ApiIntegrationTestSupport {
     }
 
     @Test
-    void createBookingRejectsUnknownService() throws Exception {
+    void createBookingRejectsUnknownOffering() throws Exception {
         BookingApiFixture.Resources resources = fixture().createResources();
         CreateBookingRequest request = BookingFixtureBuilder.valid(ids, resources.user().userId(),
-                        resources.vehicle().vehicleId(), ids.service())
+                        resources.vehicle().vehicleId(), resources.branch().branchId(), ids.offering())
                 .scheduledDateTime(TestDates.futureDays(8)).build();
         api.createBooking(request)
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.message").value(containsString("Service not found")))
+                .andExpect(jsonPath("$.message").value(containsString("Offering not found")))
                 .andExpect(jsonPath("$.path").value("/api/bookings"));
     }
 
@@ -199,7 +200,7 @@ class BookingWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         BookingApiFixture.Resources first = fixture().createResources();
         BookingApiFixture.Resources second = fixture().createResources();
         CreateBookingRequest request = BookingFixtureBuilder.valid(ids, first.user().userId(),
-                        second.vehicle().vehicleId(), first.service().serviceId())
+                        second.vehicle().vehicleId(), first.branch().branchId(), first.offering().offeringId())
                 .scheduledDateTime(TestDates.futureDays(10)).build();
         api.createBooking(request)
                 .andExpect(status().isBadRequest())
@@ -210,9 +211,12 @@ class BookingWorkflowIntegrationTest extends ApiIntegrationTestSupport {
     @Test
     void createBookingRejectsFullTimeSlot() throws Exception {
         LocalDateTime scheduled = TestDates.futureDays(11);
-        fixture().createBooking(scheduled);
+        BookingApiFixture.CreatedBooking first = fixture().createBooking(scheduled);
         BookingApiFixture.Resources second = fixture().createResources();
-        CreateBookingRequest request = booking(second, scheduled);
+        CreateBookingRequest request = BookingFixtureBuilder.valid(
+                        ids, second.user().userId(), second.vehicle().vehicleId(),
+                        first.resources().branch().branchId(), first.resources().offering().offeringId())
+                .scheduledDateTime(scheduled).build();
         api.createBooking(request)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(containsString("time slot")))
@@ -225,7 +229,7 @@ class BookingWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         BookingApiFixture.CreatedBooking existing = fixture().createBooking(scheduled);
         CreateBookingRequest conflicting = BookingFixtureBuilder.valid(ids,
                         existing.resources().user().userId(), existing.resources().vehicle().vehicleId(),
-                        existing.resources().service().serviceId())
+                        existing.resources().branch().branchId(), existing.resources().offering().offeringId())
                 .scheduledDateTime(scheduled).build();
         api.createBooking(conflicting)
                 .andExpect(status().isBadRequest())
@@ -254,7 +258,7 @@ class BookingWorkflowIntegrationTest extends ApiIntegrationTestSupport {
 
     private CreateBookingRequest booking(BookingApiFixture.Resources resources, LocalDateTime scheduled) {
         return BookingFixtureBuilder.valid(ids, resources.user().userId(), resources.vehicle().vehicleId(),
-                        resources.service().serviceId())
+                        resources.branch().branchId(), resources.offering().offeringId())
                 .scheduledDateTime(scheduled)
                 .build();
     }

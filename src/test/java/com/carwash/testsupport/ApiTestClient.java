@@ -3,6 +3,7 @@ package com.carwash.testsupport;
 import com.carwash.booking.api.dto.CreateBookingRequest;
 import com.carwash.queue.api.dto.CreateQueueEntryRequest;
 import com.carwash.catalog.api.dto.CreateServiceRequest;
+import com.carwash.catalog.api.dto.CreateServiceOfferingRequest;
 import com.carwash.identity.api.dto.CreateUserRequest;
 import com.carwash.marketplace.api.dto.CreateBranchRequest;
 import com.carwash.marketplace.api.dto.CreateBusinessRequest;
@@ -19,6 +20,8 @@ public final class ApiTestClient {
     private final MockMvc mockMvc;
     private final ObjectMapper objectMapper;
     private final AuthenticationTestClient authentication;
+    private CreateBusinessRequest defaultBusiness;
+    private CreateBranchRequest defaultBranch;
 
     public ApiTestClient(MockMvc mockMvc, ObjectMapper objectMapper, AuthenticationTestClient authentication) {
         this.mockMvc = mockMvc;
@@ -82,5 +85,28 @@ public final class ApiTestClient {
                 .with(authentication.platformAdminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)));
+    }
+
+    public ResultActions createServiceOffering(
+            String branchId,
+            CreateServiceOfferingRequest request
+    ) throws Exception {
+        return mockMvc.perform(post("/api/marketplace/branches/{branchId}/offerings", branchId)
+                .with(authentication.platformAdminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)));
+    }
+
+    public CreateBusinessRequest defaultBusiness() {
+        return defaultBusiness;
+    }
+
+    public CreateBranchRequest defaultBranch() {
+        return defaultBranch;
+    }
+
+    public void rememberDefaultOperationalScope(CreateBusinessRequest business, CreateBranchRequest branch) {
+        this.defaultBusiness = business;
+        this.defaultBranch = branch;
     }
 }

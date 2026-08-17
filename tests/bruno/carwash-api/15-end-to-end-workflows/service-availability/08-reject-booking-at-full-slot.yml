@@ -1,7 +1,7 @@
 info:
   name: Authoritative booking rejects full advertised slot
   type: http
-  seq: 8
+  seq: 10
   tags: [availability, workflow]
 
 http:
@@ -17,7 +17,8 @@ http:
         "bookingId": "{{availabilityRejectedBookingId}}",
         "userId": "{{otherCustomerUserId}}",
         "vehicleId": "{{otherCustomerVehicleId}}",
-        "serviceId": "{{availabilityServiceId}}",
+        "branchId": "{{opsBranchId}}",
+        "serviceOfferingId": "{{availabilityOfferingId}}",
         "scheduledDateTime": "{{availabilitySlot}}",
         "specialRequest": "must remain rejected"
       }

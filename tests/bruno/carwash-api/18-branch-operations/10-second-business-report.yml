@@ -1,0 +1,10 @@
+info: { name: Second business report excludes first business, type: http, seq: 11, tags: [ops, report, business, workflow] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/reports/daily-summary?date={{branchOpsReportDate}}&businessId={{marketplaceSecondBusinessId}}"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("counts only second business branches", function() { expect(res.status).to.equal(200); expect(res.body.scopeType).to.equal("BUSINESS"); expect(res.body.scopeId).to.equal(bru.getVar("marketplaceSecondBusinessId")); expect(res.body.totalBookings).to.equal(1); expect(res.body.totalQueueEntries).to.equal(1); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

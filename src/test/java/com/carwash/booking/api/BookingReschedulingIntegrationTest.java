@@ -47,7 +47,9 @@ class BookingReschedulingIntegrationTest extends ApiIntegrationTestSupport {
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].type").value("BOOKING_RESCHEDULED"))
-                .andExpect(jsonPath("$[0].booking.scheduledDateTime").value(apiDateTime(target)))
+                .andExpect(jsonPath("$[0].bookingId").value(created.booking().bookingId()))
+                .andExpect(jsonPath("$[0].branchId").value(created.resources().branch().branchId()))
+                .andExpect(jsonPath("$[0].serviceOfferingId").value(created.resources().offering().offeringId()))
                 .andExpect(jsonPath("$[0].message").value(containsString(target.toString())));
     }
 
@@ -69,7 +71,7 @@ class BookingReschedulingIntegrationTest extends ApiIntegrationTestSupport {
         LocalDateTime original = created.booking().scheduledDateTime();
         Map<String, Object> validUpdate = Map.of(
                 "vehicleId", created.resources().vehicle().vehicleId(),
-                "serviceId", created.resources().service().serviceId(),
+                "serviceOfferingId", created.resources().offering().offeringId(),
                 "specialRequest", "non-schedule update"
         );
 
@@ -142,7 +144,8 @@ class BookingReschedulingIntegrationTest extends ApiIntegrationTestSupport {
         api.deactivateService(inactive.resources().service().serviceId()).andExpect(status().isOk());
         reschedule(inactive.booking().bookingId(), TestDates.futureDays(93))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Inactive service cannot be booked"));
+                .andExpect(jsonPath("$.message").value(
+                        "Inactive service offering or reusable service cannot be booked"));
 
         BookingApiFixture.CreatedBooking waiting = fixture().createBooking(TestDates.futureDays(94));
         CreateQueueEntryRequest waitingQueue = createConfirmedQueue(waiting);
@@ -197,7 +200,8 @@ class BookingReschedulingIntegrationTest extends ApiIntegrationTestSupport {
     private CreateBookingRequest createBooking(BookingApiFixture.Resources resources, LocalDateTime schedule)
             throws Exception {
         CreateBookingRequest booking = BookingFixtureBuilder.valid(
-                        ids, resources.user().userId(), resources.vehicle().vehicleId(), resources.service().serviceId())
+                        ids, resources.user().userId(), resources.vehicle().vehicleId(),
+                        resources.branch().branchId(), resources.offering().offeringId())
                 .scheduledDateTime(schedule)
                 .build();
         api.createBooking(booking).andExpect(status().isCreated());

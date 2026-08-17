@@ -12,7 +12,7 @@ Runtime policy values are bound to validated Spring `@ConfigurationProperties` r
 | `carwash.policy.booking.operating-end` | `CARWASH_BOOKING_OPERATING_END` | `LocalTime` | `17:00` | required; after operating start | Global single-location closing time; overnight windows are not supported. |
 | `carwash.policy.booking.slot-interval` | `CARWASH_BOOKING_SLOT_INTERVAL` | `Duration` | `PT30M` | positive whole minutes; at least one minute | Interval between server-generated appointment starts, measured from operating start. |
 | `carwash.policy.notification.recent-limit` | `CARWASH_NOTIFICATION_RECENT_LIMIT` | integer | `10` | `>= 1` | Default maximum returned by the recent-notification lookup. Explicit internal caller limits still take precedence. |
-| `carwash.policy.queue.default-service-duration` | `CARWASH_QUEUE_DEFAULT_SERVICE_DURATION` | `Duration` | `PT10M` | greater than zero | Defensive ETA duration used when a queue calculation has no positive service duration. Queue estimates are exposed in whole minutes, so a positive sub-minute fallback rounds up to one minute. |
+| `carwash.policy.queue.default-service-duration` | `CARWASH_QUEUE_DEFAULT_SERVICE_DURATION` | `Duration` | `PT10M` | greater than zero | Retained validated CONFIG-001 compatibility setting. OPS-001 queue entries always resolve their offering duration and never fall back to this value. |
 | `carwash.runtime.time-zone` | `CARWASH_TIME_ZONE` | `ZoneId` | `UTC` | valid Java/IANA zone ID | Zone used by the application `Clock` for local date/time policy decisions plus queue and notification lifecycle timestamps. |
 
 `UTC` is the explicit runtime default because the current product documentation does not establish one business operating geography. It avoids inheriting a developer machine or container timezone. An environment with a defined local business zone can override it, for example `Africa/Johannesburg`. Bean Validation time constraints such as booking `@Future` validation use the same application `Clock`, so request validation and service policy decisions interpret local date/time values consistently.
@@ -25,13 +25,13 @@ Spring accepts ISO-8601 duration syntax. Common examples are:
 - `PT30M` — 30 minutes
 - `PT2H` — two hours
 
-Negative booking cancellation windows, zero/negative/sub-minute booking intervals, invalid operating-window ordering, and zero or negative queue fallback durations are rejected at startup.
+Negative booking cancellation windows, zero/negative/sub-minute booking intervals, invalid operating-window ordering, and zero or negative retained queue default durations are rejected at startup.
 
 ## Single-location scheduling window
 
-For a requested date, candidate starts begin at `operating-start` and advance by `slot-interval` while remaining before `operating-end`. A candidate is advertised or accepted only when its service-specific estimated duration finishes at or before closing. Booking creation, focused rescheduling, generic service changes, and availability all reuse this same policy. The current capacity model remains global per exact start time across all services; cancelled bookings do not consume capacity.
+For a requested date, candidate starts begin at `operating-start` and advance by `slot-interval` while remaining before `operating-end`. A candidate is advertised or accepted only when its service-specific estimated duration finishes at or before closing. Booking creation, focused rescheduling, generic offering changes, and availability all reuse this same time-grid policy. Operational booking capacity is partitioned by branch; legacy AVAIL-001 still reports the global exact-start model. Cancelled bookings do not consume capacity.
 
-These settings describe one global same-day booking/AVAIL-001 window and do not configure Marketplace branches. MKT-002 branch hours are managed through the Marketplace API and support overnight recurrence; branch-aware booking availability, external holiday calendars, staff/bay calendars, and overlapping-resource scheduling remain out of scope.
+These settings remain the transitional same-day time window for branch-scoped booking writes and legacy AVAIL-001; they do not configure Marketplace branches. MKT-002 branch hours are managed through the Marketplace API and support overnight recurrence, but OPS-001 deliberately does not enforce them. Branch-aware availability, external holiday calendars, staff/bay calendars, and overlapping-resource scheduling remain out of scope.
 
 ## Booking-change boundary
 

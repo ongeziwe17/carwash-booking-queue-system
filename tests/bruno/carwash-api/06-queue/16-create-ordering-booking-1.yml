@@ -1,7 +1,7 @@
 info:
   name: Create first ordering booking
   type: http
-  seq: 16
+  seq: 19
   tags:
     - workflow
     - integrity
@@ -19,7 +19,8 @@ http:
         "bookingId": "{{queueOrderingBooking1Id}}",
         "userId": "{{customerUserId}}",
         "vehicleId": "{{customerVehicleId}}",
-        "serviceId": "{{queueOrderingService10Id}}",
+        "branchId": "{{opsBranchId}}",
+        "serviceOfferingId": "{{queueOrderingOffering10Id}}",
         "scheduledDateTime": "{{future27}}",
         "specialRequest": "QUEUE-002 first entry"
       }

@@ -1,7 +1,7 @@
 info:
   name: Delete unreferenced service
   type: http
-  seq: 9
+  seq: 10
   tags:
     - owner
     - integrity

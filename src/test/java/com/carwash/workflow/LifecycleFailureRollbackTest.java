@@ -9,6 +9,15 @@ import com.carwash.queue.application.QueuePolicyProperties;
 import com.carwash.booking.domain.Booking;
 import com.carwash.queue.domain.QueueEntry;
 import com.carwash.catalog.domain.Service;
+import com.carwash.catalog.application.ServiceDefinitionQuery;
+import com.carwash.catalog.application.ServiceDefinitionSnapshot;
+import com.carwash.catalog.application.ServiceOfferingQuery;
+import com.carwash.catalog.application.ServiceOfferingSnapshot;
+import com.carwash.catalog.domain.ServiceOfferingStatus;
+import com.carwash.marketplace.application.BranchSnapshot;
+import com.carwash.marketplace.application.BusinessSnapshot;
+import com.carwash.marketplace.application.MarketplaceQuery;
+import com.carwash.marketplace.domain.BranchStatus;
 import com.carwash.identity.domain.User;
 import com.carwash.vehicle.domain.Vehicle;
 import com.carwash.booking.domain.BookingStatus;
@@ -29,6 +38,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -123,6 +136,40 @@ class LifecycleFailureRollbackTest {
                 .anyMatch(notification -> "BOOKING_CANCELLED".equals(notification.getType())));
     }
 
+    @Test
+    void queueCreationRestoresBookingAndExistingBranchMetricsWhenBookingUpdateFails() {
+        Fixture fixture = new Fixture();
+        Booking firstBooking = fixture.confirmedBooking("create-first", 10, 7);
+        Booking secondBooking = fixture.confirmedBooking("create-second", 25, 8);
+        QueueEntry first = fixture.queueEntry(firstBooking, "create-first");
+        fixture.bookings.failNextUpdate();
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> fixture.queueEntry(secondBooking, "create-second"));
+
+        assertFalse(fixture.queues.existsById("queue-create-second"));
+        assertNull(secondBooking.getQueueEntry());
+        assertEquals(1, first.getPosition());
+        assertEquals(0, first.getEstimatedWaitMin());
+    }
+
+    @Test
+    void queueDeletionRestoresEntryAndBookingAssociationWhenBookingUpdateFails() {
+        Fixture fixture = new Fixture();
+        Booking booking = fixture.confirmedBooking("delete", 10, 9);
+        QueueEntry queueEntry = fixture.queueEntry(booking, "delete");
+        fixture.bookings.failNextUpdate();
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> fixture.queueService.deleteQueueEntry(queueEntry.getQueueEntryId()));
+
+        assertTrue(fixture.queues.existsById(queueEntry.getQueueEntryId()));
+        assertSame(queueEntry, booking.getQueueEntry());
+        assertEquals(QueueStatus.WAITING, queueEntry.getQueueStatus());
+        assertEquals(1, queueEntry.getPosition());
+        assertEquals(0, queueEntry.getEstimatedWaitMin());
+    }
+
     private static final class Fixture {
         private final FailingBookingRepository bookings = new FailingBookingRepository();
         private final FailingQueueEntryRepository queues = new FailingQueueEntryRepository();
@@ -132,13 +179,19 @@ class LifecycleFailureRollbackTest {
         private final InMemoryNotificationRepository notifications = new InMemoryNotificationRepository();
         private final InMemoryDataCoordinator coordinator = new InMemoryDataCoordinator();
         private final Clock clock = Clock.fixed(Instant.parse("2089-01-15T12:00:00Z"), ZoneOffset.UTC);
+        private final Map<String, ServiceOfferingSnapshot> offeringSnapshots = new HashMap<>();
+        private final MarketplaceQuery marketplace = marketplaceQuery();
+        private final ServiceOfferingQuery offeringQuery = offeringQuery();
+        private final ServiceDefinitionQuery serviceQuery = serviceQuery();
         private final QueueOrderingService ordering = new QueueOrderingService(
-                queues, coordinator, new QueuePolicyProperties(Duration.ofMinutes(10)));
+                queues, coordinator, new QueuePolicyProperties(Duration.ofMinutes(10)), offeringQuery);
+        private final BookingPolicyProperties bookingPolicy = new BookingPolicyProperties(5, Duration.ZERO);
         private final BookingManagementService bookingService = new BookingManagementService(
-                bookings, users, vehicles, services, queues, notifications, null, ordering, coordinator,
-                new BookingPolicyProperties(5, Duration.ZERO), clock);
+                bookings, users, vehicles, serviceQuery, offeringQuery, marketplace, queues, notifications, null,
+                ordering, coordinator, bookingPolicy,
+                new com.carwash.booking.application.BookingSlotPolicyService(bookings, bookingPolicy, clock), clock);
         private final QueueManagementService queueService = new QueueManagementService(
-                queues, bookings, services, null, coordinator, ordering, clock);
+                queues, bookings, offeringQuery, marketplace, null, coordinator, ordering, clock);
 
         private Booking confirmedBooking(String suffix, int duration, int futureDay) {
             User user = User.withEncodedPassword(
@@ -152,7 +205,13 @@ class LifecycleFailureRollbackTest {
             Service service = new Service("service-" + suffix, "Wash " + suffix,
                     "Lifecycle fixture", BigDecimal.TEN, duration);
             assertTrue(services.insert(service));
-            Booking booking = new Booking("booking-" + suffix, user, vehicle, service,
+            String offeringId = "offering-" + suffix;
+            offeringSnapshots.put(offeringId, new ServiceOfferingSnapshot(
+                    offeringId, "branch-rollback", service.getServiceId(), service.getServiceName(),
+                    service.getDescription(), service.getPrice(), duration, 2, ServiceOfferingStatus.ACTIVE,
+                    true, true, LocalDateTime.now(clock), LocalDateTime.now(clock)));
+            Booking booking = new Booking(
+                    "booking-" + suffix, user, vehicle, "branch-rollback", offeringId, service,
                     LocalDateTime.now(clock).plusDays(futureDay), "");
             booking.setStatus(BookingStatus.CONFIRMED);
             booking.setCreatedAt(LocalDateTime.now(clock));
@@ -166,6 +225,42 @@ class LifecycleFailureRollbackTest {
             QueueEntry response = queueService.createQueueEntry(
                     "queue-" + suffix, booking.getBookingId(), booking.getService().getServiceId());
             return queues.findById(response.getQueueEntryId()).orElseThrow();
+        }
+
+        private MarketplaceQuery marketplaceQuery() {
+            return new MarketplaceQuery() {
+                public Optional<BusinessSnapshot> findBusinessOptional(String businessId) { return Optional.empty(); }
+                public Optional<BranchSnapshot> findBranchOptional(String branchId) {
+                    if (!"branch-rollback".equals(branchId)) return Optional.empty();
+                    return Optional.of(new BranchSnapshot(
+                            branchId, "business-rollback", "Rollback Branch", "1 Test Street", null,
+                            "Cape Town", "Western Cape", "8001", "ZA", BigDecimal.ZERO, BigDecimal.ZERO,
+                            "Africa/Johannesburg", BranchStatus.ACTIVE, true, true, true,
+                            LocalDateTime.now(clock), LocalDateTime.now(clock)));
+                }
+                public List<BranchSnapshot> findBranchesByBusiness(String businessId) { return List.of(); }
+                public List<BranchSnapshot> findDiscoverableBranches() { return List.of(); }
+            };
+        }
+
+        private ServiceOfferingQuery offeringQuery() {
+            return new ServiceOfferingQuery() {
+                public Optional<ServiceOfferingSnapshot> findOfferingOptional(String offeringId) {
+                    return Optional.ofNullable(offeringSnapshots.get(offeringId));
+                }
+                public List<ServiceOfferingSnapshot> findOfferingsByBranch(String branchId) { return List.of(); }
+                public List<ServiceOfferingSnapshot> findDiscoverableOfferingsByBranch(String branchId) {
+                    return List.of();
+                }
+                public Optional<ServiceOfferingSnapshot> findOfferingByBranchAndService(
+                        String branchId, String serviceId) { return Optional.empty(); }
+            };
+        }
+
+        private ServiceDefinitionQuery serviceQuery() {
+            return serviceId -> services.findById(serviceId).map(service -> new ServiceDefinitionSnapshot(
+                    service.getServiceId(), service.getServiceName(), service.getDescription(), service.getPrice(),
+                    service.getEstimatedDurationMin(), service.isActive(), service.getCreatedAt()));
         }
     }
 

@@ -1,7 +1,7 @@
 info:
   name: Deactivate availability fixture
   type: http
-  seq: 4
+  seq: 6
   tags: [availability, workflow]
 
 http:

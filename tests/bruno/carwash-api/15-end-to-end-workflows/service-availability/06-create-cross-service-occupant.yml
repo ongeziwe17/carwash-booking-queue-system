@@ -1,7 +1,7 @@
 info:
   name: Create booking for another service in target slot
   type: http
-  seq: 6
+  seq: 8
   tags: [availability, workflow]
 
 http:
@@ -17,7 +17,8 @@ http:
         "bookingId": "{{availabilityBookingId}}",
         "userId": "{{customerUserId}}",
         "vehicleId": "{{customerVehicleId}}",
-        "serviceId": "{{availabilityOtherServiceId}}",
+        "branchId": "{{opsBranchId}}",
+        "serviceOfferingId": "{{availabilityOtherOfferingId}}",
         "scheduledDateTime": "{{availabilitySlot}}",
         "specialRequest": "global capacity fixture"
       }

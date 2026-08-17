@@ -1,7 +1,7 @@
 info:
   name: Call lifecycle reschedule queue entry
   type: http
-  seq: 21
+  seq: 22
   tags: [workflow, staff]
 http:
   method: POST

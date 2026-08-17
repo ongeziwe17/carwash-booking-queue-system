@@ -1,7 +1,7 @@
 info:
   name: Complete second ordering entry
   type: http
-  seq: 38
+  seq: 41
   tags:
     - workflow
     - integrity

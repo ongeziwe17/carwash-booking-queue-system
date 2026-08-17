@@ -1,0 +1,10 @@
+info: { name: Daily report rejects unknown scope, type: http, seq: 22, tags: [ops, report, integrity] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/reports/daily-summary?date={{branchOpsReportDate}}&businessId=missing-business-{{runId}}"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("returns standard 404", function() { expect(res.status).to.equal(404); expect(res.body.code).to.equal("RESOURCE_NOT_FOUND"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

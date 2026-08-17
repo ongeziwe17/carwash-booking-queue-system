@@ -22,8 +22,9 @@ class ModuleContractTest extends ServiceTestSupport {
         User user = registerUser();
         Vehicle vehicle = createVehicle(user);
         Service service = createService();
+        String offeringId = createOffering(service);
         Booking booking = bookingService.createBooking(
-                ids.booking(), user.getUserId(), vehicle.getVehicleId(), service.getServiceId(),
+                ids.booking(), user.getUserId(), vehicle.getVehicleId(), ensureDefaultBranch(), offeringId,
                 com.carwash.testsupport.TestDates.future(), "none");
         bookingService.confirmBooking(booking.getBookingId());
         QueueEntry queueEntry = queueService.createQueueEntry(
@@ -50,12 +51,12 @@ class ModuleContractTest extends ServiceTestSupport {
         QueueEntry queueEntry = queueService.createQueueEntry(
                 ids.queueEntry(), booking.getBookingId(), booking.getService().getServiceId());
 
-        assertTrue(((BookingQuery) bookingService).findAll().stream()
-                .anyMatch(item -> booking.getBookingId().equals(item.getBookingId())));
-        QueueEntry publishedQueueEntry = ((QueueQuery) queueService).findAll().stream()
-                .filter(item -> queueEntry.getQueueEntryId().equals(item.getQueueEntryId()))
+        assertTrue(((BookingQuery) bookingService).findBookingSnapshots().stream()
+                .anyMatch(item -> booking.getBookingId().equals(item.bookingId())));
+        var publishedQueueEntry = ((QueueQuery) queueService).findQueueEntrySnapshots().stream()
+                .filter(item -> queueEntry.getQueueEntryId().equals(item.queueEntryId()))
                 .findFirst()
                 .orElseThrow();
-        assertEquals(booking.getBookingId(), publishedQueueEntry.getBooking().getBookingId());
+        assertEquals(booking.getBookingId(), publishedQueueEntry.bookingId());
     }
 }

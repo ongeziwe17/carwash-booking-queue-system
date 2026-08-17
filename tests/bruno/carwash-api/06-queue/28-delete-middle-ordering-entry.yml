@@ -1,7 +1,7 @@
 info:
   name: Delete middle ordering entry
   type: http
-  seq: 28
+  seq: 31
   tags:
     - workflow
     - integrity

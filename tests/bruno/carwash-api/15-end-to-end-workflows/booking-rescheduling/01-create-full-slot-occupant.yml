@@ -14,7 +14,8 @@ http:
         "bookingId": "{{rescheduleFullOccupantId}}",
         "userId": "{{otherCustomerUserId}}",
         "vehicleId": "{{otherCustomerVehicleId}}",
-        "serviceId": "{{serviceId}}",
+        "branchId": "{{opsBranchId}}",
+        "serviceOfferingId": "{{opsOfferingId}}",
         "scheduledDateTime": "{{future34}}",
         "specialRequest": "reschedule capacity occupant"
       }

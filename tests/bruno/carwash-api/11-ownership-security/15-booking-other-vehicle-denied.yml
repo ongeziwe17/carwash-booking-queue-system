@@ -17,7 +17,7 @@ http:
     data: |-
       {
         "vehicleId": "{{otherCustomerVehicleId}}",
-        "serviceId": "{{serviceId}}",
+        "serviceOfferingId": "{{opsOfferingId}}",
         "specialRequest": "ownership attack"
       }
   auth:

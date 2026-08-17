@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -44,20 +45,30 @@ public class BookingController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('STAFF','BUSINESS_OWNER','PLATFORM_ADMIN')")
-    @Operation(summary = "List bookings")
+    @Operation(
+            summary = "List bookings",
+            description = "Optionally filters by an existing branch. An omitted filter returns the existing "
+                    + "role-authorized global view until tenant isolation is introduced."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Bookings returned"),
+            @ApiResponse(responseCode = "400", description = "Invalid branch filter",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Authentication required",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "403", description = "Access denied",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Branch not found",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "405", description = "Method not allowed",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "500", description = "Internal server error",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public List<Booking> getAll() {
-        return service.findAll();
+    public List<Booking> getAll(
+            @RequestParam(required = false) @Size(max = 64) String branchId
+    ) {
+        return service.findAll(branchId);
     }
 
     @GetMapping("/{id}")
@@ -108,7 +119,8 @@ public class BookingController {
                 req.bookingId(),
                 req.userId(),
                 req.vehicleId(),
-                req.serviceId(),
+                req.branchId(),
+                req.serviceOfferingId(),
                 req.scheduledDateTime(),
                 req.specialRequest()
         );
@@ -145,7 +157,7 @@ public class BookingController {
         return service.updateBooking(
                 id,
                 request.vehicleId(),
-                request.serviceId(),
+                request.serviceOfferingId(),
                 request.specialRequest()
         );
     }
@@ -155,9 +167,9 @@ public class BookingController {
     @Operation(
             summary = "Reschedule booking",
             description = "Reschedules an eligible future CREATED or CONFIRMED booking while preserving its status, "
-                    + "vehicle, service, and owner. The request is rejected when the booking-change cutoff has "
+                    + "vehicle, branch, service offering, and owner. The request is rejected when the booking-change cutoff has "
                     + "closed, active queue work exists, the target slot is full or conflicting, or the associated "
-                    + "service is inactive."
+                    + "branch, offering, or reusable service is inactive."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Booking rescheduled"),

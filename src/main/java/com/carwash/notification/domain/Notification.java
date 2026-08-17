@@ -16,6 +16,8 @@ public class Notification {
     private String notificationId;
     private User user;
     private Booking booking;
+    private String branchId;
+    private String serviceOfferingId;
     private String type;
     private String message;
     private String channel;
@@ -30,6 +32,8 @@ public class Notification {
         this.notificationId = notificationId;
         this.user = user;
         this.booking = booking;
+        this.branchId = booking == null ? null : booking.getBranchId();
+        this.serviceOfferingId = booking == null ? null : booking.getServiceOfferingId();
         this.type = type;
         this.message = message;
         this.channel = channel;

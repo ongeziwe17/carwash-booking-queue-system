@@ -145,20 +145,21 @@ The collection verifies:
 - strict unknown-property rejection and Bean Validation errors;
 - safe standard error responses and sensitive-data absence;
 - DATA-001 duplicate/dependency/lifecycle protections;
-- QUEUE-001 confirmed-booking, active-service, matching-service, and active-entry uniqueness rules;
-- QUEUE-002 server-managed global positions, cumulative waits, full movement/deletion/completion rebalance, and obsolete position rejection;
-- QUEUE-003 true server-selected call-next ordering, non-waiting skip, explicit by-ID call override, and no-waiting 404 behavior;
+- QUEUE-001 confirmed-booking, canonical branch/offering inheritance, service-consistency, lifecycle, and active-entry uniqueness rules;
+- QUEUE-002 server-managed branch positions, offering-duration waits, branch-only movement/deletion/completion rebalance, and obsolete position rejection;
+- QUEUE-003 required-branch call-next ordering, non-waiting skip, explicit by-ID call override, and no-waiting 404 behavior;
 - BOOKING-001 focused CREATED/CONFIRMED rescheduling, shared cutoff enforcement, status preservation, target-slot validation, queue/service-state rejection, notification creation, and generic-update bypass prevention;
 - AVAIL-001 generated service/date slots, duration/closing fit, deterministic ordering, global remaining capacity, full-slot booking consistency, cancellation release, inactive/unknown/past rejection, and authenticated service-read access;
 - MKT-001 business/branch registration, bounded responses, immutable ownership, coordinates/timezone validation, lifecycle actions, effective activity/public discovery, Marketplace RBAC, and complete unauthenticated-operation coverage;
 - MKT-002 atomic weekly schedules, multiple/overnight intervals, timezone-aware open status, temporary-closure override/cancellation, overlap rejection, Marketplace scheduling RBAC, and complete unauthenticated-operation coverage;
 - SERVICE-001 branch-specific price/duration/configured-capacity terms, multi-branch reuse of global service definitions, offering and parent lifecycle discovery, public-discovery suppression, duplicate/reference validation, deletion integrity, Marketplace RBAC, and complete unauthenticated-operation coverage;
+- OPS-001 required booking branch/offering scope, same-branch offering changes, cross-branch rejection, inherited queue scope, branch filters, branch-partitioned call-next/positions/waits, explicit branch/business reports, and bounded notification context;
 - current queue states (`WAITING`, `CALLED`, `IN_PROGRESS`, `COMPLETED`);
 - real role changes and token acquisition;
 - final-platform-administrator protection without deleting or demoting the bootstrap admin.
 
-The run-scoped queue-ordering workflow captures its relative baseline, moves a dedicated entry to the front, proves
-that global call-next selects it, starts it, proves the next call skips that in-progress entry, verifies the documented
+The run-scoped queue-ordering workflow captures its branch baseline, moves a dedicated entry to the front, proves
+that branch call-next selects it, starts it, proves the next call skips that in-progress entry, verifies the documented
 no-waiting 404, and completes both entries so the suite remains rerunnable. Expiry/signing-clock manipulation and
 internal concurrency guarantees remain Java-test responsibilities.
 
@@ -169,7 +170,7 @@ responsibilities because the acceptance environment does not expose test-only cl
 
 The run-scoped availability workflow uses an isolated future date and services. It proves that an appointment for a different service consumes the same global exact-start capacity, the full slot disappears and cannot be booked, cancellation restores it, and a 60-minute service is never advertised past the closing boundary. Availability reads remain point-in-time snapshots and do not reserve capacity.
 
-The run-scoped Marketplace workflow registers businesses and branches, exercises every onboarding, scheduling, and offering operation, proves parent lifecycle and public-discovery filtering without rewriting child state, validates coordinate/timezone and offering-term rules, and checks customer read/management-denial behavior. It atomically creates weekly hours, proves normal and overnight opening, proves and cancels a closure override, and rejects a Sunday-to-Monday overlap. It also offers one reusable service at two branches with independent terms and protects that referenced service from deletion. It does not imply tenant isolation, distance discovery, remaining-capacity calculation, or branch-scoped booking/queue operations.
+The run-scoped Marketplace workflow registers businesses and branches, exercises every onboarding, scheduling, and offering operation, proves parent lifecycle and public-discovery filtering without rewriting child state, validates coordinate/timezone and offering-term rules, and checks customer read/management-denial behavior. A following operational workflow books the same reusable service at those two branches, proves independent queue position/call-next state, branch/business report isolation, booking/queue filters, canonical mismatch rejection, and bounded notification context. It does not imply tenant isolation, distance discovery, remaining-capacity calculation, Marketplace-hours enforcement during booking, or branch-aware AVAIL-001.
 
 ## Cleanup
 

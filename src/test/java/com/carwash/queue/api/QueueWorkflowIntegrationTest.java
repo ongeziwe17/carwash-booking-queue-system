@@ -5,6 +5,7 @@ import com.carwash.catalog.domain.Service;
 import com.carwash.booking.api.dto.CreateBookingRequest;
 import com.carwash.queue.api.dto.CreateQueueEntryRequest;
 import com.carwash.catalog.api.dto.CreateServiceRequest;
+import com.carwash.catalog.api.dto.CreateServiceOfferingRequest;
 import com.carwash.identity.api.dto.CreateUserRequest;
 import com.carwash.vehicle.api.dto.CreateVehicleRequest;
 import com.carwash.booking.domain.Booking;
@@ -55,8 +56,8 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         confirmBooking(booking);
         CreateQueueEntryRequest request = QueueFixtureBuilder.valid(ids, booking.booking().bookingId(), ids.service()).build();
         api.createQueueEntry(request)
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.message").value(containsString("Service not found")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(containsString("must match")))
                 .andExpect(jsonPath("$.path").value("/api/queue-entries"));
     }
 
@@ -140,7 +141,8 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         CreateQueueEntryRequest request = QueueFixtureBuilder.valid(ids, booking.booking().bookingId(),
                 booking.resources().service().serviceId()).build();
 
-        assertBusinessRule(api.createQueueEntry(request), "Inactive service cannot join the queue");
+        assertBusinessRule(api.createQueueEntry(request),
+                "Inactive service offering or reusable service cannot join the queue");
     }
 
     @Test
@@ -333,6 +335,7 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         postQueueAction(first, "start");
 
         mockMvc.perform(post("/api/queue-entries/call-next")
+                        .param("branchId", api.defaultBranch().branchId())
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.queueEntryId").value(second.queueEntryId()))
@@ -366,6 +369,7 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
 
         for (CreateQueueEntryRequest expected : List.of(first, second, third)) {
             mockMvc.perform(post("/api/queue-entries/call-next")
+                            .param("branchId", api.defaultBranch().branchId())
                             .with(authentication.platformAdminJwt()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.queueEntryId").value(expected.queueEntryId()))
@@ -373,10 +377,11 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         }
 
         mockMvc.perform(post("/api/queue-entries/call-next")
+                        .param("branchId", api.defaultBranch().branchId())
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
-                .andExpect(jsonPath("$.message").value("No waiting queue entry available"))
+                .andExpect(jsonPath("$.message").value(containsString("No waiting queue entry available")))
                 .andExpect(jsonPath("$.path").value("/api/queue-entries/call-next"));
     }
 
@@ -493,13 +498,19 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
                 .estimatedDurationMin(duration)
                 .build();
         api.createService(service).andExpect(status().isCreated());
+        BookingApiFixture.Resources defaultScope = new BookingApiFixture(api, ids).createResources();
+        CreateServiceOfferingRequest offering = new CreateServiceOfferingRequest(
+                ids.offering(), service.serviceId(), service.price(), duration, 2);
+        api.createServiceOffering(defaultScope.branch().branchId(), offering).andExpect(status().isCreated());
         CreateBookingRequest booking = BookingFixtureBuilder.valid(
-                        ids, user.userId(), vehicle.vehicleId(), service.serviceId())
+                        ids, user.userId(), vehicle.vehicleId(),
+                        defaultScope.branch().branchId(), offering.offeringId())
                 .scheduledDateTime(TestDates.futureDays(futureDay))
                 .build();
         api.createBooking(booking).andExpect(status().isCreated());
         return new BookingApiFixture.CreatedBooking(
-                new BookingApiFixture.Resources(user, vehicle, service), booking);
+                new BookingApiFixture.Resources(
+                        user, vehicle, service, defaultScope.business(), defaultScope.branch(), offering), booking);
     }
 
     private void confirmBooking(BookingApiFixture.CreatedBooking booking) throws Exception {

@@ -14,7 +14,8 @@ http:
         "bookingId": "{{rescheduleConflictOccupantId}}",
         "userId": "{{customerUserId}}",
         "vehicleId": "{{customerVehicleId}}",
-        "serviceId": "{{serviceId}}",
+        "branchId": "{{opsBranchId}}",
+        "serviceOfferingId": "{{opsOfferingId}}",
         "scheduledDateTime": "{{future36}}",
         "specialRequest": "reschedule conflict occupant"
       }

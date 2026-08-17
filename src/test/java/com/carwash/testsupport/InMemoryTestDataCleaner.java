@@ -72,8 +72,13 @@ public final class InMemoryTestDataCleaner {
 
     public void clean() {
         coordinator.write(() -> {
-            offerings.findAll().stream().map(ServiceOffering::getOfferingId)
-                    .forEach(offerings::deleteById);
+            notifications.findAll().stream().map(Notification::getNotificationId)
+                    .forEach(notifications::deleteById);
+            queueEntries.findAll().stream().map(QueueEntry::getQueueEntryId)
+                    .forEach(queueEntries::deleteById);
+            bookings.findAll().stream().map(Booking::getBookingId)
+                    .forEach(bookings::deleteById);
+            offerings.findAll().stream().map(ServiceOffering::getOfferingId).forEach(offerings::deleteById);
             closures.findAll().stream().map(TemporaryBranchClosure::getClosureId)
                     .forEach(closures::deleteById);
             schedules.findAll().stream().map(BranchOperatingSchedule::getBranchId)
@@ -82,12 +87,6 @@ public final class InMemoryTestDataCleaner {
                     .forEach(branches::deleteById);
             businesses.findAll().stream().map(CarWashBusiness::getBusinessId)
                     .forEach(businesses::deleteById);
-            notifications.findAll().stream().map(Notification::getNotificationId)
-                    .forEach(notifications::deleteById);
-            queueEntries.findAll().stream().map(QueueEntry::getQueueEntryId)
-                    .forEach(queueEntries::deleteById);
-            bookings.findAll().stream().map(Booking::getBookingId)
-                    .forEach(bookings::deleteById);
             vehicles.findAll().stream().map(Vehicle::getVehicleId)
                     .forEach(vehicles::deleteById);
             services.findAll().stream().map(Service::getServiceId)

@@ -1,14 +1,14 @@
 info:
   name: Call next skips in-progress entry
   type: http
-  seq: 33
+  seq: 36
   tags:
     - workflow
     - integrity
 
 http:
   method: POST
-  url: "{{baseUrl}}/api/queue-entries/call-next"
+  url: "{{baseUrl}}/api/queue-entries/call-next?branchId={{opsBranchId}}"
   auth:
     type: bearer
     token: "{{staffToken}}"

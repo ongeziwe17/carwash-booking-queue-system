@@ -24,7 +24,12 @@ class NotificationWorkflowIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(jsonPath("$[0].notificationId").value("notification-00000000000000000001"))
                 .andExpect(jsonPath("$[0].type").value("BOOKING_CONFIRMED"))
                 .andExpect(jsonPath("$[0].message").value("Your booking has been confirmed."))
-                .andExpect(jsonPath("$[0].user.userId").value(booking.resources().user().userId()));
+                .andExpect(jsonPath("$[0].userId").value(booking.resources().user().userId()))
+                .andExpect(jsonPath("$[0].branchId").value(booking.resources().branch().branchId()))
+                .andExpect(jsonPath("$[0].serviceOfferingId").value(
+                        booking.resources().offering().offeringId()))
+                .andExpect(jsonPath("$[0].user").doesNotExist())
+                .andExpect(jsonPath("$[0].booking").doesNotExist());
     }
 
     @Test

@@ -1,0 +1,30 @@
+info:
+  name: Create primary operational service offering
+  type: http
+  seq: 2
+  tags: [owner, workflow, operations, offering]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/branches/{{opsBranchId}}/offerings"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body:
+    type: json
+    data: |-
+      {
+        "offeringId": "{{opsOfferingId}}",
+        "serviceId": "{{serviceId}}",
+        "price": 135.00,
+        "estimatedDurationMin": 30,
+        "concurrentCapacity": 3
+      }
+  auth: { type: bearer, token: "{{ownerToken}}" }
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("offering is scoped to private active branch", function() { expect(res.body.offeringId).to.equal(bru.getVar("opsOfferingId")); expect(res.body.branchId).to.equal(bru.getVar("opsBranchId")); expect(res.body.effectiveActive).to.equal(true); expect(res.body.discoverable).to.equal(false); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -30,6 +30,17 @@ public class InMemoryBookingRepository extends InMemoryRepository<Booking, Strin
     }
 
     @Override
+    public List<Booking> findByBranchId(String branchId) {
+        return findMatching(booking -> branchId != null && branchId.equals(booking.getBranchId()));
+    }
+
+    @Override
+    public List<Booking> findByServiceOfferingId(String serviceOfferingId) {
+        return findMatching(booking -> serviceOfferingId != null
+                && serviceOfferingId.equals(booking.getServiceOfferingId()));
+    }
+
+    @Override
     public List<Booking> findByScheduledDateTime(LocalDateTime scheduledDateTime) {
         return findMatching(booking -> booking.getScheduledDateTime() != null
                 && booking.getScheduledDateTime().equals(scheduledDateTime));
@@ -51,6 +62,12 @@ public class InMemoryBookingRepository extends InMemoryRepository<Booking, Strin
     public boolean existsByServiceId(String serviceId) {
         return anyMatch(booking -> booking.getService() != null
                 && serviceId.equals(booking.getService().getServiceId()));
+    }
+
+    @Override
+    public boolean existsByServiceOfferingId(String serviceOfferingId) {
+        return anyMatch(booking -> serviceOfferingId != null
+                && serviceOfferingId.equals(booking.getServiceOfferingId()));
     }
 
     @Override

@@ -121,7 +121,8 @@ class AvailabilityServiceTest extends ServiceTestSupport {
             BookingSlotPolicyService slots
     ) {
         return new BookingManagementService(
-                bookingRepository, userRepository, vehicleRepository, serviceRepository,
+                bookingRepository, userRepository, vehicleRepository, catalogService,
+                serviceOfferingService, marketplaceService,
                 queueRepository, notificationRepository, notificationService, queueOrdering, coordinator,
                 policy, slots, clock);
     }

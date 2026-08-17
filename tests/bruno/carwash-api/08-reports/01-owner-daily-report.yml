@@ -9,7 +9,7 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/api/reports/daily-summary?date={{testDate}}"
+  url: "{{baseUrl}}/api/reports/daily-summary?date={{testDate}}&branchId={{opsBranchId}}"
   auth:
     type: bearer
     token: "{{ownerToken}}"
@@ -30,7 +30,7 @@ runtime:
         const bootstrapPassword = bru.interpolate("{{process.env.BRUNO_BOOTSTRAP_ADMIN_PASSWORD}}");
         if (bootstrapPassword && !bootstrapPassword.includes("process.env")) expect(payload).to.not.include(bootstrapPassword);
         test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
-        test("report has expected shape", function() { expect(res.body.reportDate).to.equal(bru.getVar("testDate")); expect(res.body.totalBookings).to.be.a("number"); });
+        test("report has explicit branch scope", function() { expect(res.body.reportDate).to.equal(bru.getVar("testDate")); expect(res.body.scopeType).to.equal("BRANCH"); expect(res.body.scopeId).to.equal(bru.getVar("opsBranchId")); expect(res.body.timezone).to.equal("Africa/Johannesburg"); expect(res.body.totalBookings).to.be.a("number"); });
 
 settings:
   encodeUrl: true

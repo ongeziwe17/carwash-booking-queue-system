@@ -1,0 +1,36 @@
+info:
+  name: Create run-scoped operational branch
+  type: http
+  seq: 18
+  tags: [setup, operations, marketplace]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/businesses/{{opsBusinessId}}/branches"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body:
+    type: json
+    data: |-
+      {
+        "branchId": "{{opsBranchId}}",
+        "branchName": "Bruno Operations Branch",
+        "addressLine1": "118 Operations Street",
+        "city": "Cape Town",
+        "province": "Western Cape",
+        "postalCode": "8001",
+        "countryCode": "ZA",
+        "latitude": -33.9249,
+        "longitude": 18.4241,
+        "timezone": "Africa/Johannesburg",
+        "publicDiscoveryEnabled": false
+      }
+  auth: { type: bearer, token: "{{ownerToken}}" }
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("private branch remains effectively active", function() { expect(res.body.branchId).to.equal(bru.getVar("opsBranchId")); expect(res.body.effectiveActive).to.equal(true); expect(res.body.discoverable).to.equal(false); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

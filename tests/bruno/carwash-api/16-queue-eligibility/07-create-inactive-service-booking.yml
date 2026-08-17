@@ -1,7 +1,7 @@
 info:
   name: Create booking before service deactivation
   type: http
-  seq: 7
+  seq: 8
   tags:
     - queue-eligibility
     - workflow
@@ -19,7 +19,8 @@ http:
         "bookingId": "{{queueEligibilityInactiveBookingId}}",
         "userId": "{{customerUserId}}",
         "vehicleId": "{{customerVehicleId}}",
-        "serviceId": "{{queueEligibilityInactiveServiceId}}",
+        "branchId": "{{opsBranchId}}",
+        "serviceOfferingId": "{{queueEligibilityInactiveOfferingId}}",
         "scheduledDateTime": "{{future23}}",
         "specialRequest": "Inactive service queue fixture"
       }

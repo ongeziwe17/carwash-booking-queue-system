@@ -157,6 +157,8 @@ public class User {
     public Booking createBooking(
             String bookingId,
             Vehicle vehicle,
+            String branchId,
+            String serviceOfferingId,
             Service service,
             LocalDateTime scheduledDateTime,
             String specialRequest
@@ -165,6 +167,8 @@ public class User {
                 bookingId,
                 this,
                 vehicle,
+                branchId,
+                serviceOfferingId,
                 service,
                 scheduledDateTime,
                 specialRequest

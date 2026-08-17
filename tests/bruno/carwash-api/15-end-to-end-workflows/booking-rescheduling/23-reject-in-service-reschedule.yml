@@ -1,7 +1,7 @@
 info:
   name: Reschedule rejects in-service booking
   type: http
-  seq: 23
+  seq: 24
   tags: [workflow, customer, integrity]
 http:
   method: POST

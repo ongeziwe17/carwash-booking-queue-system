@@ -46,7 +46,8 @@ class ReportWorkflowIntegrationTest extends ApiIntegrationTestSupport {
 
         mockMvc.perform(get("/api/reports/daily-summary")
                         .with(authentication.platformAdminJwt())
-                        .param("date", reportDateTime.toLocalDate().toString()))
+                        .param("date", reportDateTime.toLocalDate().toString())
+                        .param("branchId", confirmed.resources().branch().branchId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reportDate").value(reportDateTime.toLocalDate().toString()))
                 .andExpect(jsonPath("$.totalBookings").value(6))
@@ -63,9 +64,11 @@ class ReportWorkflowIntegrationTest extends ApiIntegrationTestSupport {
 
     @Test
     void dailySummaryReportDateWithNoDataReturnsZeroTotals() throws Exception {
+        BookingApiFixture.Resources resources = new BookingApiFixture(api, ids).createResources();
         mockMvc.perform(get("/api/reports/daily-summary")
                         .with(authentication.platformAdminJwt())
-                        .param("date", TestDates.futureDays(30).toLocalDate().toString()))
+                        .param("date", TestDates.futureDays(30).toLocalDate().toString())
+                        .param("branchId", resources.branch().branchId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalBookings").value(0))
                 .andExpect(jsonPath("$.totalQueueEntries").value(0))

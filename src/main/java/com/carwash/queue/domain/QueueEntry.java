@@ -4,6 +4,7 @@ import com.carwash.booking.domain.Booking;
 import com.carwash.catalog.domain.Service;
 
 import com.carwash.queue.domain.QueueStatus;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -16,6 +17,10 @@ public class QueueEntry {
     private String queueEntryId;
     private Booking booking;
     private Service service;
+    @Setter(AccessLevel.NONE)
+    private String branchId;
+    @Setter(AccessLevel.NONE)
+    private String serviceOfferingId;
     private int position;
     private QueueStatus queueStatus;
     private LocalDateTime joinedAt;
@@ -31,6 +36,9 @@ public class QueueEntry {
         this.queueEntryId = queueEntryId;
         this.booking = booking;
         this.service = service;
+        if (booking != null && booking.getBranchId() != null && booking.getServiceOfferingId() != null) {
+            assignOperationalScope(booking.getBranchId(), booking.getServiceOfferingId());
+        }
     }
 
     public QueueEntry(String queueEntryId, Booking booking, Service service, int position) {
@@ -38,6 +46,19 @@ public class QueueEntry {
         this.queueStatus = QueueStatus.WAITING;
         this.joinedAt = LocalDateTime.now();
         updateQueueMetrics(position, 0);
+    }
+
+    public void assignOperationalScope(String branchId, String serviceOfferingId) {
+        String normalizedBranchId = requireId(branchId, "Branch ID");
+        String normalizedOfferingId = requireId(serviceOfferingId, "Service offering ID");
+        if (this.branchId != null && !this.branchId.equals(normalizedBranchId)) {
+            throw new IllegalStateException("Queue entry branch is immutable");
+        }
+        if (this.serviceOfferingId != null && !this.serviceOfferingId.equals(normalizedOfferingId)) {
+            throw new IllegalStateException("Queue entry service offering is immutable");
+        }
+        this.branchId = normalizedBranchId;
+        this.serviceOfferingId = normalizedOfferingId;
     }
 
     public boolean callNext() {
@@ -79,6 +100,17 @@ public class QueueEntry {
         if (estimatedWaitMin < 0) throw new IllegalArgumentException("Estimated wait must not be negative");
         this.position = position;
         this.estimatedWaitMin = estimatedWaitMin;
+    }
+
+    private String requireId(String value, String field) {
+        String normalized = value == null ? null : value.trim();
+        if (normalized == null || normalized.isBlank()) {
+            throw new IllegalArgumentException(field + " is required");
+        }
+        if (normalized.length() > 64) {
+            throw new IllegalArgumentException(field + " must not exceed 64 characters");
+        }
+        return normalized;
     }
 
 }

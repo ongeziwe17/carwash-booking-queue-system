@@ -165,7 +165,7 @@ Plate numbers are unique per owner during create and update, compared case-insen
 
 New services are active. Activation/deactivation changes that state without changing identity. A service referenced by a booking, queue entry, or any active/inactive branch offering cannot be physically deleted; deactivate it instead.
 
-`Service` remains the reusable global wash-type definition. Its existing price and duration fields are transitional single-location/default values retained for backward-compatible booking, queue, and AVAIL-001 workflows. Branch-offering endpoints use only their explicitly supplied offering price/duration/capacity; they never copy or fall back to global values. OPS-001 and AVAIL-002 will migrate those workflows later.
+`Service` remains the reusable global wash-type definition. Its existing price and duration fields are transitional values retained for the unchanged Service API, AVAIL-001, and an internal booking compatibility projection. New bookings select a branch offering; slot fit and queue waits use offering duration, and offering price/duration/capacity never copy or fall back to global values. AVAIL-002 will migrate availability later.
 
 ## Availability
 
@@ -179,13 +179,13 @@ New services are active. Activation/deactivation changes that state without chan
 
 Slots are generated from the global single-location operating start in configured interval steps. The selected service must finish at or before closing; finishing exactly at closing is valid. Capacity is global per exact start across all services and counts every booking whose status is not `CANCELLED`. Service duration does not introduce overlapping bay/staff occupancy between different start times.
 
-Availability is a point-in-time read under the coordinator read lock and does not reserve capacity. Booking creation and rescheduling reuse the same slot policy and remain authoritative inside the coordinator write lock. Customer/vehicle conflicts cannot be evaluated from a service/date availability request and are therefore revalidated when a booking is created or rescheduled. No business, branch, staff, bay, recommendation, or reservation-token model is introduced.
+Availability is a point-in-time read under the coordinator read lock and does not reserve capacity. Branch-scoped booking creation and rescheduling remain authoritative inside the coordinator write lock. Customer/vehicle conflicts cannot be evaluated from a service/date availability request and are therefore revalidated on booking writes. AVAIL-001 still has no branch/offering input and does not consume Marketplace hours or configured offering capacity; AVAIL-002 owns that migration.
 
 ## Bookings
 
 | Method | Path | Auth / access | Success | Expected errors | Purpose |
 |---|---|---|---|---|---|
-| GET | `/api/bookings` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 Booking[]` | 401, 403, 405, 500 | List all bookings. |
+| GET | `/api/bookings?branchId={branchId}` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 Booking[]` | 400, 401, 403, 404, 405, 500 | List bookings, optionally filtered to one existing branch. |
 | GET | `/api/bookings/{id}` | Bearer; owner or operational role | `200 Booking` | 400, 401, 403, 404, 405, 500 | Get a booking. |
 | POST | `/api/bookings` | Bearer; customer for self, operational role for any user | `201 Booking` | 400, 401, 403, 404, 405, 415, 500 | Create a booking. |
 | PUT | `/api/bookings/{id}` | Bearer; owner or operational role | `200 Booking` | 400, 401, 403, 404, 405, 415, 500 | Update non-schedule booking details when no active queue entry exists. |
@@ -194,13 +194,13 @@ Availability is a point-in-time read under the coordinator read lock and does no
 | POST | `/api/bookings/{id}/confirm` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 Booking` | 400, 401, 403, 404, 405, 500 | Confirm a created booking. |
 | POST | `/api/bookings/{id}/cancel` | Bearer; owner or operational role | `200 Booking` | 400, 401, 403, 404, 405, 500 | Cancel and return the updated booking. |
 
-`CreateBookingRequest` accepts `bookingId`, `userId`, `vehicleId`, `serviceId`, `scheduledDateTime`, and optional `specialRequest` (max 1000). `UpdateBookingRequest` accepts only `vehicleId`, `serviceId`, and `specialRequest`; it cannot change the booking ID, owner, or schedule. Strict JSON handling rejects the removed `scheduledDateTime` property on generic `PUT` as `400 MALFORMED_REQUEST`. Schedule changes must use `POST /api/bookings/{id}/reschedule`, whose `RescheduleBookingRequest` contains only the required future `scheduledDateTime`.
+`CreateBookingRequest` accepts `bookingId`, `userId`, `vehicleId`, required `branchId`, required `serviceOfferingId`, `scheduledDateTime`, and optional `specialRequest` (max 1000). It does not accept `serviceId`: the reusable service is derived from the offering. `UpdateBookingRequest` accepts only `vehicleId`, `serviceOfferingId`, and `specialRequest`; booking identity, owner, branch, and schedule cannot change. A replacement offering must belong to the booking's existing branch. Strict JSON handling rejects removed/immutable fields such as `serviceId`, `branchId`, or `scheduledDateTime` on generic `PUT` as `400 MALFORMED_REQUEST`. Schedule changes use the focused reschedule operation.
 
-`scheduledDateTime` is a local date-time interpreted against the configured application clock/timezone and must be strictly in the future. It must be one of the configured interval starts at or after opening and before closing, and the chosen service must finish by closing. The referenced user, vehicle, and service must exist; the vehicle must belong to the booking owner; the service must be active. Active bookings sharing an exact scheduled date/time are limited by the configured global slot capacity, and the same customer/vehicle cannot have another active booking in that slot.
+`scheduledDateTime` is a local date-time interpreted by the transitional booking policy and must be strictly in the future. It must align to the configured interval and the offering duration must fit by closing. The user, vehicle, branch, offering, and reusable service must exist; the vehicle must belong to the booking owner; the branch and owning business plus offering and service must be effectively active. Public discovery is not operational eligibility, so a private active branch may be booked. Active exact-start capacity and same customer/vehicle conflicts are partitioned by branch. Marketplace operating hours are not enforced in OPS-001.
 
-Ordinary updates are allowed only in `CREATED` or `CONFIRMED`, and are rejected while the booking has an active `WAITING`, `CALLED`, or `IN_PROGRESS` queue entry. Confirmation transitions a valid `CREATED` booking to `CONFIRMED`. Cancellation can transition only `CREATED` or `CONFIRMED` bookings, and only while the booking is still in the future and the configured cancellation cutoff remains open. A valid cancellation removes an associated `WAITING` or `CALLED` queue entry, clears `Booking.queueEntry`, and rebalances remaining positions and waits before returning. `IN_SERVICE`, `COMPLETED`, and already-`CANCELLED` bookings reject cancellation. Both public cancellation routes use that same behavior; HTTP `DELETE` remains cancellation rather than physical booking deletion.
+Ordinary updates are allowed only in `CREATED` or `CONFIRMED`, and are rejected while the booking has an active queue entry. Confirmation revalidates operational parent/offering state. Cancellation can transition only eligible future bookings before the configured cutoff. A valid cancellation removes an associated `WAITING` or `CALLED` queue entry, clears `Booking.queueEntry`, and rebalances only the booking's branch. `IN_SERVICE`, `COMPLETED`, and already-`CANCELLED` bookings reject cancellation. Both public cancellation routes use the same behavior; HTTP `DELETE` remains cancellation rather than physical deletion.
 
-Rescheduling is allowed only for a future `CREATED` or `CONFIRMED` booking before the current appointment's configured booking-change cutoff. It reuses `carwash.policy.booking.cancellation-window`; no duplicate reschedule setting exists. The cutoff controls whether the current booking may still be changed and is not applied as a minimum lead time for the new slot. The operation re-resolves the canonical owner, vehicle, and existing service, rechecks vehicle ownership and service activation, and reuses the exact-slot customer/vehicle conflict and capacity rules while excluding the booking itself. Active queue work blocks rescheduling, so no queue entry, position, or ETA is changed. A successful move preserves owner, vehicle, service, and `CREATED`/`CONFIRMED` status and creates a `BOOKING_RESCHEDULED` notification containing the new schedule.
+Rescheduling is allowed only for a future `CREATED` or `CONFIRMED` booking before the current appointment's configured booking-change cutoff. It re-resolves the canonical owner, vehicle, branch, offering, and derived service, then reuses branch exact-slot conflict/capacity rules while excluding the booking itself. Active queue work blocks rescheduling. A successful move preserves owner, vehicle, branch, offering, derived service, and status and creates a bounded `BOOKING_RESCHEDULED` notification.
 
 The schedule update is committed inside the shared single-JVM write boundary. If booking repository persistence fails, the original mutable schedule is restored. `BOOKING_RESCHEDULED` notification creation occurs afterward and is best-effort: notification failure is logged without rolling back or failing the committed reschedule. There is an internal service-layer physical delete operation for already-cancelled bookings with no queue entry, but no public hard-delete endpoint.
 
@@ -208,33 +208,36 @@ The schedule update is committed inside the shared single-JVM write boundary. If
 
 | Method | Path | Auth / access | Success | Expected errors | Purpose |
 |---|---|---|---|---|---|
-| GET | `/api/queue-entries` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry[]` | 401, 403, 405, 500 | List active entries in operational order, followed by terminal history. |
+| GET | `/api/queue-entries?branchId={branchId}` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry[]` | 400, 401, 403, 404, 405, 500 | List entries, optionally filtered to one existing branch. |
 | GET | `/api/queue-entries/{id}` | Bearer; booking owner or operational role | `200 QueueEntry` | 400, 401, 403, 404, 405, 500 | Get a queue entry. |
 | POST | `/api/queue-entries` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `201 QueueEntry` | 400, 401, 403, 404, 405, 415, 500 | Append and attach an eligible entry with server-generated metrics. |
 | PUT | `/api/queue-entries/{id}/position` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry` | 400, 401, 403, 404, 405, 415, 500 | Move a waiting entry and rebalance the active queue. |
-| POST | `/api/queue-entries/call-next` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry` | 401, 403, 404, 405, 500 | Select the first `WAITING` entry in global active queue order and mark it called. |
+| POST | `/api/queue-entries/call-next?branchId={branchId}` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry` | 400, 401, 403, 404, 405, 500 | Select the first `WAITING` entry in the required branch queue and mark it called. |
 | POST | `/api/queue-entries/{id}/call` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry` | 400, 401, 403, 404, 405, 500 | Explicitly mark this specific waiting entry as called. |
 | POST | `/api/queue-entries/{id}/start` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry` | 400, 401, 403, 404, 405, 500 | Start a `CALLED` entry and synchronize its booking to `IN_SERVICE`. |
 | POST | `/api/queue-entries/{id}/complete` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry` | 400, 401, 403, 404, 405, 500 | Complete an `IN_PROGRESS` entry and synchronize its booking to `COMPLETED`. |
 | DELETE | `/api/queue-entries/{id}` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `204` | 400, 401, 403, 404, 405, 500 | Delete a waiting entry and clear its booking link. |
 
-`CreateQueueEntryRequest` accepts only `queueEntryId`, `bookingId`, and `serviceId`. Queue entry creation requires an existing `CONFIRMED` booking and its existing, active matching service. A booking may have only one active queue entry, where `WAITING`, `CALLED`, and `IN_PROGRESS` are active and `COMPLETED` and `EXITED` are terminal/non-active. Every new entry is initialized by the server as `WAITING`, appended to the one global active queue, and assigned its position, lifecycle timestamps, and estimated wait inside the current single-JVM write boundary. The canonical entry is then attached to the canonical booking. Because JSON request contracts are strict, the removed creation-time `position` property is rejected as `400 MALFORMED_REQUEST`; it is not ignored as a compatibility hint.
+`CreateQueueEntryRequest` retains only `queueEntryId`, `bookingId`, and transitional `serviceId`. Branch and offering are never client supplied: the entry inherits both from the canonical confirmed booking. `serviceId` is a consistency field and must match the booking offering's reusable service. Branch/business and offering/service activity plus every association are revalidated. One active entry is allowed per booking. Every entry starts `WAITING`, appends to its branch queue, receives server metrics, and is attached to the canonical booking inside one write boundary. Strict JSON rejects client branch/offering/position injection.
 
-Active positions are unique and consecutive from `1..N`. New entries append at `N + 1`; completion and physical deletion remove an entry from active calculations and immediately close later position gaps. `GET /api/queue-entries` returns active entries first by `position`, then uses `joinedAt` and `queueEntryId` as deterministic tie-breakers for inconsistent legacy state; terminal records follow in stable order. Service-filtered internal retrieval preserves global positions rather than creating a separate service queue. Branch-specific queues are not implemented.
+Active positions are unique and consecutive `1..N` independently within each branch. New entries append at branch `N + 1`; completion and physical deletion close gaps only there. Global list order is deterministic by branch then active/position/joined time/ID, while a `branchId` filter cannot return records from another branch. Omitting the filter preserves the current globally authorized operational view until TENANT-001; it is not tenant enforcement.
 
-Queue API responses are detached snapshots built while the coordinator lock is held, so later queue mutations cannot alter an in-flight response. Updating an estimated service duration immediately rebalances active waits within the same single-JVM write boundary.
+Booking and queue filters trim and bound the branch ID, reject blank or malformed values with `400`, and reject unknown branches with `404`. Inactive branches remain valid historical lookup/report scopes; lifecycle state blocks new operational work but does not hide existing records.
 
-`estimatedWaitMin` is the cumulative effective service duration of active entries ahead; an entry's own duration is not part of its wait. A predecessor uses its positive `estimatedDurationMin`, or the configured default service duration when no positive value is available. Completed, exited, and physically deleted entries do not contribute; terminal records have zero wait.
+Queue API responses are detached snapshots built while the coordinator lock is held, so later mutations cannot alter an in-flight response. Updating a global reusable-service duration does not rewrite waits; the selected offering's configured duration is authoritative.
 
-`UpdateQueuePositionRequest` contains one positive `position`. Only `WAITING` entries may move, and the target cannot exceed the active queue size. A successful move reorders the entry and recalculates every affected active position and wait. `POST /api/queue-entries/call-next` selects the first `WAITING` entry from deterministic global active queue order; lower-position `CALLED` and `IN_PROGRESS` entries are skipped, and no waiting entry returns `404 RESOURCE_NOT_FOUND` with `No waiting queue entry available`. `POST /api/queue-entries/{id}/call` is the explicit operator override for a known waiting entry. Calling does not start service or rebalance the queue: the booking remains `CONFIRMED`, the queue entry becomes `CALLED`, and active positions and ETAs remain unchanged. Starting service atomically produces `IN_SERVICE + IN_PROGRESS`; completion atomically produces `COMPLETED + COMPLETED` before notification and response snapshot creation. Ordering changes do not alter lifecycle state.
+`estimatedWaitMin` is the cumulative offering duration of active entries ahead in the same branch; an entry's own duration and every other branch are excluded. Completed, exited, and physically deleted entries do not contribute; terminal records have zero wait. Offering concurrent capacity is not used for remaining-capacity calculations in OPS-001.
+
+`UpdateQueuePositionRequest` contains one positive `position`. Only `WAITING` entries may move, and the target cannot exceed that branch's active size. A successful move recalculates only that branch. `call-next` requires `branchId`, revalidates canonical associations, and selects that branch's first `WAITING` entry; lower-position `CALLED`/`IN_PROGRESS` entries are skipped. The by-ID call remains an explicit override. Calling does not start service or rebalance; start and completion atomically synchronize booking and queue before notifications/responses.
 
 ## Notifications
 
 | Method | Path | Auth / access | Success | Expected errors | Purpose |
 |---|---|---|---|---|---|
-| GET | `/api/notifications/user/{userId}` | Bearer; self or `PLATFORM_ADMIN` | `200 Notification[]` | 400, 401, 403, 405, 500 | List recent in-app notifications. |
+| GET | `/api/notifications/user/{userId}` | Bearer; self or `PLATFORM_ADMIN` | `200 NotificationResponse[]` | 400, 401, 403, 405, 500 | List recent bounded in-app notifications. |
 
 Results are sorted newest first by `sentAt`, with `notificationId` as the deterministic tie-breaker, and are limited by the deployment-configured recent-item default. The endpoint does not require the requested user ID to exist before an authorized admin lookup; no records therefore produce an empty list rather than a user `404`.
+Each response contains scalar `userId`, `bookingId`, `branchId`, and `serviceOfferingId` context plus notification lifecycle fields. It never serializes User, Booking, Queue, Branch, or ServiceOffering aggregate graphs.
 
 Notifications are currently `IN_APP` only. The synchronized `BOOKING_CANCELLED`, `BOOKING_RESCHEDULED`, `SERVICE_STARTED`, and
 `SERVICE_COMPLETED` notifications are attempted only after the canonical booking/queue state is committed. For this
@@ -250,11 +253,11 @@ selects the same still-waiting entry rather than advancing the queue.
 
 | Method | Path | Auth / access | Success | Expected errors | Purpose |
 |---|---|---|---|---|---|
-| GET | `/api/reports/daily-summary` | Bearer; `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 DailySummaryReportResponse` | 400, 401, 403, 405, 500 | Return booking/queue counts for one date. |
+| GET | `/api/reports/daily-summary?date={date}&branchId={branchId}` or `&businessId={businessId}` | Bearer; `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 DailySummaryReportResponse` | 400, 401, 403, 404, 405, 500 | Return booking/queue counts for exactly one explicit scope. |
 
-The required `date` query parameter uses ISO `yyyy-MM-dd`, for example `?date=2026-08-09`. A missing date returns `400 MISSING_PARAMETER`; an invalid date returns `400 INVALID_PARAMETER`.
+The required `date` uses ISO `yyyy-MM-dd`. Exactly one nonblank bounded `branchId` or `businessId` is required; neither or both returns `400 BUSINESS_RULE_VIOLATION`, and unknown scope returns `404`. A branch report includes only that branch. A business report resolves its owned branches and includes only those records. Current role access remains global and the scope is not a tenant-authorization boundary.
 
-`DailySummaryReportResponse` contains `reportDate`, `totalBookings`, `confirmedBookings`, `cancelledBookings`, `completedBookings`, `totalQueueEntries`, `waitingQueueEntries`, `calledQueueEntries`, `inProgressQueueEntries`, `completedQueueEntries`, and `pendingWorkload`. Booking and queue completion now occur in one coordinated lifecycle operation, so their completed counts are based on synchronized source aggregates. It is an in-memory operational summary, not a tenant-aware analytics/dashboard API.
+`DailySummaryReportResponse` adds `scopeType`, `scopeId`, and `timezone` to the existing counters. Booking schedules are branch-local `LocalDateTime` values, so branch dates are compared without the server default timezone. A single-timezone business reports that zone; multi-zone businesses return `MULTIPLE_BRANCH_TIMEZONES`. Completion counters remain based on synchronized source aggregates. This is an in-memory operational summary, not tenant analytics.
 
 ## Marketplace Businesses and Branches
 
@@ -272,7 +275,7 @@ The required `date` query parameter uses ISO `yyyy-MM-dd`, for example `?date=20
 
 `CreateBusinessRequest` requires a bounded ID/name, valid contact email/phone, and optional registration number. `CreateBranchRequest` requires a bounded ID/name/address, two-letter country code, latitude `-90..90`, longitude `-180..180`, a valid Java timezone identifier, and an explicit public-discovery flag. Update requests omit IDs and business ownership.
 
-Business and branch records begin active. Business deactivation leaves branch records unchanged but makes them ineffective and undiscoverable; reactivation restores discovery only for active branches that still opt in. This foundation does not provide tenant ownership enforcement, distance/radius calculations, branch-specific booking/queue operations, or branch-aware availability.
+Business and branch records begin active. Business deactivation leaves branch records unchanged but makes them ineffective and undiscoverable; reactivation restores discovery only for active branches that still opt in. Operational booking/queue validation uses effective activity but intentionally ignores public discovery. Tenant ownership enforcement, distance/radius calculations, and branch-aware availability remain future work.
 
 ## Marketplace Branch Scheduling
 
@@ -392,7 +395,7 @@ The generated OpenAPI document is authoritative for complete schema structure. T
 }
 ```
 
-The full `Booking` response also contains the resolved `user`, `vehicle`, and `service` objects; use the generated schema for those nested fields. The internal `queueEntry` back-reference is excluded.
+The full `Booking` response also contains the resolved `user`, `vehicle`, and transitional reusable `service` projection; use the generated schema for those nested fields. Its global price/duration are compatibility metadata, never the selected offering's terms. Clients use `branchId` and `serviceOfferingId` to resolve authoritative branch terms. The internal `queueEntry` back-reference is excluded.
 
 ### Queue entry — `201` (selected top-level fields)
 
@@ -546,8 +549,8 @@ See [Runtime Policy Configuration](CONFIGURATION.md) for defaults, validation, c
 - Persistence is in-memory only and uses shared single-JVM coordination rather than database transactions.
 - Multi-instance transaction/locking guarantees are not provided.
 - Marketplace businesses/branches are in memory and management access is global until tenant isolation is implemented.
-- Reusable service definitions remain global; branch offerings add independent commercial/capacity terms, but existing bookings and AVAIL-001 still use legacy global price/duration and capacity policy.
-- Queue ordering and call-next selection use one global single-location sequence; branch-specific queues are not implemented.
+- Reusable service definitions remain global; new bookings and queue waits use branch offerings, while AVAIL-001 still uses legacy global service/capacity inputs.
+- Operational list filters and report scopes are functional but do not enforce business-owner tenant ownership until TENANT-001.
 - Queue/booking lifecycle synchronization is not yet complete beyond the transitions currently implemented.
 - Notifications are in-app only; there is no SMS/email provider delivery.
 - Payments/refunds are not implemented.
@@ -565,7 +568,7 @@ The following are roadmap capabilities, not implemented endpoints. No paths are 
 - refresh-token/logout/revocation lifecycle, if later specified;
 - durable PostgreSQL persistence and database-backed transaction boundaries;
 - Marketplace tenant isolation and owner-scoped management;
-- branch-aware availability search and branch-scoped operational workflows;
+- branch-aware availability search and configured offering-capacity evaluation;
 - payment/refund workflows;
 - external email/SMS delivery;
 - ratings/feedback and richer tenant-aware analytics;

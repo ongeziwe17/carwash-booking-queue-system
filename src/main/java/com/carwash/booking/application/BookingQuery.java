@@ -1,14 +1,14 @@
 package com.carwash.booking.application;
 
-import com.carwash.booking.domain.Booking;
-
 import java.util.List;
 import java.util.Optional;
 
 /** Published booking read contract for reporting, authorization, and reference checks. */
 public interface BookingQuery {
 
-    List<Booking> findAll();
+    List<BookingSnapshot> findBookingSnapshots();
+
+    List<BookingSnapshot> findBookingSnapshotsByBranch(String branchId);
 
     Optional<String> findOwnerId(String bookingId);
 

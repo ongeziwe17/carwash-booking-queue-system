@@ -103,7 +103,7 @@ class ServiceCatalogServiceTest extends ServiceTestSupport {
     }
 
     @Test
-    void durationUpdateRecalculatesWaitsForActiveQueueEntries() {
+    void legacyGlobalDurationUpdateDoesNotReplaceOfferingDurationForQueueWaits() {
         Booking firstBooking = createConfirmedBooking(TestDates.futureDays(1));
         Service firstService = firstBooking.getService();
         catalogService.updateService(firstService.getServiceId(), firstService.getServiceName(),
@@ -115,13 +115,13 @@ class ServiceCatalogServiceTest extends ServiceTestSupport {
                 ids.queueEntry(), secondBooking.getBookingId(), secondBooking.getService().getServiceId());
         QueueEntry first = queueRepository.findById(firstResponse.getQueueEntryId()).orElseThrow();
         QueueEntry second = queueRepository.findById(secondResponse.getQueueEntryId()).orElseThrow();
-        assertEquals(10, second.getEstimatedWaitMin());
+        assertEquals(30, second.getEstimatedWaitMin());
 
         catalogService.updateService(firstService.getServiceId(), firstService.getServiceName(),
                 firstService.getDescription(), firstService.getPrice(), 40);
 
         assertEquals(0, first.getEstimatedWaitMin());
-        assertEquals(40, second.getEstimatedWaitMin());
-        assertEquals(40, queueRepository.findById(second.getQueueEntryId()).orElseThrow().getEstimatedWaitMin());
+        assertEquals(30, second.getEstimatedWaitMin());
+        assertEquals(30, queueRepository.findById(second.getQueueEntryId()).orElseThrow().getEstimatedWaitMin());
     }
 }

@@ -42,6 +42,8 @@ runtime:
           customerVehicleId: `vehicle-customer-${runId}`, otherCustomerVehicleId: `vehicle-other-${runId}`,
           disposableVehicleId: `vehicle-delete-${runId}`, plateConflictVehicleId: `vehicle-plate-${runId}`,
           serviceId: `service-${runId}`, toggleServiceId: `service-toggle-${runId}`, inactiveServiceId: `service-inactive-${runId}`,
+          opsBusinessId: `ops-business-${runId}`, opsBranchId: `ops-branch-${runId}`,
+          opsOfferingId: `ops-offering-${runId}`, inactiveOfferingId: `ops-offering-inactive-${runId}`,
           bookingId: `booking-${runId}`, otherBookingId: `booking-other-${runId}`, cancelBookingId: `booking-cancel-${runId}`,
           ownershipUpdateBookingId: `booking-ownership-update-${runId}`,
           deleteRouteBookingId: `booking-delete-route-${runId}`, fullSlotBookingId: `booking-full-a-${runId}`,
@@ -62,12 +64,15 @@ runtime:
           rescheduleQueuedBookingId: `reschedule-queued-booking-${runId}`,
           rescheduleQueuedQueueId: `reschedule-queued-queue-${runId}`,
           rescheduleServiceId: `reschedule-service-${runId}`,
+          rescheduleOfferingId: `reschedule-offering-${runId}`,
           rescheduleInactiveBookingId: `reschedule-inactive-booking-${runId}`,
           rescheduleLifecycleBookingId: `reschedule-lifecycle-booking-${runId}`,
           rescheduleLifecycleQueueId: `reschedule-lifecycle-queue-${runId}`,
           availabilityServiceId: `availability-service-${runId}`,
           availabilityOtherServiceId: `availability-other-service-${runId}`,
           availabilityInactiveServiceId: `availability-inactive-service-${runId}`,
+          availabilityOfferingId: `availability-offering-${runId}`,
+          availabilityOtherOfferingId: `availability-other-offering-${runId}`,
           availabilityBookingId: `availability-booking-${runId}`,
           availabilityRejectedBookingId: `availability-rejected-booking-${runId}`,
           marketplaceBusinessId: `marketplace-business-${runId}`,
@@ -84,15 +89,24 @@ runtime:
           marketplaceInvalidOfferingId: `marketplace-offering-invalid-${runId}`,
           marketplaceDeniedOfferingId: `marketplace-offering-denied-${runId}`,
           marketplaceUnauthOfferingId: `marketplace-offering-unauth-${runId}`,
+          branchOpsFirstBookingId: `branch-ops-booking-first-${runId}`,
+          branchOpsSecondBookingId: `branch-ops-booking-second-${runId}`,
+          branchOpsFirstQueueId: `branch-ops-queue-first-${runId}`,
+          branchOpsSecondQueueId: `branch-ops-queue-second-${runId}`,
+          branchOpsMismatchQueueId: `branch-ops-queue-mismatch-${runId}`,
           queueEligibilityBookingId: `queue-eligibility-booking-${runId}`,
           queueEligibilityPrimaryId: `queue-eligibility-primary-${runId}`,
           queueEligibilityDuplicateId: `queue-eligibility-duplicate-${runId}`,
           queueEligibilityInactiveServiceId: `queue-eligibility-inactive-service-${runId}`,
+          queueEligibilityInactiveOfferingId: `queue-eligibility-inactive-offering-${runId}`,
           queueEligibilityInactiveBookingId: `queue-eligibility-inactive-booking-${runId}`,
           queueEligibilityInactiveQueueId: `queue-eligibility-inactive-${runId}`,
           queueOrderingService10Id: `queue-ordering-service-10-${runId}`,
           queueOrderingService25Id: `queue-ordering-service-25-${runId}`,
           queueOrderingService15Id: `queue-ordering-service-15-${runId}`,
+          queueOrderingOffering10Id: `queue-ordering-offering-10-${runId}`,
+          queueOrderingOffering25Id: `queue-ordering-offering-25-${runId}`,
+          queueOrderingOffering15Id: `queue-ordering-offering-15-${runId}`,
           queueOrderingBooking1Id: `queue-ordering-booking-1-${runId}`,
           queueOrderingBooking2Id: `queue-ordering-booking-2-${runId}`,
           queueOrderingBooking3Id: `queue-ordering-booking-3-${runId}`,
@@ -112,6 +126,7 @@ runtime:
         }
         bru.setVar("availabilityDate", String(bru.getVar("future46")).slice(0, 10));
         bru.setVar("availabilitySlot", bru.getVar("future46"));
+        bru.setVar("branchOpsReportDate", String(bru.getVar("future48")).slice(0, 10));
         bru.setVar("pastDateTime", "2020-01-01T10:00:00");
     - type: tests
       code: |-
