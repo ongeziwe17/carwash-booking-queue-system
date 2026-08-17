@@ -154,6 +154,7 @@ The collection verifies:
 - MKT-002 atomic weekly schedules, multiple/overnight intervals, timezone-aware open status, temporary-closure override/cancellation, overlap rejection, Marketplace scheduling RBAC, and complete unauthenticated-operation coverage;
 - SERVICE-001 branch-specific price/duration/configured-capacity terms, multi-branch reuse of global service definitions, offering and parent lifecycle discovery, public-discovery suppression, duplicate/reference validation, deletion integrity, Marketplace RBAC, and complete unauthenticated-operation coverage;
 - OPS-001 required booking branch/offering scope, same-branch offering changes, cross-branch rejection, inherited queue scope, branch filters, branch-partitioned call-next/positions/waits, explicit branch/business reports, and bounded notification context;
+- GEO-001 deterministic Haversine distance, radius/service/open-at filters, output rounding, lifecycle/public visibility, Marketplace-read authorization, validation, and temporary-closure workflows;
 - current queue states (`WAITING`, `CALLED`, `IN_PROGRESS`, `COMPLETED`);
 - real role changes and token acquisition;
 - final-platform-administrator protection without deleting or demoting the bootstrap admin.
@@ -170,7 +171,7 @@ responsibilities because the acceptance environment does not expose test-only cl
 
 The run-scoped availability workflow uses an isolated future date and services. It proves that an appointment for a different service consumes the same global exact-start capacity, the full slot disappears and cannot be booked, cancellation restores it, and a 60-minute service is never advertised past the closing boundary. Availability reads remain point-in-time snapshots and do not reserve capacity.
 
-The run-scoped Marketplace workflow registers businesses and branches, exercises every onboarding, scheduling, and offering operation, proves parent lifecycle and public-discovery filtering without rewriting child state, validates coordinate/timezone and offering-term rules, and checks customer read/management-denial behavior. A following operational workflow books the same reusable service at those two branches, proves independent queue position/call-next state, branch/business report isolation, booking/queue filters, canonical mismatch rejection, and bounded notification context. It does not imply tenant isolation, distance discovery, remaining-capacity calculation, Marketplace-hours enforcement during booking, or branch-aware AVAIL-001.
+The run-scoped Marketplace workflow registers businesses and branches, exercises every onboarding, scheduling, and offering operation, proves parent lifecycle and public-discovery filtering without rewriting child state, validates coordinate/timezone and offering-term rules, and checks customer read/management-denial behavior. A following operational workflow books the same reusable service at those two branches and proves branch isolation. The GEO workflow then exercises authenticated nearby discovery, every optional filter, raw-distance ordering/radius behaviour, schedule/closure reuse, lifecycle visibility, and validation. It does not imply tenant isolation, driving routes, remaining-capacity calculation, Marketplace-hours enforcement during booking, or branch-aware AVAIL-001.
 
 ## Cleanup
 

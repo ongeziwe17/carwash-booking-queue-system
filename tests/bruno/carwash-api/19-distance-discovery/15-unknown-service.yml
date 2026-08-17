@@ -1,0 +1,10 @@
+info: { name: Unknown canonical service is rejected, type: http, seq: 15, tags: [discovery, validation, service] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/discoverable/nearby?latitude=-33&longitude=18&serviceId=missing-geo-{{runId}}"
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: 'test("returns standard 404", function() { expect(res.status).to.equal(404); expect(res.body.code).to.equal("RESOURCE_NOT_FOUND"); });'
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

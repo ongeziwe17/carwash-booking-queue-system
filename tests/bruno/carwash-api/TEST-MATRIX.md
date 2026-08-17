@@ -53,6 +53,7 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 | `GET` | `/api/marketplace/businesses/{businessId}/branches` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
 | `POST` | `/api/marketplace/businesses/{businessId}/branches` | ✅ | ✅ | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
 | `GET` | `/api/marketplace/branches/discoverable` | ✅ | N/A — no typed input | ✅ | N/A — all roles have read permission | N/A — public discovery view | ✅ | ✅ |
+| `GET` | `/api/marketplace/branches/discoverable/nearby` | ✅ | ✅ — coordinates/radius/service/openAt/sort | ✅ | N/A — all roles have read permission | N/A — public discovery view | ✅ — lifecycle/offering/hours filters | ✅ |
 | `GET` | `/api/marketplace/branches/{branchId}` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | N/A — read only | ✅ |
 | `PUT` | `/api/marketplace/branches/{branchId}` | ✅ | ✅ | ✅ | ✅ | ✅ — business ownership preserved | ✅ | ✅ |
 | `POST` | `/api/marketplace/branches/{branchId}/activate` | ✅ | N/A — path validation in Java | ✅ | ✅ | N/A — tenant isolation pending | ✅ | ✅ |
@@ -73,14 +74,14 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 
 ## Totals
 
-- API operations: **66**
-- Happy-path functional coverage: **66/66**
-- 401 coverage: **64/64 protected operations** (2 public operations are N/A)
+- API operations: **67**
+- Happy-path functional coverage: **67/67**
+- 401 coverage: **65/65 protected operations** (2 public operations are N/A)
 - RBAC/403 applicability covered: **57 operations/capabilities**
 - Ownership/identity applicability covered: **16 operations**
-- Validation applicability covered: **28 operations**
-- HTTP-visible integrity applicability covered: **46 operations**
-- Operations used in multi-step workflows: **55**
-- Bruno requests/tests: **483 requests / 1,616 tests**
+- Validation applicability covered: **29 operations**
+- HTTP-visible integrity applicability covered: **47 operations**
+- Operations used in multi-step workflows: **56**
+- Bruno requests/tests: **505 requests / 1,650 tests**
 
 The full authorization suite also exercises each significant role/capability allow/deny cell rather than relying only on per-operation counts.

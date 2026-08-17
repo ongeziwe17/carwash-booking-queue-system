@@ -24,12 +24,13 @@ flowchart TD
 | `notification` | Notification records, scalar branch/offering context, bounded response DTOs, ID generation, policy, persistence, and HTTP API |
 | `reporting` | Explicit branch/business daily summaries composed from published immutable queries and report HTTP API |
 | `marketplace` | Business/branch aggregates, weekly schedules, temporary closures, `MarketplaceQuery`/`BranchScheduleQuery`, lifecycle/scheduling services, module-owned repositories, bounded DTO mapping, and Marketplace HTTP APIs |
+| `discovery` | Nearby-search orchestration, immutable coordinate/search/result values, the `DistanceCalculator` port, Haversine adapter, and bounded discovery HTTP API |
 | `shared` | Standard API errors, common exceptions, generic repository primitives, runtime settings, and the single in-memory coordinator |
 | `bootstrap` | Explicit Spring bean composition and runtime/OpenAPI configuration |
 
 A module publishes its domain types and repository/application contracts only where another capability genuinely needs them. Infrastructure implementations are internal. Existing aggregate references (for example Booking to User, Vehicle, and Service) remain intentional published-domain dependencies; this refactor does not duplicate them into snapshots.
 
-The narrow cross-module read contracts are `UserQuery`, `VehicleQuery`, `BookingQuery`, `QueueQuery`, `MarketplaceQuery`, `BranchScheduleQuery`, `ServiceDefinitionQuery`, `ServiceOfferingQuery`, and `ServiceDefinitionUsageQuery`. Booking and Queue consume detached Marketplace/Catalog snapshots for operational validation; Reporting consumes immutable booking/queue snapshots plus Marketplace scope; resource authorization consumes ownership queries; JWT validation consumes the identity query. Marketplace consumes only shared primitives and publishes detached business/branch snapshots plus an explicit-instant operational open-status decision. Catalog application code consumes only `MarketplaceQuery`; Catalog's reference-check port is implemented in the composition root so Catalog no longer imports Booking or Queue. Catalog domain code has no Marketplace dependency, Marketplace does not depend on Catalog, and no foreign infrastructure repository is accessed. Identity owns the role/permission catalogue and its credential contract, while Access implements that contract with BCrypt.
+The narrow cross-module read contracts are `UserQuery`, `VehicleQuery`, `BookingQuery`, `QueueQuery`, `MarketplaceQuery`, `BranchScheduleQuery`, `ServiceDefinitionQuery`, `ServiceOfferingQuery`, and `ServiceDefinitionUsageQuery`. Booking and Queue consume detached Marketplace/Catalog snapshots for operational validation; Reporting consumes immutable booking/queue snapshots plus Marketplace scope; Discovery consumes only `MarketplaceQuery`, `BranchScheduleQuery`, `ServiceOfferingQuery`, and `ServiceDefinitionQuery`; resource authorization consumes ownership queries; JWT validation consumes the identity query. Marketplace consumes only shared primitives and publishes detached business/branch snapshots plus an explicit-instant operational open-status decision. Catalog application code consumes only `MarketplaceQuery`; Catalog's reference-check port is implemented in the composition root so Catalog no longer imports Booking or Queue. Neither Marketplace nor Catalog depends on Discovery, so no reverse dependency or cycle is introduced. Identity owns the role/permission catalogue and its credential contract, while Access implements that contract with BCrypt.
 
 ## Composition and dependencies
 
@@ -46,6 +47,7 @@ flowchart LR
     Bootstrap --> Notification
     Bootstrap --> Reporting
     Bootstrap --> Marketplace
+    Bootstrap --> Discovery
     Access --> Identity
     Access --> Vehicle
     Access --> Booking
@@ -71,6 +73,8 @@ flowchart LR
     Reporting --> Marketplace
     Marketplace --> Shared
     Catalog --> Marketplace
+    Discovery --> Marketplace
+    Discovery --> Catalog
     Shared --> Runtime[Low-level runtime only]
     Access --> Shared
     Identity --> Shared
@@ -80,6 +84,7 @@ flowchart LR
     Queue --> Shared
     Notification --> Shared
     Reporting --> Shared
+    Discovery --> Shared
 ```
 
 Cross-capability workflows depend on owning-module repository or application contracts and stable domain types, never a foreign module's `infrastructure` package. Each in-memory repository implementation resides in its owning capability. `insert` remains create-only and `update` remains existing-only; no upsert-style `save` abstraction is introduced.
@@ -102,6 +107,7 @@ ArchUnit runs with the normal Maven test suite and enforces:
 
 The rules also keep Marketplace independent of Catalog, keep Catalog domain independent of Marketplace, and allow Catalog to consume only Marketplace's published application surface—not its API, domain, infrastructure, or repositories.
 OPS-001 additionally prevents Booking, Queue, and Reporting application code from accessing Marketplace/Catalog API or infrastructure packages, and prevents Catalog from depending on Booking or Queue.
+GEO-001 additionally confines Discovery's cross-capability access to published Marketplace/Catalog application contracts and prevents Marketplace or Catalog from depending on Discovery.
 
 ## Decisions
 
@@ -115,8 +121,9 @@ OPS-001 additionally prevents Booking, Queue, and Reporting application code fro
 - **Offerings stay inside Catalog:** `ServiceOffering` owns branch/service identifiers and commercial/capacity terms; only Catalog application code looks up detached branch state through `MarketplaceQuery`.
 - **Operational scope is canonical:** Booking stores immutable `branchId` and controlled `serviceOfferingId`; Queue inherits both from the canonical booking and partitions every ordering decision by branch.
 - **Reporting scope is explicit:** one `branchId` or `businessId` is required; tenant authorization remains deliberately separate.
+- **Distance is replaceable:** Discovery owns a narrow `DistanceCalculator` application port; the current infrastructure adapter uses the IUGG mean Earth radius (`6371.0088 km`) and no external network service.
 - **Spring Modulith deferred:** package conventions plus ArchUnit meet the current need without adding a second architecture framework.
 
 ## Current limitations
 
-Persistence is in memory, elevated operational/Marketplace access remains global until tenant isolation, notifications are in-app only, and reporting remains a basic scoped snapshot. Offering `concurrentCapacity` is configuration only; remaining-capacity calculation, branch-aware availability, PostgreSQL, messaging, and distributed transactions are intentionally absent. Weekly schedules and temporary closures are not enforced by booking creation in OPS-001 and remain inputs for AVAIL-002.
+Persistence is in memory, elevated operational/Marketplace access remains global until tenant isolation, notifications are in-app only, and reporting remains a basic scoped snapshot. Nearby distance is straight-line rather than driving distance and has no traffic, route, geocoding, external maps, cache, or geospatial index. Offering `concurrentCapacity` is configuration only; remaining-capacity calculation, branch-aware availability, PostgreSQL, messaging, and distributed transactions are intentionally absent. Weekly schedules and temporary closures are not enforced by booking creation in OPS-001 and remain inputs for AVAIL-002.

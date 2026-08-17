@@ -1,0 +1,10 @@
+info: { name: Staff can read nearby discovery, type: http, seq: 18, tags: [discovery, staff, rbac] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/discoverable/nearby?latitude=-33&longitude=18"
+  auth: { type: bearer, token: "{{staffToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: 'test("returns 200", function() { expect(res.status).to.equal(200); });'
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

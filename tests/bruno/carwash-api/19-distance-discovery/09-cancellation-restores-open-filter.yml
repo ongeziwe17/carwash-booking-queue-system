@@ -1,0 +1,12 @@
+info: { name: Cancelling closure restores open discovery result, type: http, seq: 9, tags: [discovery, schedule, workflow] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/discoverable/nearby?latitude=-33.908&longitude=18.42&radiusKm=1&openAt=2030-01-07T08:00:00Z"
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("branch is restored", function() { expect(res.body.map(b => b.branchId)).to.include(bru.getVar("marketplaceBranchId")); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

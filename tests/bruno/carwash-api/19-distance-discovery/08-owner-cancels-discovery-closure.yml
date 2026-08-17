@@ -1,0 +1,12 @@
+info: { name: Owner cancels discovery workflow closure, type: http, seq: 8, tags: [discovery, schedule, owner, workflow] }
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/closures/{{geoClosureId}}/cancel"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("closure is cancelled", function() { expect(res.body.status).to.equal("CANCELLED"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

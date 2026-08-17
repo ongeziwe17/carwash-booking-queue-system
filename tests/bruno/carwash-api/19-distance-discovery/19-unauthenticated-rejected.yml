@@ -1,0 +1,10 @@
+info: { name: Unauthenticated nearby discovery is rejected, type: http, seq: 19, tags: [discovery, auth, security] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/discoverable/nearby?latitude=-33&longitude=18"
+  auth: { type: none }
+runtime:
+  scripts:
+    - type: tests
+      code: 'test("returns standard 401", function() { expect(res.status).to.equal(401); expect(res.body.code).to.equal("AUTHENTICATION_REQUIRED"); });'
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

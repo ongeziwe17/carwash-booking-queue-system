@@ -1,0 +1,10 @@
+info: { name: Owner deactivates second branch for visibility workflow, type: http, seq: 20, tags: [discovery, lifecycle, owner, workflow] }
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceSecondBranchId}}/deactivate"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: 'test("returns 200", function() { expect(res.status).to.equal(200); expect(res.body.effectiveActive).to.equal(false); });'
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

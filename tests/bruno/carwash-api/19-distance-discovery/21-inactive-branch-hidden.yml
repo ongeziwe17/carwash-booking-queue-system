@@ -1,0 +1,12 @@
+info: { name: Inactive branch is hidden from nearby discovery, type: http, seq: 21, tags: [discovery, lifecycle, workflow] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/discoverable/nearby?latitude=-33&longitude=18"
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("inactive branch is absent", function() { expect(res.body.map(b => b.branchId)).to.not.include(bru.getVar("marketplaceSecondBranchId")); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

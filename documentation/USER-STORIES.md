@@ -51,7 +51,7 @@ Stories are grouped by delivery phase so planned capabilities are not confused w
 | US-MKT-002 | #116 | As a business owner, I want to configure branch operating hours and closures. | Implemented: atomic weekly schedules, multiple/overnight intervals, absolute temporary closures with cancellation history, and timezone-aware explicit-instant open/closed decisions. |
 | US-SERVICE-001 | #117 | As a business owner, I want each branch to define its own service offerings, prices, durations, and capacity. | Implemented: immutable branch/service relationships, independent validated terms, activation lifecycle, configured capacity, and effective/public discovery projection. |
 | US-OPS-001 | #118 | As an operator, I want bookings, queues, notifications, and reports scoped to the correct branch. | Implemented: canonical branch/offering bookings, inherited queue scope, branch-isolated ordering and lookup, bounded notification context, and explicit branch/business reports. |
-| US-GEO-001 | #119 | As a customer, I want to discover active branches near my location. | Valid coordinates, distance in kilometres, radius/service filters, deterministic sorting. |
+| US-GEO-001 | #119 | As a customer, I want to discover active branches near my location. | Implemented: valid coordinates, bounded radius, effective service-offering and explicit open-instant filters, deterministic raw-distance sorting/ties, and two-decimal kilometre output. |
 | US-AVAIL-002 | #120 | As a customer, I want branch-aware availability so I see branches that are open, capable, and not full. | Hours, closures, offerings, capacity, bookings, queue, and distance are considered. |
 
 ## 6. Phase 3 — Smart Marketplace Recommendations

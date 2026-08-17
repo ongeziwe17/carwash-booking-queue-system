@@ -1,0 +1,10 @@
+info: { name: Unsupported nearby sort is rejected, type: http, seq: 17, tags: [discovery, validation, sort] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/discoverable/nearby?latitude=-33&longitude=18&sort=name"
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: 'test("returns standard 400", function() { expect(res.status).to.equal(400); expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); });'
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

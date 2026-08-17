@@ -1,0 +1,10 @@
+info: { name: Invalid and non-finite coordinates are rejected, type: http, seq: 12, tags: [discovery, validation] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/discoverable/nearby?latitude=NaN&longitude=181"
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: 'test("returns standard 400", function() { expect(res.status).to.equal(400); expect(["INVALID_PARAMETER", "VALIDATION_FAILED"]).to.include(res.body.code); });'
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

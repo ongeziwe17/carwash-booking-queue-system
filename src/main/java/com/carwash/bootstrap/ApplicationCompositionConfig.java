@@ -43,6 +43,10 @@ import com.carwash.catalog.application.ServiceDefinitionQuery;
 import com.carwash.catalog.application.ServiceDefinitionUsageQuery;
 import com.carwash.catalog.application.ServiceOfferingQuery;
 import com.carwash.catalog.application.ServiceOfferingService;
+import com.carwash.discovery.application.DistanceCalculator;
+import com.carwash.discovery.application.NearbyBranchDiscoveryService;
+import com.carwash.discovery.infrastructure.HaversineDistanceCalculator;
+import com.carwash.marketplace.application.BranchScheduleQuery;
 import com.carwash.marketplace.application.MarketplaceQuery;
 import com.carwash.identity.application.UserManagementService;
 import com.carwash.vehicle.application.VehicleManagementService;
@@ -145,6 +149,28 @@ public class ApplicationCompositionConfig {
                 closureRepository,
                 coordinator,
                 clock
+        );
+    }
+
+    @Bean
+    public DistanceCalculator distanceCalculator() {
+        return new HaversineDistanceCalculator();
+    }
+
+    @Bean
+    public NearbyBranchDiscoveryService nearbyBranchDiscoveryService(
+            MarketplaceQuery marketplaceQuery,
+            BranchScheduleQuery branchScheduleQuery,
+            ServiceOfferingQuery serviceOfferingQuery,
+            ServiceDefinitionQuery serviceDefinitionQuery,
+            DistanceCalculator distanceCalculator
+    ) {
+        return new NearbyBranchDiscoveryService(
+                marketplaceQuery,
+                branchScheduleQuery,
+                serviceOfferingQuery,
+                serviceDefinitionQuery,
+                distanceCalculator
         );
     }
 
