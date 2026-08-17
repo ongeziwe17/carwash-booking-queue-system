@@ -144,7 +144,8 @@ class BookingReschedulingIntegrationTest extends ApiIntegrationTestSupport {
         api.deactivateService(inactive.resources().service().serviceId()).andExpect(status().isOk());
         reschedule(inactive.booking().bookingId(), TestDates.futureDays(93))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Inactive service cannot be booked"));
+                .andExpect(jsonPath("$.message").value(
+                        "Inactive service offering or reusable service cannot be booked"));
 
         BookingApiFixture.CreatedBooking waiting = fixture().createBooking(TestDates.futureDays(94));
         CreateQueueEntryRequest waitingQueue = createConfirmedQueue(waiting);

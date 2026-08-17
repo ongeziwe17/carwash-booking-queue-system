@@ -521,7 +521,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         BusinessRuleViolationException exception = assertThrows(BusinessRuleViolationException.class,
                 () -> queueService.updatePosition(queueEntry.getQueueEntryId(), 2));
 
-        assertEquals("Queue position exceeds active branch queue size", exception.getMessage());
+        assertEquals("Queue position exceeds active queue size", exception.getMessage());
         assertQueueMetrics(queueEntry, 1, 0);
     }
 

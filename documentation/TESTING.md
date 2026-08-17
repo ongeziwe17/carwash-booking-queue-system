@@ -2,6 +2,10 @@
 
 TEST-001 separates fast unit/repository/service tests from Spring API integration tests and makes isolation, test data, execution order, and release-gate behaviour explicit.
 
+## Current OPS-001 inventory
+
+The OPS-001 suite executes **310 Surefire unit/repository/service tests** and **148 Failsafe Spring integration tests**. The generated OpenAPI contract remains exactly **66 operations** because OPS-001 evolves existing routes, and the complete Bruno collection contains **483 requests / 1,617 assertions**. CI repeats the complete Maven verification under deterministic seeds `11001` and `11002`; exact coverage and container evidence is recorded in the draft pull request for the change.
+
 ## Baseline inventory before TEST-001
 
 The prerequisite CI/CD run #163 executed **187 tests across 20 test classes**. The inventory below records the relevant isolation characteristics from the `staging` source used for TEST-001.
@@ -64,7 +68,7 @@ The cleaner also resets only the test implementation of `NotificationIdGenerator
 
 ## Post-refactor test ownership
 
-The current verification measures **216 tests across 34 classes**: **134 Surefire tests** and **82 Failsafe integration tests**.
+The original post-TEST-001 verification measured **216 tests across 34 classes**: **134 Surefire tests** and **82 Failsafe integration tests**. The class inventory below records that refactor baseline; the current aggregate is listed above.
 
 ### Surefire: unit, repository and service tests
 

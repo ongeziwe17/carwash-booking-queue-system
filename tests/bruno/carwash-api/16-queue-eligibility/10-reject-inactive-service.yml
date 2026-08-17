@@ -30,7 +30,7 @@ runtime:
       code: |-
         test("returns 400", function() { expect(res.status).to.equal(400); });
         test("uses BUSINESS_RULE_VIOLATION", function() { expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); });
-        test("reports inactive service rule", function() { expect(res.body.message).to.equal("Inactive service cannot join the queue"); });
+        test("reports inactive service rule", function() { expect(res.body.message).to.equal("Inactive service offering or reusable service cannot join the queue"); });
         const lower = JSON.stringify(res.body ?? {}).toLowerCase();
         for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password", "accesstoken"]) {
           expect(lower, `response leaked ${forbidden}`).to.not.include(forbidden);

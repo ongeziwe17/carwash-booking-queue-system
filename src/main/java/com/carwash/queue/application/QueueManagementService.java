@@ -169,7 +169,7 @@ public class QueueManagementService implements QueueQuery {
             List<QueueEntry> activeQueue = new ArrayList<>(
                     queueEntryRepository.findActiveOrderedByBranch(queueEntry.getBranchId()));
             if (position > activeQueue.size()) {
-                throw new BusinessRuleViolationException("Queue position exceeds active branch queue size");
+                throw new BusinessRuleViolationException("Queue position exceeds active queue size");
             }
             activeQueue.removeIf(entry -> queueEntryId.equals(entry.getQueueEntryId()));
             activeQueue.add(position - 1, queueEntry);
@@ -458,7 +458,7 @@ public class QueueManagementService implements QueueQuery {
         validateCanonicalOperationalScope(queueEntry, booking);
         ServiceOfferingSnapshot offering = requireOffering(booking.getServiceOfferingId());
         if (!offering.serviceId().equals(suppliedServiceId)) {
-            throw new BusinessRuleViolationException("Queue entry service must match the booking service offering");
+            throw new BusinessRuleViolationException("Queue entry service must match booking service offering");
         }
         if (booking.getService() == null
                 || !offering.serviceId().equals(booking.getService().getServiceId())) {

@@ -141,7 +141,8 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         CreateQueueEntryRequest request = QueueFixtureBuilder.valid(ids, booking.booking().bookingId(),
                 booking.resources().service().serviceId()).build();
 
-        assertBusinessRule(api.createQueueEntry(request), "Inactive service cannot join the queue");
+        assertBusinessRule(api.createQueueEntry(request),
+                "Inactive service offering or reusable service cannot join the queue");
     }
 
     @Test
