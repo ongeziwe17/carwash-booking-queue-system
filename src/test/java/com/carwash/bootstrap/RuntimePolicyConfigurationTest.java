@@ -80,7 +80,7 @@ class RuntimePolicyConfigurationTest {
                     Validator validator = context.getBean(Validator.class);
 
                     CreateBookingRequest futureAccordingToApplicationClock = new CreateBookingRequest(
-                            "booking-1", "user-1", "vehicle-1", "service-1",
+                            "booking-1", "user-1", "vehicle-1", "branch-1", "offering-1",
                             LocalDateTime.of(2000, 1, 1, 7, 30), null);
 
                     Set<String> violatedFields = validator.validate(futureAccordingToApplicationClock).stream()

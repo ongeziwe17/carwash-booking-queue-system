@@ -18,7 +18,8 @@ http:
         "bookingId": "conflict-b-{{runId}}",
         "userId": "{{customerUserId}}",
         "vehicleId": "{{customerVehicleId}}",
-        "serviceId": "{{serviceId}}",
+        "branchId": "{{opsBranchId}}",
+        "serviceOfferingId": "{{opsOfferingId}}",
         "scheduledDateTime": "{{future16}}",
         "specialRequest": "conflict"
       }

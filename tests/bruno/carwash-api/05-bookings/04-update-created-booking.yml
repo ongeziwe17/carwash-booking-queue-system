@@ -17,7 +17,7 @@ http:
     data: |-
       {
         "vehicleId": "{{customerVehicleId}}",
-        "serviceId": "{{serviceId}}",
+        "serviceOfferingId": "{{opsOfferingId}}",
         "specialRequest": "Updated before confirmation"
       }
   auth:

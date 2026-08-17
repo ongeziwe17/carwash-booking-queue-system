@@ -1,0 +1,12 @@
+info: { name: Cross-branch booking creation is rejected, type: http, seq: 13, tags: [ops, booking, integrity] }
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body: { type: json, data: '{"bookingId":"branch-ops-cross-{{runId}}","userId":"{{customerUserId}}","vehicleId":"{{customerVehicleId}}","branchId":"{{marketplaceBranchId}}","serviceOfferingId":"{{marketplaceSecondOfferingId}}","scheduledDateTime":"{{future47}}"}' }
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("rejects cross-branch relationship", function() { expect(res.status).to.equal(400); expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); expect(res.body.message).to.equal("Service offering does not belong to the requested branch"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

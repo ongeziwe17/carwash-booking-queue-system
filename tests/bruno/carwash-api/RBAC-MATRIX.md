@@ -34,4 +34,6 @@ This matrix is derived from `RoleCatalog`, controller `@PreAuthorize` expression
 
 Operational roles are STAFF, BUSINESS_OWNER, and PLATFORM_ADMIN for vehicle, booking, and queue resource authorization. Notifications are stricter: only the user themselves or PLATFORM_ADMIN may read them.
 
+OPS-001 branch filters, branch call-next, and branch/business report scopes constrain returned or selected data, but they do not establish tenant ownership authorization. STAFF and BUSINESS_OWNER operational access remains global until TENANT-001.
+
 Marketplace management is intentionally global for BUSINESS_OWNER and PLATFORM_ADMIN until TENANT-001 introduces owner/business scoping. `MARKETPLACE_READ` exposes bounded branch/offering discovery and operational open-status decisions; the public-discovery flag does not change whether a branch is operationally open. Offering discovery derives parent activity and branch public discovery but does not evaluate operating hours.

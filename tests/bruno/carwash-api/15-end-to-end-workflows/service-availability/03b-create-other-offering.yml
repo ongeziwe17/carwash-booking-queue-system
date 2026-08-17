@@ -1,0 +1,18 @@
+info:
+  name: Create branch offering for cross-service fixture
+  type: http
+  seq: 5
+  tags: [availability, workflow, offering]
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/branches/{{opsBranchId}}/offerings"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body:
+    type: json
+    data: '{"offeringId":"{{availabilityOtherOfferingId}}","serviceId":"{{availabilityOtherServiceId}}","price":100.00,"estimatedDurationMin":30,"concurrentCapacity":2}'
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("returns 201", function() { expect(res.status).to.equal(201); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

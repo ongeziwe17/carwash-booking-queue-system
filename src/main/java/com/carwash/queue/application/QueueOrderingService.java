@@ -1,40 +1,72 @@
 package com.carwash.queue.application;
 
 import com.carwash.queue.application.QueuePolicyProperties;
+import com.carwash.catalog.application.ServiceOfferingQuery;
+import com.carwash.catalog.application.ServiceOfferingSnapshot;
 import com.carwash.queue.domain.QueueEntry;
-import com.carwash.catalog.domain.Service;
 import com.carwash.queue.domain.QueueEntryRepository;
 import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
 
-import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 
 /**
- * Applies the global active-queue position and wait invariants.
+ * Applies active-queue position and wait invariants independently for each branch.
  */
 public final class QueueOrderingService {
 
     private final QueueEntryRepository queueEntryRepository;
     private final InMemoryDataCoordinator coordinator;
-    private final QueuePolicyProperties queuePolicy;
+    private final ServiceOfferingQuery serviceOfferingQuery;
 
     public QueueOrderingService(QueueEntryRepository queueEntryRepository,
                                 InMemoryDataCoordinator coordinator,
-                                QueuePolicyProperties queuePolicy) {
+                                QueuePolicyProperties queuePolicy,
+                                ServiceOfferingQuery serviceOfferingQuery) {
         this.queueEntryRepository = Objects.requireNonNull(queueEntryRepository, "Queue repository is required");
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
-        this.queuePolicy = Objects.requireNonNull(queuePolicy, "Queue policy is required");
+        Objects.requireNonNull(queuePolicy, "Queue policy is required");
+        this.serviceOfferingQuery = Objects.requireNonNull(
+                serviceOfferingQuery, "Service offering query is required");
     }
 
+    /** Rebalances each branch independently; retained for internal maintenance compatibility. */
     public void rebalanceActiveQueue() {
-        coordinator.write(() -> rebalanceActiveQueue(queueEntryRepository.findActiveOrdered()));
+        coordinator.write(() -> {
+            List<QueueEntry> activeEntries = queueEntryRepository.findActiveOrdered();
+            LinkedHashSet<String> branchIds = activeEntries.stream()
+                    .map(QueueEntry::getBranchId)
+                    .filter(Objects::nonNull)
+                    .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+            branchIds.forEach(branchId -> applyQueueMetrics(
+                    queueEntryRepository.findActiveOrderedByBranch(branchId)));
+            List<QueueEntry> legacyEntries = activeEntries.stream()
+                    .filter(entry -> entry.getBranchId() == null)
+                    .toList();
+            if (!legacyEntries.isEmpty()) applyQueueMetrics(legacyEntries);
+        });
+    }
+
+    public void rebalanceActiveQueue(String branchId) {
+        String normalizedBranchId = requireBranchId(branchId);
+        coordinator.write(() -> applyQueueMetrics(
+                queueEntryRepository.findActiveOrderedByBranch(normalizedBranchId)));
     }
 
     public void rebalanceActiveQueue(List<QueueEntry> orderedActiveQueue) {
-        coordinator.write(() -> applyQueueMetrics(orderedActiveQueue));
+        coordinator.write(() -> {
+            String branchId = orderedActiveQueue.isEmpty() ? null : orderedActiveQueue.getFirst().getBranchId();
+            boolean mixedBranches = orderedActiveQueue.stream()
+                    .anyMatch(entry -> !Objects.equals(branchId, entry.getBranchId()));
+            if (mixedBranches) {
+                throw new IllegalArgumentException("Queue rebalancing cannot mix branches");
+            }
+            applyQueueMetrics(orderedActiveQueue);
+        });
     }
 
     private void applyQueueMetrics(List<QueueEntry> orderedActiveQueue) {
@@ -57,17 +89,22 @@ public final class QueueOrderingService {
     }
 
     private int effectiveServiceDurationMinutes(QueueEntry queueEntry) {
-        Service service = queueEntry.getService();
-        if (service != null && service.getEstimatedDurationMin() > 0) {
-            return service.getEstimatedDurationMin();
+        if (queueEntry.getServiceOfferingId() == null || queueEntry.getServiceOfferingId().isBlank()) {
+            throw new BusinessRuleViolationException("Queue entry service offering is required for wait estimation");
         }
-        return durationInMinutes(queuePolicy.defaultServiceDuration());
+        ServiceOfferingSnapshot offering = serviceOfferingQuery
+                .findOfferingOptional(queueEntry.getServiceOfferingId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Offering not found: " + queueEntry.getServiceOfferingId()));
+        return offering.estimatedDurationMin();
     }
 
-    private int durationInMinutes(Duration duration) {
-        long seconds = duration.getSeconds();
-        long minutes = seconds / 60;
-        if (seconds % 60 != 0 || duration.getNano() != 0) minutes++;
-        return Math.toIntExact(Math.max(minutes, 1));
+    private String requireBranchId(String branchId) {
+        String normalized = branchId == null ? null : branchId.trim();
+        if (normalized == null || normalized.isBlank()) {
+            throw new IllegalArgumentException("Branch ID is required");
+        }
+        return normalized;
     }
+
 }

@@ -1,7 +1,7 @@
 info:
   name: Reschedule rejects completed booking
   type: http
-  seq: 25
+  seq: 26
   tags: [workflow, customer, integrity]
 http:
   method: POST

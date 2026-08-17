@@ -1,7 +1,7 @@
 info:
   name: Reactivate dedicated reschedule service
   type: http
-  seq: 17
+  seq: 18
   tags: [workflow, owner]
 http:
   method: POST

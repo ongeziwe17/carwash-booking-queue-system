@@ -18,7 +18,8 @@ http:
         "bookingId": "invalid-booking-{{runId}}",
         "userId": "{{customerUserId}}",
         "vehicleId": "{{customerVehicleId}}",
-        "serviceId": "{{serviceId}}"
+        "branchId": "{{opsBranchId}}",
+        "serviceOfferingId": "{{opsOfferingId}}"
       }
   auth:
     type: bearer

@@ -7,7 +7,7 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/api/reports/daily-summary?date=2026-99-99"
+  url: "{{baseUrl}}/api/reports/daily-summary?date=2026-99-99&branchId={{opsBranchId}}"
   auth:
     type: bearer
     token: "{{ownerToken}}"

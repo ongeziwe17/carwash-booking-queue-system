@@ -1,7 +1,7 @@
 info:
   name: Create booking for service lifecycle reschedule rejection
   type: http
-  seq: 18
+  seq: 19
   tags: [workflow, customer]
 http:
   method: POST
@@ -14,7 +14,8 @@ http:
         "bookingId": "{{rescheduleLifecycleBookingId}}",
         "userId": "{{customerUserId}}",
         "vehicleId": "{{customerVehicleId}}",
-        "serviceId": "{{rescheduleServiceId}}",
+        "branchId": "{{opsBranchId}}",
+        "serviceOfferingId": "{{rescheduleOfferingId}}",
         "scheduledDateTime": "{{future43}}",
         "specialRequest": "service lifecycle reschedule"
       }

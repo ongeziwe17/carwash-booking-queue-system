@@ -20,12 +20,12 @@ Priority guide:
 | --- | --- | --- |
 | Users | Safe registration/profile responses, secure credentials, JWT authentication, RBAC and duplicate-email validation | Privileged role assignment is separate and platform-admin-only. |
 | Vehicles | CRUD, owner association, duplicate-plate validation, ownership authorization and deletion integrity | Marketplace tenant scoping is not implemented. |
-| Services | Global service catalogue CRUD and activate/deactivate workflows | Branch-specific offerings are not implemented. |
-| Bookings and availability | Create, retrieve, guarded non-schedule update, focused rescheduling, confirm, synchronized cancellation, shared future/grid/window/duration validation, global exact-start capacity, remaining-capacity availability, and shared booking-change cutoff | Branch-aware scheduling, staff/bay resources, and reservations are not implemented. |
-| Queues | Eligible creation, server-managed global ordering/waits, true call-next selection, explicit call override, full manual rebalance, synchronized call/start/complete workflow, and delete | Branch-scoped queues are not implemented. |
-| Notifications | In-app notification creation and recent lookup by user | Read APIs and external delivery are incomplete. |
-| Reports | Basic in-memory daily summary | Tenant/branch analytics and revenue reporting are future work. |
-| Marketplace | Business/branch registration, validated location metadata, lifecycle management, basic effective-active/public discovery, weekly operating schedules, temporary closures, and timezone-aware open status | Tenant isolation, distance, offerings, branch-scoped operations, and branch-aware availability remain future work. |
+| Services | Reusable global service catalogue plus branch-specific offerings with independent price, duration, capacity, lifecycle, and discovery | Global price/duration remain transitional for legacy AVAIL-001. |
+| Bookings and availability | Canonical branch/offering booking creation, retrieval/filtering, guarded same-branch offering update, rescheduling, confirm/cancel, branch-partitioned slot checks, plus legacy global AVAIL-001 | Branch-hours enforcement, configured-capacity availability, staff/bay resources, and reservations are not implemented. |
+| Queues | Booking-derived branch/offering scope, branch-isolated ordering/waits/call-next/rebalance, explicit call override, synchronized call/start/complete workflow, and delete | Offering concurrent capacity is not a remaining-capacity model. |
+| Notifications | In-app notification creation and bounded recent lookup with branch/offering context | Read-status lifecycle and external delivery are incomplete. |
+| Reports | In-memory daily summary with exactly one branch or business scope and branch-local dates | Tenant-authorized dashboards, revenue, and durable analytics are future work. |
+| Marketplace | Businesses/branches, location/lifecycle/discovery, schedules/closures/open status, offerings, and branch-scoped operations | Tenant isolation, distance, and branch-aware availability remain future work. |
 | API/Docs | Generated Swagger/OpenAPI plus human-readable API documentation and contract quality gates | DOCS-001 keeps written and generated contracts aligned. |
 | Testing | Unit/integration suites plus deterministic repeatability, OpenAPI gates, and Bruno HTTP acceptance | Production persistence testing remains future work. |
 | Packaging | Maven, Docker, Docker Compose, and staging-aligned GitHub Actions | Production deployment hardening remains future work. |
@@ -55,6 +55,7 @@ Completed issue cleanup:
 - #115 — Marketplace business and branch registration (MKT-001).
 - #116 — Branch operating hours and temporary closures (MKT-002).
 - #117 — Branch-specific service offerings and configured capacity (SERVICE-001).
+- #118 — Branch-scoped bookings, queues, notifications, and reports (OPS-001).
 
 ## 3. Phase 0 — Immediate Hardening
 
@@ -87,7 +88,7 @@ Phase exit criteria:
 - Booking and queue states remain consistent.
 - Customers can query availability before booking.
 
-Phase 1 and the ARCH-001 transition are complete. MKT-001 (#115), MKT-002 (#116), and SERVICE-001 (#117) are implemented Phase 2 foundations; OPS-001 (#118) is next.
+Phase 1 and the ARCH-001 transition are complete. MKT-001 (#115), MKT-002 (#116), SERVICE-001 (#117), and OPS-001 (#118) are implemented Phase 2 foundations; GEO-001 (#119) is next.
 
 ## 5. Phase 2 — Marketplace Business and Branch Foundation
 
@@ -96,7 +97,7 @@ Phase 1 and the ARCH-001 transition are complete. MKT-001 (#115), MKT-002 (#116)
 | MKT-001 | #115 | Add Marketplace business and branch registration — implemented | P1 | Phase 0, ARCH-001, AVAIL-001 |
 | MKT-002 | #116 | Add branch operating hours and temporary closures — implemented | P1 | MKT-001, CONFIG-001 |
 | SERVICE-001 | #117 | Add branch-specific service offerings and capacity — implemented | P1 | MKT-001, MKT-002, DATA-001 |
-| OPS-001 | #118 | Scope bookings, queues, notifications, and reports to branches | P1 | SERVICE-001, WORKFLOW-001, QUEUE-002 |
+| OPS-001 | #118 | Scope bookings, queues, notifications, and reports to branches — implemented | P1 | SERVICE-001, WORKFLOW-001, QUEUE-002 |
 | GEO-001 | #119 | Add branch distance calculation and public discovery | P1 | MKT-001, SERVICE-001 |
 | AVAIL-002 | #120 | Add branch-aware availability search | P1 | MKT-002, SERVICE-001, OPS-001, GEO-001 |
 

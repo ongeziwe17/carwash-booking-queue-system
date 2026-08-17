@@ -182,15 +182,19 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
     }
 
     private BookingManagementService bookingServiceWith(NotificationManagementService notifications) {
+        BookingPolicyProperties policy = new BookingPolicyProperties(1, Duration.ZERO);
         return new BookingManagementService(
-                bookingRepository, userRepository, vehicleRepository, serviceRepository,
+                bookingRepository, userRepository, vehicleRepository, catalogService,
+                serviceOfferingService, marketplaceService,
                 queueRepository, notificationRepository, notifications, queueOrdering, coordinator,
-                new BookingPolicyProperties(1, Duration.ZERO), clock);
+                policy, new com.carwash.booking.application.BookingSlotPolicyService(
+                        bookingRepository, policy, clock), clock);
     }
 
     private QueueManagementService queueServiceWith(NotificationManagementService notifications) {
         return new QueueManagementService(
-                queueRepository, bookingRepository, serviceRepository, notifications, coordinator,
+                queueRepository, bookingRepository, serviceOfferingService, marketplaceService,
+                notifications, coordinator,
                 queueOrdering, clock);
     }
 

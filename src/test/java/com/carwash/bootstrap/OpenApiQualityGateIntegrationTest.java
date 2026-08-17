@@ -138,7 +138,12 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
             assertFalse(user.has(forbidden), "User schema exposed internal field " + forbidden);
         }
         assertFalse(schemas.path("Booking").path("properties").has("queueEntry"));
+        assertTrue(schemas.path("Booking").path("properties").has("branchId"));
+        assertTrue(schemas.path("Booking").path("properties").has("serviceOfferingId"));
         assertFalse(schemas.path("Vehicle").path("properties").has("user"));
+        assertEquals(Set.of("notificationId", "userId", "bookingId", "branchId", "serviceOfferingId",
+                        "type", "message", "channel", "sentAt", "readAt", "deliveryStatus"),
+                propertyNames(schemas.path("NotificationResponse")));
         assertTrue(schemas.path("CreateUserRequest").path("properties").path("password").path("writeOnly").asBoolean());
         assertTrue(schemas.path("LoginRequest").path("properties").path("password").path("writeOnly").asBoolean());
     }
@@ -163,6 +168,9 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         JsonNode explicitCall = document.path("paths").path("/api/queue-entries/{id}/call").path("post");
 
         assertTrue(callNext.path("description").asText().contains("lowest-position WAITING"));
+        JsonNode branchParameter = findParameter(callNext.path("parameters"), "query", "branchId");
+        assertFalse(branchParameter.isMissingNode());
+        assertTrue(branchParameter.path("required").asBoolean());
         assertTrue(callNext.path("responses").has("404"));
         assertTrue(explicitCall.path("description").asText().contains("specified WAITING"));
         assertTrue(document.path("paths").path("/api/queue-entries/{id}/call-next").isMissingNode());
@@ -307,7 +315,7 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         JsonNode update = schemas.path("UpdateBookingRequest");
         JsonNode reschedule = schemas.path("RescheduleBookingRequest");
 
-        assertEquals(Set.of("vehicleId", "serviceId", "specialRequest"), propertyNames(update));
+        assertEquals(Set.of("vehicleId", "serviceOfferingId", "specialRequest"), propertyNames(update));
         assertFalse(update.path("properties").has("scheduledDateTime"));
         assertEquals(Set.of("scheduledDateTime"), propertyNames(reschedule));
         assertEquals(Set.of("scheduledDateTime"), requiredNames(reschedule));
@@ -322,6 +330,25 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         }
         assertTrue(document.path("paths").path("/api/bookings/{id}").path("put")
                 .path("description").asText().contains("Schedule changes must use"));
+    }
+
+    @Test
+    void operationalCreationAndReportScopesAreExplicit() throws Exception {
+        JsonNode document = openApi();
+        JsonNode createBooking = document.path("components").path("schemas").path("CreateBookingRequest");
+        assertEquals(Set.of("bookingId", "userId", "vehicleId", "branchId", "serviceOfferingId",
+                "scheduledDateTime", "specialRequest"), propertyNames(createBooking));
+        assertTrue(requiredNames(createBooking).containsAll(Set.of(
+                "bookingId", "userId", "vehicleId", "branchId", "serviceOfferingId", "scheduledDateTime")));
+        assertFalse(createBooking.path("properties").has("serviceId"));
+
+        JsonNode report = document.path("paths").path("/api/reports/daily-summary").path("get");
+        Set<String> reportParameters = new HashSet<>();
+        report.path("parameters").forEach(parameter -> reportParameters.add(parameter.path("name").asText()));
+        assertEquals(Set.of("date", "branchId", "businessId"), reportParameters);
+        assertTrue(findParameter(report.path("parameters"), "query", "date").path("required").asBoolean());
+        assertFalse(findParameter(report.path("parameters"), "query", "branchId").path("required").asBoolean());
+        assertFalse(findParameter(report.path("parameters"), "query", "businessId").path("required").asBoolean());
     }
 
     @Test

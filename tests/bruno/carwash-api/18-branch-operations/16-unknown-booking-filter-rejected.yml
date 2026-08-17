@@ -1,0 +1,10 @@
+info: { name: Unknown booking branch filter is rejected, type: http, seq: 16, tags: [ops, booking, validation] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/bookings?branchId=missing-branch-{{runId}}"
+  auth: { type: bearer, token: "{{staffToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("returns standard 404", function() { expect(res.status).to.equal(404); expect(res.body.code).to.equal("RESOURCE_NOT_FOUND"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -3,6 +3,7 @@ package com.carwash.notification.api;
 import com.carwash.shared.api.error.ApiErrorResponse;
 import com.carwash.notification.domain.Notification;
 import com.carwash.notification.application.NotificationManagementService;
+import com.carwash.notification.api.dto.NotificationResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -51,9 +52,25 @@ public class NotificationController {
             @ApiResponse(responseCode = "500", description = "Internal server error",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public List<Notification> getRecentByUserId(
+    public List<NotificationResponse> getRecentByUserId(
             @PathVariable @NotBlank @Size(max = 64) String userId
     ) {
-        return service.findRecentByUserId(userId);
+        return service.findRecentByUserId(userId).stream().map(this::response).toList();
+    }
+
+    private NotificationResponse response(Notification notification) {
+        return new NotificationResponse(
+                notification.getNotificationId(),
+                notification.getUser() == null ? null : notification.getUser().getUserId(),
+                notification.getBooking() == null ? null : notification.getBooking().getBookingId(),
+                notification.getBranchId(),
+                notification.getServiceOfferingId(),
+                notification.getType(),
+                notification.getMessage(),
+                notification.getChannel(),
+                notification.getSentAt(),
+                notification.getReadAt(),
+                notification.getDeliveryStatus()
+        );
     }
 }

@@ -1,7 +1,7 @@
 info:
   name: Reschedule rejects inactive associated service
   type: http
-  seq: 16
+  seq: 17
   tags: [workflow, customer, integrity]
 http:
   method: POST

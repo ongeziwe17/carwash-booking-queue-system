@@ -1,0 +1,10 @@
+info: { name: First branch report excludes second branch, type: http, seq: 9, tags: [ops, report, branch, workflow] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/reports/daily-summary?date={{branchOpsReportDate}}&branchId={{marketplaceBranchId}}"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("counts only first branch", function() { expect(res.status).to.equal(200); expect(res.body.scopeType).to.equal("BRANCH"); expect(res.body.scopeId).to.equal(bru.getVar("marketplaceBranchId")); expect(res.body.totalBookings).to.equal(1); expect(res.body.totalQueueEntries).to.equal(1); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

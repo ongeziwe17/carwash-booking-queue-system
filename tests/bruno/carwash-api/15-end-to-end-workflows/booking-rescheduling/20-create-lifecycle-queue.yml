@@ -1,7 +1,7 @@
 info:
   name: Create lifecycle reschedule queue
   type: http
-  seq: 20
+  seq: 21
   tags: [workflow, staff]
 http:
   method: POST

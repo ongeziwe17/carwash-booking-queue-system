@@ -1,7 +1,7 @@
 info:
   name: Server appends third queue entry
   type: http
-  seq: 24
+  seq: 27
   tags:
     - workflow
     - integrity

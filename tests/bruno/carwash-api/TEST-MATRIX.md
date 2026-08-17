@@ -8,7 +8,7 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 | `POST` | `/api/auth/login` | ✅ | ✅ | N/A — public endpoint | N/A — public or no wrong-role case | N/A — not user-owned | N/A — no state/dependency mutation | ✅ |
 | `GET` | `/api/auth/me` | ✅ | N/A — no request body/typed input case | ✅ | N/A — public or no wrong-role case | N/A — not user-owned | N/A — no state/dependency mutation | ✅ |
 | `GET` | `/api/availability` | ✅ | ✅ | ✅ | N/A — all current roles have SERVICE_READ | N/A — service/date capacity view | ✅ | ✅ |
-| `GET` | `/api/bookings` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | N/A — no state/dependency mutation | N/A — not needed in multi-step journey |
+| `GET` | `/api/bookings` | ✅ | ✅ — invalid/unknown branch filter | ✅ | ✅ | N/A — filter is not tenant authorization | ✅ — no cross-branch leakage | ✅ |
 | `POST` | `/api/bookings` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `DELETE` | `/api/bookings/{id}` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | ✅ | ✅ | N/A — not needed in multi-step journey |
 | `GET` | `/api/bookings/{id}` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | ✅ | N/A — no state/dependency mutation | ✅ |
@@ -17,16 +17,16 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 | `POST` | `/api/bookings/{id}/cancel` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `POST` | `/api/bookings/{id}/confirm` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
 | `GET` | `/api/notifications/user/{userId}` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | ✅ | N/A — no state/dependency mutation | ✅ |
-| `GET` | `/api/queue-entries` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | N/A — no state/dependency mutation | N/A — not needed in multi-step journey |
+| `GET` | `/api/queue-entries` | ✅ | ✅ — blank/unknown branch filter | ✅ | ✅ | N/A — filter is not tenant authorization | ✅ — no cross-branch leakage | ✅ |
 | `POST` | `/api/queue-entries` | ✅ | ✅ | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
 | `DELETE` | `/api/queue-entries/{id}` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | N/A — not needed in multi-step journey |
 | `GET` | `/api/queue-entries/{id}` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | ✅ | N/A — no state/dependency mutation | ✅ |
-| `POST` | `/api/queue-entries/call-next` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
+| `POST` | `/api/queue-entries/call-next` | ✅ | ✅ — required branch | ✅ | ✅ | N/A — not tenant authorization | ✅ — branch selection | ✅ |
 | `POST` | `/api/queue-entries/{id}/call` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
 | `POST` | `/api/queue-entries/{id}/complete` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
 | `PUT` | `/api/queue-entries/{id}/position` | ✅ | ✅ | ✅ | ✅ | N/A — not user-owned | ✅ | N/A — not needed in multi-step journey |
 | `POST` | `/api/queue-entries/{id}/start` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
-| `GET` | `/api/reports/daily-summary` | ✅ | ✅ | ✅ | ✅ | N/A — not user-owned | N/A — no state/dependency mutation | ✅ |
+| `GET` | `/api/reports/daily-summary` | ✅ | ✅ — exactly one scope | ✅ | ✅ | N/A — scope is not tenant authorization | ✅ — branch/business isolation | ✅ |
 | `GET` | `/api/services` | ✅ | ✅ | ✅ | N/A — public or no wrong-role case | N/A — not user-owned | N/A — no state/dependency mutation | ✅ |
 | `POST` | `/api/services` | ✅ | ✅ | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
 | `DELETE` | `/api/services/{id}` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | N/A — not needed in multi-step journey |
@@ -78,9 +78,9 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 - 401 coverage: **64/64 protected operations** (2 public operations are N/A)
 - RBAC/403 applicability covered: **57 operations/capabilities**
 - Ownership/identity applicability covered: **16 operations**
-- Validation applicability covered: **25 operations**
-- HTTP-visible integrity applicability covered: **42 operations**
-- Operations used in multi-step workflows: **51**
-- Bruno requests/tests: **451 requests / 1,577 tests**
+- Validation applicability covered: **28 operations**
+- HTTP-visible integrity applicability covered: **46 operations**
+- Operations used in multi-step workflows: **55**
+- Bruno requests/tests: **483 requests / 1,617 tests**
 
 The full authorization suite also exercises each significant role/capability allow/deny cell rather than relying only on per-operation counts.

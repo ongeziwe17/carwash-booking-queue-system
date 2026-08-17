@@ -2,11 +2,15 @@ package com.carwash.testsupport;
 
 import com.carwash.booking.api.dto.CreateBookingRequest;
 import com.carwash.catalog.api.dto.CreateServiceRequest;
+import com.carwash.catalog.api.dto.CreateServiceOfferingRequest;
 import com.carwash.identity.api.dto.CreateUserRequest;
+import com.carwash.marketplace.api.dto.CreateBranchRequest;
+import com.carwash.marketplace.api.dto.CreateBusinessRequest;
 import com.carwash.vehicle.api.dto.CreateVehicleRequest;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 public final class BookingApiFixture {
 
@@ -29,13 +33,33 @@ public final class BookingApiFixture {
         api.createService(service).andExpect(MockMvcResultMatchers.status().isCreated());
         api.activateService(service.serviceId()).andExpect(MockMvcResultMatchers.status().isOk());
 
-        return new Resources(user, vehicle, service);
+        CreateBusinessRequest business = api.defaultBusiness();
+        CreateBranchRequest branch = api.defaultBranch();
+        if (branch == null) {
+            String businessId = ids.business();
+            business = new CreateBusinessRequest(
+                    businessId, "Test Car Wash", ids.emailFor(businessId), "+27821234567", null);
+            api.createBusiness(business).andExpect(MockMvcResultMatchers.status().isCreated());
+            branch = new CreateBranchRequest(
+                    ids.branch(), "Test Branch", "1 Test Street", null, "Cape Town", "Western Cape",
+                    "8001", "ZA", new BigDecimal("-33.9249"), new BigDecimal("18.4241"),
+                    "Africa/Johannesburg", true);
+            api.createBranch(business.businessId(), branch).andExpect(MockMvcResultMatchers.status().isCreated());
+            api.rememberDefaultOperationalScope(business, branch);
+        }
+        CreateServiceOfferingRequest offering = new CreateServiceOfferingRequest(
+                ids.offering(), service.serviceId(), service.price(), service.estimatedDurationMin(), 2);
+        api.createServiceOffering(branch.branchId(), offering)
+                .andExpect(MockMvcResultMatchers.status().isCreated());
+
+        return new Resources(user, vehicle, service, business, branch, offering);
     }
 
     public CreatedBooking createBooking(LocalDateTime scheduledDateTime) throws Exception {
         Resources resources = createResources();
         CreateBookingRequest booking = BookingFixtureBuilder.valid(
-                        ids, resources.user().userId(), resources.vehicle().vehicleId(), resources.service().serviceId())
+                        ids, resources.user().userId(), resources.vehicle().vehicleId(),
+                        resources.branch().branchId(), resources.offering().offeringId())
                 .scheduledDateTime(scheduledDateTime)
                 .build();
         api.createBooking(booking).andExpect(MockMvcResultMatchers.status().isCreated());
@@ -45,7 +69,10 @@ public final class BookingApiFixture {
     public record Resources(
             CreateUserRequest user,
             CreateVehicleRequest vehicle,
-            CreateServiceRequest service
+            CreateServiceRequest service,
+            CreateBusinessRequest business,
+            CreateBranchRequest branch,
+            CreateServiceOfferingRequest offering
     ) {
     }
 

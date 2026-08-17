@@ -1,0 +1,21 @@
+info:
+  name: Create booking at first Marketplace branch
+  type: http
+  seq: 1
+  tags: [ops, booking, branch, workflow]
+http:
+  method: POST
+  url: "{{baseUrl}}/api/bookings"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body:
+    type: json
+    data: |-
+      {"bookingId":"{{branchOpsFirstBookingId}}","userId":"{{customerUserId}}","vehicleId":"{{customerVehicleId}}","branchId":"{{marketplaceBranchId}}","serviceOfferingId":"{{marketplaceOfferingId}}","scheduledDateTime":"{{future48}}","specialRequest":"first branch operation"}
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("uses first branch terms", function() { expect(res.body.branchId).to.equal(bru.getVar("marketplaceBranchId")); expect(res.body.serviceOfferingId).to.equal(bru.getVar("marketplaceOfferingId")); expect(res.body.service.serviceId).to.equal(bru.getVar("serviceId")); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -54,7 +54,9 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         User missingUser = User.withEncodedPassword(ids.user(), "Missing", ids.emailFor(ids.user()), "123", "hash", null);
         Vehicle vehicle = new Vehicle(ids.vehicle(), ids.plate(), "Sedan", "Toyota", "Corolla", "Blue", "");
         Service service = createService();
-        Booking booking = new Booking(ids.booking(), missingUser, vehicle, service, TestDates.future(), "none");
+        Booking booking = new Booking(
+                ids.booking(), missingUser, vehicle, ensureDefaultBranch(), createOffering(service),
+                service, TestDates.future(), "none");
         assertThrows(ResourceNotFoundException.class, () -> bookingService.createBooking(booking));
     }
 
@@ -63,16 +65,19 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         User user = registerUser();
         Service service = createService();
         Vehicle missing = new Vehicle(ids.vehicle(), ids.plate(), "Sedan", "Toyota", "Corolla", "Blue", "");
-        Booking booking = new Booking(ids.booking(), user, missing, service, TestDates.future(), "none");
+        Booking booking = new Booking(
+                ids.booking(), user, missing, ensureDefaultBranch(), createOffering(service),
+                service, TestDates.future(), "none");
         assertThrows(ResourceNotFoundException.class, () -> bookingService.createBooking(booking));
     }
 
     @Test
-    void createBookingRejectsUnknownService() {
+    void createBookingRejectsUnknownOffering() {
         User user = registerUser();
         Vehicle vehicle = createVehicle(user);
-        Service missing = new Service(ids.service(), "Missing", "desc", BigDecimal.TEN, 30);
-        Booking booking = new Booking(ids.booking(), user, vehicle, missing, TestDates.future(), "none");
+        Booking booking = new Booking(
+                ids.booking(), user, vehicle, ensureDefaultBranch(), ids.offering(),
+                null, TestDates.future(), "none");
         assertThrows(ResourceNotFoundException.class, () -> bookingService.createBooking(booking));
     }
 
@@ -81,8 +86,12 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         User user = registerUser();
         Vehicle vehicle = createVehicle(user);
         Service service = createService();
+        String offeringId = createOffering(service);
         service.deactivate();
-        Booking booking = new Booking(ids.booking(), user, vehicle, service, TestDates.future(), "none");
+        serviceRepository.update(service);
+        Booking booking = new Booking(
+                ids.booking(), user, vehicle, ensureDefaultBranch(), offeringId,
+                service, TestDates.future(), "none");
         assertThrows(BusinessRuleViolationException.class, () -> bookingService.createBooking(booking));
     }
 
@@ -92,7 +101,9 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         User secondUser = registerUser();
         Vehicle vehicle = createVehicle(secondUser);
         Service service = createService();
-        Booking booking = new Booking(ids.booking(), firstUser, vehicle, service, TestDates.future(), "none");
+        Booking booking = new Booking(
+                ids.booking(), firstUser, vehicle, ensureDefaultBranch(), createOffering(service),
+                service, TestDates.future(), "none");
         assertThrows(BusinessRuleViolationException.class, () -> bookingService.createBooking(booking));
     }
 
@@ -141,7 +152,7 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         Booking existing = newBookingWithFixture(scheduled);
         bookingService.createBooking(existing);
         Booking conflicting = new Booking(ids.booking(), existing.getUser(), existing.getVehicle(),
-                existing.getService(), scheduled, "conflict");
+                existing.getBranchId(), existing.getServiceOfferingId(), existing.getService(), scheduled, "conflict");
         BusinessRuleViolationException exception = assertThrows(
                 BusinessRuleViolationException.class, () -> bookingService.createBooking(conflicting));
         assertTrue(exception.getMessage().contains("Customer vehicle"));
@@ -174,13 +185,16 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         Vehicle vehicle = createVehicle(user);
         Service hourService = catalogService.createService(new Service(
                 ids.service(), "Hour wash", "test", BigDecimal.TEN, 60));
+        String offeringId = createOffering(hourService);
 
         Booking tooLate = new Booking(
-                ids.booking(), user, vehicle, hourService, date.atTime(16, 30), "too late");
+                ids.booking(), user, vehicle, ensureDefaultBranch(), offeringId,
+                hourService, date.atTime(16, 30), "too late");
         assertThrows(BusinessRuleViolationException.class, () -> bookingService.createBooking(tooLate));
 
         Booking valid = new Booking(
-                ids.booking(), user, vehicle, hourService, date.atTime(16, 0), "valid");
+                ids.booking(), user, vehicle, ensureDefaultBranch(), offeringId,
+                hourService, date.atTime(16, 0), "valid");
         assertEquals(date.atTime(16, 0), bookingService.createBooking(valid).getScheduledDateTime());
     }
 
@@ -395,8 +409,9 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         LocalDateTime original = TestDates.futureDays(49);
         LocalDateTime target = TestDates.futureDays(50);
         Booking moving = bookingService.createBooking(newBookingWithFixture(original));
-        Booking conflicting = new Booking(ids.booking(), moving.getUser(), moving.getVehicle(), moving.getService(),
-                target, "conflict");
+        Booking conflicting = new Booking(
+                ids.booking(), moving.getUser(), moving.getVehicle(), moving.getBranchId(),
+                moving.getServiceOfferingId(), moving.getService(), target, "conflict");
         bookingService.createBooking(conflicting);
 
         BusinessRuleViolationException exception = assertThrows(BusinessRuleViolationException.class,
@@ -723,8 +738,10 @@ class BookingManagementServiceTest extends ServiceTestSupport {
             BookingPolicyProperties policy
     ) {
         return new BookingManagementService(
-                bookings, userRepository, vehicleRepository, serviceRepository,
-                queueRepository, notificationRepository, notifications, queueOrdering, coordinator, policy, clock);
+                bookings, userRepository, vehicleRepository, catalogService,
+                serviceOfferingService, marketplaceService,
+                queueRepository, notificationRepository, notifications, queueOrdering, coordinator, policy,
+                new BookingSlotPolicyService(bookings, policy, clock), clock);
     }
 
     private boolean attemptConcurrentReschedule(
@@ -811,6 +828,16 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         }
 
         @Override
+        public List<Booking> findByBranchId(String branchId) {
+            return delegate.findByBranchId(branchId);
+        }
+
+        @Override
+        public List<Booking> findByServiceOfferingId(String serviceOfferingId) {
+            return delegate.findByServiceOfferingId(serviceOfferingId);
+        }
+
+        @Override
         public List<Booking> findByScheduledDateTime(LocalDateTime scheduledDateTime) {
             return delegate.findByScheduledDateTime(scheduledDateTime);
         }
@@ -828,6 +855,11 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         @Override
         public boolean existsByServiceId(String serviceId) {
             return delegate.existsByServiceId(serviceId);
+        }
+
+        @Override
+        public boolean existsByServiceOfferingId(String serviceOfferingId) {
+            return delegate.existsByServiceOfferingId(serviceOfferingId);
         }
     }
 }

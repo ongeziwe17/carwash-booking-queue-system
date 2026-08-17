@@ -1,7 +1,7 @@
 info:
   name: Confirm lifecycle reschedule booking
   type: http
-  seq: 19
+  seq: 20
   tags: [workflow, staff]
 http:
   method: POST

@@ -9,6 +9,11 @@ import com.carwash.identity.domain.RoleName;
 import com.carwash.booking.application.BookingManagementService;
 import com.carwash.queue.application.QueueManagementService;
 import com.carwash.catalog.application.ServiceCatalogService;
+import com.carwash.catalog.application.CreateServiceOfferingCommand;
+import com.carwash.catalog.application.ServiceOfferingService;
+import com.carwash.marketplace.application.CreateBranchCommand;
+import com.carwash.marketplace.application.MarketplaceManagementService;
+import com.carwash.marketplace.application.RegisterBusinessCommand;
 import com.carwash.identity.application.UserManagementService;
 import com.carwash.vehicle.application.VehicleManagementService;
 import com.carwash.testsupport.ApiContractAssertions;
@@ -52,6 +57,8 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
     @Autowired UserManagementService users;
     @Autowired VehicleManagementService vehicles;
     @Autowired ServiceCatalogService services;
+    @Autowired ServiceOfferingService offerings;
+    @Autowired MarketplaceManagementService marketplace;
     @Autowired BookingManagementService bookings;
     @Autowired QueueManagementService queues;
     @Autowired JwtEncoder jwtEncoder;
@@ -59,6 +66,7 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
     @Autowired Clock securityClock;
 
     private int slotSequence;
+    private String defaultBranchId;
 
     @Test
     void customerCanAccessOwnResourcesButNotOtherCustomersOrOperationalApis() throws Exception {
@@ -89,11 +97,13 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         assertForbidden(mockMvc.perform(post("/api/services").header(HttpHeaders.AUTHORIZATION, customer.bearer())
                 .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(serviceRequest()))));
         assertForbidden(mockMvc.perform(post("/api/queue-entries/call-next")
+                .param("branchId", ownResources.branchId())
                 .header(HttpHeaders.AUTHORIZATION, customer.bearer())));
         assertForbidden(mockMvc.perform(post("/api/queue-entries/{id}/call", ownResources.queueEntryId())
                 .header(HttpHeaders.AUTHORIZATION, customer.bearer())));
         assertForbidden(mockMvc.perform(get("/api/reports/daily-summary").header(HttpHeaders.AUTHORIZATION, customer.bearer())
-                .param("date", TestDates.future().toLocalDate().toString())));
+                .param("date", TestDates.future().toLocalDate().toString())
+                .param("branchId", ownResources.branchId())));
         assertForbidden(mockMvc.perform(put("/api/admin/users/{id}/role", other.userId())
                 .header(HttpHeaders.AUTHORIZATION, customer.bearer()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"roleName\":\"STAFF\"}")));
@@ -114,12 +124,14 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         assertOperationalUpdateCannotTransferOwner(staff, resources, other.userId());
         enqueue(resources);
         mockMvc.perform(post("/api/queue-entries/call-next")
+                        .param("branchId", resources.branchId())
                         .header(HttpHeaders.AUTHORIZATION, staff.bearer()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.queueStatus").value("CALLED"));
         assertForbidden(mockMvc.perform(post("/api/services").header(HttpHeaders.AUTHORIZATION, staff.bearer())
                 .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(serviceRequest()))));
         assertForbidden(mockMvc.perform(get("/api/reports/daily-summary").header(HttpHeaders.AUTHORIZATION, staff.bearer())
-                .param("date", TestDates.future().toLocalDate().toString())));
+                .param("date", TestDates.future().toLocalDate().toString())
+                .param("branchId", resources.branchId())));
         assertForbidden(mockMvc.perform(put("/api/admin/users/{id}/role", customer.userId())
                 .header(HttpHeaders.AUTHORIZATION, staff.bearer()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"roleName\":\"BUSINESS_OWNER\"}")));
@@ -145,7 +157,8 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
                         .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(serviceRequest())))
                 .andExpect(status().isCreated());
         mockMvc.perform(get("/api/reports/daily-summary").header(HttpHeaders.AUTHORIZATION, owner.bearer())
-                        .param("date", TestDates.future().toLocalDate().toString())).andExpect(status().isOk());
+                        .param("date", TestDates.future().toLocalDate().toString())
+                        .param("branchId", resources.branchId())).andExpect(status().isOk());
         assertForbidden(mockMvc.perform(put("/api/admin/users/{id}/role", customer.userId())
                 .header(HttpHeaders.AUTHORIZATION, owner.bearer()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"roleName\":\"STAFF\"}")));
@@ -171,7 +184,8 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
                         .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(serviceRequest())))
                 .andExpect(status().isCreated());
         mockMvc.perform(get("/api/reports/daily-summary").header(HttpHeaders.AUTHORIZATION, administrator.bearer())
-                        .param("date", TestDates.future().toLocalDate().toString())).andExpect(status().isOk());
+                        .param("date", TestDates.future().toLocalDate().toString())
+                        .param("branchId", resources.branchId())).andExpect(status().isOk());
         assertOperationalUpdateCannotTransferOwner(administrator, resources, other.userId());
 
         mockMvc.perform(delete("/api/users/{id}", administrator.userId()).header(HttpHeaders.AUTHORIZATION, administrator.bearer()))
@@ -191,7 +205,8 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         ResourceSet resources = createResourceSetWithoutQueue(customer.userId());
         ResourceSet otherResources = createResourceSetWithoutQueue(other.userId());
 
-        Map<String, Object> allowedUpdate = updateBookingRequest(resources.alternateVehicleId(), resources.serviceId());
+        Map<String, Object> allowedUpdate = updateBookingRequest(
+                resources.alternateVehicleId(), resources.serviceOfferingId());
         mockMvc.perform(put("/api/bookings/{id}", resources.bookingId())
                         .header(HttpHeaders.AUTHORIZATION, customer.bearer()).contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(allowedUpdate)))
@@ -208,7 +223,8 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(jsonPath("$.scheduledDateTime").value(apiDateTime(rescheduled)))
                 .andExpect(jsonPath("$.status").value("CONFIRMED"));
 
-        Map<String, Object> rejectedUpdate = updateBookingRequest(otherResources.primaryVehicleId(), resources.serviceId());
+        Map<String, Object> rejectedUpdate = updateBookingRequest(
+                otherResources.primaryVehicleId(), resources.serviceOfferingId());
         mockMvc.perform(put("/api/bookings/{id}", resources.bookingId())
                         .header(HttpHeaders.AUTHORIZATION, customer.bearer()).contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(rejectedUpdate)))
@@ -261,7 +277,8 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
 
     private void assertOperationalUpdateCannotTransferOwner(LoginIdentity operator, ResourceSet resources, String attemptedOwnerId)
             throws Exception {
-        Map<String, Object> allowed = updateBookingRequest(resources.alternateVehicleId(), resources.serviceId());
+        Map<String, Object> allowed = updateBookingRequest(
+                resources.alternateVehicleId(), resources.serviceOfferingId());
         mockMvc.perform(put("/api/bookings/{id}", resources.bookingId())
                         .header(HttpHeaders.AUTHORIZATION, operator.bearer()).contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(allowed)))
@@ -308,9 +325,17 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         Vehicle primary = vehicles.createVehicle(new Vehicle(primaryVehicleId, ids.plate(), "SUV", "Toyota", "Rav4", "Black", ""), ownerId);
         vehicles.createVehicle(new Vehicle(alternateVehicleId, ids.plate(), "Sedan", "Honda", "Civic", "White", ""), ownerId);
         Service service = services.createService(new Service(serviceId, "RBAC Wash", "authorization fixture", BigDecimal.valueOf(200), 30));
-        Booking booking = bookings.createBooking(new Booking(bookingId, users.findById(ownerId), primary, service, nextScheduledTime(), "authorization fixture"));
+        String branchId = ensureBranch();
+        String offeringId = ids.offering();
+        offerings.createOffering(branchId, new CreateServiceOfferingCommand(
+                offeringId, serviceId, BigDecimal.valueOf(200), 30, 2));
+        Booking booking = bookings.createBooking(new Booking(
+                bookingId, users.findById(ownerId), primary, branchId, offeringId, service,
+                nextScheduledTime(), "authorization fixture"));
         bookings.confirmBooking(bookingId);
-        return new ResourceSet(ownerId, primaryVehicleId, alternateVehicleId, serviceId, bookingId, queueEntryId);
+        return new ResourceSet(
+                ownerId, primaryVehicleId, alternateVehicleId, serviceId, branchId, offeringId,
+                bookingId, queueEntryId);
     }
 
     private void enqueue(ResourceSet resources) {
@@ -318,9 +343,22 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         queues.createQueueEntry(new QueueEntry(resources.queueEntryId(), booking, booking.getService()));
     }
 
-    private Map<String, Object> updateBookingRequest(String vehicleId, String serviceId) {
-        return Map.of("vehicleId", vehicleId, "serviceId", serviceId,
+    private Map<String, Object> updateBookingRequest(String vehicleId, String serviceOfferingId) {
+        return Map.of("vehicleId", vehicleId, "serviceOfferingId", serviceOfferingId,
                 "specialRequest", "authorization update");
+    }
+
+    private String ensureBranch() {
+        if (defaultBranchId != null) return defaultBranchId;
+        String businessId = ids.business();
+        marketplace.registerBusiness(new RegisterBusinessCommand(
+                businessId, "RBAC Wash", ids.emailFor(businessId), "+27821234567", null));
+        defaultBranchId = ids.branch();
+        marketplace.createBranch(businessId, new CreateBranchCommand(
+                defaultBranchId, "RBAC Branch", "1 Test Street", null, "Cape Town", "Western Cape",
+                "8001", "ZA", new BigDecimal("-33.9249"), new BigDecimal("18.4241"),
+                "Africa/Johannesburg", true));
+        return defaultBranchId;
     }
 
     private void assertAvailabilityAllowed(LoginIdentity identity, String serviceId) throws Exception {
@@ -372,5 +410,6 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
     private String bearer(String token) { return "Bearer " + token; }
     private record LoginIdentity(String userId, String email, String token) { String bearer() { return "Bearer " + token; } }
     private record ResourceSet(String ownerId, String primaryVehicleId, String alternateVehicleId,
-                               String serviceId, String bookingId, String queueEntryId) {}
+                               String serviceId, String branchId, String serviceOfferingId,
+                               String bookingId, String queueEntryId) {}
 }

@@ -17,7 +17,7 @@ http:
     data: |-
       {
         "vehicleId": "{{e2eVehicleId}}",
-        "serviceId": "{{serviceId}}",
+        "serviceOfferingId": "{{opsOfferingId}}",
         "specialRequest": "E2E updated"
       }
   auth:

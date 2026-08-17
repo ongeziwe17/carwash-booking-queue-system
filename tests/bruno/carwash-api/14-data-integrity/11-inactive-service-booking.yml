@@ -18,7 +18,8 @@ http:
         "bookingId": "{{conflictBookingId}}",
         "userId": "{{customerUserId}}",
         "vehicleId": "{{customerVehicleId}}",
-        "serviceId": "{{inactiveServiceId}}",
+        "branchId": "{{opsBranchId}}",
+        "serviceOfferingId": "{{inactiveOfferingId}}",
         "scheduledDateTime": "{{future13}}",
         "specialRequest": "Bruno acceptance booking"
       }

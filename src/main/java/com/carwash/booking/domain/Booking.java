@@ -21,6 +21,10 @@ public class Booking {
     private User user;
     private Vehicle vehicle;
     private Service service;
+    @Setter(AccessLevel.NONE)
+    private String branchId;
+    @Setter(AccessLevel.NONE)
+    private String serviceOfferingId;
     private LocalDateTime scheduledDateTime;
     private BookingStatus status;
     private LocalDateTime createdAt;
@@ -32,7 +36,7 @@ public class Booking {
     public Booking() {
     }
 
-    public Booking(
+    private Booking(
             String bookingId,
             User user,
             Vehicle vehicle,
@@ -50,15 +54,53 @@ public class Booking {
         this.createdAt = LocalDateTime.now();
     }
 
-    public static Booking create(
+    public Booking(
             String bookingId,
             User user,
             Vehicle vehicle,
+            String branchId,
+            String serviceOfferingId,
             Service service,
             LocalDateTime scheduledDateTime,
             String specialRequest
     ) {
-        return new Booking(bookingId, user, vehicle, service, scheduledDateTime, specialRequest);
+        this(bookingId, user, vehicle, service, scheduledDateTime, specialRequest);
+        assignOperationalScope(branchId, serviceOfferingId);
+    }
+
+    public static Booking create(
+            String bookingId,
+            User user,
+            Vehicle vehicle,
+            String branchId,
+            String serviceOfferingId,
+            Service service,
+            LocalDateTime scheduledDateTime,
+            String specialRequest
+    ) {
+        return new Booking(
+                bookingId, user, vehicle, branchId, serviceOfferingId, service, scheduledDateTime, specialRequest);
+    }
+
+    public void assignOperationalScope(String branchId, String serviceOfferingId) {
+        String normalizedBranchId = requireId(branchId, "Branch ID");
+        String normalizedOfferingId = requireId(serviceOfferingId, "Service offering ID");
+        if (this.branchId != null && !this.branchId.equals(normalizedBranchId)) {
+            throw new IllegalStateException("Booking branch is immutable");
+        }
+        if (this.serviceOfferingId != null && !this.serviceOfferingId.equals(normalizedOfferingId)) {
+            throw new IllegalStateException("Use changeServiceOffering to replace a booking offering");
+        }
+        this.branchId = normalizedBranchId;
+        this.serviceOfferingId = normalizedOfferingId;
+    }
+
+    public void changeServiceOffering(String serviceOfferingId, Service service) {
+        if (branchId == null) {
+            throw new IllegalStateException("Booking branch is required before changing its offering");
+        }
+        this.serviceOfferingId = requireId(serviceOfferingId, "Service offering ID");
+        this.service = Objects.requireNonNull(service, "Service is required");
     }
 
     public void attachQueueEntry(QueueEntry queueEntry) {
@@ -130,5 +172,16 @@ public class Booking {
             case IN_SERVICE -> targetStatus == BookingStatus.COMPLETED;
             case CANCELLED, COMPLETED -> false;
         };
+    }
+
+    private String requireId(String value, String field) {
+        String normalized = value == null ? null : value.trim();
+        if (normalized == null || normalized.isBlank()) {
+            throw new IllegalArgumentException(field + " is required");
+        }
+        if (normalized.length() > 64) {
+            throw new IllegalArgumentException(field + " must not exceed 64 characters");
+        }
+        return normalized;
     }
 }

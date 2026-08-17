@@ -1,11 +1,7 @@
 package com.carwash.catalog.application;
 
-import com.carwash.queue.application.QueueOrderingService;
-
 import com.carwash.catalog.domain.Service;
 import com.carwash.catalog.domain.ServiceOfferingRepository;
-import com.carwash.booking.domain.BookingRepository;
-import com.carwash.queue.domain.QueueEntryRepository;
 import com.carwash.catalog.domain.ServiceRepository;
 import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
 import com.carwash.shared.exception.BusinessRuleViolationException;
@@ -14,32 +10,27 @@ import com.carwash.shared.exception.ResourceNotFoundException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
-public class ServiceCatalogService {
+public class ServiceCatalogService implements ServiceDefinitionQuery {
 
     private final ServiceRepository serviceRepository;
     private final ServiceOfferingRepository serviceOfferingRepository;
-    private final BookingRepository bookingRepository;
-    private final QueueEntryRepository queueEntryRepository;
+    private final ServiceDefinitionUsageQuery serviceUsageQuery;
     private final InMemoryDataCoordinator coordinator;
-    private final QueueOrderingService queueOrdering;
 
 
     public ServiceCatalogService(
             ServiceRepository serviceRepository,
             ServiceOfferingRepository serviceOfferingRepository,
-            BookingRepository bookingRepository,
-            QueueEntryRepository queueEntryRepository,
-            InMemoryDataCoordinator coordinator,
-            QueueOrderingService queueOrdering
+            ServiceDefinitionUsageQuery serviceUsageQuery,
+            InMemoryDataCoordinator coordinator
     ) {
         this.serviceRepository = Objects.requireNonNull(serviceRepository, "Service repository is required");
         this.serviceOfferingRepository = Objects.requireNonNull(
                 serviceOfferingRepository, "Service offering repository is required");
-        this.bookingRepository = bookingRepository;
-        this.queueEntryRepository = queueEntryRepository;
+        this.serviceUsageQuery = Objects.requireNonNull(serviceUsageQuery, "Service usage query is required");
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
-        this.queueOrdering = Objects.requireNonNull(queueOrdering, "Queue ordering service is required");
     }
 
     public Service createService(String serviceId, String serviceName, String description,
@@ -70,6 +61,15 @@ public class ServiceCatalogService {
                 .filter(service -> service.isActive() == active).toList());
     }
 
+    @Override
+    public Optional<ServiceDefinitionSnapshot> findServiceDefinitionOptional(String serviceId) {
+        if (serviceId == null || serviceId.isBlank()) {
+            throw new BusinessRuleViolationException("Service ID must not be blank");
+        }
+        String normalizedId = serviceId.trim();
+        return coordinator.read(() -> serviceRepository.findById(normalizedId).map(this::snapshot));
+    }
+
     public Service updateService(String serviceId, String serviceName, String description,
                                  BigDecimal price, int estimatedDurationMin) {
         Service updated = new Service();
@@ -86,13 +86,11 @@ public class ServiceCatalogService {
             if (service == null) throw new BusinessRuleViolationException("Service is required");
             Service existing = requireService(service.getServiceId());
             validateService(service);
-            boolean durationChanged = existing.getEstimatedDurationMin() != service.getEstimatedDurationMin();
             existing.updateDetails(service.getServiceName(), service.getDescription(), service.getPrice(),
                     service.getEstimatedDurationMin());
             if (!serviceRepository.update(existing)) {
                 throw new ResourceNotFoundException("Service not found: " + existing.getServiceId());
             }
-            if (durationChanged) queueOrdering.rebalanceActiveQueue();
             return existing;
         });
     }
@@ -118,8 +116,8 @@ public class ServiceCatalogService {
     public void deleteService(String serviceId) {
         coordinator.write(() -> {
             requireService(serviceId);
-            boolean referencedByBooking = bookingRepository != null && bookingRepository.existsByServiceId(serviceId);
-            boolean referencedByQueue = queueEntryRepository != null && queueEntryRepository.existsByServiceId(serviceId);
+            boolean referencedByBooking = serviceUsageQuery.referencedByBooking(serviceId);
+            boolean referencedByQueue = serviceUsageQuery.referencedByQueue(serviceId);
             boolean referencedByOffering = serviceOfferingRepository.existsByServiceId(serviceId);
             if (referencedByOffering) {
                 throw new BusinessRuleViolationException(
@@ -135,6 +133,18 @@ public class ServiceCatalogService {
     private Service requireService(String serviceId) {
         return serviceRepository.findById(serviceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Service not found: " + serviceId));
+    }
+
+    private ServiceDefinitionSnapshot snapshot(Service service) {
+        return new ServiceDefinitionSnapshot(
+                service.getServiceId(),
+                service.getServiceName(),
+                service.getDescription(),
+                service.getPrice(),
+                service.getEstimatedDurationMin(),
+                service.isActive(),
+                service.getCreatedAt()
+        );
     }
 
     private void validateService(Service service) {

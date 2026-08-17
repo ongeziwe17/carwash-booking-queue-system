@@ -1,7 +1,7 @@
 info:
   name: Create booking for DELETE cancellation
   type: http
-  seq: 13
+  seq: 14
   tags:
     - customer
 
@@ -18,7 +18,8 @@ http:
         "bookingId": "{{deleteRouteBookingId}}",
         "userId": "{{customerUserId}}",
         "vehicleId": "{{customerVehicleId}}",
-        "serviceId": "{{serviceId}}",
+        "branchId": "{{opsBranchId}}",
+        "serviceOfferingId": "{{opsOfferingId}}",
         "scheduledDateTime": "{{future5}}",
         "specialRequest": "Bruno acceptance booking"
       }

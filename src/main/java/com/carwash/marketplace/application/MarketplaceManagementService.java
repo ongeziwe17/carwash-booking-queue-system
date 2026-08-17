@@ -138,6 +138,7 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
         });
     }
 
+    @Override
     public List<BranchSnapshot> findBranchesByBusiness(String businessId) {
         return coordinator.read(() -> {
             CarWashBusiness business = requireBusiness(businessId);

@@ -8,7 +8,7 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/api/bookings"
+  url: "{{baseUrl}}/api/bookings?branchId={{opsBranchId}}"
   auth:
     type: bearer
     token: "{{staffToken}}"
@@ -29,7 +29,7 @@ runtime:
         const bootstrapPassword = bru.interpolate("{{process.env.BRUNO_BOOTSTRAP_ADMIN_PASSWORD}}");
         if (bootstrapPassword && !bootstrapPassword.includes("process.env")) expect(payload).to.not.include(bootstrapPassword);
         test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
-        test("core booking appears", function() { expect(res.body.some(b => b.bookingId === bru.getVar("bookingId"))).to.equal(true); });
+        test("branch-filtered core booking appears without leakage", function() { expect(res.body.some(b => b.bookingId === bru.getVar("bookingId"))).to.equal(true); expect(res.body.every(b => b.branchId === bru.getVar("opsBranchId") && typeof b.serviceOfferingId === "string")).to.equal(true); });
 
 settings:
   encodeUrl: true

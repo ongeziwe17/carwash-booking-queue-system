@@ -1,7 +1,7 @@
 info:
   name: Server appends first queue entry
   type: http
-  seq: 22
+  seq: 25
   tags:
     - workflow
     - integrity

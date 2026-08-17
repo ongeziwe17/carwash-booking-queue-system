@@ -8,6 +8,9 @@ import com.carwash.vehicle.domain.Vehicle;
 import com.carwash.booking.api.dto.CreateBookingRequest;
 import com.carwash.queue.api.dto.CreateQueueEntryRequest;
 import com.carwash.catalog.api.dto.CreateServiceRequest;
+import com.carwash.catalog.api.dto.CreateServiceOfferingRequest;
+import com.carwash.marketplace.api.dto.CreateBusinessRequest;
+import com.carwash.marketplace.api.dto.CreateBranchRequest;
 import com.carwash.identity.api.dto.CreateUserRequest;
 import com.carwash.vehicle.api.dto.CreateVehicleRequest;
 import com.carwash.testsupport.ApiContractAssertions;
@@ -22,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
 import java.util.Map;
+import java.math.BigDecimal;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -53,12 +57,15 @@ class DataIntegrityIntegrationTest extends ApiIntegrationTestSupport {
         CreateServiceRequest duplicateService = new CreateServiceRequest(service.serviceId(), "Replacement",
                 service.description(), service.price(), service.estimatedDurationMin());
         assertBusinessRule(api.createService(duplicateService), "/api/services", "Service ID already exists");
+        Scope scope = createScope(service);
 
-        CreateBookingRequest booking = BookingFixtureBuilder.valid(ids, user.userId(), vehicle.vehicleId(), service.serviceId())
+        CreateBookingRequest booking = BookingFixtureBuilder.valid(
+                        ids, user.userId(), vehicle.vehicleId(), scope.branchId(), scope.offeringId())
                 .scheduledDateTime(TestDates.futureDays(40)).build();
         api.createBooking(booking).andExpect(status().isCreated());
         CreateBookingRequest duplicateBooking = new CreateBookingRequest(booking.bookingId(), booking.userId(),
-                booking.vehicleId(), booking.serviceId(), booking.scheduledDateTime(), "Replacement");
+                booking.vehicleId(), booking.branchId(), booking.serviceOfferingId(),
+                booking.scheduledDateTime(), "Replacement");
         assertBusinessRule(api.createBooking(duplicateBooking), "/api/bookings", "Booking ID already exists");
         mockMvc.perform(post("/api/bookings/{id}/confirm", booking.bookingId())
                         .with(authentication.platformAdminJwt()))
@@ -67,7 +74,7 @@ class DataIntegrityIntegrationTest extends ApiIntegrationTestSupport {
         CreateQueueEntryRequest queue = QueueFixtureBuilder.valid(ids, booking.bookingId(), service.serviceId()).build();
         api.createQueueEntry(queue).andExpect(status().isCreated());
         CreateBookingRequest secondBooking = BookingFixtureBuilder.valid(
-                        ids, user.userId(), vehicle.vehicleId(), service.serviceId())
+                        ids, user.userId(), vehicle.vehicleId(), scope.branchId(), scope.offeringId())
                 .scheduledDateTime(TestDates.futureDays(41)).build();
         api.createBooking(secondBooking).andExpect(status().isCreated());
         mockMvc.perform(post("/api/bookings/{id}/confirm", secondBooking.bookingId())
@@ -93,7 +100,7 @@ class DataIntegrityIntegrationTest extends ApiIntegrationTestSupport {
                 "Vehicle cannot be deleted while bookings still reference it");
         assertBusinessRule(mockMvc.perform(delete("/api/services/{id}", fixture.service.serviceId())
                         .with(authentication.platformAdminJwt())), "/api/services/" + fixture.service.serviceId(),
-                "Referenced service cannot be deleted; deactivate it instead");
+                "Service referenced by a branch offering cannot be deleted; deactivate it instead");
     }
 
     @Test
@@ -119,7 +126,8 @@ class DataIntegrityIntegrationTest extends ApiIntegrationTestSupport {
         assertBusinessRule(mockMvc.perform(put("/api/bookings/{id}", fixture.booking.bookingId())
                         .with(authentication.platformAdminJwt()).contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "vehicleId", fixture.vehicle.vehicleId(), "serviceId", fixture.service.serviceId(),
+                                "vehicleId", fixture.vehicle.vehicleId(),
+                                "serviceOfferingId", fixture.booking.serviceOfferingId(),
                                 "specialRequest", "Updated")))),
                 "/api/bookings/" + fixture.booking.bookingId(), "Booking cannot be updated in its current state");
     }
@@ -131,10 +139,28 @@ class DataIntegrityIntegrationTest extends ApiIntegrationTestSupport {
         api.createVehicle(vehicle).andExpect(status().isCreated());
         CreateServiceRequest service = ServiceFixtureBuilder.valid(ids).build();
         api.createService(service).andExpect(status().isCreated());
-        CreateBookingRequest booking = BookingFixtureBuilder.valid(ids, user.userId(), vehicle.vehicleId(), service.serviceId())
+        Scope scope = createScope(service);
+        CreateBookingRequest booking = BookingFixtureBuilder.valid(
+                        ids, user.userId(), vehicle.vehicleId(), scope.branchId(), scope.offeringId())
                 .scheduledDateTime(scheduled).build();
         api.createBooking(booking).andExpect(status().isCreated());
         return new Fixture(user, vehicle, service, booking);
+    }
+
+    private Scope createScope(CreateServiceRequest service) throws Exception {
+        String businessId = ids.business();
+        api.createBusiness(new CreateBusinessRequest(
+                businessId, "Integrity Wash", ids.emailFor(businessId), "+27821234567", null))
+                .andExpect(status().isCreated());
+        CreateBranchRequest branch = new CreateBranchRequest(
+                ids.branch(), "Integrity Branch", "1 Test Street", null, "Cape Town", "Western Cape",
+                "8001", "ZA", new BigDecimal("-33.9249"), new BigDecimal("18.4241"),
+                "Africa/Johannesburg", true);
+        api.createBranch(businessId, branch).andExpect(status().isCreated());
+        CreateServiceOfferingRequest offering = new CreateServiceOfferingRequest(
+                ids.offering(), service.serviceId(), service.price(), service.estimatedDurationMin(), 2);
+        api.createServiceOffering(branch.branchId(), offering).andExpect(status().isCreated());
+        return new Scope(branch.branchId(), offering.offeringId());
     }
 
     private void assertBusinessRule(org.springframework.test.web.servlet.ResultActions action, String path, String message)
@@ -150,4 +176,6 @@ class DataIntegrityIntegrationTest extends ApiIntegrationTestSupport {
 
     private record Fixture(CreateUserRequest user, CreateVehicleRequest vehicle,
                            CreateServiceRequest service, CreateBookingRequest booking) {}
+
+    private record Scope(String branchId, String offeringId) {}
 }

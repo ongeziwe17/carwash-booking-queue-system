@@ -29,7 +29,7 @@ runtime:
         const bootstrapPassword = bru.interpolate("{{process.env.BRUNO_BOOTSTRAP_ADMIN_PASSWORD}}");
         if (bootstrapPassword && !bootstrapPassword.includes("process.env")) expect(payload).to.not.include(bootstrapPassword);
         test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
-        test("contains workflow notifications", function() { expect(res.body.some(n => n.booking && n.booking.bookingId === bru.getVar("opsE2eBookingId"))).to.equal(true); });
+        test("contains bounded workflow notifications", function() { expect(res.body.some(n => n.bookingId === bru.getVar("opsE2eBookingId") && n.branchId === bru.getVar("opsBranchId") && n.serviceOfferingId === bru.getVar("opsOfferingId") && n.user === undefined && n.booking === undefined)).to.equal(true); });
 
 settings:
   encodeUrl: true

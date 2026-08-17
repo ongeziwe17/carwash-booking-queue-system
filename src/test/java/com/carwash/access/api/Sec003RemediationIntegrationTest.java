@@ -8,6 +8,11 @@ import com.carwash.catalog.domain.Service;
 import com.carwash.vehicle.domain.Vehicle;
 import com.carwash.booking.application.BookingManagementService;
 import com.carwash.catalog.application.ServiceCatalogService;
+import com.carwash.catalog.application.CreateServiceOfferingCommand;
+import com.carwash.catalog.application.ServiceOfferingService;
+import com.carwash.marketplace.application.CreateBranchCommand;
+import com.carwash.marketplace.application.MarketplaceManagementService;
+import com.carwash.marketplace.application.RegisterBusinessCommand;
 import com.carwash.identity.application.UserManagementService;
 import com.carwash.vehicle.application.VehicleManagementService;
 import com.carwash.identity.application.CreateUserCommand;
@@ -36,6 +41,8 @@ class Sec003RemediationIntegrationTest extends ApiIntegrationTestSupport {
     @Autowired VehicleManagementService vehicles;
     @Autowired ServiceCatalogService services;
     @Autowired BookingManagementService bookings;
+    @Autowired ServiceOfferingService offerings;
+    @Autowired MarketplaceManagementService marketplace;
 
     @Test
     void customerCannotTransferExistingBookingToAnotherCustomer() throws Exception {
@@ -49,11 +56,23 @@ class Sec003RemediationIntegrationTest extends ApiIntegrationTestSupport {
         vehicles.createVehicle(new Vehicle(ownerVehicleId, ids.plate(), "SUV", "Toyota", "Rav4", "Black", ""), ownerId);
         vehicles.createVehicle(new Vehicle(otherVehicleId, ids.plate(), "SUV", "Honda", "CR-V", "White", ""), otherId);
         services.createService(new Service(serviceId, "Transfer Test Wash", "security regression", BigDecimal.valueOf(150), 30));
-        bookings.createBooking(bookingId, ownerId, ownerVehicleId, serviceId, TestDates.futureDays(2), "original request");
+        String businessId = ids.business();
+        marketplace.registerBusiness(new RegisterBusinessCommand(
+                businessId, "Security Wash", ids.emailFor(businessId), "+27821234567", null));
+        String branchId = ids.branch();
+        marketplace.createBranch(businessId, new CreateBranchCommand(
+                branchId, "Security Branch", "1 Test Street", null, "Cape Town", "Western Cape", "8001", "ZA",
+                new BigDecimal("-33.9249"), new BigDecimal("18.4241"), "Africa/Johannesburg", true));
+        String offeringId = ids.offering();
+        offerings.createOffering(branchId, new CreateServiceOfferingCommand(
+                offeringId, serviceId, BigDecimal.valueOf(150), 30, 2));
+        bookings.createBooking(
+                bookingId, ownerId, ownerVehicleId, branchId, offeringId,
+                TestDates.futureDays(2), "original request");
 
         Map<String, Object> transferRequest = new LinkedHashMap<>();
         transferRequest.put("vehicleId", otherVehicleId);
-        transferRequest.put("serviceId", serviceId);
+        transferRequest.put("serviceOfferingId", offeringId);
         transferRequest.put("specialRequest", "attempted transfer");
 
         mockMvc.perform(put("/api/bookings/{id}", bookingId)

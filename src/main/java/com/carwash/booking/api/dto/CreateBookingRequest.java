@@ -11,7 +11,8 @@ public record CreateBookingRequest(
         @NotBlank(message = "bookingId is required") @Size(max = 64) String bookingId,
         @NotBlank(message = "userId is required") @Size(max = 64) String userId,
         @NotBlank(message = "vehicleId is required") @Size(max = 64) String vehicleId,
-        @NotBlank(message = "serviceId is required") @Size(max = 64) String serviceId,
+        @NotBlank(message = "branchId is required") @Size(max = 64) String branchId,
+        @NotBlank(message = "serviceOfferingId is required") @Size(max = 64) String serviceOfferingId,
         @NotNull(message = "scheduledDateTime is required")
         @Future(message = "scheduledDateTime must be in the future") LocalDateTime scheduledDateTime,
         @Size(max = 1000) String specialRequest
@@ -20,7 +21,8 @@ public record CreateBookingRequest(
         bookingId = trim(bookingId);
         userId = trim(userId);
         vehicleId = trim(vehicleId);
-        serviceId = trim(serviceId);
+        branchId = trim(branchId);
+        serviceOfferingId = trim(serviceOfferingId);
         specialRequest = trim(specialRequest);
     }
 

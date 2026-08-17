@@ -39,6 +39,9 @@ import com.carwash.marketplace.application.BranchSchedulingService;
 import com.carwash.queue.application.QueueManagementService;
 import com.carwash.queue.application.QueueOrderingService;
 import com.carwash.catalog.application.ServiceCatalogService;
+import com.carwash.catalog.application.ServiceDefinitionQuery;
+import com.carwash.catalog.application.ServiceDefinitionUsageQuery;
+import com.carwash.catalog.application.ServiceOfferingQuery;
 import com.carwash.catalog.application.ServiceOfferingService;
 import com.carwash.marketplace.application.MarketplaceQuery;
 import com.carwash.identity.application.UserManagementService;
@@ -173,9 +176,28 @@ public class ApplicationCompositionConfig {
     public QueueOrderingService queueOrderingService(
             QueueEntryRepository queueEntryRepository,
             InMemoryDataCoordinator coordinator,
-            QueuePolicyProperties queuePolicy
+            QueuePolicyProperties queuePolicy,
+            ServiceOfferingQuery serviceOfferingQuery
     ) {
-        return new QueueOrderingService(queueEntryRepository, coordinator, queuePolicy);
+        return new QueueOrderingService(queueEntryRepository, coordinator, queuePolicy, serviceOfferingQuery);
+    }
+
+    @Bean
+    public ServiceDefinitionUsageQuery serviceDefinitionUsageQuery(
+            BookingRepository bookingRepository,
+            QueueEntryRepository queueEntryRepository
+    ) {
+        return new ServiceDefinitionUsageQuery() {
+            @Override
+            public boolean referencedByBooking(String serviceId) {
+                return bookingRepository.existsByServiceId(serviceId);
+            }
+
+            @Override
+            public boolean referencedByQueue(String serviceId) {
+                return queueEntryRepository.existsByServiceId(serviceId);
+            }
+        };
     }
 
     @Bean
@@ -216,18 +238,14 @@ public class ApplicationCompositionConfig {
     public ServiceCatalogService serviceCatalogService(
             ServiceRepository serviceRepository,
             ServiceOfferingRepository serviceOfferingRepository,
-            BookingRepository bookingRepository,
-            QueueEntryRepository queueEntryRepository,
             InMemoryDataCoordinator coordinator,
-            QueueOrderingService queueOrderingService
+            ServiceDefinitionUsageQuery serviceDefinitionUsageQuery
     ) {
         return new ServiceCatalogService(
                 serviceRepository,
                 serviceOfferingRepository,
-                bookingRepository,
-                queueEntryRepository,
-                coordinator,
-                queueOrderingService
+                serviceDefinitionUsageQuery,
+                coordinator
         );
     }
 
@@ -274,7 +292,9 @@ public class ApplicationCompositionConfig {
             BookingRepository bookingRepository,
             UserRepository userRepository,
             VehicleRepository vehicleRepository,
-            ServiceRepository serviceRepository,
+            ServiceDefinitionQuery serviceDefinitionQuery,
+            ServiceOfferingQuery serviceOfferingQuery,
+            MarketplaceQuery marketplaceQuery,
             QueueEntryRepository queueEntryRepository,
             NotificationRepository notificationRepository,
             NotificationManagementService notificationManagementService,
@@ -288,7 +308,9 @@ public class ApplicationCompositionConfig {
                 bookingRepository,
                 userRepository,
                 vehicleRepository,
-                serviceRepository,
+                serviceDefinitionQuery,
+                serviceOfferingQuery,
+                marketplaceQuery,
                 queueEntryRepository,
                 notificationRepository,
                 notificationManagementService,
@@ -304,7 +326,8 @@ public class ApplicationCompositionConfig {
     public QueueManagementService queueManagementService(
             QueueEntryRepository queueEntryRepository,
             BookingRepository bookingRepository,
-            ServiceRepository serviceRepository,
+            ServiceOfferingQuery serviceOfferingQuery,
+            MarketplaceQuery marketplaceQuery,
             NotificationManagementService notificationManagementService,
             InMemoryDataCoordinator coordinator,
             QueueOrderingService queueOrderingService,
@@ -313,7 +336,8 @@ public class ApplicationCompositionConfig {
         return new QueueManagementService(
                 queueEntryRepository,
                 bookingRepository,
-                serviceRepository,
+                serviceOfferingQuery,
+                marketplaceQuery,
                 notificationManagementService,
                 coordinator,
                 queueOrderingService,
@@ -325,11 +349,13 @@ public class ApplicationCompositionConfig {
     public DailySummaryReportService dailySummaryReportService(
             BookingManagementService bookingManagementService,
             QueueManagementService queueManagementService,
+            MarketplaceQuery marketplaceQuery,
             InMemoryDataCoordinator coordinator
     ) {
         return new DailySummaryReportService(
                 bookingManagementService,
                 queueManagementService,
+                marketplaceQuery,
                 coordinator
         );
     }

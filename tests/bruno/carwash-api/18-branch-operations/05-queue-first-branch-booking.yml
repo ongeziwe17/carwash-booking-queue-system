@@ -1,0 +1,12 @@
+info: { name: Queue first branch booking, type: http, seq: 5, tags: [ops, queue, branch, workflow] }
+http:
+  method: POST
+  url: "{{baseUrl}}/api/queue-entries"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body: { type: json, data: '{"queueEntryId":"{{branchOpsFirstQueueId}}","bookingId":"{{branchOpsFirstBookingId}}","serviceId":"{{serviceId}}"}' }
+  auth: { type: bearer, token: "{{staffToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("first branch starts at position one", function() { expect(res.status).to.equal(201); expect(res.body.branchId).to.equal(bru.getVar("marketplaceBranchId")); expect(res.body.serviceOfferingId).to.equal(bru.getVar("marketplaceOfferingId")); expect(res.body.position).to.equal(1); expect(res.body.estimatedWaitMin).to.equal(0); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

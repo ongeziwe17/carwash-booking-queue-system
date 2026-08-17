@@ -1,0 +1,10 @@
+info: { name: Call-next requires branch scope, type: http, seq: 18, tags: [ops, queue, validation] }
+http:
+  method: POST
+  url: "{{baseUrl}}/api/queue-entries/call-next"
+  auth: { type: bearer, token: "{{staffToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("returns missing-parameter error", function() { expect(res.status).to.equal(400); expect(res.body.code).to.equal("MISSING_PARAMETER"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

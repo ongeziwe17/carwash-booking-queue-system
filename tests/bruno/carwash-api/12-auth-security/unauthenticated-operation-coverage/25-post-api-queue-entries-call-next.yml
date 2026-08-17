@@ -8,7 +8,7 @@ info:
 
 http:
   method: POST
-  url: "{{baseUrl}}/api/queue-entries/call-next"
+  url: "{{baseUrl}}/api/queue-entries/call-next?branchId={{opsBranchId}}"
   headers:
     - name: Content-Type
       value: "application/json"

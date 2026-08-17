@@ -1,0 +1,10 @@
+info: { name: Blank queue branch filter is rejected, type: http, seq: 17, tags: [ops, queue, validation] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/queue-entries?branchId="
+  auth: { type: bearer, token: "{{staffToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("returns standard 400", function() { expect(res.status).to.equal(400); expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

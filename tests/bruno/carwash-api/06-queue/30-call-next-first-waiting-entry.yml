@@ -1,14 +1,14 @@
 info:
   name: Call next selects first waiting ordering entry
   type: http
-  seq: 30
+  seq: 33
   tags:
     - workflow
     - integrity
 
 http:
   method: POST
-  url: "{{baseUrl}}/api/queue-entries/call-next"
+  url: "{{baseUrl}}/api/queue-entries/call-next?branchId={{opsBranchId}}"
   auth:
     type: bearer
     token: "{{staffToken}}"

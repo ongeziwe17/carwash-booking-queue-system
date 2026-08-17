@@ -1,25 +1,29 @@
 package com.carwash.booking.application;
 
-import com.carwash.notification.application.NotificationManagementService;
-import com.carwash.queue.application.QueueOrderingService;
-
-import com.carwash.booking.application.BookingPolicyProperties;
 import com.carwash.booking.domain.Booking;
-import com.carwash.queue.domain.QueueEntry;
-import com.carwash.catalog.domain.Service;
-import com.carwash.identity.domain.User;
-import com.carwash.vehicle.domain.Vehicle;
-import com.carwash.booking.domain.BookingStatus;
-import com.carwash.queue.domain.QueueStatus;
 import com.carwash.booking.domain.BookingRepository;
-import com.carwash.notification.domain.NotificationRepository;
-import com.carwash.queue.domain.QueueEntryRepository;
-import com.carwash.catalog.domain.ServiceRepository;
+import com.carwash.booking.domain.BookingStatus;
+import com.carwash.catalog.application.ServiceDefinitionQuery;
+import com.carwash.catalog.application.ServiceDefinitionSnapshot;
+import com.carwash.catalog.application.ServiceOfferingQuery;
+import com.carwash.catalog.application.ServiceOfferingSnapshot;
+import com.carwash.catalog.domain.Service;
+import com.carwash.identity.domain.Role;
+import com.carwash.identity.domain.User;
 import com.carwash.identity.domain.UserRepository;
-import com.carwash.vehicle.domain.VehicleRepository;
-import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.marketplace.application.BranchSnapshot;
+import com.carwash.marketplace.application.MarketplaceQuery;
+import com.carwash.notification.application.NotificationManagementService;
+import com.carwash.notification.domain.NotificationRepository;
+import com.carwash.queue.application.QueueOrderingService;
+import com.carwash.queue.domain.QueueEntry;
+import com.carwash.queue.domain.QueueEntryRepository;
+import com.carwash.queue.domain.QueueStatus;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
+import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.vehicle.domain.Vehicle;
+import com.carwash.vehicle.domain.VehicleRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +40,9 @@ public class BookingManagementService implements BookingQuery {
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final VehicleRepository vehicleRepository;
-    private final ServiceRepository serviceRepository;
+    private final ServiceDefinitionQuery serviceDefinitionQuery;
+    private final ServiceOfferingQuery serviceOfferingQuery;
+    private final MarketplaceQuery marketplaceQuery;
     private final QueueEntryRepository queueEntryRepository;
     private final NotificationRepository notificationRepository;
     private final NotificationManagementService notificationManagementService;
@@ -46,36 +52,29 @@ public class BookingManagementService implements BookingQuery {
     private final BookingSlotPolicyService slotPolicy;
     private final Clock clock;
 
-
-    public BookingManagementService(BookingRepository bookingRepository, UserRepository userRepository,
-                                    VehicleRepository vehicleRepository, ServiceRepository serviceRepository,
-                                    QueueEntryRepository queueEntryRepository,
-                                    NotificationRepository notificationRepository,
-                                    NotificationManagementService notificationManagementService,
-                                    QueueOrderingService queueOrdering,
-                                    InMemoryDataCoordinator coordinator,
-                                    BookingPolicyProperties bookingPolicy,
-                                    Clock clock) {
-        this(bookingRepository, userRepository, vehicleRepository, serviceRepository,
-                queueEntryRepository, notificationRepository, notificationManagementService,
-                queueOrdering, coordinator, bookingPolicy,
-                new BookingSlotPolicyService(bookingRepository, bookingPolicy, clock), clock);
-    }
-
-    public BookingManagementService(BookingRepository bookingRepository, UserRepository userRepository,
-                                    VehicleRepository vehicleRepository, ServiceRepository serviceRepository,
-                                    QueueEntryRepository queueEntryRepository,
-                                    NotificationRepository notificationRepository,
-                                    NotificationManagementService notificationManagementService,
-                                    QueueOrderingService queueOrdering,
-                                    InMemoryDataCoordinator coordinator,
-                                    BookingPolicyProperties bookingPolicy,
-                                    BookingSlotPolicyService slotPolicy,
-                                    Clock clock) {
+    public BookingManagementService(
+            BookingRepository bookingRepository,
+            UserRepository userRepository,
+            VehicleRepository vehicleRepository,
+            ServiceDefinitionQuery serviceDefinitionQuery,
+            ServiceOfferingQuery serviceOfferingQuery,
+            MarketplaceQuery marketplaceQuery,
+            QueueEntryRepository queueEntryRepository,
+            NotificationRepository notificationRepository,
+            NotificationManagementService notificationManagementService,
+            QueueOrderingService queueOrdering,
+            InMemoryDataCoordinator coordinator,
+            BookingPolicyProperties bookingPolicy,
+            BookingSlotPolicyService slotPolicy,
+            Clock clock
+    ) {
         this.bookingRepository = Objects.requireNonNull(bookingRepository, "Booking repository is required");
         this.userRepository = Objects.requireNonNull(userRepository, "User repository is required");
         this.vehicleRepository = Objects.requireNonNull(vehicleRepository, "Vehicle repository is required");
-        this.serviceRepository = Objects.requireNonNull(serviceRepository, "Service repository is required");
+        this.serviceDefinitionQuery = Objects.requireNonNull(serviceDefinitionQuery,
+                "Service definition query is required");
+        this.serviceOfferingQuery = Objects.requireNonNull(serviceOfferingQuery, "Service offering query is required");
+        this.marketplaceQuery = Objects.requireNonNull(marketplaceQuery, "Marketplace query is required");
         this.queueEntryRepository = Objects.requireNonNull(queueEntryRepository, "Queue repository is required");
         this.notificationRepository = notificationRepository;
         this.notificationManagementService = notificationManagementService;
@@ -86,12 +85,21 @@ public class BookingManagementService implements BookingQuery {
         this.clock = Objects.requireNonNull(clock, "Application clock is required");
     }
 
-    public Booking createBooking(String bookingId, String userId, String vehicleId, String serviceId,
-                                 LocalDateTime scheduledDateTime, String specialRequest) {
-        User user = new User(); user.setUserId(userId);
-        Vehicle vehicle = new Vehicle(); vehicle.setVehicleId(vehicleId);
-        Service service = new Service(); service.setServiceId(serviceId);
-        return createBooking(new Booking(bookingId, user, vehicle, service, scheduledDateTime, specialRequest));
+    public Booking createBooking(
+            String bookingId,
+            String userId,
+            String vehicleId,
+            String branchId,
+            String serviceOfferingId,
+            LocalDateTime scheduledDateTime,
+            String specialRequest
+    ) {
+        User user = new User();
+        user.setUserId(userId);
+        Vehicle vehicle = new Vehicle();
+        vehicle.setVehicleId(vehicleId);
+        return createBooking(new Booking(
+                bookingId, user, vehicle, branchId, serviceOfferingId, null, scheduledDateTime, specialRequest));
     }
 
     public Booking createBooking(Booking booking) {
@@ -112,11 +120,37 @@ public class BookingManagementService implements BookingQuery {
     }
 
     public Booking findById(String bookingId) {
-        return coordinator.read(() -> requireBooking(bookingId));
+        return coordinator.read(() -> snapshotBooking(requireBooking(bookingId)));
     }
 
     public List<Booking> findAll() {
-        return coordinator.read(bookingRepository::findAll);
+        return findAll(null);
+    }
+
+    public List<Booking> findAll(String branchId) {
+        return coordinator.read(() -> {
+            List<Booking> source;
+            if (branchId == null) {
+                source = bookingRepository.findAll();
+            } else {
+                String normalizedBranchId = requireBranch(branchId).branchId();
+                source = bookingRepository.findByBranchId(normalizedBranchId);
+            }
+            return source.stream().map(this::snapshotBooking).toList();
+        });
+    }
+
+    @Override
+    public List<BookingSnapshot> findBookingSnapshots() {
+        return coordinator.read(() -> bookingRepository.findAll().stream().map(this::snapshot).toList());
+    }
+
+    @Override
+    public List<BookingSnapshot> findBookingSnapshotsByBranch(String branchId) {
+        return coordinator.read(() -> {
+            String normalizedBranchId = requireBranch(branchId).branchId();
+            return bookingRepository.findByBranchId(normalizedBranchId).stream().map(this::snapshot).toList();
+        });
     }
 
     @Override
@@ -141,7 +175,12 @@ public class BookingManagementService implements BookingQuery {
         return coordinator.read(() -> bookingRepository.existsByServiceId(serviceId));
     }
 
-    public Booking updateBooking(String bookingId, String vehicleId, String serviceId, String specialRequest) {
+    public Booking updateBooking(
+            String bookingId,
+            String vehicleId,
+            String serviceOfferingId,
+            String specialRequest
+    ) {
         return coordinator.write(() -> {
             Booking existing = requireBooking(bookingId);
             requireModifiableBooking(existing);
@@ -151,24 +190,30 @@ public class BookingManagementService implements BookingQuery {
             User owner = requireExistingOwner(existing);
             Vehicle vehicle = resolveVehicle(vehicleId);
             requireVehicleOwnedBy(vehicle, owner, "Vehicle does not belong to booking owner");
-            Service service = resolveService(serviceId);
-            requireActiveService(service);
+            ResolvedOffering resolved = resolveOperationalOffering(existing.getBranchId(), serviceOfferingId);
             slotPolicy.validateBookableSlot(
-                    bookingId, existing.getScheduledDateTime(), service, owner, vehicle);
+                    bookingId,
+                    existing.getScheduledDateTime(),
+                    resolved.offering().estimatedDurationMin(),
+                    existing.getBranchId(),
+                    owner,
+                    vehicle
+            );
 
             Vehicle originalVehicle = existing.getVehicle();
             Service originalService = existing.getService();
+            String originalOfferingId = existing.getServiceOfferingId();
             String originalSpecialRequest = existing.getSpecialRequest();
             try {
                 existing.setVehicle(vehicle);
-                existing.setService(service);
+                existing.changeServiceOffering(resolved.offering().offeringId(), resolved.service());
                 existing.setSpecialRequest(specialRequest);
                 if (!bookingRepository.update(existing)) {
                     throw new ResourceNotFoundException("Booking not found: " + bookingId);
                 }
             } catch (RuntimeException exception) {
                 existing.setVehicle(originalVehicle);
-                existing.setService(originalService);
+                existing.changeServiceOffering(originalOfferingId, originalService);
                 existing.setSpecialRequest(originalSpecialRequest);
                 throw exception;
             }
@@ -190,18 +235,28 @@ public class BookingManagementService implements BookingQuery {
             User owner = requireExistingOwner(booking);
             Vehicle vehicle = resolveCurrentVehicle(booking);
             requireVehicleOwnedBy(vehicle, owner, "Vehicle does not belong to booking owner");
-            Service service = resolveCurrentService(booking);
-            requireActiveService(service);
-            slotPolicy.validateBookableSlot(bookingId, scheduledDateTime, service, owner, vehicle);
+            ResolvedOffering resolved = resolveOperationalOffering(
+                    booking.getBranchId(), booking.getServiceOfferingId());
+            slotPolicy.validateBookableSlot(
+                    bookingId,
+                    scheduledDateTime,
+                    resolved.offering().estimatedDurationMin(),
+                    booking.getBranchId(),
+                    owner,
+                    vehicle
+            );
 
             LocalDateTime originalScheduledDateTime = booking.getScheduledDateTime();
+            Service originalService = booking.getService();
             try {
+                booking.setService(resolved.service());
                 booking.setScheduledDateTime(scheduledDateTime);
                 if (!bookingRepository.update(booking)) {
                     throw new ResourceNotFoundException("Booking not found: " + bookingId);
                 }
             } catch (RuntimeException exception) {
                 booking.setScheduledDateTime(originalScheduledDateTime);
+                booking.setService(originalService);
                 throw exception;
             }
 
@@ -230,7 +285,8 @@ public class BookingManagementService implements BookingQuery {
             LifecycleStateSnapshot.BookingState bookingState = LifecycleStateSnapshot.booking(booking);
             List<LifecycleStateSnapshot.QueueEntryState> queueStates = activeQueueEntry == null
                     ? List.of()
-                    : LifecycleStateSnapshot.queueEntries(queueEntryRepository.findActiveOrdered());
+                    : LifecycleStateSnapshot.queueEntries(
+                            queueEntryRepository.findActiveOrderedByBranch(booking.getBranchId()));
             boolean queueRemoved = false;
             try {
                 if (activeQueueEntry != null) {
@@ -249,7 +305,9 @@ public class BookingManagementService implements BookingQuery {
                 if (!bookingRepository.update(booking)) {
                     throw new ResourceNotFoundException("Booking not found: " + bookingId);
                 }
-                if (queueRemoved) queueOrdering.rebalanceActiveQueue();
+                if (queueRemoved) {
+                    queueOrdering.rebalanceActiveQueue(booking.getBranchId());
+                }
             } catch (RuntimeException exception) {
                 rollbackCancellation(exception, bookingState, queueStates);
                 throw exception;
@@ -269,11 +327,16 @@ public class BookingManagementService implements BookingQuery {
     public Booking confirmBooking(String bookingId) {
         return coordinator.write(() -> {
             Booking booking = requireBooking(bookingId);
+            resolveOperationalOffering(booking.getBranchId(), booking.getServiceOfferingId());
             if (booking.getStatus() == BookingStatus.CANCELLED) {
                 throw new BusinessRuleViolationException("Cancelled booking cannot be confirmed");
             }
-            if (!booking.confirm()) throw new BusinessRuleViolationException("Invalid booking status transition");
-            if (!bookingRepository.update(booking)) throw new ResourceNotFoundException("Booking not found: " + bookingId);
+            if (!booking.confirm()) {
+                throw new BusinessRuleViolationException("Invalid booking status transition");
+            }
+            if (!bookingRepository.update(booking)) {
+                throw new ResourceNotFoundException("Booking not found: " + bookingId);
+            }
             notifyCustomer(booking, "BOOKING_CONFIRMED", "Your booking has been confirmed.");
             return booking;
         });
@@ -286,7 +349,7 @@ public class BookingManagementService implements BookingQuery {
                 throw new BusinessRuleViolationException("Only cancelled bookings can be deleted");
             }
             boolean hasQueueEntry = booking.getQueueEntry() != null
-                    || queueEntryRepository != null && queueEntryRepository.existsByBookingId(bookingId);
+                    || queueEntryRepository.existsByBookingId(bookingId);
             if (hasQueueEntry) {
                 throw new BusinessRuleViolationException("Booking cannot be deleted while a queue entry references it");
             }
@@ -312,8 +375,12 @@ public class BookingManagementService implements BookingQuery {
     }
 
     private void validateAndResolveNewBooking(Booking booking) {
-        if (booking == null) throw new BusinessRuleViolationException("Booking is required");
-        if (isBlank(booking.getBookingId())) throw new BusinessRuleViolationException("Booking ID is required");
+        if (booking == null) {
+            throw new BusinessRuleViolationException("Booking is required");
+        }
+        if (isBlank(booking.getBookingId())) {
+            throw new BusinessRuleViolationException("Booking ID is required");
+        }
         if (bookingRepository.existsById(booking.getBookingId().trim())) {
             throw new BusinessRuleViolationException("Booking ID already exists");
         }
@@ -323,20 +390,79 @@ public class BookingManagementService implements BookingQuery {
         if (booking.getVehicle() == null || isBlank(booking.getVehicle().getVehicleId())) {
             throw new BusinessRuleViolationException("Vehicle is required");
         }
-        if (booking.getService() == null || isBlank(booking.getService().getServiceId())) {
-            throw new BusinessRuleViolationException("Service is required");
-        }
         User user = resolveUser(booking.getUser().getUserId());
         Vehicle vehicle = resolveVehicle(booking.getVehicle().getVehicleId());
-        Service service = resolveService(booking.getService().getServiceId());
-        requireActiveService(service);
         requireVehicleOwnedBy(vehicle, user, "Vehicle does not belong to selected user");
-        slotPolicy.validateBookableSlot(null, booking.getScheduledDateTime(), service, user, vehicle);
+        ResolvedOffering resolved = resolveOperationalOffering(
+                booking.getBranchId(), booking.getServiceOfferingId());
+        slotPolicy.validateBookableSlot(
+                null,
+                booking.getScheduledDateTime(),
+                resolved.offering().estimatedDurationMin(),
+                resolved.offering().branchId(),
+                user,
+                vehicle
+        );
         booking.setBookingId(booking.getBookingId().trim());
         booking.setUser(user);
         booking.setVehicle(vehicle);
-        booking.setService(service);
+        booking.assignOperationalScope(resolved.offering().branchId(), resolved.offering().offeringId());
+        booking.setService(resolved.service());
         booking.setCreatedAt(LocalDateTime.now(clock));
+    }
+
+    private ResolvedOffering resolveOperationalOffering(String branchId, String offeringId) {
+        BranchSnapshot branch = requireBranch(branchId);
+        if (!branch.effectiveActive()) {
+            throw new BusinessRuleViolationException(
+                    "Inactive branch or owning business cannot accept operational bookings");
+        }
+        String normalizedOfferingId = normalizeId(offeringId, "Service offering ID");
+        ServiceOfferingSnapshot offering = serviceOfferingQuery.findOfferingOptional(normalizedOfferingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Offering not found: " + normalizedOfferingId));
+        if (!branch.branchId().equals(offering.branchId())) {
+            throw new BusinessRuleViolationException("Service offering does not belong to the requested branch");
+        }
+        if (!offering.effectiveActive()) {
+            throw new BusinessRuleViolationException(
+                    "Inactive service offering or reusable service cannot be booked");
+        }
+        ServiceDefinitionSnapshot definition = serviceDefinitionQuery
+                .findServiceDefinitionOptional(offering.serviceId())
+                .orElseThrow(() -> new ResourceNotFoundException("Service not found: " + offering.serviceId()));
+        if (!definition.active()) {
+            throw new BusinessRuleViolationException("Inactive reusable service cannot be booked");
+        }
+        return new ResolvedOffering(offering, legacyService(definition));
+    }
+
+    private BranchSnapshot requireBranch(String branchId) {
+        String normalizedBranchId = normalizeId(branchId, "Branch ID");
+        return marketplaceQuery.findBranchOptional(normalizedBranchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Branch not found: " + normalizedBranchId));
+    }
+
+    private String normalizeId(String value, String field) {
+        String normalized = value == null ? null : value.trim();
+        if (normalized == null || normalized.isBlank()) {
+            throw new BusinessRuleViolationException(field + " is required");
+        }
+        if (normalized.length() > 64) {
+            throw new BusinessRuleViolationException(field + " must not exceed 64 characters");
+        }
+        return normalized;
+    }
+
+    private Service legacyService(ServiceDefinitionSnapshot definition) {
+        Service service = new Service();
+        service.setServiceId(definition.serviceId());
+        service.setServiceName(definition.serviceName());
+        service.setDescription(definition.description());
+        service.setPrice(definition.legacyDefaultPrice());
+        service.setEstimatedDurationMin(definition.legacyDefaultEstimatedDurationMin());
+        service.setActive(definition.active());
+        service.setCreatedAt(definition.createdAt());
+        return service;
     }
 
     private void requireModifiableBooking(Booking booking) {
@@ -377,7 +503,9 @@ public class BookingManagementService implements BookingQuery {
     }
 
     private Vehicle resolveVehicle(String vehicleId) {
-        if (isBlank(vehicleId)) throw new BusinessRuleViolationException("Vehicle ID is required");
+        if (isBlank(vehicleId)) {
+            throw new BusinessRuleViolationException("Vehicle ID is required");
+        }
         return vehicleRepository.findById(vehicleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + vehicleId));
     }
@@ -389,27 +517,10 @@ public class BookingManagementService implements BookingQuery {
         return resolveVehicle(booking.getVehicle().getVehicleId());
     }
 
-    private Service resolveService(String serviceId) {
-        if (isBlank(serviceId)) throw new BusinessRuleViolationException("Service ID is required");
-        return serviceRepository.findById(serviceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Service not found: " + serviceId));
-    }
-
-    private Service resolveCurrentService(Booking booking) {
-        if (booking.getService() == null || isBlank(booking.getService().getServiceId())) {
-            throw new BusinessRuleViolationException("Booking service is required");
-        }
-        return resolveService(booking.getService().getServiceId());
-    }
-
     private void requireVehicleOwnedBy(Vehicle vehicle, User owner, String message) {
         if (vehicle.getUserId() == null || !vehicle.getUserId().equals(owner.getUserId())) {
             throw new BusinessRuleViolationException(message);
         }
-    }
-
-    private void requireActiveService(Service service) {
-        if (!service.isActive()) throw new BusinessRuleViolationException("Inactive service cannot be booked");
     }
 
     private void validateCancellationRequest(Booking booking, String customerId) {
@@ -447,9 +558,11 @@ public class BookingManagementService implements BookingQuery {
                 .orElse(null);
     }
 
-    private void rollbackCancellation(RuntimeException failure,
-                                      LifecycleStateSnapshot.BookingState bookingState,
-                                      List<LifecycleStateSnapshot.QueueEntryState> queueStates) {
+    private void rollbackCancellation(
+            RuntimeException failure,
+            LifecycleStateSnapshot.BookingState bookingState,
+            List<LifecycleStateSnapshot.QueueEntryState> queueStates
+    ) {
         try {
             bookingState.restore();
             for (LifecycleStateSnapshot.QueueEntryState queueState : queueStates) {
@@ -486,7 +599,81 @@ public class BookingManagementService implements BookingQuery {
         }
     }
 
+    private BookingSnapshot snapshot(Booking booking) {
+        return new BookingSnapshot(
+                booking.getBookingId(),
+                booking.getUser() == null ? null : booking.getUser().getUserId(),
+                booking.getVehicle() == null ? null : booking.getVehicle().getVehicleId(),
+                booking.getBranchId(),
+                booking.getServiceOfferingId(),
+                booking.getService() == null ? null : booking.getService().getServiceId(),
+                booking.getScheduledDateTime(),
+                booking.getStatus(),
+                booking.getCreatedAt()
+        );
+    }
+
+    private Booking snapshotBooking(Booking source) {
+        Booking snapshot = new Booking();
+        snapshot.setBookingId(source.getBookingId());
+        snapshot.setUser(snapshotUser(source.getUser()));
+        snapshot.setVehicle(snapshotVehicle(source.getVehicle()));
+        snapshot.setService(snapshotService(source.getService()));
+        if (source.getBranchId() != null && source.getServiceOfferingId() != null) {
+            snapshot.assignOperationalScope(source.getBranchId(), source.getServiceOfferingId());
+        }
+        snapshot.setScheduledDateTime(source.getScheduledDateTime());
+        snapshot.setStatus(source.getStatus());
+        snapshot.setCreatedAt(source.getCreatedAt());
+        snapshot.setSpecialRequest(source.getSpecialRequest());
+        return snapshot;
+    }
+
+    private User snapshotUser(User source) {
+        if (source == null) return null;
+        User snapshot = new User();
+        snapshot.setUserId(source.getUserId());
+        snapshot.setFullName(source.getFullName());
+        snapshot.setEmail(source.getEmail());
+        snapshot.setPhone(source.getPhone());
+        snapshot.setAccountStatus(source.getAccountStatus());
+        snapshot.setCreatedAt(source.getCreatedAt());
+        snapshot.setLastLoginAt(source.getLastLoginAt());
+        snapshot.setRole(snapshotRole(source.getRole()));
+        return snapshot;
+    }
+
+    private Role snapshotRole(Role source) {
+        if (source == null) return null;
+        return new Role(source.getRoleId(), source.getRoleName(), source.getDescription(), source.getPermissions());
+    }
+
+    private Vehicle snapshotVehicle(Vehicle source) {
+        if (source == null) return null;
+        Vehicle snapshot = new Vehicle(
+                source.getVehicleId(), source.getPlateNumber(), source.getVehicleType(), source.getBrand(),
+                source.getModel(), source.getColor(), source.getNotes());
+        snapshot.setUserId(source.getUserId());
+        return snapshot;
+    }
+
+    private Service snapshotService(Service source) {
+        if (source == null) return null;
+        Service snapshot = new Service();
+        snapshot.setServiceId(source.getServiceId());
+        snapshot.setServiceName(source.getServiceName());
+        snapshot.setDescription(source.getDescription());
+        snapshot.setPrice(source.getPrice());
+        snapshot.setEstimatedDurationMin(source.getEstimatedDurationMin());
+        snapshot.setActive(source.isActive());
+        snapshot.setCreatedAt(source.getCreatedAt());
+        return snapshot;
+    }
+
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private record ResolvedOffering(ServiceOfferingSnapshot offering, Service service) {
     }
 }

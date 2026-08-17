@@ -61,25 +61,25 @@ The current backend does not include a frontend application, durable PostgreSQL 
 
 ### FR3: Booking System
 
-**Description:** The system allows bookings to be created and managed for valid user, vehicle, and service records.
+**Description:** The system requires each booking to reference a valid user-owned vehicle, Marketplace branch, and branch service offering, and preserves that scope through its lifecycle.
 
-**Status:** Implemented for backend workflows. Advanced slot/capacity rules need hardening.
+**Status:** Implemented for backend workflows. Marketplace-hours enforcement and configured-capacity availability remain future work.
 
 ### FR4: Queue Management
 
-**Description:** The system allows queue entries to be created, positioned, called, started, completed, and deleted.
+**Description:** The system derives queue branch/offering scope from an eligible booking and isolates positioning, waits, rebalance, call-next, and lifecycle operations by branch.
 
 **Status:** Implemented for backend workflows. Advanced capacity and operational rules need hardening.
 
 ### FR5: Notification Records
 
-**Description:** The system stores and retrieves in-app notification records.
+**Description:** The system stores and retrieves bounded in-app notification records with booking, branch, and service-offering context.
 
 **Status:** Implemented as records only. External SMS/email delivery is not implemented.
 
 ### FR6: Basic Reporting
 
-**Description:** The system provides a daily summary endpoint computed from current in-memory data.
+**Description:** The system provides a daily summary endpoint for exactly one branch or owning-business scope, computed with branch-local date semantics from current in-memory data.
 
 **Status:** Partially implemented. Rich dashboards, revenue reports, and production analytics are future work.
 
@@ -142,4 +142,4 @@ The current backend does not include a frontend application, durable PostgreSQL 
 
 - Current APIs are used for backend validation, local development, and automated tests.
 - Production use requires security, persistence, observability, and deployment hardening first.
-- The initial implementation assumes a single-location/non-tenant workflow until SaaS tenancy is introduced.
+- Branch-scoped operational filters and reports are implemented, but authorization remains global by role until SaaS tenant isolation is introduced.

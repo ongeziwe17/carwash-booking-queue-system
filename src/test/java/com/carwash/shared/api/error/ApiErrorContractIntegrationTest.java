@@ -42,7 +42,8 @@ class ApiErrorContractIntegrationTest extends ApiIntegrationTestSupport {
                   "bookingId": " ",
                   "userId": " ",
                   "vehicleId": "vehicle",
-                  "serviceId": "service",
+                  "branchId": "branch",
+                  "serviceOfferingId": "offering",
                   "scheduledDateTime": null
                 }
                 """;

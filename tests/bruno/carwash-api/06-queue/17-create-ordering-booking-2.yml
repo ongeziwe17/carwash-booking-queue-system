@@ -1,7 +1,7 @@
 info:
   name: Create second ordering booking
   type: http
-  seq: 17
+  seq: 20
   tags:
     - workflow
     - integrity
@@ -19,7 +19,8 @@ http:
         "bookingId": "{{queueOrderingBooking2Id}}",
         "userId": "{{customerUserId}}",
         "vehicleId": "{{customerVehicleId}}",
-        "serviceId": "{{queueOrderingService25Id}}",
+        "branchId": "{{opsBranchId}}",
+        "serviceOfferingId": "{{queueOrderingOffering25Id}}",
         "scheduledDateTime": "{{future28}}",
         "specialRequest": "QUEUE-002 second entry"
       }

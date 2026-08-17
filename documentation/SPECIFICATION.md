@@ -18,10 +18,10 @@ Implemented in the current backend:
 - User record management.
 - Vehicle registration, lookup, update, and deletion.
 - Service catalog creation, lookup, update, deletion, activation, and deactivation.
-- Booking creation, retrieval, update, confirmation, and cancellation.
-- Queue entry creation, retrieval, position update, call/start/complete transitions, and deletion.
-- In-app notification record lookup by user.
-- Basic daily summary reporting from current in-memory data.
+- Branch/offering-scoped booking creation, retrieval/filtering, same-branch offering update, rescheduling, confirmation, and cancellation.
+- Booking-derived queue scope with branch-filtered retrieval, ordering, rebalance/call-next, offering-duration waits, call/start/complete transitions, and deletion.
+- Bounded in-app notification record lookup by user with branch/offering context.
+- Branch- or business-scoped daily summaries from current in-memory data using branch-local dates.
 - Swagger/OpenAPI documentation.
 - Secure BCrypt credential storage and stateless JWT login/current-user APIs.
 - RBAC and ownership authorization for customer, staff, business-owner, and platform-admin workflows.
@@ -43,14 +43,15 @@ Implemented in the current backend:
 | FR-01 | Expose APIs for managing user records.                                                       | Implemented           |
 | FR-02 | Allow vehicle records to be created, retrieved, updated, deleted, and associated with users. | Implemented           |
 | FR-03 | Expose service catalog APIs for available wash services.                                     | Implemented           |
-| FR-04 | Allow booking creation for a customer, vehicle, and service, with confirm/cancel workflows.  | Implemented           |
-| FR-05 | Allow queue entries to be created, positioned, called, started, completed, and deleted.      | Implemented           |
+| FR-04 | Require canonical branch and offering scope for booking creation, preserve it through update/reschedule/confirm/cancel, and support branch filtering. | Implemented |
+| FR-05 | Derive queue scope from bookings and partition positioning, waits, rebalance, and call-next by branch. | Implemented |
 | FR-06 | Maintain in-app notification records and list recent records for a user.                     | Partially implemented |
 | FR-07 | Return consistent error responses for invalid requests and missing resources.                | Implemented           |
 | FR-08 | Provide a basic daily summary report from current data.                                      | Partially implemented |
 | FR-09 | Authenticate users with JWT and enforce current RBAC/ownership rules.                          | Implemented           |
 | FR-10 | Manage Marketplace businesses/branches and evaluate branch operating status from weekly hours and temporary closures. | Implemented |
 | FR-11 | Configure and discover branch-specific service price, duration, configured concurrent capacity, and activation state. | Implemented |
+| FR-12 | Include bounded branch/offering notification context and require explicit branch/business daily report scope. | Implemented |
 
 ## Functional Requirements: Planned/Future
 
@@ -60,7 +61,7 @@ Implemented in the current backend:
 | Security and operational audit logging.                            | Future security hardening       |
 | Tenant-scoped authorization for Marketplace businesses/branches.  | Future SaaS hardening           |
 | PostgreSQL persistence and migrations.                             | Planned persistence work        |
-| Branch-scoped bookings/queues/reports/availability and tenant isolation. | Future SaaS hardening      |
+| Branch-aware availability, configured remaining capacity, and tenant isolation. | Future Marketplace/SaaS work |
 | External email/SMS notification delivery.                          | Future product/platform work    |
 | Payments.                                                          | Future product/platform work    |
 | Ratings and feedback.                                              | Future product capability       |
@@ -81,15 +82,16 @@ Implemented in the current backend:
 
 ## Business Rules
 
-- A booking must reference valid customer, vehicle, and service records.
+- A booking must reference a valid customer-owned vehicle, Marketplace branch, Catalog offering belonging to that branch, and the offering-derived reusable service.
 - A vehicle plate number cannot be duplicated for the same owner.
 - The domain workflow constrains booking status transitions.
-- Queue entries must reference valid booking/service context as supported by the API workflow.
-- Queue positions should remain positive and drive estimated wait calculations.
-- Notification records preserve channel, message, user, booking, and delivery-status metadata, but external delivery is future work.
+- Queue entries inherit immutable branch/offering scope from an eligible confirmed booking; client service input is consistency-only and mismatches are rejected.
+- Queue positions, rebalancing, call-next, and offering-duration wait calculations are isolated by branch.
+- Notification records preserve bounded branch/offering context in addition to channel, message, user, booking, and delivery-status metadata; external delivery is future work.
+- Daily reports require exactly one branch or business scope and apply branch-local date boundaries; scopes do not enforce tenant authorization.
 - Branch open status requires active business/branch state, a matching half-open weekly interval in the branch timezone, and no active covering temporary closure; public discovery is a separate decision.
 - An offering is effectively active only when its stored state, reusable global service, branch, and owning business are active; discovery additionally requires branch public discovery. Configured concurrent capacity is not remaining capacity.
 
 ## Out of Current Scope
 
-The current backend implements in-memory Marketplace business/branch registration, branch scheduling, and branch service offering configuration/discovery, but does not implement PostgreSQL persistence, payments, tenant isolation, branch-scoped booking/queue operations, remaining-capacity calculation, branch-aware availability, external notification delivery, observability, frontend applications, or production SaaS readiness. Authentication, RBAC, ownership authorization, and secure credential storage are implemented foundations.
+The current backend implements in-memory Marketplace registration/scheduling/offerings and branch-scoped operational workflows, but does not implement PostgreSQL persistence, payments, tenant isolation, remaining-capacity calculation, branch-aware availability, external notification delivery, observability, frontend applications, or production SaaS readiness. Authentication, RBAC, ownership authorization, and secure credential storage are implemented foundations.

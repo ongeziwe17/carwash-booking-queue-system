@@ -18,7 +18,7 @@ http:
     data: |-
       {
         "vehicleId": "{{customerVehicleId}}",
-        "serviceId": "{{serviceId}}",
+        "serviceOfferingId": "{{opsOfferingId}}",
         "specialRequest": "ownership injection",
         "userId": "{{otherCustomerUserId}}"
       }

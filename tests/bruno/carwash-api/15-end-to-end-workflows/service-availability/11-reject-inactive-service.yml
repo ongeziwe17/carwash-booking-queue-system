@@ -1,7 +1,7 @@
 info:
   name: Reject inactive service availability
   type: http
-  seq: 11
+  seq: 13
   tags: [availability, workflow]
 
 http:

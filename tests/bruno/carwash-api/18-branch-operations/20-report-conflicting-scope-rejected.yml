@@ -1,0 +1,10 @@
+info: { name: Daily report rejects conflicting scopes, type: http, seq: 20, tags: [ops, report, validation] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/reports/daily-summary?date={{branchOpsReportDate}}&branchId={{marketplaceBranchId}}&businessId={{marketplaceBusinessId}}"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("rejects both scopes", function() { expect(res.status).to.equal(400); expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

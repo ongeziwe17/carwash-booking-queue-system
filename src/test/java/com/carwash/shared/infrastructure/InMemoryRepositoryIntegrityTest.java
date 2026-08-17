@@ -157,6 +157,7 @@ class InMemoryRepositoryIntegrityTest {
     }
 
     private static Booking booking(String id, User user, Vehicle vehicle, Service service) {
-        return new Booking(id, user, vehicle, service, TestDates.future(), "");
+        return new Booking(id, user, vehicle, "branch-test", "offering-" + id,
+                service, TestDates.future(), "");
     }
 }

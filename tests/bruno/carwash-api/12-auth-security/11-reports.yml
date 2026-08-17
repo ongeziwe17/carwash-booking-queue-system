@@ -8,7 +8,7 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/api/reports/daily-summary?date={{testDate}}"
+  url: "{{baseUrl}}/api/reports/daily-summary?date={{testDate}}&branchId={{opsBranchId}}"
   auth:
     type: none
 

@@ -1,6 +1,7 @@
 package com.carwash.queue.application;
 
 import com.carwash.testsupport.ServiceTestSupport;
+import com.carwash.catalog.application.UpdateServiceOfferingCommand;
 
 import com.carwash.notification.application.NotificationManagementService;
 import com.carwash.queue.application.QueueManagementService;
@@ -107,7 +108,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         QueueEntry third = createQueueEntry(confirmedBookingWithDuration(30, 43));
         queueService.updatePosition(third.getQueueEntryId(), 1);
 
-        QueueEntry selected = queueService.callNext();
+        QueueEntry selected = queueService.callNext(defaultBranchId);
 
         assertEquals(third.getQueueEntryId(), selected.getQueueEntryId());
         assertEquals(QueueStatus.CALLED, selected.getQueueStatus());
@@ -127,7 +128,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         List<Integer> waitsBefore = List.of(first.getEstimatedWaitMin(), second.getEstimatedWaitMin(),
                 third.getEstimatedWaitMin());
 
-        QueueEntry selected = queueService.callNext();
+        QueueEntry selected = queueService.callNext(defaultBranchId);
 
         assertEquals(third.getQueueEntryId(), selected.getQueueEntryId());
         assertEquals(QueueStatus.CALLED, selected.getQueueStatus());
@@ -151,14 +152,15 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         assertTrue(queueRepository.update(completed));
         assertTrue(queueRepository.update(exited));
 
-        assertEquals(waiting.getQueueEntryId(), queueService.callNext().getQueueEntryId());
+        assertEquals(waiting.getQueueEntryId(), queueService.callNext(defaultBranchId).getQueueEntryId());
     }
 
     @Test
     void callNextReturnsNotFoundWhenQueueIsEmpty() {
-        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, queueService::callNext);
+        ResourceNotFoundException exception = assertThrows(
+                ResourceNotFoundException.class, () -> queueService.callNext(defaultBranchId));
 
-        assertEquals("No waiting queue entry available", exception.getMessage());
+        assertEquals("No waiting queue entry available for branch: " + defaultBranchId, exception.getMessage());
     }
 
     @Test
@@ -169,9 +171,10 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         queueService.callQueueEntry(inProgress.getQueueEntryId());
         queueService.startService(inProgress.getQueueEntryId());
 
-        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, queueService::callNext);
+        ResourceNotFoundException exception = assertThrows(
+                ResourceNotFoundException.class, () -> queueService.callNext(defaultBranchId));
 
-        assertEquals("No waiting queue entry available", exception.getMessage());
+        assertEquals("No waiting queue entry available for branch: " + defaultBranchId, exception.getMessage());
     }
 
     @Test
@@ -224,10 +227,12 @@ class QueueManagementServiceTest extends ServiceTestSupport {
             }
         };
         queueService = new QueueManagementService(
-                queueRepository, bookingRepository, serviceRepository, failingNotifications, coordinator,
+                queueRepository, bookingRepository, serviceOfferingService, marketplaceService,
+                failingNotifications, coordinator,
                 queueOrdering, clock);
 
-        IllegalStateException exception = assertThrows(IllegalStateException.class, queueService::callNext);
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class, () -> queueService.callNext(defaultBranchId));
 
         assertEquals("notification persistence failed", exception.getMessage());
         assertEquals(QueueStatus.WAITING, queueEntry.getQueueStatus());
@@ -235,9 +240,10 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         assertQueueMetrics(queueEntry, originalPosition, originalWait);
 
         queueService = new QueueManagementService(
-                queueRepository, bookingRepository, serviceRepository, notificationService, coordinator,
+                queueRepository, bookingRepository, serviceOfferingService, marketplaceService,
+                notificationService, coordinator,
                 queueOrdering, clock);
-        assertEquals(queueEntry.getQueueEntryId(), queueService.callNext().getQueueEntryId());
+        assertEquals(queueEntry.getQueueEntryId(), queueService.callNext(defaultBranchId).getQueueEntryId());
     }
 
     @Test
@@ -327,18 +333,19 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         Service service = createService();
         User user = User.withEncodedPassword(ids.user(), "Missing", "missing@example.test", "123", "hash", null);
         Vehicle vehicle = new Vehicle(ids.vehicle(), ids.plate(), "Sedan", "Toyota", "Corolla", "Blue", "");
-        Booking missing = new Booking(ids.booking(), user, vehicle, service, TestDates.future(), "none");
+        Booking missing = new Booking(ids.booking(), user, vehicle, defaultBranchId, createOffering(service),
+                service, TestDates.future(), "none");
 
         assertThrows(ResourceNotFoundException.class,
                 () -> queueService.createQueueEntry(new QueueEntry(ids.queueEntry(), missing, service)));
     }
 
     @Test
-    void createQueueEntryRejectsUnknownService() {
+    void createQueueEntryRejectsMismatchedLegacyServiceField() {
         Booking booking = createConfirmedBooking();
         Service missing = new Service(ids.service(), "Missing", "desc", BigDecimal.TEN, 30);
 
-        assertThrows(ResourceNotFoundException.class,
+        assertThrows(BusinessRuleViolationException.class,
                 () -> queueService.createQueueEntry(new QueueEntry(ids.queueEntry(), booking, missing)));
     }
 
@@ -374,7 +381,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
                 () -> queueService.createQueueEntry(
                         new QueueEntry(ids.queueEntry(), booking, booking.getService())));
 
-        assertEquals("Inactive service cannot join the queue", exception.getMessage());
+        assertTrue(exception.getMessage().contains("Inactive service offering"));
         assertTrue(queueRepository.findAll().isEmpty());
         assertNull(booking.getQueueEntry());
     }
@@ -628,7 +635,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
                             throw new IllegalStateException("Concurrent start timed out");
                         }
                         try {
-                            return queueService.callNext().getQueueEntryId();
+                            return queueService.callNext(defaultBranchId).getQueueEntryId();
                         } catch (ResourceNotFoundException exception) {
                             return exception.getMessage();
                         }
@@ -640,7 +647,8 @@ class QueueManagementServiceTest extends ServiceTestSupport {
             for (Future<String> future : futures) outcomes.add(future.get(5, TimeUnit.SECONDS));
 
             assertEquals(1, outcomes.stream().filter(queueEntry.getQueueEntryId()::equals).count());
-            assertEquals(1, outcomes.stream().filter("No waiting queue entry available"::equals).count());
+            assertEquals(1, outcomes.stream()
+                    .filter(("No waiting queue entry available for branch: " + defaultBranchId)::equals).count());
             assertEquals(QueueStatus.CALLED, queueEntry.getQueueStatus());
             assertEquals(1, notificationRepository.findByBookingId(queueEntry.getBooking().getBookingId()).stream()
                     .filter(notification -> "QUEUE_CALLED".equals(notification.getType())).count());
@@ -665,7 +673,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
                         if (!start.await(5, TimeUnit.SECONDS)) {
                             throw new IllegalStateException("Concurrent start timed out");
                         }
-                        return queueService.callNext().getQueueEntryId();
+                        return queueService.callNext(defaultBranchId).getQueueEntryId();
                     })).toList();
             assertTrue(ready.await(5, TimeUnit.SECONDS));
             start.countDown();
@@ -743,6 +751,9 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         Booking booking = createConfirmedBooking(TestDates.futureDays(futureDay));
         booking.getService().setEstimatedDurationMin(duration);
         assertTrue(serviceRepository.update(booking.getService()));
+        serviceOfferingService.updateOffering(
+                booking.getServiceOfferingId(),
+                new UpdateServiceOfferingCommand(booking.getService().getPrice(), duration, 2));
         return booking;
     }
 

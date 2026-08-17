@@ -1,7 +1,7 @@
 info:
   name: Reject inactive matching service from queue
   type: http
-  seq: 10
+  seq: 11
   tags:
     - queue-eligibility
     - integrity

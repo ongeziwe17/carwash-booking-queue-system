@@ -48,14 +48,14 @@ Every Spring/API integration test now extends `ApiIntegrationTestSupport`, which
 - focused API/authentication clients and fixture builders
 - reusable standard-error and privacy assertions
 
-Before every integration-test method, `InMemoryTestDataCleaner` performs one `InMemoryDataCoordinator.write(...)` operation and deletes current records through repository APIs in dependency order. The current order begins with Catalog offerings, Marketplace closures/schedules, branches/businesses, then notifications, queue entries, bookings, vehicles, reusable services, and users so no dependent outlives its owner.
+Before every integration-test method, `InMemoryTestDataCleaner` performs one `InMemoryDataCoordinator.write(...)` operation and deletes current records through repository APIs in dependency order so no dependent outlives its owner.
 
-1. branch service offerings
-2. branch temporary closures and operating schedules
-3. Marketplace branches and businesses
-4. notifications
-5. queue entries
-6. bookings
+1. notifications
+2. queue entries
+3. bookings
+4. branch service offerings
+5. branch temporary closures and operating schedules
+6. Marketplace branches and businesses
 7. vehicles
 8. reusable global services
 9. users

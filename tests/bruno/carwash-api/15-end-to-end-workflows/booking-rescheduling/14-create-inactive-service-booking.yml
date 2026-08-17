@@ -1,7 +1,7 @@
 info:
   name: Create booking before service deactivation
   type: http
-  seq: 14
+  seq: 15
   tags: [workflow, customer]
 http:
   method: POST
@@ -14,7 +14,8 @@ http:
         "bookingId": "{{rescheduleInactiveBookingId}}",
         "userId": "{{customerUserId}}",
         "vehicleId": "{{customerVehicleId}}",
-        "serviceId": "{{rescheduleServiceId}}",
+        "branchId": "{{opsBranchId}}",
+        "serviceOfferingId": "{{rescheduleOfferingId}}",
         "scheduledDateTime": "{{future41}}",
         "specialRequest": "inactive service reschedule"
       }

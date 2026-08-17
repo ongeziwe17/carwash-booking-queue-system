@@ -11,9 +11,12 @@ public interface BookingRepository extends Repository<Booking, String> {
     List<Booking> findByUserId(String userId);
     List<Booking> findByVehicleId(String vehicleId);
     List<Booking> findByServiceId(String serviceId);
+    List<Booking> findByBranchId(String branchId);
+    List<Booking> findByServiceOfferingId(String serviceOfferingId);
     List<Booking> findByScheduledDateTime(LocalDateTime scheduledDateTime);
 
     boolean existsByUserId(String userId);
     boolean existsByVehicleId(String vehicleId);
     boolean existsByServiceId(String serviceId);
+    boolean existsByServiceOfferingId(String serviceOfferingId);
 }

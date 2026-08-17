@@ -18,7 +18,8 @@ http:
         "bookingId": "full-slot-b-{{runId}}",
         "userId": "{{otherCustomerUserId}}",
         "vehicleId": "{{otherCustomerVehicleId}}",
-        "serviceId": "{{serviceId}}",
+        "branchId": "{{opsBranchId}}",
+        "serviceOfferingId": "{{opsOfferingId}}",
         "scheduledDateTime": "{{future15}}",
         "specialRequest": "full slot"
       }

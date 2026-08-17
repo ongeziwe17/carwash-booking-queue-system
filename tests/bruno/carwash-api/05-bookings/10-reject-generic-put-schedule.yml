@@ -1,7 +1,7 @@
 info:
   name: Generic booking update rejects schedule mutation
   type: http
-  seq: 10
+  seq: 11
   tags:
     - customer
     - integrity
@@ -18,7 +18,7 @@ http:
     data: |-
       {
         "vehicleId": "{{customerVehicleId}}",
-        "serviceId": "{{serviceId}}",
+        "serviceOfferingId": "{{opsOfferingId}}",
         "scheduledDateTime": "{{future4}}",
         "specialRequest": "schedule bypass attempt"
       }

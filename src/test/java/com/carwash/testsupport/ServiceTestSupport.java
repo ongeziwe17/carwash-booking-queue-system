@@ -4,6 +4,12 @@ import com.carwash.booking.application.AvailabilityService;
 import com.carwash.booking.application.BookingManagementService;
 import com.carwash.booking.application.BookingSlotPolicyService;
 import com.carwash.catalog.application.ServiceCatalogService;
+import com.carwash.catalog.application.CreateServiceOfferingCommand;
+import com.carwash.catalog.application.ServiceDefinitionUsageQuery;
+import com.carwash.catalog.application.ServiceOfferingService;
+import com.carwash.marketplace.application.CreateBranchCommand;
+import com.carwash.marketplace.application.MarketplaceManagementService;
+import com.carwash.marketplace.application.RegisterBusinessCommand;
 import com.carwash.identity.application.UserManagementService;
 import com.carwash.notification.application.NotificationManagementService;
 import com.carwash.queue.application.QueueManagementService;
@@ -27,6 +33,8 @@ import com.carwash.notification.infrastructure.InMemoryNotificationRepository;
 import com.carwash.queue.infrastructure.InMemoryQueueEntryRepository;
 import com.carwash.catalog.infrastructure.InMemoryServiceRepository;
 import com.carwash.catalog.infrastructure.InMemoryServiceOfferingRepository;
+import com.carwash.marketplace.infrastructure.InMemoryCarWashBranchRepository;
+import com.carwash.marketplace.infrastructure.InMemoryCarWashBusinessRepository;
 import com.carwash.identity.infrastructure.InMemoryUserRepository;
 import com.carwash.vehicle.infrastructure.InMemoryVehicleRepository;
 import com.carwash.access.application.UserCredentialService;
@@ -48,6 +56,8 @@ public abstract class ServiceTestSupport {
     protected InMemoryVehicleRepository vehicleRepository;
     protected InMemoryServiceRepository serviceRepository;
     protected InMemoryServiceOfferingRepository serviceOfferingRepository;
+    protected InMemoryCarWashBusinessRepository businessRepository;
+    protected InMemoryCarWashBranchRepository branchRepository;
     protected InMemoryBookingRepository bookingRepository;
     protected InMemoryQueueEntryRepository queueRepository;
     protected InMemoryNotificationRepository notificationRepository;
@@ -56,6 +66,8 @@ public abstract class ServiceTestSupport {
     protected UserManagementService userService;
     protected VehicleManagementService vehicleService;
     protected ServiceCatalogService catalogService;
+    protected MarketplaceManagementService marketplaceService;
+    protected ServiceOfferingService serviceOfferingService;
     protected BookingManagementService bookingService;
     protected BookingSlotPolicyService bookingSlotPolicy;
     protected AvailabilityService availabilityService;
@@ -67,6 +79,8 @@ public abstract class ServiceTestSupport {
     protected TestIdFactory ids;
     protected Clock clock;
     protected BookingPolicyProperties bookingPolicy;
+    protected String defaultBusinessId;
+    protected String defaultBranchId;
 
     @BeforeEach
     protected final void createFreshServiceGraph(TestInfo testInfo) {
@@ -78,6 +92,8 @@ public abstract class ServiceTestSupport {
         vehicleRepository = new InMemoryVehicleRepository();
         serviceRepository = new InMemoryServiceRepository();
         serviceOfferingRepository = new InMemoryServiceOfferingRepository();
+        businessRepository = new InMemoryCarWashBusinessRepository();
+        branchRepository = new InMemoryCarWashBranchRepository();
         bookingRepository = new InMemoryBookingRepository();
         queueRepository = new InMemoryQueueEntryRepository();
         notificationRepository = new InMemoryNotificationRepository();
@@ -90,10 +106,25 @@ public abstract class ServiceTestSupport {
         userService = new UserManagementService(userRepository, credentialService,
                 vehicleRepository, bookingRepository, notificationRepository, coordinator);
         vehicleService = new VehicleManagementService(vehicleRepository, userRepository, bookingRepository, coordinator);
-        queueOrdering = new QueueOrderingService(
-                queueRepository, coordinator, new QueuePolicyProperties(Duration.ofMinutes(10)));
+        marketplaceService = new MarketplaceManagementService(
+                businessRepository, branchRepository, coordinator, clock);
+        ServiceDefinitionUsageQuery serviceUsage = new ServiceDefinitionUsageQuery() {
+            @Override
+            public boolean referencedByBooking(String serviceId) {
+                return bookingRepository.existsByServiceId(serviceId);
+            }
+
+            @Override
+            public boolean referencedByQueue(String serviceId) {
+                return queueRepository.existsByServiceId(serviceId);
+            }
+        };
         catalogService = new ServiceCatalogService(
-                serviceRepository, serviceOfferingRepository, bookingRepository, queueRepository, coordinator, queueOrdering);
+                serviceRepository, serviceOfferingRepository, serviceUsage, coordinator);
+        serviceOfferingService = new ServiceOfferingService(
+                serviceOfferingRepository, serviceRepository, marketplaceService, coordinator, clock);
+        queueOrdering = new QueueOrderingService(
+                queueRepository, coordinator, new QueuePolicyProperties(Duration.ofMinutes(10)), serviceOfferingService);
         notificationService = new NotificationManagementService(
                 notificationRepository, userRepository, bookingRepository, coordinator, notificationIds,
                 new NotificationPolicyProperties(10), clock);
@@ -102,13 +133,15 @@ public abstract class ServiceTestSupport {
         availabilityService = new AvailabilityService(
                 serviceRepository, bookingSlotPolicy, bookingPolicy, coordinator);
         bookingService = new BookingManagementService(
-                bookingRepository, userRepository, vehicleRepository, serviceRepository,
+                bookingRepository, userRepository, vehicleRepository, catalogService,
+                serviceOfferingService, marketplaceService,
                 queueRepository, notificationRepository, notificationService, queueOrdering, coordinator,
                 bookingPolicy, bookingSlotPolicy, clock);
         queueService = new QueueManagementService(
-                queueRepository, bookingRepository, serviceRepository, notificationService, coordinator,
+                queueRepository, bookingRepository, serviceOfferingService, marketplaceService,
+                notificationService, coordinator,
                 queueOrdering, clock);
-        reportService = new DailySummaryReportService(bookingService, queueService, coordinator);
+        reportService = new DailySummaryReportService(bookingService, queueService, marketplaceService, coordinator);
     }
 
     protected User registerUser() {
@@ -135,11 +168,34 @@ public abstract class ServiceTestSupport {
                 ids.service(), "Premium Wash", "integration test", BigDecimal.TEN, 30));
     }
 
+    protected String createOffering(com.carwash.catalog.domain.Service service) {
+        String offeringId = ids.offering();
+        serviceOfferingService.createOffering(ensureDefaultBranch(), new CreateServiceOfferingCommand(
+                offeringId, service.getServiceId(), service.getPrice(), service.getEstimatedDurationMin(), 2));
+        return offeringId;
+    }
+
     protected Booking newBookingWithFixture(LocalDateTime scheduledDateTime) {
         User user = registerUser();
         Vehicle vehicle = createVehicle(user);
         com.carwash.catalog.domain.Service service = createService();
-        return new Booking(ids.booking(), user, vehicle, service, scheduledDateTime, "none");
+        String branchId = ensureDefaultBranch();
+        String offeringId = createOffering(service);
+        return new Booking(
+                ids.booking(), user, vehicle, branchId, offeringId, service, scheduledDateTime, "none");
+    }
+
+    protected String ensureDefaultBranch() {
+        if (defaultBranchId != null) return defaultBranchId;
+        defaultBusinessId = ids.business();
+        marketplaceService.registerBusiness(new RegisterBusinessCommand(
+                defaultBusinessId, "Test Car Wash", ids.emailFor(defaultBusinessId), "+27821234567", null));
+        defaultBranchId = ids.branch();
+        marketplaceService.createBranch(defaultBusinessId, new CreateBranchCommand(
+                defaultBranchId, "Test Branch", "1 Test Street", null, "Cape Town", "Western Cape",
+                "8001", "ZA", new BigDecimal("-33.9249"), new BigDecimal("18.4241"),
+                "Africa/Johannesburg", true));
+        return defaultBranchId;
     }
 
     protected Booking createSavedBooking() {

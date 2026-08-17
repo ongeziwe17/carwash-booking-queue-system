@@ -8,11 +8,11 @@ Spring Boot backend foundation for car wash booking, queue management, and Marke
 - Stateless JWT authentication and role-based authorization.
 - Vehicle management with ownership and duplicate-plate validation.
 - Service catalogue management with activation workflows.
-- Booking management with ownership, lifecycle, time, capacity, and vehicle validation.
+- Branch-scoped booking management with canonical service offerings, ownership, lifecycle, time, capacity, and vehicle validation.
 - Read-only single-location service availability with configured operating hours, interval slots, service duration, and remaining global capacity.
-- Queue lifecycle operations.
-- In-app notification lookup.
-- Daily summary reporting.
+- Branch-partitioned queue lifecycle, ordering, call-next, and offering-duration wait estimation.
+- In-app notification lookup with bounded branch/offering context.
+- Explicit branch- or business-scoped daily summary reporting.
 - Marketplace business/branch registration, bounded lifecycle management, coordinates, timezones, and basic active/public branch discovery.
 - Marketplace branch scheduling with atomic weekly intervals, overnight/week-boundary support, temporary closure history, and explicit-instant open-status decisions.
 - Catalog-owned branch service offerings with independent price, duration, configured concurrent capacity, lifecycle, and parent-aware discovery.
@@ -24,7 +24,7 @@ Spring Boot backend foundation for car wash booking, queue management, and Marke
 - Storage is in-memory and is lost when the application restarts.
 - Staff and business-owner operational access remains global until tenant isolation is implemented.
 - External SMS/email delivery is not implemented.
-- Payments, branch-aware booking/availability/queue operations, PostgreSQL, production observability, and deployment hardening remain future work.
+- Payments, branch-aware availability, configured-capacity calculations, PostgreSQL, production observability, and deployment hardening remain future work.
 - The application does not yet expose dedicated Actuator liveness or readiness endpoints.
 
 ## Tech stack
@@ -146,7 +146,7 @@ Start from a clean build directory and run the complete release-gate verificatio
 
 Tests use the dedicated `test` Spring profile from `src/test/resources/application-test.properties`. It contains only deterministic test-safe configuration, disables bootstrap administration, lowers BCrypt cost for test execution, and uses a clearly test-only signing key. Tests do **not** require a developer `.env` file.
 
-Every Spring API integration test inherits the shared test foundation and begins with empty in-memory application data. Cleanup happens inside one `InMemoryDataCoordinator` write operation in dependency order: Catalog offerings, Marketplace closures/schedules, branches/businesses, notifications, queue entries, bookings, vehicles, services, then users. The Spring application context is reused; `@DirtiesContext` is not the default isolation mechanism.
+Every Spring API integration test inherits the shared test foundation and begins with empty in-memory application data. Cleanup happens inside one `InMemoryDataCoordinator` write operation in dependency order: notifications, queue entries, bookings, Catalog offerings, Marketplace closures/schedules, branches/businesses, vehicles, services, then users. The Spring application context is reused; `@DirtiesContext` is not the default isolation mechanism.
 
 Integration fixtures use a fresh `TestIdFactory` per test method. IDs are readable and local to that test, for example `bookingworkflowintegrationtest-create-user-001`, rather than global IDs such as `u1` or timestamp-only values. Notification IDs are generated through an injectable abstraction; integration tests reset only the test implementation before each method while production exposes no reset operation.
 
