@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -226,7 +227,7 @@ public class BookingManagementService implements BookingQuery {
         return coordinator.write(() -> {
             Booking booking = requireBooking(bookingId);
             requireReschedulableBooking(booking);
-            LocalDateTime now = LocalDateTime.now(clock);
+            LocalDateTime now = currentBranchLocalDateTime(booking);
             requireCurrentFutureSchedule(booking, now);
             requireOpenReschedulingWindow(booking, now);
             if (queueEntryRepository.existsActiveByBookingId(bookingId)) {
@@ -531,7 +532,7 @@ public class BookingManagementService implements BookingQuery {
         if (booking.getStatus() == BookingStatus.CANCELLED) {
             throw new BusinessRuleViolationException("Cancelled booking cannot be cancelled again");
         }
-        LocalDateTime now = LocalDateTime.now(clock);
+        LocalDateTime now = currentBranchLocalDateTime(booking);
         if (booking.getScheduledDateTime() == null || !now.isBefore(booking.getScheduledDateTime())) {
             throw new BusinessRuleViolationException("Only future bookings can be cancelled");
         }
@@ -547,6 +548,11 @@ public class BookingManagementService implements BookingQuery {
                 .filter(queueEntry -> queueEntry.getQueueStatus().isActive())
                 .findFirst()
                 .orElse(null);
+    }
+
+    private LocalDateTime currentBranchLocalDateTime(Booking booking) {
+        BranchSnapshot branch = requireBranch(booking.getBranchId());
+        return LocalDateTime.ofInstant(clock.instant(), ZoneId.of(branch.timezone()));
     }
 
     private void rollbackCancellation(
