@@ -50,6 +50,7 @@ public class BookingManagementService implements BookingQuery {
     private final InMemoryDataCoordinator coordinator;
     private final BookingPolicyProperties bookingPolicy;
     private final BookingSlotPolicyService slotPolicy;
+    private final BranchAvailabilityDecisionService branchAvailability;
     private final Clock clock;
 
     public BookingManagementService(
@@ -66,6 +67,7 @@ public class BookingManagementService implements BookingQuery {
             InMemoryDataCoordinator coordinator,
             BookingPolicyProperties bookingPolicy,
             BookingSlotPolicyService slotPolicy,
+            BranchAvailabilityDecisionService branchAvailability,
             Clock clock
     ) {
         this.bookingRepository = Objects.requireNonNull(bookingRepository, "Booking repository is required");
@@ -82,6 +84,8 @@ public class BookingManagementService implements BookingQuery {
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
         this.bookingPolicy = Objects.requireNonNull(bookingPolicy, "Booking policy is required");
         this.slotPolicy = Objects.requireNonNull(slotPolicy, "Booking slot policy is required");
+        this.branchAvailability = Objects.requireNonNull(branchAvailability,
+                "Branch availability decision service is required");
         this.clock = Objects.requireNonNull(clock, "Application clock is required");
     }
 
@@ -191,14 +195,11 @@ public class BookingManagementService implements BookingQuery {
             Vehicle vehicle = resolveVehicle(vehicleId);
             requireVehicleOwnedBy(vehicle, owner, "Vehicle does not belong to booking owner");
             ResolvedOffering resolved = resolveOperationalOffering(existing.getBranchId(), serviceOfferingId);
-            slotPolicy.validateBookableSlot(
-                    bookingId,
-                    existing.getScheduledDateTime(),
-                    resolved.offering().estimatedDurationMin(),
-                    existing.getBranchId(),
-                    owner,
-                    vehicle
-            );
+            slotPolicy.validateCustomerVehicleConflict(
+                    bookingId, existing.getScheduledDateTime(), existing.getBranchId(), owner, vehicle);
+            branchAvailability.requireAvailableLocal(
+                    existing.getBranchId(), resolved.offering().offeringId(),
+                    existing.getScheduledDateTime(), bookingId);
 
             Vehicle originalVehicle = existing.getVehicle();
             Service originalService = existing.getService();
@@ -237,14 +238,10 @@ public class BookingManagementService implements BookingQuery {
             requireVehicleOwnedBy(vehicle, owner, "Vehicle does not belong to booking owner");
             ResolvedOffering resolved = resolveOperationalOffering(
                     booking.getBranchId(), booking.getServiceOfferingId());
-            slotPolicy.validateBookableSlot(
-                    bookingId,
-                    scheduledDateTime,
-                    resolved.offering().estimatedDurationMin(),
-                    booking.getBranchId(),
-                    owner,
-                    vehicle
-            );
+            slotPolicy.validateCustomerVehicleConflict(
+                    bookingId, scheduledDateTime, booking.getBranchId(), owner, vehicle);
+            branchAvailability.requireAvailableLocal(
+                    booking.getBranchId(), resolved.offering().offeringId(), scheduledDateTime, bookingId);
 
             LocalDateTime originalScheduledDateTime = booking.getScheduledDateTime();
             try {
@@ -392,14 +389,11 @@ public class BookingManagementService implements BookingQuery {
         requireVehicleOwnedBy(vehicle, user, "Vehicle does not belong to selected user");
         ResolvedOffering resolved = resolveOperationalOffering(
                 booking.getBranchId(), booking.getServiceOfferingId());
-        slotPolicy.validateBookableSlot(
-                null,
-                booking.getScheduledDateTime(),
-                resolved.offering().estimatedDurationMin(),
-                resolved.offering().branchId(),
-                user,
-                vehicle
-        );
+        slotPolicy.validateCustomerVehicleConflict(
+                null, booking.getScheduledDateTime(), resolved.offering().branchId(), user, vehicle);
+        branchAvailability.requireAvailableLocal(
+                resolved.offering().branchId(), resolved.offering().offeringId(),
+                booking.getScheduledDateTime(), null);
         booking.setBookingId(booking.getBookingId().trim());
         booking.setUser(user);
         booking.setVehicle(vehicle);

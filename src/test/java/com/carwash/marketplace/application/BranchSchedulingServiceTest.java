@@ -116,6 +116,43 @@ class BranchSchedulingServiceTest {
     }
 
     @Test
+    void completeServiceWindowMustStayInsideContinuousHoursAndAvoidAnyClosureOverlap() {
+        createBranch("branch-window", "Africa/Johannesburg", true);
+        replaceWithMondayHours("branch-window");
+        Instant startsAt = Instant.parse("2030-01-07T08:00:00Z");
+
+        assertTrue(scheduling.getServiceWindowStatus(
+                "branch-window", startsAt, startsAt.plusSeconds(30 * 60)).open());
+        assertFalse(scheduling.getServiceWindowStatus(
+                "branch-window", Instant.parse("2030-01-07T14:45:00Z"),
+                Instant.parse("2030-01-07T15:15:00Z")).withinWeeklyHours());
+
+        scheduling.createTemporaryClosure("branch-window", new CreateTemporaryBranchClosureCommand(
+                "closure-window", startsAt.plusSeconds(15 * 60), startsAt.plusSeconds(20 * 60), "Short closure"));
+        BranchServiceWindowSnapshot closed = scheduling.getServiceWindowStatus(
+                "branch-window", startsAt, startsAt.plusSeconds(30 * 60));
+        assertTrue(closed.withinWeeklyHours());
+        assertTrue(closed.temporarilyClosed());
+        assertFalse(closed.open());
+    }
+
+    @Test
+    void completeServiceWindowSupportsOvernightHoursAndAdjacentIntervals() {
+        createBranch("branch-overnight", "Africa/Johannesburg", true);
+        scheduling.replaceOperatingSchedule("branch-overnight", new ReplaceOperatingScheduleCommand(List.of(
+                new WeeklyOperatingIntervalCommand(
+                        DayOfWeek.MONDAY, LocalTime.of(20, 0), LocalTime.of(23, 0)),
+                new WeeklyOperatingIntervalCommand(
+                        DayOfWeek.MONDAY, LocalTime.of(23, 0), LocalTime.of(2, 0))
+        )));
+
+        assertTrue(scheduling.getServiceWindowStatus(
+                "branch-overnight",
+                Instant.parse("2030-01-07T19:30:00Z"),
+                Instant.parse("2030-01-07T23:30:00Z")).open());
+    }
+
+    @Test
     void duplicateAndOverlappingActiveClosuresAreRejectedWhileAdjacencyAndCancelledReplacementAreAllowed() {
         createBranch("branch-za", "Africa/Johannesburg", true);
         Instant firstStart = Instant.parse("2030-01-07T08:00:00Z");

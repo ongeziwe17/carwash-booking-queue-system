@@ -8,6 +8,7 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 | `POST` | `/api/auth/login` | ✅ | ✅ | N/A — public endpoint | N/A — public or no wrong-role case | N/A — not user-owned | N/A — no state/dependency mutation | ✅ |
 | `GET` | `/api/auth/me` | ✅ | N/A — no request body/typed input case | ✅ | N/A — public or no wrong-role case | N/A — not user-owned | N/A — no state/dependency mutation | ✅ |
 | `GET` | `/api/availability` | ✅ | ✅ | ✅ | N/A — all current roles have SERVICE_READ | N/A — service/date capacity view | ✅ | ✅ |
+| `GET` | `/api/availability/branches` | ✅ | ✅ — required instant/service, coordinate pair, radius | ✅ | N/A — all current roles have SERVICE_READ | N/A — public discovery view | ✅ — lifecycle/hours/closure/offering capacity | ✅ |
 | `GET` | `/api/bookings` | ✅ | ✅ — invalid/unknown branch filter | ✅ | ✅ | N/A — filter is not tenant authorization | ✅ — no cross-branch leakage | ✅ |
 | `POST` | `/api/bookings` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `DELETE` | `/api/bookings/{id}` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | ✅ | ✅ | N/A — not needed in multi-step journey |
@@ -74,14 +75,14 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 
 ## Totals
 
-- API operations: **67**
-- Happy-path functional coverage: **67/67**
-- 401 coverage: **65/65 protected operations** (2 public operations are N/A)
+- API operations: **68**
+- Happy-path functional coverage: **68/68**
+- 401 coverage: **66/66 protected operations** (2 public operations are N/A)
 - RBAC/403 applicability covered: **57 operations/capabilities**
 - Ownership/identity applicability covered: **16 operations**
-- Validation applicability covered: **29 operations**
-- HTTP-visible integrity applicability covered: **47 operations**
-- Operations used in multi-step workflows: **56**
-- Bruno requests/tests: **505 requests / 1,650 tests**
+- Validation applicability covered: **30 operations**
+- HTTP-visible integrity applicability covered: **48 operations**
+- Operations used in multi-step workflows: **57**
+- Bruno requests/tests: **512 requests / 1,664 tests**
 
 The full authorization suite also exercises each significant role/capability allow/deny cell rather than relying only on per-operation counts.

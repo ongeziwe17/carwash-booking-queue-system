@@ -3,6 +3,8 @@ package com.carwash.workflow;
 import com.carwash.booking.api.dto.CreateBookingRequest;
 import com.carwash.catalog.api.dto.CreateServiceOfferingRequest;
 import com.carwash.marketplace.api.dto.CreateBranchRequest;
+import com.carwash.marketplace.api.dto.ReplaceOperatingHoursRequest;
+import com.carwash.marketplace.api.dto.WeeklyOperatingIntervalRequest;
 import com.carwash.queue.api.dto.CreateQueueEntryRequest;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.BookingApiFixture;
@@ -13,6 +15,7 @@ import org.springframework.http.MediaType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -34,6 +37,9 @@ class BranchScopedOperationsWorkflowIntegrationTest extends ApiIntegrationTestSu
                 "8001", "ZA", new BigDecimal("-33.9250"), new BigDecimal("18.4250"),
                 "Africa/Johannesburg", true);
         api.createBranch(resources.business().businessId(), branchB).andExpect(status().isCreated());
+        api.replaceOperatingHours(branchB.branchId(), new ReplaceOperatingHoursRequest(java.util.List.of(
+                new WeeklyOperatingIntervalRequest(scheduled.getDayOfWeek(), LocalTime.of(8, 0), LocalTime.of(17, 0))
+        ))).andExpect(status().isOk());
         CreateServiceOfferingRequest offeringB = new CreateServiceOfferingRequest(
                 ids.offering(), resources.service().serviceId(), BigDecimal.valueOf(275), 45, 3);
         api.createServiceOffering(branchB.branchId(), offeringB).andExpect(status().isCreated());

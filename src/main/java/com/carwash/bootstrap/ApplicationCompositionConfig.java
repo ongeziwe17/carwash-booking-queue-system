@@ -29,6 +29,9 @@ import com.carwash.vehicle.infrastructure.InMemoryVehicleRepository;
 import com.carwash.access.application.UserCredentialService;
 import com.carwash.notification.infrastructure.AtomicNotificationIdGenerator;
 import com.carwash.booking.application.AvailabilityService;
+import com.carwash.booking.application.BranchAvailabilityDecisionService;
+import com.carwash.booking.application.BranchAvailabilityQuery;
+import com.carwash.booking.application.BranchAvailabilitySearchService;
 import com.carwash.booking.application.BookingManagementService;
 import com.carwash.booking.application.BookingSlotPolicyService;
 import com.carwash.reporting.application.DailySummaryReportService;
@@ -37,6 +40,7 @@ import com.carwash.notification.application.NotificationManagementService;
 import com.carwash.marketplace.application.MarketplaceManagementService;
 import com.carwash.marketplace.application.BranchSchedulingService;
 import com.carwash.queue.application.QueueManagementService;
+import com.carwash.queue.application.QueueQuery;
 import com.carwash.queue.application.QueueOrderingService;
 import com.carwash.catalog.application.ServiceCatalogService;
 import com.carwash.catalog.application.ServiceDefinitionQuery;
@@ -199,6 +203,50 @@ public class ApplicationCompositionConfig {
     }
 
     @Bean
+    public BranchAvailabilityDecisionService branchAvailabilityDecisionService(
+            BookingRepository bookingRepository,
+            MarketplaceQuery marketplaceQuery,
+            BranchScheduleQuery branchScheduleQuery,
+            ServiceOfferingQuery serviceOfferingQuery,
+            ServiceDefinitionQuery serviceDefinitionQuery,
+            BookingPolicyProperties bookingPolicy,
+            Clock clock
+    ) {
+        return new BranchAvailabilityDecisionService(
+                bookingRepository,
+                marketplaceQuery,
+                branchScheduleQuery,
+                serviceOfferingQuery,
+                serviceDefinitionQuery,
+                bookingPolicy,
+                clock
+        );
+    }
+
+    @Bean
+    public BranchAvailabilitySearchService branchAvailabilitySearchService(
+            MarketplaceQuery marketplaceQuery,
+            ServiceOfferingQuery serviceOfferingQuery,
+            ServiceDefinitionQuery serviceDefinitionQuery,
+            BranchAvailabilityQuery branchAvailabilityQuery,
+            QueueQuery queueQuery,
+            DistanceCalculator distanceCalculator,
+            InMemoryDataCoordinator coordinator,
+            Clock clock
+    ) {
+        return new BranchAvailabilitySearchService(
+                marketplaceQuery,
+                serviceOfferingQuery,
+                serviceDefinitionQuery,
+                branchAvailabilityQuery,
+                queueQuery,
+                distanceCalculator,
+                coordinator,
+                clock
+        );
+    }
+
+    @Bean
     public QueueOrderingService queueOrderingService(
             QueueEntryRepository queueEntryRepository,
             InMemoryDataCoordinator coordinator,
@@ -328,6 +376,7 @@ public class ApplicationCompositionConfig {
             InMemoryDataCoordinator coordinator,
             BookingPolicyProperties bookingPolicy,
             BookingSlotPolicyService bookingSlotPolicyService,
+            BranchAvailabilityDecisionService branchAvailabilityDecisionService,
             Clock clock
     ) {
         return new BookingManagementService(
@@ -344,6 +393,7 @@ public class ApplicationCompositionConfig {
                 coordinator,
                 bookingPolicy,
                 bookingSlotPolicyService,
+                branchAvailabilityDecisionService,
                 clock
         );
     }

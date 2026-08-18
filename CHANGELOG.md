@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Added branch-aware exact-instant availability search with complete Marketplace schedule/closure windows, branch offering terms and overlapping configured capacity, same-day queue estimates, optional Haversine radius filtering, and one shared authoritative booking decision.
 - Added authenticated nearby Marketplace branch discovery with a replaceable distance port, deterministic Haversine calculations, radius/service/open-at filtering, bounded responses, and Java/OpenAPI/Bruno coverage.
 - Corrected queue completion so already-started work may reach `COMPLETED` after parent business, branch, offering, or reusable-service deactivation while canonical booking/queue scope integrity remains mandatory and inactive state continues to block new/call/start work.
 - Scoped every new booking and queue entry to a canonical Marketplace branch and Catalog service offering, partitioned queue ordering/waits/call-next by branch, added branch filters and scoped daily reports, and added bounded branch context to notifications.

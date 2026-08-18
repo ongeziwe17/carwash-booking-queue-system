@@ -1,8 +1,8 @@
 # Current Endpoint Inventory
 
-Inventory source: the controllers and OpenAPI quality gate for GEO-001. Generated `/v3/api-docs` is authoritative when wording differs.
+Inventory source: the controllers and OpenAPI quality gate for AVAIL-002. Generated `/v3/api-docs` is authoritative when wording differs.
 
-**Total HTTP operations: 67.**
+**Total HTTP operations: 68.**
 
 | Method | Path | Authentication | Role / permission | Ownership | Request DTO | Success | 400/401/403/404 | Important rules |
 |---|---|---|---|---|---|---:|---|---|
@@ -10,6 +10,7 @@ Inventory source: the controllers and OpenAPI quality gate for GEO-001. Generate
 | `POST` | `/api/auth/login` | Public | N/A | N/A | `LoginRequest` | 200 | 400,401 | Returns INVALID_CREDENTIALS for wrong or unknown credentials; no password leakage. |
 | `GET` | `/api/auth/me` | Bearer | Any authenticated current role | Authenticated principal | `—` | 200 | 401,404 | Token role must still match current active repository user. |
 | `GET` | `/api/availability` | Bearer | All roles via SERVICE_READ | N/A | Query `serviceId`, `date` | 200 | 400,401,403,404 | Point-in-time single-location starts; global exact-slot remaining capacity; duration must fit closing; no reservation. |
+| `GET` | `/api/availability/branches` | Bearer | All roles via SERVICE_READ | Public-discovery view; not tenant authorization | Required `serviceId`,`at`; optional paired `latitude`,`longitude`,`radiusKm` | 200 | 400,401,403,404 | Shared complete-window decision; effective offering terms, overlapping branch/offering capacity, same-day queue estimate, optional raw Haversine radius/order; no reservation. |
 | `GET` | `/api/bookings` | Bearer | STAFF, BUSINESS_OWNER, PLATFORM_ADMIN | Operational access; optional branch filter is not tenant authorization | Query `branchId` | 200 | 400,401,403,404 | Omitted keeps global role view; supplied existing branch returns only that branch. |
 | `POST` | `/api/bookings` | Bearer | CUSTOMER: self; STAFF/OWNER/ADMIN: operational | Requested user must be self unless operational role | `CreateBookingRequest` | 201 | 400,401,403,404 | Requires active branch and matching active offering; derives reusable service; branch exact-slot rules apply. |
 | `DELETE` | `/api/bookings/{id}` | Bearer | CUSTOMER: owner; STAFF/OWNER/ADMIN: operational | Booking owner for CUSTOMER | `—` | 204 | 400,401,403,404 | HTTP DELETE is cancellation, not physical deletion; configured cancellation cutoff applies. |

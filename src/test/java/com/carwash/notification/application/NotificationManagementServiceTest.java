@@ -188,7 +188,10 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
                 serviceOfferingService, marketplaceService,
                 queueRepository, notificationRepository, notifications, queueOrdering, coordinator,
                 policy, new com.carwash.booking.application.BookingSlotPolicyService(
-                        bookingRepository, policy, clock), clock);
+                        bookingRepository, policy, clock),
+                new com.carwash.booking.application.BranchAvailabilityDecisionService(
+                        bookingRepository, marketplaceService, branchSchedulingService, serviceOfferingService,
+                        catalogService, policy, clock), clock);
     }
 
     private QueueManagementService queueServiceWith(NotificationManagementService notifications) {

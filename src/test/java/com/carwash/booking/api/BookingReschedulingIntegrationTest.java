@@ -121,7 +121,11 @@ class BookingReschedulingIntegrationTest extends ApiIntegrationTestSupport {
     void rescheduleRejectsFullSlotAndCustomerVehicleConflictWithoutMutation() throws Exception {
         LocalDateTime fullTarget = TestDates.futureDays(88);
         BookingApiFixture.CreatedBooking moving = fixture().createBooking(TestDates.futureDays(89));
-        fixture().createBooking(fullTarget);
+        BookingApiFixture.Resources otherCustomer = fixture().createResources();
+        api.createBooking(BookingFixtureBuilder.valid(
+                        ids, otherCustomer.user().userId(), otherCustomer.vehicle().vehicleId(),
+                        moving.resources().branch().branchId(), moving.resources().offering().offeringId())
+                .scheduledDateTime(fullTarget).build()).andExpect(status().isCreated());
 
         reschedule(moving.booking().bookingId(), fullTarget)
                 .andExpect(status().isBadRequest())

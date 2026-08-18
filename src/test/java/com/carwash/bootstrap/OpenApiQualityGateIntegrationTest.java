@@ -53,7 +53,7 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
             "GET /api/queue-entries", "POST /api/queue-entries", "POST /api/queue-entries/{id}/start",
             "POST /api/queue-entries/{id}/complete", "POST /api/queue-entries/{id}/call",
             "POST /api/queue-entries/call-next",
-            "GET /api/availability",
+            "GET /api/availability", "GET /api/availability/branches",
             "GET /api/bookings", "POST /api/bookings", "POST /api/bookings/{id}/confirm",
             "POST /api/bookings/{id}/cancel", "POST /api/auth/login", "GET /api/reports/daily-summary",
             "GET /api/queue-entries/{id}", "DELETE /api/queue-entries/{id}",
@@ -342,6 +342,40 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         }
         for (String response : Set.of("200", "400", "401", "403", "404", "405", "500")) {
             assertTrue(operation.path("responses").has(response), "Missing nearby discovery response " + response);
+        }
+    }
+
+    @Test
+    void branchAvailabilityContractIsBoundedAndDocumentsPointInTimeSemantics() throws Exception {
+        JsonNode document = openApi();
+        JsonNode operation = document.path("paths").path("/api/availability/branches").path("get");
+        Map<String, JsonNode> parameters = new java.util.HashMap<>();
+        operation.path("parameters").forEach(parameter ->
+                parameters.put(parameter.path("name").asText(), parameter));
+        assertEquals(Set.of("serviceId", "at", "latitude", "longitude", "radiusKm"), parameters.keySet());
+        assertTrue(parameters.get("serviceId").path("required").asBoolean());
+        assertTrue(parameters.get("at").path("required").asBoolean());
+        assertEquals("date-time", parameters.get("at").path("schema").path("format").asText());
+        for (String optional : Set.of("latitude", "longitude", "radiusKm")) {
+            assertFalse(parameters.get(optional).path("required").asBoolean());
+        }
+        assertTrue(operation.path("description").asText().contains("raw Haversine distance"));
+        assertTrue(operation.path("description").asText().contains("do not reserve capacity"));
+
+        JsonNode schema = document.path("components").path("schemas").path("BranchAvailabilityResponse");
+        assertEquals(Set.of("branchId", "businessId", "branchName", "addressLine1", "addressLine2", "city",
+                        "province", "postalCode", "countryCode", "latitude", "longitude", "timezone",
+                        "serviceOfferingId", "serviceId", "serviceName", "price", "estimatedDurationMin",
+                        "availableStartAt", "estimatedEndAt", "concurrentCapacity", "capacityRemaining",
+                        "queueWaitEstimateMin", "distanceKm"),
+                propertyNames(schema));
+        for (String forbidden : Set.of("branch", "business", "offering", "service", "bookings", "queue",
+                "status", "effectiveActive", "publicDiscoveryEnabled", "createdAt", "updatedAt", "reason")) {
+            assertFalse(schema.path("properties").has(forbidden));
+        }
+        for (String response : Set.of("200", "400", "401", "403", "404", "405", "500")) {
+            assertTrue(operation.path("responses").has(response),
+                    "Missing branch availability response " + response);
         }
     }
 

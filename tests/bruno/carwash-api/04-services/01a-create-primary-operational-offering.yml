@@ -16,7 +16,7 @@ http:
         "serviceId": "{{serviceId}}",
         "price": 135.00,
         "estimatedDurationMin": 30,
-        "concurrentCapacity": 3
+        "concurrentCapacity": 1
       }
   auth: { type: bearer, token: "{{ownerToken}}" }
 

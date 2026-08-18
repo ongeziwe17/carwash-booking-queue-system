@@ -1,0 +1,15 @@
+info:
+  name: Unauthenticated branch availability rejected
+  type: http
+  seq: 4
+  tags: [availability, security, unauthenticated]
+http:
+  method: GET
+  url: "{{baseUrl}}/api/availability/branches?serviceId={{serviceId}}&at={{future47}}Z"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 401", function() { expect(res.status).to.equal(401); });
+        test("uses standard authentication error", function() { expect(res.body.code).to.equal("AUTHENTICATION_REQUIRED"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -1,6 +1,7 @@
 package com.carwash.workflow;
 
 import com.carwash.booking.application.BookingManagementService;
+import com.carwash.booking.application.BranchAvailabilityDecisionService;
 import com.carwash.queue.application.QueueManagementService;
 import com.carwash.queue.application.QueueOrderingService;
 
@@ -15,6 +16,8 @@ import com.carwash.catalog.application.ServiceOfferingQuery;
 import com.carwash.catalog.application.ServiceOfferingSnapshot;
 import com.carwash.catalog.domain.ServiceOfferingStatus;
 import com.carwash.marketplace.application.BranchSnapshot;
+import com.carwash.marketplace.application.BranchOpenStatusSnapshot;
+import com.carwash.marketplace.application.BranchScheduleQuery;
 import com.carwash.marketplace.application.BusinessSnapshot;
 import com.carwash.marketplace.application.MarketplaceQuery;
 import com.carwash.marketplace.domain.BranchStatus;
@@ -189,7 +192,10 @@ class LifecycleFailureRollbackTest {
         private final BookingManagementService bookingService = new BookingManagementService(
                 bookings, users, vehicles, serviceQuery, offeringQuery, marketplace, queues, notifications, null,
                 ordering, coordinator, bookingPolicy,
-                new com.carwash.booking.application.BookingSlotPolicyService(bookings, bookingPolicy, clock), clock);
+                new com.carwash.booking.application.BookingSlotPolicyService(bookings, bookingPolicy, clock),
+                new BranchAvailabilityDecisionService(
+                        bookings, marketplace, openSchedules(), offeringQuery, serviceQuery, bookingPolicy, clock),
+                clock);
         private final QueueManagementService queueService = new QueueManagementService(
                 queues, bookings, offeringQuery, marketplace, null, coordinator, ordering, clock);
 
@@ -261,6 +267,13 @@ class LifecycleFailureRollbackTest {
             return serviceId -> services.findById(serviceId).map(service -> new ServiceDefinitionSnapshot(
                     service.getServiceId(), service.getServiceName(), service.getDescription(), service.getPrice(),
                     service.getEstimatedDurationMin(), service.isActive(), service.getCreatedAt()));
+        }
+
+        private BranchScheduleQuery openSchedules() {
+            return (branchId, requestedAt) -> new BranchOpenStatusSnapshot(
+                    branchId, requestedAt, "Africa/Johannesburg",
+                    requestedAt.atZone(java.time.ZoneId.of("Africa/Johannesburg")),
+                    true, true, false, true, null, null);
         }
     }
 

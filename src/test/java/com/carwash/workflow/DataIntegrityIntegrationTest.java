@@ -11,6 +11,8 @@ import com.carwash.catalog.api.dto.CreateServiceRequest;
 import com.carwash.catalog.api.dto.CreateServiceOfferingRequest;
 import com.carwash.marketplace.api.dto.CreateBusinessRequest;
 import com.carwash.marketplace.api.dto.CreateBranchRequest;
+import com.carwash.marketplace.api.dto.ReplaceOperatingHoursRequest;
+import com.carwash.marketplace.api.dto.WeeklyOperatingIntervalRequest;
 import com.carwash.identity.api.dto.CreateUserRequest;
 import com.carwash.vehicle.api.dto.CreateVehicleRequest;
 import com.carwash.testsupport.ApiContractAssertions;
@@ -26,6 +28,8 @@ import org.springframework.http.MediaType;
 
 import java.util.Map;
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.LocalTime;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -157,6 +161,11 @@ class DataIntegrityIntegrationTest extends ApiIntegrationTestSupport {
                 "8001", "ZA", new BigDecimal("-33.9249"), new BigDecimal("18.4241"),
                 "Africa/Johannesburg", true);
         api.createBranch(businessId, branch).andExpect(status().isCreated());
+        api.replaceOperatingHours(branch.branchId(), new ReplaceOperatingHoursRequest(
+                java.util.Arrays.stream(DayOfWeek.values())
+                        .map(day -> new WeeklyOperatingIntervalRequest(
+                                day, LocalTime.of(8, 0), LocalTime.of(17, 0)))
+                        .toList())).andExpect(status().isOk());
         CreateServiceOfferingRequest offering = new CreateServiceOfferingRequest(
                 ids.offering(), service.serviceId(), service.price(), service.estimatedDurationMin(), 2);
         api.createServiceOffering(branch.branchId(), offering).andExpect(status().isCreated());

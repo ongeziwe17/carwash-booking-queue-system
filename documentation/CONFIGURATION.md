@@ -29,9 +29,9 @@ Negative booking cancellation windows, zero/negative/sub-minute booking interval
 
 ## Single-location scheduling window
 
-For a requested date, candidate starts begin at `operating-start` and advance by `slot-interval` while remaining before `operating-end`. A candidate is advertised or accepted only when its service-specific estimated duration finishes at or before closing. Booking creation, focused rescheduling, generic offering changes, and availability all reuse this same time-grid policy. Operational booking capacity is partitioned by branch; legacy AVAIL-001 still reports the global exact-start model. Cancelled bookings do not consume capacity.
+For legacy AVAIL-001, candidate starts begin at `operating-start` and advance by `slot-interval` while remaining before `operating-end`. Branch-aware writes and AVAIL-002 retain `slot-interval` alignment but use each branch's Marketplace schedule and the offering duration. AVAIL-001 still reports the global exact-start model. Branch-aware capacity is scoped to overlapping active bookings for one branch/offering; cancelled and completed bookings do not consume it.
 
-These settings remain the transitional same-day time window for branch-scoped booking writes and legacy AVAIL-001; they do not configure Marketplace branches. MKT-002 branch hours are managed through the Marketplace API and support overnight recurrence, but OPS-001 deliberately does not enforce them. Branch-aware availability, external holiday calendars, staff/bay calendars, and overlapping-resource scheduling remain out of scope.
+The legacy start/end settings configure AVAIL-001 only; they do not configure Marketplace branches. MKT-002 branch hours are managed through the Marketplace API and support overnight recurrence. AVAIL-002 booking writes and search enforce those hours and closures. External holiday calendars, staff/bay calendars, reservations, and predictive scheduling remain out of scope.
 
 ## Booking-change boundary
 

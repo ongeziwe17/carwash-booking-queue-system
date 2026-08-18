@@ -1,0 +1,16 @@
+info:
+  name: Branch availability radius filter
+  type: http
+  seq: 2
+  tags: [availability, branch, distance]
+http:
+  method: GET
+  url: "{{baseUrl}}/api/availability/branches?serviceId={{serviceId}}&at={{future47}}Z&latitude=-33.9249&longitude=18.4241&radiusKm=25"
+  auth: { type: bearer, token: "{{staffToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("keeps only the nearby branch", function() { const ids = res.body.map(item => item.branchId); expect(ids).to.include(bru.getVar("marketplaceBranchId")); expect(ids).to.not.include(bru.getVar("marketplaceSecondBranchId")); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -59,6 +59,28 @@ public final class BookingSlotPolicyService {
         }
     }
 
+    /** Booking-specific conflict rule kept separate from public branch availability. */
+    public void validateCustomerVehicleConflict(
+            String excludedBookingId,
+            LocalDateTime scheduledDateTime,
+            String branchId,
+            User user,
+            Vehicle vehicle
+    ) {
+        if (scheduledDateTime == null) {
+            throw new BusinessRuleViolationException("Scheduled date/time is required");
+        }
+        if (branchId == null || branchId.isBlank()) {
+            throw new BusinessRuleViolationException("Branch ID is required for operational booking validation");
+        }
+        boolean conflict = activeBookingsAt(scheduledDateTime, excludedBookingId, branchId).stream()
+                .anyMatch(existingBooking -> hasSameCustomerAndVehicle(existingBooking, user, vehicle));
+        if (conflict) {
+            throw new BusinessRuleViolationException(
+                    "Customer vehicle already has an active booking for this scheduled date/time");
+        }
+    }
+
     public void validateBookableSlot(
             String excludedBookingId,
             LocalDateTime scheduledDateTime,
