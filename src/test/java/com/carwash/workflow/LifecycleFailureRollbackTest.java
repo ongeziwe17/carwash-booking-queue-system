@@ -18,6 +18,7 @@ import com.carwash.catalog.domain.ServiceOfferingStatus;
 import com.carwash.marketplace.application.BranchSnapshot;
 import com.carwash.marketplace.application.BranchOpenStatusSnapshot;
 import com.carwash.marketplace.application.BranchScheduleQuery;
+import com.carwash.marketplace.application.BranchServiceWindowSnapshot;
 import com.carwash.marketplace.application.BusinessSnapshot;
 import com.carwash.marketplace.application.MarketplaceQuery;
 import com.carwash.marketplace.domain.BranchStatus;
@@ -270,10 +271,26 @@ class LifecycleFailureRollbackTest {
         }
 
         private BranchScheduleQuery openSchedules() {
-            return (branchId, requestedAt) -> new BranchOpenStatusSnapshot(
-                    branchId, requestedAt, "Africa/Johannesburg",
-                    requestedAt.atZone(java.time.ZoneId.of("Africa/Johannesburg")),
-                    true, true, false, true, null, null);
+            java.time.ZoneId zone = java.time.ZoneId.of("Africa/Johannesburg");
+            return new BranchScheduleQuery() {
+                @Override
+                public BranchOpenStatusSnapshot getOpenStatus(String branchId, Instant requestedAt) {
+                    return new BranchOpenStatusSnapshot(
+                            branchId, requestedAt, zone.getId(), requestedAt.atZone(zone),
+                            true, true, false, true, null, null);
+                }
+
+                @Override
+                public BranchServiceWindowSnapshot getServiceWindowStatus(
+                        String branchId,
+                        Instant startsAt,
+                        Instant endsAt
+                ) {
+                    return new BranchServiceWindowSnapshot(
+                            branchId, startsAt, endsAt, zone.getId(), startsAt.atZone(zone), endsAt.atZone(zone),
+                            startsAt.atZone(zone), true, true, false, true, null, null);
+                }
+            };
         }
     }
 

@@ -71,7 +71,7 @@ The capability modules and automated dependency rules are the prerequisite for P
 3. **SERVICE-001** — Add branch-specific service offerings, prices, durations, and capacity (#117) — implemented.
 4. **OPS-001** — Scope bookings, queues, notifications, and reports to branches (#118) — implemented.
 5. **GEO-001** — Add branch distance calculation and public discovery (#119) — implemented with deterministic straight-line distance and no external maps provider.
-6. **AVAIL-002** — Add branch-aware availability search (#120) — implemented with one shared booking/search decision, complete schedule windows, configured offering capacity, queue context, and optional raw-distance filtering.
+6. **AVAIL-002** — Add branch-aware availability search (#120) — implemented with one shared booking/search decision, continuous-window-anchored slots, complete schedule windows, configured offering capacity, branch-isolated queue context, and optional raw-distance filtering.
 
 Expected outcome: the backend understands which business and branch is being considered, which services are offered there, whether the branch is open, what capacity is available, and how far it is from the customer.
 

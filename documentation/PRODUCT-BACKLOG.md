@@ -100,7 +100,7 @@ Phase 1 and the ARCH-001 transition are complete. MKT-001 (#115), MKT-002 (#116)
 | SERVICE-001 | #117 | Add branch-specific service offerings and capacity — implemented | P1 | MKT-001, MKT-002, DATA-001 |
 | OPS-001 | #118 | Scope bookings, queues, notifications, and reports to branches — implemented | P1 | SERVICE-001, WORKFLOW-001, QUEUE-002 |
 | GEO-001 | #119 | Add branch distance calculation and public discovery — implemented | P1 | MKT-001, SERVICE-001 |
-| AVAIL-002 | #120 | Add branch-aware availability search — implemented | P1 | MKT-002, SERVICE-001, OPS-001, GEO-001 |
+| AVAIL-002 | #120 | Add branch-aware availability search — implemented, including continuous-window slot anchoring | P1 | MKT-002, SERVICE-001, OPS-001, GEO-001 |
 
 Phase exit criteria:
 

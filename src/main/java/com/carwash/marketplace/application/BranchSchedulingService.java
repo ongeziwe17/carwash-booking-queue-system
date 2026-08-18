@@ -207,9 +207,10 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
             ZonedDateTime localStart = startsAt.atZone(timezone);
             ZonedDateTime localEnd = endsAt.atZone(timezone);
             boolean effectiveActive = branch.isActive() && business.isActive();
-            boolean withinWeeklyHours = scheduleRepository.findById(branch.getBranchId())
-                    .map(schedule -> coversServiceWindow(schedule, startsAt, endsAt, timezone))
-                    .orElse(false);
+            OperatingWindowCoverage operatingWindow = scheduleRepository.findById(branch.getBranchId())
+                    .map(schedule -> resolveOperatingWindow(schedule, startsAt, endsAt, timezone))
+                    .orElseGet(OperatingWindowCoverage::closed);
+            boolean withinWeeklyHours = operatingWindow.coversServiceWindow();
             TemporaryBranchClosure applicableClosure = closureRepository.findByBranchId(branch.getBranchId()).stream()
                     .filter(closure -> closure.overlaps(startsAt, endsAt))
                     .findFirst()
@@ -223,6 +224,7 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
                     timezone.getId(),
                     localStart,
                     localEnd,
+                    operatingWindow.branchLocalStartsAt(),
                     effectiveActive,
                     withinWeeklyHours,
                     temporarilyClosed,
@@ -233,7 +235,7 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
         });
     }
 
-    private boolean coversServiceWindow(
+    private OperatingWindowCoverage resolveOperatingWindow(
             BranchOperatingSchedule schedule,
             Instant startsAt,
             Instant endsAt,
@@ -252,31 +254,63 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
                 LocalDateTime localOpening = date.atTime(interval.opensAt());
                 LocalDate closingDate = interval.isOvernight() ? date.plusDays(1) : date;
                 LocalDateTime localClosing = closingDate.atTime(interval.closesAt());
+                ZonedDateTime zonedOpening = localOpening.atZone(timezone);
                 operatingRanges.add(new InstantRange(
-                        localOpening.atZone(timezone).toInstant(),
-                        localClosing.atZone(timezone).toInstant()
+                        zonedOpening.toInstant(),
+                        localClosing.atZone(timezone).toInstant(),
+                        zonedOpening
                 ));
             }
         }
 
         operatingRanges.sort(Comparator.comparing(InstantRange::startInclusive));
-        Instant coveredUntil = startsAt;
+        List<InstantRange> continuousRanges = new ArrayList<>();
         for (InstantRange range : operatingRanges) {
-            if (!range.endExclusive().isAfter(coveredUntil)) {
+            if (continuousRanges.isEmpty()) {
+                continuousRanges.add(range);
                 continue;
             }
-            if (range.startInclusive().isAfter(coveredUntil)) {
-                return false;
-            }
-            coveredUntil = range.endExclusive();
-            if (!coveredUntil.isBefore(endsAt)) {
-                return true;
+            int lastIndex = continuousRanges.size() - 1;
+            InstantRange current = continuousRanges.get(lastIndex);
+            if (!range.startInclusive().isAfter(current.endExclusive())) {
+                continuousRanges.set(lastIndex, current.extendThrough(range));
+            } else {
+                continuousRanges.add(range);
             }
         }
-        return false;
+
+        for (InstantRange range : continuousRanges) {
+            if (!startsAt.isBefore(range.startInclusive()) && startsAt.isBefore(range.endExclusive())) {
+                return new OperatingWindowCoverage(
+                        !endsAt.isAfter(range.endExclusive()),
+                        range.branchLocalStartsAt()
+                );
+            }
+        }
+        return OperatingWindowCoverage.closed();
     }
 
-    private record InstantRange(Instant startInclusive, Instant endExclusive) {
+    private record InstantRange(
+            Instant startInclusive,
+            Instant endExclusive,
+            ZonedDateTime branchLocalStartsAt
+    ) {
+
+        private InstantRange extendThrough(InstantRange other) {
+            return other.endExclusive().isAfter(endExclusive)
+                    ? new InstantRange(startInclusive, other.endExclusive(), branchLocalStartsAt)
+                    : this;
+        }
+    }
+
+    private record OperatingWindowCoverage(
+            boolean coversServiceWindow,
+            ZonedDateTime branchLocalStartsAt
+    ) {
+
+        private static OperatingWindowCoverage closed() {
+            return new OperatingWindowCoverage(false, null);
+        }
     }
 
     private WeeklyOperatingInterval toDomainInterval(WeeklyOperatingIntervalCommand command) {

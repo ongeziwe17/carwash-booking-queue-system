@@ -71,6 +71,16 @@ class RuntimePolicyConfigurationTest {
     }
 
     @Test
+    void slotIntervalMayBeAnyPositiveWholeMinuteDuration() {
+        contextRunner.withPropertyValues("carwash.policy.booking.slot-interval=PT45M")
+                .run(context -> {
+                    assertNull(context.getStartupFailure());
+                    assertEquals(Duration.ofMinutes(45),
+                            context.getBean(BookingPolicyProperties.class).slotInterval());
+                });
+    }
+
+    @Test
     void beanValidationFutureConstraintUsesApplicationClock() {
         contextRunner
                 .withUserConfiguration(FixedClockConfiguration.class)

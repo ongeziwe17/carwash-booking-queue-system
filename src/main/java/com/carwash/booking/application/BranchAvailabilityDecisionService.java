@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Objects;
 
@@ -84,7 +85,7 @@ public final class BranchAvailabilityDecisionService implements BranchAvailabili
         BranchServiceWindowSnapshot window = branchScheduleQuery
                 .getServiceWindowStatus(branch.branchId(), startsAt, endsAt);
         boolean future = startsAt.isAfter(clock.instant());
-        boolean aligned = isAligned(startsAt, zone);
+        boolean aligned = isAligned(startsAt, zone, window.branchLocalOperatingWindowStartsAt());
         boolean effectiveEligible = branch.effectiveActive() && offering.effectiveActive() && service.active();
         int occupied = occupiedCapacity(
                 branch.branchId(), offering.offeringId(), startsAt, endsAt, zone, excludedBookingId);
@@ -177,10 +178,21 @@ public final class BranchAvailabilityDecisionService implements BranchAvailabili
                 && booking.getStatus() != BookingStatus.COMPLETED;
     }
 
-    private boolean isAligned(Instant startsAt, ZoneId zone) {
+    private boolean isAligned(
+            Instant startsAt,
+            ZoneId zone,
+            ZonedDateTime branchLocalOperatingWindowStartsAt
+    ) {
+        if (branchLocalOperatingWindowStartsAt == null) {
+            return true;
+        }
         LocalDateTime local = LocalDateTime.ofInstant(startsAt, zone);
+        Duration fromWindowStart = Duration.between(
+                branchLocalOperatingWindowStartsAt.toLocalDateTime(), local);
         long intervalSeconds = bookingPolicy.slotInterval().getSeconds();
-        return local.getNano() == 0 && local.toLocalTime().toSecondOfDay() % intervalSeconds == 0;
+        return !fromWindowStart.isNegative()
+                && fromWindowStart.getNano() == 0
+                && fromWindowStart.getSeconds() % intervalSeconds == 0;
     }
 
     private BranchAvailabilityReason reason(

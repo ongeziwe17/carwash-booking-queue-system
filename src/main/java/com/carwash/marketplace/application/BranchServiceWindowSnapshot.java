@@ -11,6 +11,7 @@ public record BranchServiceWindowSnapshot(
         String timezone,
         ZonedDateTime branchLocalStartsAt,
         ZonedDateTime branchLocalEndsAt,
+        ZonedDateTime branchLocalOperatingWindowStartsAt,
         boolean effectiveActive,
         boolean withinWeeklyHours,
         boolean temporarilyClosed,

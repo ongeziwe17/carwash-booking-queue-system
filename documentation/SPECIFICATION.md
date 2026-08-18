@@ -54,7 +54,7 @@ Implemented in the current backend:
 | FR-11 | Configure and discover branch-specific service price, duration, configured concurrent capacity, and activation state. | Implemented |
 | FR-12 | Include bounded branch/offering notification context and require explicit branch/business daily report scope. | Implemented |
 | FR-13 | Discover effective public branches by validated coordinates using deterministic distance, radius/service/open filters, and bounded responses. | Implemented |
-| FR-14 | Search branch-aware availability at an explicit instant using complete operating windows, closures, offering terms/capacity, active bookings, branch queues, and optional distance. | Implemented |
+| FR-14 | Search branch-aware availability at an explicit instant using continuous-window-anchored slots, complete operating windows, closures, offering terms/capacity, active bookings, branch queues, and optional distance. | Implemented |
 
 ## Functional Requirements: Planned/Future
 

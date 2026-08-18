@@ -4,7 +4,7 @@ TEST-001 separates fast unit/repository/service tests from Spring API integratio
 
 ## Current AVAIL-002 inventory
 
-AVAIL-002 adds complete-window scheduling tests, shared booking/search decision tests, offering-scoped overlap/cancellation capacity tests, queue relevance, distance boundary/order, branch-local request-time validation, API/security, architecture, and OpenAPI metadata coverage. The expected inventory is **342 unit tests**, **159 integration tests**, exactly **68 OpenAPI operations**, and **512 Bruno requests / 1,664 Bruno tests**; CI results remain authoritative. The complete suite remains randomized and repeatable under seeds `11001` and `11002`, with the existing JaCoCo, Docker, workflow, and vulnerability thresholds unchanged.
+AVAIL-002 plus its operating-window alignment correction covers complete-window scheduling, `PT45M` and offset-opening grids, adjacent/split/overnight anchors, shared booking/search decisions, multi-business offering/capacity isolation, real branch-queue estimates, cancellation release, distance boundary/order, branch-local request-time validation, API/security, architecture, and OpenAPI metadata. The expected inventory is **346 unit tests**, **163 integration tests**, exactly **68 OpenAPI operations**, and **512 Bruno requests / 1,664 Bruno tests**; CI results remain authoritative. The complete suite remains randomized and repeatable under seeds `11001` and `11002`, with the existing JaCoCo, Docker, workflow, and vulnerability thresholds unchanged.
 
 ## Baseline inventory before TEST-001
 

@@ -7,6 +7,7 @@ import com.carwash.catalog.application.ServiceOfferingSnapshot;
 import com.carwash.catalog.domain.ServiceOfferingStatus;
 import com.carwash.marketplace.application.BranchOpenStatusSnapshot;
 import com.carwash.marketplace.application.BranchScheduleQuery;
+import com.carwash.marketplace.application.BranchServiceWindowSnapshot;
 import com.carwash.marketplace.application.BranchSnapshot;
 import com.carwash.marketplace.application.BusinessSnapshot;
 import com.carwash.marketplace.application.MarketplaceQuery;
@@ -155,17 +156,31 @@ class NearbyBranchDiscoveryServiceTest {
         };
         ServiceDefinitionQuery definitions = id -> Optional.ofNullable(services.get(id));
         ServiceOfferingQuery offeringQuery = new StubOfferingQuery(offerings);
-        BranchScheduleQuery schedules = (branchId, requestedAt) -> new BranchOpenStatusSnapshot(
-                branchId,
-                requestedAt,
-                "Africa/Johannesburg",
-                requestedAt.atZone(ZoneOffset.ofHours(2)),
-                true,
-                open.getOrDefault(branchId, false),
-                "branch-closure".equals(branchId),
-                open.getOrDefault(branchId, false),
-                "branch-closure".equals(branchId) ? "closure-1" : null,
-                "branch-closure".equals(branchId) ? "Maintenance" : null);
+        BranchScheduleQuery schedules = new BranchScheduleQuery() {
+            @Override
+            public BranchOpenStatusSnapshot getOpenStatus(String branchId, Instant requestedAt) {
+                return new BranchOpenStatusSnapshot(
+                        branchId,
+                        requestedAt,
+                        "Africa/Johannesburg",
+                        requestedAt.atZone(ZoneOffset.ofHours(2)),
+                        true,
+                        open.getOrDefault(branchId, false),
+                        "branch-closure".equals(branchId),
+                        open.getOrDefault(branchId, false),
+                        "branch-closure".equals(branchId) ? "closure-1" : null,
+                        "branch-closure".equals(branchId) ? "Maintenance" : null);
+            }
+
+            @Override
+            public BranchServiceWindowSnapshot getServiceWindowStatus(
+                    String branchId,
+                    Instant startsAt,
+                    Instant endsAt
+            ) {
+                throw new UnsupportedOperationException("Nearby discovery only queries instant open status");
+            }
+        };
         return new NearbyBranchDiscoveryService(marketplace, schedules, offeringQuery, definitions, distance);
     }
 
