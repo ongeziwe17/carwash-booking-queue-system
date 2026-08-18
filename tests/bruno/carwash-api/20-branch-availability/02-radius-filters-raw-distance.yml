@@ -5,7 +5,7 @@ info:
   tags: [availability, branch, distance]
 http:
   method: GET
-  url: "{{baseUrl}}/api/availability/branches?serviceId={{serviceId}}&at={{future47}}Z&latitude=-33.9249&longitude=18.4241&radiusKm=25"
+  url: "{{baseUrl}}/api/availability/branches?serviceId={{serviceId}}&at={{future47}}Z&latitude=-33.9249&longitude=18.4241&radiusKm=2.5"
   auth: { type: bearer, token: "{{staffToken}}" }
 runtime:
   scripts:
