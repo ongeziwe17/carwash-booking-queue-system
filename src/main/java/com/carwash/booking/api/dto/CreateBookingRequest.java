@@ -1,6 +1,5 @@
 package com.carwash.booking.api.dto;
 
-import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -13,8 +12,7 @@ public record CreateBookingRequest(
         @NotBlank(message = "vehicleId is required") @Size(max = 64) String vehicleId,
         @NotBlank(message = "branchId is required") @Size(max = 64) String branchId,
         @NotBlank(message = "serviceOfferingId is required") @Size(max = 64) String serviceOfferingId,
-        @NotNull(message = "scheduledDateTime is required")
-        @Future(message = "scheduledDateTime must be in the future") LocalDateTime scheduledDateTime,
+        @NotNull(message = "scheduledDateTime is required") LocalDateTime scheduledDateTime,
         @Size(max = 1000) String specialRequest
 ) {
     public CreateBookingRequest {

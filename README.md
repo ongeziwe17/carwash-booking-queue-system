@@ -1,6 +1,6 @@
 # Car Wash Booking Queue System
 
-Spring Boot backend foundation for car wash booking, queue management, and Marketplace onboarding/scheduling. The code is organized as a capability-based modular monolith with explicit `bootstrap`, `shared`, `identity`, `access`, `vehicle`, `catalog`, `booking`, `queue`, `notification`, `reporting`, `marketplace`, and `discovery` boundaries enforced by ArchUnit. The current codebase exposes APIs for users, vehicles, reusable global services, branch-specific offerings, bookings, queues, notifications, daily reporting, Marketplace businesses, physical branches, weekly branch hours, temporary closures, timezone-aware open-status decisions, and authenticated nearby branch discovery over in-memory repositories.
+Spring Boot backend foundation for car wash booking, queue management, and Marketplace onboarding/scheduling. The code is organized as a capability-based modular monolith with explicit `bootstrap`, `shared`, `identity`, `access`, `vehicle`, `catalog`, `booking`, `queue`, `notification`, `reporting`, `marketplace`, and `discovery` boundaries enforced by ArchUnit. The current codebase exposes APIs for users, vehicles, reusable global services, branch-specific offerings, bookings, queues, notifications, daily reporting, Marketplace businesses, physical branches, weekly branch hours, temporary closures, timezone-aware open-status decisions, authenticated nearby branch discovery, and branch-aware availability over in-memory repositories.
 
 ## Current backend foundation
 
@@ -10,6 +10,7 @@ Spring Boot backend foundation for car wash booking, queue management, and Marke
 - Service catalogue management with activation workflows.
 - Branch-scoped booking management with canonical service offerings, ownership, lifecycle, time, capacity, and vehicle validation.
 - Read-only single-location service availability with configured operating hours, interval slots, service duration, and remaining global capacity.
+- Branch-aware exact-instant availability using effective public branches, full service-window hours/closures, offering price/duration/capacity, overlapping active bookings, same-day branch queue estimates, and optional raw-distance radius filtering.
 - Branch-partitioned queue lifecycle, ordering, call-next, and offering-duration wait estimation.
 - In-app notification lookup with bounded branch/offering context.
 - Explicit branch- or business-scoped daily summary reporting.
@@ -26,7 +27,7 @@ Spring Boot backend foundation for car wash booking, queue management, and Marke
 - Staff and business-owner operational access remains global until tenant isolation is implemented.
 - External SMS/email delivery is not implemented.
 - Nearby distance is straight-line only; no routing, traffic, geocoding, or external maps provider is used.
-- Payments, branch-aware availability, configured-capacity calculations, PostgreSQL, production observability, and deployment hardening remain future work.
+- Payments, capacity reservations, concurrent bay/staff scheduling, PostgreSQL, production observability, and deployment hardening remain future work.
 - The application does not yet expose dedicated Actuator liveness or readiness endpoints.
 
 ## Tech stack

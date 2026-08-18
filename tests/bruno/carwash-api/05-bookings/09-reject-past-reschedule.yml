@@ -27,8 +27,8 @@ runtime:
     - type: tests
       code: |-
         test("returns HTTP 400", function() { expect(res.status).to.equal(400); });
-        test("uses VALIDATION_FAILED", function() { expect(res.body.code).to.equal("VALIDATION_FAILED"); });
-        test("reports scheduledDateTime", function() { expect(res.body.fieldErrors.some(e => e.field === "scheduledDateTime")).to.equal(true); });
+        test("uses the branch-timezone business rule", function() { expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); });
+        test("reports the authoritative future rule", function() { expect(res.body.message).to.equal("Scheduled date/time must be in the future"); });
 
 settings:
   encodeUrl: true

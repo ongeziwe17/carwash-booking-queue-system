@@ -139,6 +139,19 @@ public class QueueManagementService implements QueueQuery {
     }
 
     @Override
+    public int estimateWaitMinutesForNewWork(String branchId) {
+        return coordinator.read(() -> {
+            String normalizedBranchId = requireBranch(branchId).branchId();
+            int waitMinutes = 0;
+            for (QueueEntry entry : queueEntryRepository.findActiveOrderedByBranch(normalizedBranchId)) {
+                ServiceOfferingSnapshot offering = requireOffering(entry.getServiceOfferingId());
+                waitMinutes = Math.addExact(waitMinutes, offering.estimatedDurationMin());
+            }
+            return waitMinutes;
+        });
+    }
+
+    @Override
     public Optional<String> findOwnerId(String queueEntryId) {
         return coordinator.read(() -> queueEntryRepository.findById(queueEntryId)
                 .map(QueueEntry::getBooking)

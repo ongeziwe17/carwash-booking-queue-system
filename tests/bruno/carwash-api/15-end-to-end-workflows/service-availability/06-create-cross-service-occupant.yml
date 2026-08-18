@@ -1,5 +1,5 @@
 info:
-  name: Create booking for another service in target slot
+  name: Create booking for selected branch offering in target slot
   type: http
   seq: 8
   tags: [availability, workflow]
@@ -18,9 +18,9 @@ http:
         "userId": "{{customerUserId}}",
         "vehicleId": "{{customerVehicleId}}",
         "branchId": "{{opsBranchId}}",
-        "serviceOfferingId": "{{availabilityOtherOfferingId}}",
+        "serviceOfferingId": "{{availabilityOfferingId}}",
         "scheduledDateTime": "{{availabilitySlot}}",
-        "specialRequest": "global capacity fixture"
+        "specialRequest": "offering capacity fixture"
       }
   auth:
     type: bearer

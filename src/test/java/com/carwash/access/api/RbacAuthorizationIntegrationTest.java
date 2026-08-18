@@ -13,6 +13,9 @@ import com.carwash.catalog.application.CreateServiceOfferingCommand;
 import com.carwash.catalog.application.ServiceOfferingService;
 import com.carwash.marketplace.application.CreateBranchCommand;
 import com.carwash.marketplace.application.MarketplaceManagementService;
+import com.carwash.marketplace.application.BranchSchedulingService;
+import com.carwash.marketplace.application.ReplaceOperatingScheduleCommand;
+import com.carwash.marketplace.application.WeeklyOperatingIntervalCommand;
 import com.carwash.marketplace.application.RegisterBusinessCommand;
 import com.carwash.identity.application.UserManagementService;
 import com.carwash.vehicle.application.VehicleManagementService;
@@ -35,6 +38,8 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.DayOfWeek;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -59,6 +64,7 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
     @Autowired ServiceCatalogService services;
     @Autowired ServiceOfferingService offerings;
     @Autowired MarketplaceManagementService marketplace;
+    @Autowired BranchSchedulingService branchScheduling;
     @Autowired BookingManagementService bookings;
     @Autowired QueueManagementService queues;
     @Autowired JwtEncoder jwtEncoder;
@@ -358,6 +364,11 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
                 defaultBranchId, "RBAC Branch", "1 Test Street", null, "Cape Town", "Western Cape",
                 "8001", "ZA", new BigDecimal("-33.9249"), new BigDecimal("18.4241"),
                 "Africa/Johannesburg", true));
+        branchScheduling.replaceOperatingSchedule(defaultBranchId, new ReplaceOperatingScheduleCommand(
+                java.util.Arrays.stream(DayOfWeek.values())
+                        .map(day -> new WeeklyOperatingIntervalCommand(
+                                day, LocalTime.of(8, 0), LocalTime.of(17, 0)))
+                        .toList()));
         return defaultBranchId;
     }
 

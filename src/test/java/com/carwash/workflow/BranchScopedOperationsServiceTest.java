@@ -259,6 +259,7 @@ class BranchScopedOperationsServiceTest extends ServiceTestSupport {
         marketplaceService.createBranch(businessId, new CreateBranchCommand(
                 branchId, branchName, "2 Test Street", null, "Cape Town", "Western Cape", "8001", "ZA",
                 new BigDecimal("-33.9250"), new BigDecimal("18.4250"), "Africa/Johannesburg", true));
+        replaceFullWeekOperatingHours(branchId, java.time.LocalTime.of(8, 0), java.time.LocalTime.of(17, 0));
         return branchId;
     }
 

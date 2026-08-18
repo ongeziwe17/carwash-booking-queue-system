@@ -6,11 +6,16 @@ import com.carwash.catalog.api.dto.CreateServiceOfferingRequest;
 import com.carwash.identity.api.dto.CreateUserRequest;
 import com.carwash.marketplace.api.dto.CreateBranchRequest;
 import com.carwash.marketplace.api.dto.CreateBusinessRequest;
+import com.carwash.marketplace.api.dto.ReplaceOperatingHoursRequest;
+import com.carwash.marketplace.api.dto.WeeklyOperatingIntervalRequest;
 import com.carwash.vehicle.api.dto.CreateVehicleRequest;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 import java.time.LocalDateTime;
+import java.time.DayOfWeek;
+import java.time.LocalTime;
 import java.math.BigDecimal;
+import java.util.Arrays;
 
 public final class BookingApiFixture {
 
@@ -45,10 +50,16 @@ public final class BookingApiFixture {
                     "8001", "ZA", new BigDecimal("-33.9249"), new BigDecimal("18.4241"),
                     "Africa/Johannesburg", true);
             api.createBranch(business.businessId(), branch).andExpect(MockMvcResultMatchers.status().isCreated());
+            api.replaceOperatingHours(branch.branchId(), new ReplaceOperatingHoursRequest(
+                    Arrays.stream(DayOfWeek.values())
+                            .map(day -> new WeeklyOperatingIntervalRequest(
+                                    day, LocalTime.of(8, 0), LocalTime.of(17, 0)))
+                            .toList()))
+                    .andExpect(MockMvcResultMatchers.status().isOk());
             api.rememberDefaultOperationalScope(business, branch);
         }
         CreateServiceOfferingRequest offering = new CreateServiceOfferingRequest(
-                ids.offering(), service.serviceId(), service.price(), service.estimatedDurationMin(), 2);
+                ids.offering(), service.serviceId(), service.price(), service.estimatedDurationMin(), 1);
         api.createServiceOffering(branch.branchId(), offering)
                 .andExpect(MockMvcResultMatchers.status().isCreated());
 

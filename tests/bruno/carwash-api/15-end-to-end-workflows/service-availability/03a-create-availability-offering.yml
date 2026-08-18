@@ -9,7 +9,7 @@ http:
   headers: [{ name: Content-Type, value: "application/json" }]
   body:
     type: json
-    data: '{"offeringId":"{{availabilityOfferingId}}","serviceId":"{{availabilityServiceId}}","price":180.00,"estimatedDurationMin":60,"concurrentCapacity":2}'
+    data: '{"offeringId":"{{availabilityOfferingId}}","serviceId":"{{availabilityServiceId}}","price":180.00,"estimatedDurationMin":60,"concurrentCapacity":1}'
   auth: { type: bearer, token: "{{ownerToken}}" }
 runtime:
   scripts:

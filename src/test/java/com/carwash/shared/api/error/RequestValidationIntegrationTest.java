@@ -10,6 +10,8 @@ import com.carwash.identity.api.dto.CreateUserRequest;
 import com.carwash.vehicle.api.dto.CreateVehicleRequest;
 import com.carwash.marketplace.api.dto.CreateBranchRequest;
 import com.carwash.marketplace.api.dto.CreateBusinessRequest;
+import com.carwash.marketplace.api.dto.ReplaceOperatingHoursRequest;
+import com.carwash.marketplace.api.dto.WeeklyOperatingIntervalRequest;
 import com.carwash.testsupport.ApiContractAssertions;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.BookingFixtureBuilder;
@@ -25,6 +27,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import java.util.HashMap;
 import java.util.Map;
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.LocalTime;
+import java.util.Arrays;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -78,6 +83,12 @@ class RequestValidationIntegrationTest extends ApiIntegrationTestSupport {
                 BigDecimal.valueOf(-33.9249), BigDecimal.valueOf(18.4241), "Africa/Johannesburg", true);
         api.createBusiness(business).andExpect(status().isCreated());
         api.createBranch(business.businessId(), branch).andExpect(status().isCreated());
+        api.replaceOperatingHours(branch.branchId(), new ReplaceOperatingHoursRequest(
+                Arrays.stream(DayOfWeek.values())
+                        .map(day -> new WeeklyOperatingIntervalRequest(
+                                day, LocalTime.of(8, 0), LocalTime.of(17, 0)))
+                        .toList()))
+                .andExpect(status().isOk());
         CreateServiceOfferingRequest offering = new CreateServiceOfferingRequest(
                 ids.offering(), service.serviceId(), service.price(), service.estimatedDurationMin(), 2);
         api.createServiceOffering(branch.branchId(), offering).andExpect(status().isCreated());

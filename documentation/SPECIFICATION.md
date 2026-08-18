@@ -54,6 +54,7 @@ Implemented in the current backend:
 | FR-11 | Configure and discover branch-specific service price, duration, configured concurrent capacity, and activation state. | Implemented |
 | FR-12 | Include bounded branch/offering notification context and require explicit branch/business daily report scope. | Implemented |
 | FR-13 | Discover effective public branches by validated coordinates using deterministic distance, radius/service/open filters, and bounded responses. | Implemented |
+| FR-14 | Search branch-aware availability at an explicit instant using complete operating windows, closures, offering terms/capacity, active bookings, branch queues, and optional distance. | Implemented |
 
 ## Functional Requirements: Planned/Future
 
@@ -63,7 +64,7 @@ Implemented in the current backend:
 | Security and operational audit logging.                            | Future security hardening       |
 | Tenant-scoped authorization for Marketplace businesses/branches.  | Future SaaS hardening           |
 | PostgreSQL persistence and migrations.                             | Planned persistence work        |
-| Branch-aware availability, configured remaining capacity, and tenant isolation. | Future Marketplace/SaaS work |
+| Capacity reservations, staff/wash-bay allocation, and tenant isolation. | Future Marketplace/SaaS work |
 | External email/SMS notification delivery.                          | Future product/platform work    |
 | Payments.                                                          | Future product/platform work    |
 | Ratings and feedback.                                              | Future product capability       |
@@ -94,7 +95,8 @@ Implemented in the current backend:
 - Branch open status requires active business/branch state, a matching half-open weekly interval in the branch timezone, and no active covering temporary closure; public discovery is a separate decision.
 - An offering is effectively active only when its stored state, reusable global service, branch, and owning business are active; discovery additionally requires branch public discovery. Configured concurrent capacity is not remaining capacity.
 - Nearby discovery uses raw Haversine kilometres for filtering/sorting, rounds only output to two decimals with `HALF_UP`, defaults to branch-ID order, and never treats public visibility as anonymous authorization.
+- Branch availability uses one shared decision for search and authoritative booking writes; it requires continuous hours across the complete offering-duration window, excludes active closure intersections and full branch/offering capacity, and never reserves a returned result.
 
 ## Out of Current Scope
 
-The current backend implements in-memory Marketplace registration/scheduling/offerings, nearby straight-line branch discovery, and branch-scoped operational workflows, but does not implement PostgreSQL persistence, payments, tenant isolation, driving routes/traffic/geocoding, remaining-capacity calculation, branch-aware availability, external notification delivery, observability, frontend applications, or production SaaS readiness. Authentication, RBAC, ownership authorization, and secure credential storage are implemented foundations.
+The current backend implements in-memory Marketplace registration/scheduling/offerings, nearby straight-line branch discovery, branch-aware point-in-time availability, and branch-scoped operational workflows, but does not implement PostgreSQL persistence, payments, tenant isolation, driving routes/traffic/geocoding, capacity reservations, staff/bay calendars, external notification delivery, observability, frontend applications, or production SaaS readiness. Authentication, RBAC, ownership authorization, and secure credential storage are implemented foundations.

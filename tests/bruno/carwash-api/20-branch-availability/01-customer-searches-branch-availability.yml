@@ -1,0 +1,31 @@
+info:
+  name: Customer searches branch-aware availability
+  type: http
+  seq: 1
+  tags: [availability, branch, workflow, customer]
+http:
+  method: GET
+  url: "{{baseUrl}}/api/availability/branches?serviceId={{serviceId}}&at={{future47}}Z&latitude=-33.9249&longitude=18.4241"
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("returns bounded branch offering decisions", function() {
+          expect(res.body).to.be.an("array");
+          expect(res.body.length).to.be.greaterThan(0);
+          const result = res.body.find(item => item.branchId === bru.getVar("marketplaceBranchId"));
+          expect(result.serviceId).to.equal(bru.getVar("serviceId"));
+          expect(result.serviceOfferingId).to.equal(bru.getVar("marketplaceOfferingId"));
+          expect(result.price).to.be.a("number");
+          expect(result.capacityRemaining).to.be.greaterThan(0);
+          expect(result.distanceKm).to.be.a("number");
+          expect(result.status).to.equal(undefined);
+          expect(result.reason).to.equal(undefined);
+        });
+        test("distance results use deterministic nearest-first order", function() {
+          const ids = res.body.map(item => item.branchId);
+          expect(ids.indexOf(bru.getVar("marketplaceBranchId"))).to.be.lessThan(ids.indexOf(bru.getVar("marketplaceSecondBranchId")));
+        });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

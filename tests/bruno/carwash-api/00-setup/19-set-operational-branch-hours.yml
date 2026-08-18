@@ -1,0 +1,32 @@
+info:
+  name: Configure run-scoped operational branch hours
+  type: http
+  seq: 19
+  tags: [setup, operations, marketplace, availability]
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/marketplace/branches/{{opsBranchId}}/operating-hours"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body:
+    type: json
+    data: |-
+      {"intervals":[
+        {"dayOfWeek":"MONDAY","opensAt":"08:00:00","closesAt":"17:00:00"},
+        {"dayOfWeek":"TUESDAY","opensAt":"08:00:00","closesAt":"17:00:00"},
+        {"dayOfWeek":"WEDNESDAY","opensAt":"08:00:00","closesAt":"17:00:00"},
+        {"dayOfWeek":"THURSDAY","opensAt":"08:00:00","closesAt":"17:00:00"},
+        {"dayOfWeek":"FRIDAY","opensAt":"08:00:00","closesAt":"17:00:00"},
+        {"dayOfWeek":"SATURDAY","opensAt":"08:00:00","closesAt":"17:00:00"},
+        {"dayOfWeek":"SUNDAY","opensAt":"08:00:00","closesAt":"17:00:00"}
+      ]}
+  auth: { type: bearer, token: "{{ownerToken}}" }
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("stores all weekday intervals", function() { expect(res.body.intervals).to.have.length(7); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

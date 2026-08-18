@@ -30,7 +30,7 @@ flowchart TD
 
 A module publishes its domain types and repository/application contracts only where another capability genuinely needs them. Infrastructure implementations are internal. Existing aggregate references (for example Booking to User, Vehicle, and Service) remain intentional published-domain dependencies; this refactor does not duplicate them into snapshots.
 
-The narrow cross-module read contracts are `UserQuery`, `VehicleQuery`, `BookingQuery`, `QueueQuery`, `MarketplaceQuery`, `BranchScheduleQuery`, `ServiceDefinitionQuery`, `ServiceOfferingQuery`, and `ServiceDefinitionUsageQuery`. Booking and Queue consume detached Marketplace/Catalog snapshots for operational validation; Reporting consumes immutable booking/queue snapshots plus Marketplace scope; Discovery consumes only `MarketplaceQuery`, `BranchScheduleQuery`, `ServiceOfferingQuery`, and `ServiceDefinitionQuery`; resource authorization consumes ownership queries; JWT validation consumes the identity query. Marketplace consumes only shared primitives and publishes detached business/branch snapshots plus an explicit-instant operational open-status decision. Catalog application code consumes only `MarketplaceQuery`; Catalog's reference-check port is implemented in the composition root so Catalog no longer imports Booking or Queue. Neither Marketplace nor Catalog depends on Discovery, so no reverse dependency or cycle is introduced. Identity owns the role/permission catalogue and its credential contract, while Access implements that contract with BCrypt.
+The narrow cross-module read contracts are `UserQuery`, `VehicleQuery`, `BookingQuery`, `BranchAvailabilityQuery`, `QueueQuery`, `MarketplaceQuery`, `BranchScheduleQuery`, `ServiceDefinitionQuery`, `ServiceOfferingQuery`, and `ServiceDefinitionUsageQuery`. Booking owns the shared availability policy and consumes detached Marketplace/Catalog snapshots, Queue's published estimate, and Discovery's distance-calculation port; Queue consumes Marketplace/Catalog contracts; Reporting consumes immutable booking/queue snapshots plus Marketplace scope; Discovery consumes only Marketplace/Catalog application contracts. Marketplace publishes instant and complete-window schedule decisions. Catalog's reference-check port remains implemented in bootstrap, and neither Marketplace nor Catalog depends on Booking or Discovery, so no cycle is introduced.
 
 ## Composition and dependencies
 
@@ -61,6 +61,7 @@ flowchart LR
     Booking --> Vehicle
     Booking --> Catalog
     Booking --> Marketplace
+    Booking --> Discovery
     Booking <--> Queue
     Booking --> Notification
     Queue --> Catalog
@@ -108,6 +109,7 @@ ArchUnit runs with the normal Maven test suite and enforces:
 The rules also keep Marketplace independent of Catalog, keep Catalog domain independent of Marketplace, and allow Catalog to consume only Marketplace's published application surface—not its API, domain, infrastructure, or repositories.
 OPS-001 additionally prevents Booking, Queue, and Reporting application code from accessing Marketplace/Catalog API or infrastructure packages, and prevents Catalog from depending on Booking or Queue.
 GEO-001 additionally confines Discovery's cross-capability access to published Marketplace/Catalog application contracts and prevents Marketplace or Catalog from depending on Discovery.
+AVAIL-002 permits Booking application code to consume Discovery's public distance port/domain coordinate and Queue's published read contract, while prohibiting Discovery, Marketplace, and Catalog from depending on Booking.
 
 ## Decisions
 
@@ -122,8 +124,9 @@ GEO-001 additionally confines Discovery's cross-capability access to published M
 - **Operational scope is canonical:** Booking stores immutable `branchId` and controlled `serviceOfferingId`; Queue inherits both from the canonical booking and partitions every ordering decision by branch.
 - **Reporting scope is explicit:** one `branchId` or `businessId` is required; tenant authorization remains deliberately separate.
 - **Distance is replaceable:** Discovery owns a narrow `DistanceCalculator` application port; the current infrastructure adapter uses the IUGG mean Earth radius (`6371.0088 km`) and no external network service.
+- **Availability is one decision:** Booking owns a detached `BranchAvailabilityQuery`; search and coordinated booking writes share lifecycle, complete-window, and offering-capacity rules while customer/vehicle conflicts remain command-specific.
 - **Spring Modulith deferred:** package conventions plus ArchUnit meet the current need without adding a second architecture framework.
 
 ## Current limitations
 
-Persistence is in memory, elevated operational/Marketplace access remains global until tenant isolation, notifications are in-app only, and reporting remains a basic scoped snapshot. Nearby distance is straight-line rather than driving distance and has no traffic, route, geocoding, external maps, cache, or geospatial index. Offering `concurrentCapacity` is configuration only; remaining-capacity calculation, branch-aware availability, PostgreSQL, messaging, and distributed transactions are intentionally absent. Weekly schedules and temporary closures are not enforced by booking creation in OPS-001 and remain inputs for AVAIL-002.
+Persistence is in memory, elevated operational/Marketplace access remains global until tenant isolation, notifications are in-app only, and reporting remains a basic scoped snapshot. Nearby distance is straight-line rather than driving distance and has no traffic, route, geocoding, external maps, cache, or geospatial index. Availability is a non-reserving snapshot; concurrent bay/staff allocation, PostgreSQL, messaging, and distributed transactions remain intentionally absent.

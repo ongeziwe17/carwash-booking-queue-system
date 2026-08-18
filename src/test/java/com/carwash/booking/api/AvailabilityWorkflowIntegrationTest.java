@@ -7,6 +7,8 @@ import com.carwash.identity.api.dto.CreateUserRequest;
 import com.carwash.vehicle.api.dto.CreateVehicleRequest;
 import com.carwash.marketplace.api.dto.CreateBranchRequest;
 import com.carwash.marketplace.api.dto.CreateBusinessRequest;
+import com.carwash.marketplace.api.dto.ReplaceOperatingHoursRequest;
+import com.carwash.marketplace.api.dto.WeeklyOperatingIntervalRequest;
 import com.carwash.booking.domain.BookingRepository;
 import com.carwash.notification.domain.NotificationRepository;
 import com.carwash.queue.domain.QueueEntryRepository;
@@ -33,6 +35,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.DayOfWeek;
+import java.time.LocalTime;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -96,7 +100,7 @@ class AvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSupport {
     }
 
     @Test
-    void partialAndFullGlobalCapacityStayConsistentWithBookingAndCancellation() throws Exception {
+    void legacyGlobalReadRemainsStableWhileNewBookingCapacityIsOfferingScoped() throws Exception {
         CreateServiceRequest requestedService = createService(30);
         CreateServiceRequest otherService = createService(30);
         LocalDateTime target = FUTURE_DATE.atTime(9, 0);
@@ -112,12 +116,18 @@ class AvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.slots[?(@.startDateTime == '" + target + ":00')]").isEmpty());
 
+        CreateBookingRequest third = bookingRequest(requestedService.serviceId(), target);
+        api.createBooking(third).andExpect(status().isCreated());
         CreateBookingRequest rejected = bookingRequest(requestedService.serviceId(), target);
         api.createBooking(rejected)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
                 .andExpect(jsonPath("$.message").value("Booking time slot is already full"));
 
+        cancel(third.bookingId());
+        availability(requestedService.serviceId(), FUTURE_DATE)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.slots[?(@.startDateTime == '" + target + ":00')]").isEmpty());
         cancel(second.bookingId());
         availability(requestedService.serviceId(), FUTURE_DATE)
                 .andExpect(status().isOk())
@@ -299,6 +309,11 @@ class AvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSupport {
                 "Africa/Johannesburg", true);
         api.createBranch(businessId, branch).andExpect(status().isCreated());
         operationalBranchId = branch.branchId();
+        api.replaceOperatingHours(operationalBranchId, new ReplaceOperatingHoursRequest(
+                java.util.Arrays.stream(DayOfWeek.values())
+                        .map(day -> new WeeklyOperatingIntervalRequest(
+                                day, LocalTime.of(8, 0), LocalTime.of(17, 0)))
+                        .toList())).andExpect(status().isOk());
         return operationalBranchId;
     }
 

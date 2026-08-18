@@ -1,12 +1,16 @@
 package com.carwash.workflow;
 
 import com.carwash.booking.application.BookingManagementService;
+import com.carwash.booking.application.BranchAvailabilityDecisionService;
 import com.carwash.catalog.application.ServiceCatalogService;
 import com.carwash.catalog.application.CreateServiceOfferingCommand;
 import com.carwash.catalog.application.ServiceDefinitionUsageQuery;
 import com.carwash.catalog.application.ServiceOfferingService;
 import com.carwash.marketplace.application.CreateBranchCommand;
 import com.carwash.marketplace.application.MarketplaceManagementService;
+import com.carwash.marketplace.application.BranchSchedulingService;
+import com.carwash.marketplace.application.ReplaceOperatingScheduleCommand;
+import com.carwash.marketplace.application.WeeklyOperatingIntervalCommand;
 import com.carwash.marketplace.application.RegisterBusinessCommand;
 import com.carwash.identity.application.UserManagementService;
 import com.carwash.notification.application.NotificationManagementService;
@@ -32,6 +36,8 @@ import com.carwash.catalog.infrastructure.InMemoryServiceRepository;
 import com.carwash.catalog.infrastructure.InMemoryServiceOfferingRepository;
 import com.carwash.marketplace.infrastructure.InMemoryCarWashBusinessRepository;
 import com.carwash.marketplace.infrastructure.InMemoryCarWashBranchRepository;
+import com.carwash.marketplace.infrastructure.InMemoryBranchOperatingScheduleRepository;
+import com.carwash.marketplace.infrastructure.InMemoryTemporaryBranchClosureRepository;
 import com.carwash.identity.infrastructure.InMemoryUserRepository;
 import com.carwash.vehicle.infrastructure.InMemoryVehicleRepository;
 import com.carwash.access.application.UserCredentialService;
@@ -43,7 +49,9 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.HashSet;
 import java.util.List;
@@ -88,8 +96,12 @@ class AggregateIntegrityServiceTest {
         NotificationManagementService notificationManagement = new NotificationManagementService(
                 notifications, users, bookings, coordinator, new AtomicNotificationIdGenerator(),
                 new NotificationPolicyProperties(10), clock);
-        marketplace = new MarketplaceManagementService(
-                new InMemoryCarWashBusinessRepository(), new InMemoryCarWashBranchRepository(), coordinator, clock);
+        InMemoryCarWashBusinessRepository businesses = new InMemoryCarWashBusinessRepository();
+        InMemoryCarWashBranchRepository branches = new InMemoryCarWashBranchRepository();
+        marketplace = new MarketplaceManagementService(businesses, branches, coordinator, clock);
+        BranchSchedulingService schedules = new BranchSchedulingService(
+                businesses, branches, new InMemoryBranchOperatingScheduleRepository(),
+                new InMemoryTemporaryBranchClosureRepository(), coordinator, clock);
         String businessId = "aggregate-business";
         marketplace.registerBusiness(new RegisterBusinessCommand(
                 businessId, "Aggregate Wash", "aggregate-wash@example.test", "+27821234567", null));
@@ -97,6 +109,11 @@ class AggregateIntegrityServiceTest {
                 "aggregate-branch", "Aggregate Branch", "1 Test Street", null, "Cape Town", "Western Cape",
                 "8001", "ZA", new BigDecimal("-33.9249"), new BigDecimal("18.4241"),
                 "Africa/Johannesburg", true));
+        schedules.replaceOperatingSchedule("aggregate-branch", new ReplaceOperatingScheduleCommand(
+                java.util.Arrays.stream(DayOfWeek.values())
+                        .map(day -> new WeeklyOperatingIntervalCommand(
+                                day, LocalTime.of(8, 0), LocalTime.of(17, 0)))
+                        .toList()));
         ServiceDefinitionUsageQuery usage = new ServiceDefinitionUsageQuery() {
             public boolean referencedByBooking(String serviceId) { return bookings.existsByServiceId(serviceId); }
             public boolean referencedByQueue(String serviceId) { return queues.existsByServiceId(serviceId); }
@@ -111,7 +128,10 @@ class AggregateIntegrityServiceTest {
         bookingManagement = new BookingManagementService(
                 bookings, users, vehicles, serviceCatalog, offeringService, marketplace, queues,
                 notifications, notificationManagement, queueOrdering, coordinator,
-                bookingPolicy, new BookingSlotPolicyService(bookings, bookingPolicy, clock), clock);
+                bookingPolicy, new BookingSlotPolicyService(bookings, bookingPolicy, clock),
+                new BranchAvailabilityDecisionService(
+                        bookings, marketplace, schedules, offeringService, serviceCatalog, bookingPolicy, clock),
+                clock);
         queueManagement = new QueueManagementService(
                 queues, bookings, offeringService, marketplace, notificationManagement, coordinator, queueOrdering, clock);
         userManagement = new UserManagementService(users, mock(UserCredentialService.class), vehicles,

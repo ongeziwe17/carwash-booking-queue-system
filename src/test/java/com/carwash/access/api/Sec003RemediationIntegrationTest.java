@@ -12,6 +12,9 @@ import com.carwash.catalog.application.CreateServiceOfferingCommand;
 import com.carwash.catalog.application.ServiceOfferingService;
 import com.carwash.marketplace.application.CreateBranchCommand;
 import com.carwash.marketplace.application.MarketplaceManagementService;
+import com.carwash.marketplace.application.BranchSchedulingService;
+import com.carwash.marketplace.application.ReplaceOperatingScheduleCommand;
+import com.carwash.marketplace.application.WeeklyOperatingIntervalCommand;
 import com.carwash.marketplace.application.RegisterBusinessCommand;
 import com.carwash.identity.application.UserManagementService;
 import com.carwash.vehicle.application.VehicleManagementService;
@@ -24,6 +27,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -43,6 +49,7 @@ class Sec003RemediationIntegrationTest extends ApiIntegrationTestSupport {
     @Autowired BookingManagementService bookings;
     @Autowired ServiceOfferingService offerings;
     @Autowired MarketplaceManagementService marketplace;
+    @Autowired BranchSchedulingService branchScheduling;
 
     @Test
     void customerCannotTransferExistingBookingToAnotherCustomer() throws Exception {
@@ -63,6 +70,11 @@ class Sec003RemediationIntegrationTest extends ApiIntegrationTestSupport {
         marketplace.createBranch(businessId, new CreateBranchCommand(
                 branchId, "Security Branch", "1 Test Street", null, "Cape Town", "Western Cape", "8001", "ZA",
                 new BigDecimal("-33.9249"), new BigDecimal("18.4241"), "Africa/Johannesburg", true));
+        branchScheduling.replaceOperatingSchedule(branchId, new ReplaceOperatingScheduleCommand(
+                Arrays.stream(DayOfWeek.values())
+                        .map(day -> new WeeklyOperatingIntervalCommand(
+                                day, LocalTime.of(8, 0), LocalTime.of(17, 0)))
+                        .toList()));
         String offeringId = ids.offering();
         offerings.createOffering(branchId, new CreateServiceOfferingCommand(
                 offeringId, serviceId, BigDecimal.valueOf(150), 30, 2));

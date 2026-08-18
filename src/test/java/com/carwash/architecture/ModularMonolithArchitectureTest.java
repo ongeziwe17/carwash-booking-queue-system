@@ -165,6 +165,19 @@ class ModularMonolithArchitectureTest {
                 .check(APPLICATION);
     }
 
+    @Test
+    void availability_uses_only_the_discovery_port_without_a_reverse_dependency() {
+        noClasses().that().resideInAPackage("com.carwash.booking.application..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.carwash.discovery.api..",
+                        "com.carwash.discovery.infrastructure.."
+                )
+                .check(APPLICATION);
+        noClasses().that().resideInAPackage("com.carwash.discovery..")
+                .should().dependOnClassesThat().resideInAPackage("com.carwash.booking..")
+                .check(APPLICATION);
+    }
+
     private static String[] businessPackages() {
         return java.util.Arrays.stream(BUSINESS_MODULES)
                 .map(module -> "com.carwash." + module + "..")

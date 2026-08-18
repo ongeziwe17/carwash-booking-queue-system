@@ -2,12 +2,16 @@ package com.carwash.testsupport;
 
 import com.carwash.booking.application.AvailabilityService;
 import com.carwash.booking.application.BookingManagementService;
+import com.carwash.booking.application.BranchAvailabilityDecisionService;
 import com.carwash.booking.application.BookingSlotPolicyService;
 import com.carwash.catalog.application.ServiceCatalogService;
 import com.carwash.catalog.application.CreateServiceOfferingCommand;
 import com.carwash.catalog.application.ServiceDefinitionUsageQuery;
 import com.carwash.catalog.application.ServiceOfferingService;
 import com.carwash.marketplace.application.CreateBranchCommand;
+import com.carwash.marketplace.application.BranchSchedulingService;
+import com.carwash.marketplace.application.ReplaceOperatingScheduleCommand;
+import com.carwash.marketplace.application.WeeklyOperatingIntervalCommand;
 import com.carwash.marketplace.application.MarketplaceManagementService;
 import com.carwash.marketplace.application.RegisterBusinessCommand;
 import com.carwash.identity.application.UserManagementService;
@@ -35,6 +39,8 @@ import com.carwash.catalog.infrastructure.InMemoryServiceRepository;
 import com.carwash.catalog.infrastructure.InMemoryServiceOfferingRepository;
 import com.carwash.marketplace.infrastructure.InMemoryCarWashBranchRepository;
 import com.carwash.marketplace.infrastructure.InMemoryCarWashBusinessRepository;
+import com.carwash.marketplace.infrastructure.InMemoryBranchOperatingScheduleRepository;
+import com.carwash.marketplace.infrastructure.InMemoryTemporaryBranchClosureRepository;
 import com.carwash.identity.infrastructure.InMemoryUserRepository;
 import com.carwash.vehicle.infrastructure.InMemoryVehicleRepository;
 import com.carwash.access.application.UserCredentialService;
@@ -47,8 +53,11 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 
 public abstract class ServiceTestSupport {
 
@@ -58,6 +67,8 @@ public abstract class ServiceTestSupport {
     protected InMemoryServiceOfferingRepository serviceOfferingRepository;
     protected InMemoryCarWashBusinessRepository businessRepository;
     protected InMemoryCarWashBranchRepository branchRepository;
+    protected InMemoryBranchOperatingScheduleRepository scheduleRepository;
+    protected InMemoryTemporaryBranchClosureRepository closureRepository;
     protected InMemoryBookingRepository bookingRepository;
     protected InMemoryQueueEntryRepository queueRepository;
     protected InMemoryNotificationRepository notificationRepository;
@@ -67,6 +78,7 @@ public abstract class ServiceTestSupport {
     protected VehicleManagementService vehicleService;
     protected ServiceCatalogService catalogService;
     protected MarketplaceManagementService marketplaceService;
+    protected BranchSchedulingService branchSchedulingService;
     protected ServiceOfferingService serviceOfferingService;
     protected BookingManagementService bookingService;
     protected BookingSlotPolicyService bookingSlotPolicy;
@@ -94,6 +106,8 @@ public abstract class ServiceTestSupport {
         serviceOfferingRepository = new InMemoryServiceOfferingRepository();
         businessRepository = new InMemoryCarWashBusinessRepository();
         branchRepository = new InMemoryCarWashBranchRepository();
+        scheduleRepository = new InMemoryBranchOperatingScheduleRepository();
+        closureRepository = new InMemoryTemporaryBranchClosureRepository();
         bookingRepository = new InMemoryBookingRepository();
         queueRepository = new InMemoryQueueEntryRepository();
         notificationRepository = new InMemoryNotificationRepository();
@@ -108,6 +122,8 @@ public abstract class ServiceTestSupport {
         vehicleService = new VehicleManagementService(vehicleRepository, userRepository, bookingRepository, coordinator);
         marketplaceService = new MarketplaceManagementService(
                 businessRepository, branchRepository, coordinator, clock);
+        branchSchedulingService = new BranchSchedulingService(
+                businessRepository, branchRepository, scheduleRepository, closureRepository, coordinator, clock);
         ServiceDefinitionUsageQuery serviceUsage = new ServiceDefinitionUsageQuery() {
             @Override
             public boolean referencedByBooking(String serviceId) {
@@ -130,13 +146,16 @@ public abstract class ServiceTestSupport {
                 new NotificationPolicyProperties(10), clock);
         bookingPolicy = new BookingPolicyProperties(1, Duration.ZERO);
         bookingSlotPolicy = new BookingSlotPolicyService(bookingRepository, bookingPolicy, clock);
+        BranchAvailabilityDecisionService branchAvailability = new BranchAvailabilityDecisionService(
+                bookingRepository, marketplaceService, branchSchedulingService, serviceOfferingService,
+                catalogService, bookingPolicy, clock);
         availabilityService = new AvailabilityService(
                 serviceRepository, bookingSlotPolicy, bookingPolicy, coordinator);
         bookingService = new BookingManagementService(
                 bookingRepository, userRepository, vehicleRepository, catalogService,
                 serviceOfferingService, marketplaceService,
                 queueRepository, notificationRepository, notificationService, queueOrdering, coordinator,
-                bookingPolicy, bookingSlotPolicy, clock);
+                bookingPolicy, bookingSlotPolicy, branchAvailability, clock);
         queueService = new QueueManagementService(
                 queueRepository, bookingRepository, serviceOfferingService, marketplaceService,
                 notificationService, coordinator,
@@ -171,7 +190,8 @@ public abstract class ServiceTestSupport {
     protected String createOffering(com.carwash.catalog.domain.Service service) {
         String offeringId = ids.offering();
         serviceOfferingService.createOffering(ensureDefaultBranch(), new CreateServiceOfferingCommand(
-                offeringId, service.getServiceId(), service.getPrice(), service.getEstimatedDurationMin(), 2));
+                offeringId, service.getServiceId(), service.getPrice(), service.getEstimatedDurationMin(),
+                bookingPolicy.maxActiveBookingsPerSlot()));
         return offeringId;
     }
 
@@ -195,7 +215,15 @@ public abstract class ServiceTestSupport {
                 defaultBranchId, "Test Branch", "1 Test Street", null, "Cape Town", "Western Cape",
                 "8001", "ZA", new BigDecimal("-33.9249"), new BigDecimal("18.4241"),
                 "Africa/Johannesburg", true));
+        replaceFullWeekOperatingHours(defaultBranchId, LocalTime.of(8, 0), LocalTime.of(17, 0));
         return defaultBranchId;
+    }
+
+    protected void replaceFullWeekOperatingHours(String branchId, LocalTime opensAt, LocalTime closesAt) {
+        branchSchedulingService.replaceOperatingSchedule(branchId, new ReplaceOperatingScheduleCommand(
+                Arrays.stream(DayOfWeek.values())
+                        .map(day -> new WeeklyOperatingIntervalCommand(day, opensAt, closesAt))
+                        .toList()));
     }
 
     protected Booking createSavedBooking() {

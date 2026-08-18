@@ -7,6 +7,7 @@ import com.carwash.catalog.api.dto.CreateServiceOfferingRequest;
 import com.carwash.identity.api.dto.CreateUserRequest;
 import com.carwash.marketplace.api.dto.CreateBranchRequest;
 import com.carwash.marketplace.api.dto.CreateBusinessRequest;
+import com.carwash.marketplace.api.dto.ReplaceOperatingHoursRequest;
 import com.carwash.vehicle.api.dto.CreateVehicleRequest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -14,6 +15,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 public final class ApiTestClient {
 
@@ -92,6 +94,16 @@ public final class ApiTestClient {
             CreateServiceOfferingRequest request
     ) throws Exception {
         return mockMvc.perform(post("/api/marketplace/branches/{branchId}/offerings", branchId)
+                .with(authentication.platformAdminJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)));
+    }
+
+    public ResultActions replaceOperatingHours(
+            String branchId,
+            ReplaceOperatingHoursRequest request
+    ) throws Exception {
+        return mockMvc.perform(put("/api/marketplace/branches/{branchId}/operating-hours", branchId)
                 .with(authentication.platformAdminJwt())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)));

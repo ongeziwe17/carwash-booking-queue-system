@@ -124,7 +124,9 @@ class AvailabilityServiceTest extends ServiceTestSupport {
                 bookingRepository, userRepository, vehicleRepository, catalogService,
                 serviceOfferingService, marketplaceService,
                 queueRepository, notificationRepository, notificationService, queueOrdering, coordinator,
-                policy, slots, clock);
+                policy, slots, new BranchAvailabilityDecisionService(
+                        bookingRepository, marketplaceService, branchSchedulingService, serviceOfferingService,
+                        catalogService, policy, clock), clock);
     }
 
     private AvailabilityService availabilityService(

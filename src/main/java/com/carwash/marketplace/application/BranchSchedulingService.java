@@ -15,10 +15,14 @@ import com.carwash.shared.exception.ResourceNotFoundException;
 import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
 
 import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
@@ -181,6 +185,98 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
                     applicableClosure == null ? null : applicableClosure.getReason()
             );
         });
+    }
+
+    @Override
+    public BranchServiceWindowSnapshot getServiceWindowStatus(
+            String branchId,
+            Instant startsAt,
+            Instant endsAt
+    ) {
+        return coordinator.read(() -> {
+            if (startsAt == null || endsAt == null) {
+                throw new BusinessRuleViolationException("Service window start and end are required");
+            }
+            if (!startsAt.isBefore(endsAt)) {
+                throw new BusinessRuleViolationException("Service window start must be before end");
+            }
+
+            CarWashBranch branch = requireBranch(branchId);
+            CarWashBusiness business = requireBusiness(branch.getBusinessId());
+            ZoneId timezone = ZoneId.of(branch.getTimezone());
+            ZonedDateTime localStart = startsAt.atZone(timezone);
+            ZonedDateTime localEnd = endsAt.atZone(timezone);
+            boolean effectiveActive = branch.isActive() && business.isActive();
+            boolean withinWeeklyHours = scheduleRepository.findById(branch.getBranchId())
+                    .map(schedule -> coversServiceWindow(schedule, startsAt, endsAt, timezone))
+                    .orElse(false);
+            TemporaryBranchClosure applicableClosure = closureRepository.findByBranchId(branch.getBranchId()).stream()
+                    .filter(closure -> closure.overlaps(startsAt, endsAt))
+                    .findFirst()
+                    .orElse(null);
+            boolean temporarilyClosed = applicableClosure != null;
+
+            return new BranchServiceWindowSnapshot(
+                    branch.getBranchId(),
+                    startsAt,
+                    endsAt,
+                    timezone.getId(),
+                    localStart,
+                    localEnd,
+                    effectiveActive,
+                    withinWeeklyHours,
+                    temporarilyClosed,
+                    effectiveActive && withinWeeklyHours && !temporarilyClosed,
+                    applicableClosure == null ? null : applicableClosure.getClosureId(),
+                    applicableClosure == null ? null : applicableClosure.getReason()
+            );
+        });
+    }
+
+    private boolean coversServiceWindow(
+            BranchOperatingSchedule schedule,
+            Instant startsAt,
+            Instant endsAt,
+            ZoneId timezone
+    ) {
+        LocalDate firstLocalDate = startsAt.atZone(timezone).toLocalDate().minusDays(1);
+        LocalDate lastLocalDate = endsAt.atZone(timezone).toLocalDate();
+        List<InstantRange> operatingRanges = new ArrayList<>();
+
+        for (LocalDate date = firstLocalDate; !date.isAfter(lastLocalDate); date = date.plusDays(1)) {
+            DayOfWeek day = date.getDayOfWeek();
+            for (WeeklyOperatingInterval interval : schedule.getIntervals()) {
+                if (interval.dayOfWeek() != day) {
+                    continue;
+                }
+                LocalDateTime localOpening = date.atTime(interval.opensAt());
+                LocalDate closingDate = interval.isOvernight() ? date.plusDays(1) : date;
+                LocalDateTime localClosing = closingDate.atTime(interval.closesAt());
+                operatingRanges.add(new InstantRange(
+                        localOpening.atZone(timezone).toInstant(),
+                        localClosing.atZone(timezone).toInstant()
+                ));
+            }
+        }
+
+        operatingRanges.sort(Comparator.comparing(InstantRange::startInclusive));
+        Instant coveredUntil = startsAt;
+        for (InstantRange range : operatingRanges) {
+            if (!range.endExclusive().isAfter(coveredUntil)) {
+                continue;
+            }
+            if (range.startInclusive().isAfter(coveredUntil)) {
+                return false;
+            }
+            coveredUntil = range.endExclusive();
+            if (!coveredUntil.isBefore(endsAt)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private record InstantRange(Instant startInclusive, Instant endExclusive) {
     }
 
     private WeeklyOperatingInterval toDomainInterval(WeeklyOperatingIntervalCommand command) {

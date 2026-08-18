@@ -2,9 +2,9 @@
 
 TEST-001 separates fast unit/repository/service tests from Spring API integration tests and makes isolation, test data, execution order, and release-gate behaviour explicit.
 
-## Current GEO-001 inventory
+## Current AVAIL-002 inventory
 
-GEO-001 adds focused coordinate/Haversine edge tests, discovery orchestration tests, lifecycle-regression coverage, API/security tests, architecture contracts, and OpenAPI metadata checks. The verified inventory is **332 unit tests**, **154 integration tests**, exactly **67 OpenAPI operations**, and **505 Bruno requests / 1,650 Bruno tests**. The complete suite remains randomized and repeatable under seeds `11001` and `11002`. JaCoCo reports 89.84% instruction, 67.99% branch, 91.52% line, and 71.54% complexity coverage; all configured thresholds pass. Dockerfile lint, Compose validation, image build, non-root/runtime smoke checks, and the fixed-critical vulnerability gate pass. The scan baseline contains no critical vulnerabilities; its 12 high-severity findings remain tracked by the existing baseline policy.
+AVAIL-002 adds complete-window scheduling tests, shared booking/search decision tests, offering-scoped overlap/cancellation capacity tests, queue relevance, distance boundary/order, branch-local request-time validation, API/security, architecture, and OpenAPI metadata coverage. The expected inventory is **342 unit tests**, **159 integration tests**, exactly **68 OpenAPI operations**, and **512 Bruno requests / 1,664 Bruno tests**; CI results remain authoritative. The complete suite remains randomized and repeatable under seeds `11001` and `11002`, with the existing JaCoCo, Docker, workflow, and vulnerability thresholds unchanged.
 
 ## Baseline inventory before TEST-001
 

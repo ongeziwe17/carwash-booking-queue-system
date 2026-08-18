@@ -1,0 +1,16 @@
+info:
+  name: Branch availability rejects partial coordinates
+  type: http
+  seq: 3
+  tags: [availability, validation]
+http:
+  method: GET
+  url: "{{baseUrl}}/api/availability/branches?serviceId={{serviceId}}&at={{future47}}Z&latitude=-33.9249"
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 400", function() { expect(res.status).to.equal(400); });
+        test("uses standard error contract", function() { expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); expect(res.body.message).to.include("supplied together"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -64,7 +64,7 @@ The current backend does not include a frontend application, durable PostgreSQL 
 
 **Description:** The system requires each booking to reference a valid user-owned vehicle, Marketplace branch, and branch service offering, and preserves that scope through its lifecycle.
 
-**Status:** Implemented for backend workflows. Marketplace-hours enforcement and configured-capacity availability remain future work.
+**Status:** Implemented for backend workflows. New bookings, offering changes, and rescheduling share branch-hours, closure, offering-capacity, and lifecycle validation with branch-aware availability search.
 
 ### FR4: Queue Management
 

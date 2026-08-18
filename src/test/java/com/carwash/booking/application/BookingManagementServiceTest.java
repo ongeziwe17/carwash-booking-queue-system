@@ -26,6 +26,8 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
@@ -117,21 +119,23 @@ class BookingManagementServiceTest extends ServiceTestSupport {
     @Test
     void createBookingRejectsFullTimeSlot() {
         LocalDateTime scheduled = TestDates.futureDays(3);
-        bookingService.createBooking(newBookingWithFixture(scheduled));
-        Booking overlapping = newBookingWithFixture(scheduled);
+        Booking existing = bookingService.createBooking(newBookingWithFixture(scheduled));
+        Booking overlapping = newBookingForScope(existing, scheduled);
         BusinessRuleViolationException exception = assertThrows(
                 BusinessRuleViolationException.class, () -> bookingService.createBooking(overlapping));
         assertTrue(exception.getMessage().contains("time slot"));
     }
 
     @Test
-    void configuredCapacityAllowsTwoActiveBookingsButRejectsThird() {
+    void offeringCapacityAllowsTwoActiveBookingsButRejectsThird() {
         BookingManagementService capacityTwo = bookingServiceWithPolicy(2, Duration.ZERO);
         LocalDateTime scheduled = TestDates.futureDays(7);
 
         Booking first = newBookingWithFixture(scheduled);
-        Booking second = newBookingWithFixture(scheduled);
-        Booking third = newBookingWithFixture(scheduled);
+        serviceOfferingService.updateOffering(first.getServiceOfferingId(), new UpdateServiceOfferingCommand(
+                first.getService().getPrice(), first.getService().getEstimatedDurationMin(), 2));
+        Booking second = newBookingForScope(first, scheduled);
+        Booking third = newBookingForScope(first, scheduled);
 
         assertEquals(first.getBookingId(), capacityTwo.createBooking(first).getBookingId());
         assertEquals(second.getBookingId(), capacityTwo.createBooking(second).getBookingId());
@@ -143,7 +147,7 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         LocalDateTime scheduled = TestDates.futureDays(4);
         Booking cancelled = bookingService.createBooking(newBookingWithFixture(scheduled));
         bookingService.cancelBooking(cancelled.getBookingId(), cancelled.getUser().getUserId());
-        Booking replacement = newBookingWithFixture(scheduled);
+        Booking replacement = newBookingForScope(cancelled, scheduled);
         assertEquals(replacement.getBookingId(), bookingService.createBooking(replacement).getBookingId());
     }
 
@@ -367,7 +371,8 @@ class BookingManagementServiceTest extends ServiceTestSupport {
     @Test
     void rescheduleUsesConfiguredCutoffBeforeInsideAndAtBoundary() {
         BookingManagementService twoHourWindow = bookingServiceWithPolicy(1, Duration.ofHours(2));
-        LocalDateTime now = LocalDateTime.now(clock);
+        replaceFullWeekOperatingHours(ensureDefaultBranch(), LocalTime.of(8, 0), LocalTime.of(23, 0));
+        LocalDateTime now = branchLocalNow();
         Booking beforeCutoff = twoHourWindow.createBooking(newBookingWithFixture(now.plusHours(3)));
         Booking insideCutoff = twoHourWindow.createBooking(newBookingWithFixture(now.plusHours(1)));
         Booking atCutoff = twoHourWindow.createBooking(newBookingWithFixture(now.plusHours(2)));
@@ -383,7 +388,8 @@ class BookingManagementServiceTest extends ServiceTestSupport {
     @Test
     void rescheduleCutoffDoesNotImposeMinimumLeadTimeOnNewSchedule() {
         BookingManagementService twoHourWindow = bookingServiceWithPolicy(1, Duration.ofHours(2));
-        LocalDateTime now = LocalDateTime.now(clock);
+        replaceFullWeekOperatingHours(ensureDefaultBranch(), LocalTime.of(8, 0), LocalTime.of(23, 0));
+        LocalDateTime now = branchLocalNow();
         Booking booking = twoHourWindow.createBooking(newBookingWithFixture(now.plusDays(4)));
 
         assertEquals(now.plusHours(1),
@@ -395,7 +401,7 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         LocalDateTime original = TestDates.futureDays(47);
         LocalDateTime target = TestDates.futureDays(48);
         Booking moving = bookingService.createBooking(newBookingWithFixture(original));
-        Booking occupying = bookingService.createBooking(newBookingWithFixture(target));
+        Booking occupying = bookingService.createBooking(newBookingForScope(moving, target));
 
         BusinessRuleViolationException exception = assertThrows(BusinessRuleViolationException.class,
                 () -> bookingService.rescheduleBooking(moving.getBookingId(), target));
@@ -570,7 +576,7 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         LocalDateTime secondOriginal = TestDates.futureDays(71);
         LocalDateTime target = TestDates.futureDays(72);
         Booking first = bookingService.createBooking(newBookingWithFixture(firstOriginal));
-        Booking second = bookingService.createBooking(newBookingWithFixture(secondOriginal));
+        Booking second = bookingService.createBooking(newBookingForScope(first, secondOriginal));
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -654,7 +660,7 @@ class BookingManagementServiceTest extends ServiceTestSupport {
 
     @Test
     void zeroCancellationWindowPreservesFutureBookingCancellation() {
-        LocalDateTime scheduled = LocalDateTime.now(clock).plusMinutes(30);
+        LocalDateTime scheduled = branchLocalNow().plusMinutes(30);
         Booking booking = bookingService.createBooking(newBookingWithFixture(scheduled));
 
         assertEquals(BookingStatus.CANCELLED,
@@ -664,7 +670,8 @@ class BookingManagementServiceTest extends ServiceTestSupport {
     @Test
     void configuredCancellationWindowAllowsBeforeCutoffAndRejectsAfterCutoff() {
         BookingManagementService twoHourWindow = bookingServiceWithPolicy(1, Duration.ofHours(2));
-        LocalDateTime now = LocalDateTime.now(clock);
+        replaceFullWeekOperatingHours(ensureDefaultBranch(), LocalTime.of(8, 0), LocalTime.of(23, 0));
+        LocalDateTime now = branchLocalNow();
         Booking outsideWindow = twoHourWindow.createBooking(newBookingWithFixture(now.plusHours(3)));
         Booking insideWindow = twoHourWindow.createBooking(newBookingWithFixture(now.plusHours(1)));
 
@@ -679,7 +686,7 @@ class BookingManagementServiceTest extends ServiceTestSupport {
     void cancellationIsRejectedAtExactConfiguredCutoff() {
         BookingManagementService twoHourWindow = bookingServiceWithPolicy(1, Duration.ofHours(2));
         Booking booking = twoHourWindow.createBooking(
-                newBookingWithFixture(LocalDateTime.now(clock).plusHours(2)));
+                newBookingWithFixture(branchLocalNow().plusHours(2)));
 
         assertThrows(BusinessRuleViolationException.class,
                 () -> twoHourWindow.cancelBooking(booking.getBookingId(), booking.getUser().getUserId()));
@@ -736,6 +743,18 @@ class BookingManagementServiceTest extends ServiceTestSupport {
                 new BookingPolicyProperties(capacity, cancellationWindow));
     }
 
+    private LocalDateTime branchLocalNow() {
+        return LocalDateTime.ofInstant(clock.instant(), ZoneId.of("Africa/Johannesburg"));
+    }
+
+    private Booking newBookingForScope(Booking scope, LocalDateTime scheduledDateTime) {
+        User user = registerUser();
+        Vehicle vehicle = createVehicle(user);
+        return new Booking(
+                ids.booking(), user, vehicle, scope.getBranchId(), scope.getServiceOfferingId(),
+                scope.getService(), scheduledDateTime, "same offering capacity");
+    }
+
     private BookingManagementService bookingServiceWithRepositories(
             BookingRepository bookings,
             NotificationManagementService notifications,
@@ -745,7 +764,11 @@ class BookingManagementServiceTest extends ServiceTestSupport {
                 bookings, userRepository, vehicleRepository, catalogService,
                 serviceOfferingService, marketplaceService,
                 queueRepository, notificationRepository, notifications, queueOrdering, coordinator, policy,
-                new BookingSlotPolicyService(bookings, policy, clock), clock);
+                new BookingSlotPolicyService(bookings, policy, clock),
+                new BranchAvailabilityDecisionService(
+                        bookings, marketplaceService, branchSchedulingService, serviceOfferingService,
+                        catalogService, policy, clock),
+                clock);
     }
 
     private boolean attemptConcurrentReschedule(
