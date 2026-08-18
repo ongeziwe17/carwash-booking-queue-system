@@ -110,7 +110,8 @@ class BookingReschedulingIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(jsonPath("$.fieldErrors[?(@.field == 'scheduledDateTime')]").exists());
         reschedule(created.booking().bookingId(), TestDates.past())
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+                .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
+                .andExpect(jsonPath("$.message").value("Scheduled date/time must be in the future"));
         reschedule("missing-booking", TestDates.futureDays(87))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))

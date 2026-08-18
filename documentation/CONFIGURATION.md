@@ -15,7 +15,7 @@ Runtime policy values are bound to validated Spring `@ConfigurationProperties` r
 | `carwash.policy.queue.default-service-duration` | `CARWASH_QUEUE_DEFAULT_SERVICE_DURATION` | `Duration` | `PT10M` | greater than zero | Retained validated CONFIG-001 compatibility setting. OPS-001 queue entries always resolve their offering duration and never fall back to this value. |
 | `carwash.runtime.time-zone` | `CARWASH_TIME_ZONE` | `ZoneId` | `UTC` | valid Java/IANA zone ID | Zone used by the application `Clock` for local date/time policy decisions plus queue and notification lifecycle timestamps. |
 
-`UTC` is the explicit runtime default because the current product documentation does not establish one business operating geography. It avoids inheriting a developer machine or container timezone. An environment with a defined local business zone can override it, for example `Africa/Johannesburg`. Bean Validation time constraints such as booking `@Future` validation use the same application `Clock`, so request validation and service policy decisions interpret local date/time values consistently.
+`UTC` is the explicit runtime default because the current product documentation does not establish one business operating geography. It avoids inheriting a developer machine or container timezone. An environment with a defined local business zone can override it, for example `Africa/Johannesburg`. Booking request DTOs validate required local date/time syntax, while the shared availability decision resolves future-time validity against the selected branch timezone; a timezone-less Bean Validation `@Future` check is deliberately avoided.
 
 ## Duration values
 

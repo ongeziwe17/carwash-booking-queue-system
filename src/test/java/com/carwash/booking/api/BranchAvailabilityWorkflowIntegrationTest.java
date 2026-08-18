@@ -113,6 +113,52 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
     }
 
     @Test
+    void timezoneLessBookingInputIsValidatedAgainstTheSelectedBranchTimezone() throws Exception {
+        String businessId = ids.business();
+        String branchId = ids.branch();
+        String serviceId = ids.service();
+        String offeringId = ids.offering();
+        api.createBusiness(new CreateBusinessRequest(
+                businessId, "Pacific Availability", ids.emailFor(businessId), "+27821234567", null))
+                .andExpect(status().isCreated());
+        api.createBranch(businessId, new CreateBranchRequest(
+                branchId, "Pacific Branch", "1 Main Road", null, "Los Angeles", "California", "90001", "US",
+                new BigDecimal("34.0522"), new BigDecimal("-118.2437"), "America/Los_Angeles", true))
+                .andExpect(status().isCreated());
+        api.replaceOperatingHours(branchId, new ReplaceOperatingHoursRequest(List.of(
+                new WeeklyOperatingIntervalRequest(
+                        DayOfWeek.SUNDAY, LocalTime.of(0, 0), LocalTime.of(5, 0)))))
+                .andExpect(status().isOk());
+        api.createService(new CreateServiceRequest(
+                serviceId, "Pacific Wash", "Timezone validation", new BigDecimal("90.00"), 30))
+                .andExpect(status().isCreated());
+        api.createServiceOffering(branchId, new CreateServiceOfferingRequest(
+                offeringId, serviceId, new BigDecimal("110.00"), 30, 1))
+                .andExpect(status().isCreated());
+        CreateUserRequest user = UserFixtureBuilder.valid(ids).build();
+        api.createUser(user).andExpect(status().isCreated());
+        CreateVehicleRequest vehicle = VehicleFixtureBuilder.valid(ids, user.userId()).build();
+        api.createVehicle(vehicle).andExpect(status().isCreated());
+
+        String requestedAt = "2090-01-15T01:00:00-08:00";
+        mockMvc.perform(get("/api/availability/branches")
+                        .with(reader()).param("serviceId", serviceId).param("at", requestedAt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].branchId", contains(branchId)))
+                .andExpect(jsonPath("$[0].availableStartAt").value(requestedAt));
+
+        CreateBookingRequest booking = BookingFixtureBuilder.valid(
+                        ids, user.userId(), vehicle.vehicleId(), branchId, offeringId)
+                .scheduledDateTime(LocalDateTime.of(2090, 1, 15, 1, 0))
+                .build();
+        api.createBooking(booking).andExpect(status().isCreated());
+        mockMvc.perform(get("/api/availability/branches")
+                        .with(reader()).param("serviceId", serviceId).param("at", requestedAt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
     void validationAuthenticationAndAuthorizationUseStandardErrors() throws Exception {
         Fixture fixture = fixture();
         mockMvc.perform(get("/api/availability/branches")
