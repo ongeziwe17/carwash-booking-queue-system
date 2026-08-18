@@ -12,6 +12,7 @@ import com.carwash.catalog.domain.ServiceOfferingStatus;
 import com.carwash.identity.domain.User;
 import com.carwash.marketplace.application.BranchOpenStatusSnapshot;
 import com.carwash.marketplace.application.BranchScheduleQuery;
+import com.carwash.marketplace.application.BranchServiceWindowSnapshot;
 import com.carwash.marketplace.application.BranchSnapshot;
 import com.carwash.marketplace.application.BusinessSnapshot;
 import com.carwash.marketplace.application.MarketplaceQuery;
@@ -25,8 +26,10 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -98,9 +101,7 @@ class BranchAvailabilityDecisionServiceTest {
         assertEquals(BranchAvailabilityReason.INACTIVE_SERVICE,
                 service(true, true, false).evaluate("branch-1", "offering-1", START, null).reason());
 
-        BranchScheduleQuery closedWindow = (branchId, requestedAt) -> new BranchOpenStatusSnapshot(
-                branchId, requestedAt, "Africa/Johannesburg", requestedAt.atZone(ZoneId.of("Africa/Johannesburg")),
-                true, false, false, false, null, null);
+        BranchScheduleQuery closedWindow = schedules(false, null);
         BranchAvailabilityDecisionService closed = new BranchAvailabilityDecisionService(
                 bookings, marketplace(true), closedWindow, offerings(true), definitions(true),
                 policy(), clock());
@@ -108,17 +109,96 @@ class BranchAvailabilityDecisionServiceTest {
                 closed.evaluate("branch-1", "offering-1", START, null).reason());
     }
 
+    @Test
+    void arbitraryWholeMinuteIntervalsAlignFromTheOperatingWindowStart() {
+        ZoneId zone = ZoneId.of("Africa/Johannesburg");
+        LocalDateTime opening = LocalDateTime.of(2030, 1, 7, 8, 0);
+        BranchAvailabilityDecisionService fortyFiveMinutes = service(
+                true, true, true,
+                new BookingPolicyProperties(99, Duration.ZERO, LocalTime.of(8, 0),
+                        LocalTime.of(17, 0), Duration.ofMinutes(45)),
+                schedules(true, opening.atZone(zone)));
+
+        assertTrue(fortyFiveMinutes.evaluate("branch-1", "offering-1",
+                opening.atZone(zone).toInstant(), null).available());
+        assertTrue(fortyFiveMinutes.evaluate("branch-1", "offering-1",
+                opening.plusMinutes(45).atZone(zone).toInstant(), null).available());
+        assertEquals(BranchAvailabilityReason.MISALIGNED_SLOT,
+                fortyFiveMinutes.evaluate("branch-1", "offering-1",
+                        opening.plusMinutes(15).atZone(zone).toInstant(), null).reason());
+
+        LocalDateTime offsetOpening = LocalDateTime.of(2030, 1, 7, 8, 15);
+        BranchAvailabilityDecisionService thirtyMinutes = service(
+                true, true, true,
+                new BookingPolicyProperties(99, Duration.ZERO, LocalTime.of(8, 0),
+                        LocalTime.of(17, 0), Duration.ofMinutes(30)),
+                schedules(true, offsetOpening.atZone(zone)));
+        assertTrue(thirtyMinutes.evaluate("branch-1", "offering-1",
+                offsetOpening.atZone(zone).toInstant(), null).available());
+        assertTrue(thirtyMinutes.evaluate("branch-1", "offering-1",
+                offsetOpening.plusMinutes(30).atZone(zone).toInstant(), null).available());
+    }
+
+    @Test
+    void fractionalOperatingWindowPrecisionIsPreservedForAlignment() {
+        ZoneId zone = ZoneId.of("Africa/Johannesburg");
+        ZonedDateTime opening = LocalDateTime.of(2030, 1, 7, 8, 0, 0, 100_000_000).atZone(zone);
+        BranchAvailabilityDecisionService precise = service(
+                true, true, true,
+                new BookingPolicyProperties(99, Duration.ZERO, LocalTime.of(8, 0),
+                        LocalTime.of(17, 0), Duration.ofMinutes(45)),
+                schedules(true, opening));
+
+        assertTrue(precise.evaluate("branch-1", "offering-1", opening.toInstant(), null).available());
+        assertTrue(precise.evaluate(
+                "branch-1", "offering-1", opening.plusMinutes(45).toInstant(), null).available());
+        assertEquals(BranchAvailabilityReason.MISALIGNED_SLOT,
+                precise.evaluate("branch-1", "offering-1",
+                        opening.plusMinutes(45).minusNanos(100_000_000).toInstant(), null).reason());
+    }
+
     private BranchAvailabilityDecisionService service(
             boolean branchActive,
             boolean offeringActive,
             boolean serviceActive
     ) {
-        BranchScheduleQuery open = (branchId, requestedAt) -> new BranchOpenStatusSnapshot(
-                branchId, requestedAt, "Africa/Johannesburg", requestedAt.atZone(ZoneId.of("Africa/Johannesburg")),
-                true, true, false, true, null, null);
+        return service(branchActive, offeringActive, serviceActive, policy(), schedules(
+                true, LocalDateTime.of(2030, 1, 7, 8, 0).atZone(ZoneId.of("Africa/Johannesburg"))));
+    }
+
+    private BranchAvailabilityDecisionService service(
+            boolean branchActive,
+            boolean offeringActive,
+            boolean serviceActive,
+            BookingPolicyProperties bookingPolicy,
+            BranchScheduleQuery schedules
+    ) {
         return new BranchAvailabilityDecisionService(
-                bookings, marketplace(branchActive), open, offerings(offeringActive), definitions(serviceActive),
-                policy(), clock());
+                bookings, marketplace(branchActive), schedules, offerings(offeringActive), definitions(serviceActive),
+                bookingPolicy, clock());
+    }
+
+    private BranchScheduleQuery schedules(boolean open, ZonedDateTime operatingWindowStartsAt) {
+        ZoneId zone = ZoneId.of("Africa/Johannesburg");
+        return new BranchScheduleQuery() {
+            @Override
+            public BranchOpenStatusSnapshot getOpenStatus(String branchId, Instant requestedAt) {
+                return new BranchOpenStatusSnapshot(
+                        branchId, requestedAt, zone.getId(), requestedAt.atZone(zone),
+                        true, open, false, open, null, null);
+            }
+
+            @Override
+            public BranchServiceWindowSnapshot getServiceWindowStatus(
+                    String branchId,
+                    Instant startsAt,
+                    Instant endsAt
+            ) {
+                return new BranchServiceWindowSnapshot(
+                        branchId, startsAt, endsAt, zone.getId(), startsAt.atZone(zone), endsAt.atZone(zone),
+                        operatingWindowStartsAt, true, open, false, open, null, null);
+            }
+        };
     }
 
     private MarketplaceQuery marketplace(boolean active) {

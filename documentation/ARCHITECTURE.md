@@ -124,7 +124,7 @@ AVAIL-002 permits Booking application code to consume Discovery's public distanc
 - **Operational scope is canonical:** Booking stores immutable `branchId` and controlled `serviceOfferingId`; Queue inherits both from the canonical booking and partitions every ordering decision by branch.
 - **Reporting scope is explicit:** one `branchId` or `businessId` is required; tenant authorization remains deliberately separate.
 - **Distance is replaceable:** Discovery owns a narrow `DistanceCalculator` application port; the current infrastructure adapter uses the IUGG mean Earth radius (`6371.0088 km`) and no external network service.
-- **Availability is one decision:** Booking owns a detached `BranchAvailabilityQuery`; search and coordinated booking writes share lifecycle, complete-window, and offering-capacity rules while customer/vehicle conflicts remain command-specific.
+- **Availability is one decision:** Booking owns a detached `BranchAvailabilityQuery`; search and coordinated booking writes share lifecycle, continuous-window-anchored slot alignment, complete-window, and offering-capacity rules while customer/vehicle conflicts remain command-specific. Marketplace publishes the immutable applicable window anchor without exposing its repositories or schedule aggregates.
 - **Spring Modulith deferred:** package conventions plus ArchUnit meet the current need without adding a second architecture framework.
 
 ## Current limitations

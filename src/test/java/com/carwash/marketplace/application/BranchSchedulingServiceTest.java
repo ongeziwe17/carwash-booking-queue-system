@@ -18,6 +18,7 @@ import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalTime;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 
@@ -150,6 +151,42 @@ class BranchSchedulingServiceTest {
                 "branch-overnight",
                 Instant.parse("2030-01-07T19:30:00Z"),
                 Instant.parse("2030-01-07T23:30:00Z")).open());
+    }
+
+    @Test
+    void serviceWindowReportsContinuousSplitAndOvernightAlignmentAnchors() {
+        createBranch("branch-anchors", "Africa/Johannesburg", true);
+        scheduling.replaceOperatingSchedule("branch-anchors", new ReplaceOperatingScheduleCommand(List.of(
+                new WeeklyOperatingIntervalCommand(
+                        DayOfWeek.MONDAY, LocalTime.of(8, 0), LocalTime.of(10, 0)),
+                new WeeklyOperatingIntervalCommand(
+                        DayOfWeek.MONDAY, LocalTime.of(10, 0), LocalTime.of(12, 0)),
+                new WeeklyOperatingIntervalCommand(
+                        DayOfWeek.MONDAY, LocalTime.of(13, 0), LocalTime.of(17, 0)),
+                new WeeklyOperatingIntervalCommand(
+                        DayOfWeek.MONDAY, LocalTime.of(20, 0), LocalTime.of(2, 0))
+        )));
+
+        BranchServiceWindowSnapshot adjacent = scheduling.getServiceWindowStatus(
+                "branch-anchors",
+                Instant.parse("2030-01-07T08:15:00Z"),
+                Instant.parse("2030-01-07T08:45:00Z"));
+        assertEquals(LocalDateTime.of(2030, 1, 7, 8, 0),
+                adjacent.branchLocalOperatingWindowStartsAt().toLocalDateTime());
+
+        BranchServiceWindowSnapshot split = scheduling.getServiceWindowStatus(
+                "branch-anchors",
+                Instant.parse("2030-01-07T11:15:00Z"),
+                Instant.parse("2030-01-07T11:45:00Z"));
+        assertEquals(LocalDateTime.of(2030, 1, 7, 13, 0),
+                split.branchLocalOperatingWindowStartsAt().toLocalDateTime());
+
+        BranchServiceWindowSnapshot overnight = scheduling.getServiceWindowStatus(
+                "branch-anchors",
+                Instant.parse("2030-01-07T22:30:00Z"),
+                Instant.parse("2030-01-07T23:00:00Z"));
+        assertEquals(LocalDateTime.of(2030, 1, 7, 20, 0),
+                overnight.branchLocalOperatingWindowStartsAt().toLocalDateTime());
     }
 
     @Test

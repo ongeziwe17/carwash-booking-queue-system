@@ -23,6 +23,19 @@ runtime:
           expect(result.distanceKm).to.be.a("number");
           expect(result.status).to.equal(undefined);
           expect(result.reason).to.equal(undefined);
+          expect(result.createdAt).to.equal(undefined);
+          expect(result.updatedAt).to.equal(undefined);
+          expect(result.effectiveActive).to.equal(undefined);
+        });
+        test("returns eligible branches from distinct businesses with independent offering terms", function() {
+          const first = res.body.find(item => item.branchId === bru.getVar("marketplaceBranchId"));
+          const second = res.body.find(item => item.branchId === bru.getVar("marketplaceSecondBranchId"));
+          expect(first).to.not.equal(undefined);
+          expect(second).to.not.equal(undefined);
+          expect(first.businessId).to.not.equal(second.businessId);
+          expect(first.serviceOfferingId).to.not.equal(second.serviceOfferingId);
+          expect(first.price).to.not.equal(second.price);
+          expect(first.estimatedDurationMin).to.not.equal(second.estimatedDurationMin);
         });
         test("distance results use deterministic nearest-first order", function() {
           const ids = res.body.map(item => item.branchId);

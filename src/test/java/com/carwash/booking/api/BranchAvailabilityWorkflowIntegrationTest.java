@@ -9,6 +9,7 @@ import com.carwash.marketplace.api.dto.CreateBusinessRequest;
 import com.carwash.marketplace.api.dto.CreateTemporaryClosureRequest;
 import com.carwash.marketplace.api.dto.ReplaceOperatingHoursRequest;
 import com.carwash.marketplace.api.dto.WeeklyOperatingIntervalRequest;
+import com.carwash.queue.api.dto.CreateQueueEntryRequest;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.BookingFixtureBuilder;
 import com.carwash.testsupport.UserFixtureBuilder;
@@ -60,6 +61,9 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
                 .andExpect(jsonPath("$[0].distanceKm").isNumber())
                 .andExpect(jsonPath("$[0].status").doesNotExist())
                 .andExpect(jsonPath("$[0].reason").doesNotExist())
+                .andExpect(jsonPath("$[0].createdAt").doesNotExist())
+                .andExpect(jsonPath("$[0].updatedAt").doesNotExist())
+                .andExpect(jsonPath("$[0].effectiveActive").doesNotExist())
                 .andExpect(jsonPath("$[1].price").value(175.50))
                 .andExpect(jsonPath("$[1].estimatedDurationMin").value(60))
                 .andExpect(jsonPath("$[1].concurrentCapacity").value(2));
@@ -79,6 +83,95 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
         search(fixture.serviceId(), AT)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[*].branchId", contains(fixture.nearBranch(), fixture.farBranch())));
+    }
+
+    @Test
+    void multiBusinessLifecycleAndCapacityRemainIsolated() throws Exception {
+        Fixture fixture = fixture();
+
+        mockMvc.perform(post("/api/marketplace/businesses/{id}/deactivate", fixture.nearBusiness())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk());
+        search(fixture.serviceId(), AT)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].branchId", contains(fixture.farBranch())));
+
+        mockMvc.perform(post("/api/marketplace/businesses/{id}/activate", fixture.nearBusiness())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk());
+        search(fixture.serviceId(), AT)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].branchId", contains(fixture.nearBranch(), fixture.farBranch())));
+
+        CreateBookingRequest booking = BookingFixtureBuilder.valid(
+                        ids, fixture.userId(), fixture.vehicleId(), fixture.nearBranch(), fixture.nearOffering())
+                .scheduledDateTime(LocalDateTime.of(2090, 1, 15, 9, 0))
+                .build();
+        api.createBooking(booking).andExpect(status().isCreated());
+        search(fixture.serviceId(), AT)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].branchId", contains(fixture.farBranch())))
+                .andExpect(jsonPath("$[0].capacityRemaining").value(2));
+
+        mockMvc.perform(post("/api/bookings/{id}/cancel", booking.bookingId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk());
+        search(fixture.serviceId(), AT)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].branchId", contains(fixture.nearBranch(), fixture.farBranch())))
+                .andExpect(jsonPath("$[0].capacityRemaining").value(1))
+                .andExpect(jsonPath("$[1].capacityRemaining").value(2));
+    }
+
+    @Test
+    void realQueueEstimatesAreCurrentDateOnlyBranchIsolatedAndIgnoreCompletedWork() throws Exception {
+        Fixture fixture = fixture(2);
+        CreateBookingRequest booking = BookingFixtureBuilder.valid(
+                        ids, fixture.userId(), fixture.vehicleId(), fixture.nearBranch(), fixture.nearOffering())
+                .scheduledDateTime(LocalDateTime.of(2090, 1, 15, 9, 0))
+                .build();
+        api.createBooking(booking).andExpect(status().isCreated());
+        mockMvc.perform(post("/api/bookings/{id}/confirm", booking.bookingId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk());
+        String queueEntryId = ids.queueEntry();
+        api.createQueueEntry(new CreateQueueEntryRequest(queueEntryId, booking.bookingId(), fixture.serviceId()))
+                .andExpect(status().isCreated());
+
+        search(fixture.serviceId(), AT)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].branchId", contains(fixture.nearBranch(), fixture.farBranch())))
+                .andExpect(jsonPath("$[0].queueWaitEstimateMin").value(30))
+                .andExpect(jsonPath("$[1].queueWaitEstimateMin").value(0));
+
+        search(fixture.serviceId(), "2090-01-22T09:00:00+02:00")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].queueWaitEstimateMin").doesNotExist())
+                .andExpect(jsonPath("$[1].queueWaitEstimateMin").doesNotExist());
+
+        mockMvc.perform(post("/api/queue-entries/{id}/call", queueEntryId)
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/queue-entries/{id}/start", queueEntryId)
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/marketplace/offerings/{id}/deactivate", fixture.nearOffering())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/queue-entries/{id}/complete", queueEntryId)
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.queueStatus").value("COMPLETED"))
+                .andExpect(jsonPath("$.booking.status").value("COMPLETED"));
+        mockMvc.perform(post("/api/marketplace/offerings/{id}/activate", fixture.nearOffering())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk());
+
+        search(fixture.serviceId(), AT)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].branchId", contains(fixture.nearBranch(), fixture.farBranch())))
+                .andExpect(jsonPath("$[0].queueWaitEstimateMin").value(0))
+                .andExpect(jsonPath("$[1].queueWaitEstimateMin").value(0));
     }
 
     @Test
@@ -159,6 +252,47 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
     }
 
     @Test
+    void defaultThirtyMinuteSlotsAlignFromAnOffsetBranchOpening() throws Exception {
+        String businessId = ids.business();
+        String branchId = ids.branch();
+        String serviceId = ids.service();
+        String offeringId = ids.offering();
+        api.createBusiness(new CreateBusinessRequest(
+                businessId, "Offset Opening Group", ids.emailFor(businessId), "+27821234567", null))
+                .andExpect(status().isCreated());
+        api.createBranch(businessId, branch(branchId, "Offset Opening Branch", "-33.9249", "18.4241"))
+                .andExpect(status().isCreated());
+        api.replaceOperatingHours(branchId, new ReplaceOperatingHoursRequest(List.of(
+                new WeeklyOperatingIntervalRequest(
+                        DayOfWeek.SUNDAY, LocalTime.of(8, 15), LocalTime.of(12, 0)))))
+                .andExpect(status().isOk());
+        api.createService(new CreateServiceRequest(
+                serviceId, "Offset Wash", "Thirty-minute anchor", new BigDecimal("80.00"), 15))
+                .andExpect(status().isCreated());
+        api.createServiceOffering(branchId, new CreateServiceOfferingRequest(
+                offeringId, serviceId, new BigDecimal("95.00"), 15, 2))
+                .andExpect(status().isCreated());
+        CreateUserRequest user = UserFixtureBuilder.valid(ids).build();
+        api.createUser(user).andExpect(status().isCreated());
+        CreateVehicleRequest vehicle = VehicleFixtureBuilder.valid(ids, user.userId()).build();
+        api.createVehicle(vehicle).andExpect(status().isCreated());
+
+        for (LocalDateTime localStart : List.of(
+                LocalDateTime.of(2090, 1, 15, 8, 15),
+                LocalDateTime.of(2090, 1, 15, 8, 45))) {
+            String requestedAt = localStart.atOffset(ZoneOffset.ofHours(2)).toString();
+            mockMvc.perform(get("/api/availability/branches")
+                            .with(reader()).param("serviceId", serviceId).param("at", requestedAt))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[*].branchId", contains(branchId)));
+            api.createBooking(BookingFixtureBuilder.valid(
+                            ids, user.userId(), vehicle.vehicleId(), branchId, offeringId)
+                    .scheduledDateTime(localStart)
+                    .build()).andExpect(status().isCreated());
+        }
+    }
+
+    @Test
     void validationAuthenticationAndAuthorizationUseStandardErrors() throws Exception {
         Fixture fixture = fixture();
         mockMvc.perform(get("/api/availability/branches")
@@ -216,18 +350,26 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
     }
 
     private Fixture fixture() throws Exception {
-        String businessId = ids.business();
+        return fixture(1);
+    }
+
+    private Fixture fixture(int nearCapacity) throws Exception {
+        String nearBusiness = ids.business();
+        String farBusiness = ids.business();
         String nearBranch = ids.branch();
         String farBranch = ids.branch();
         String serviceId = ids.service();
         String nearOffering = ids.offering();
         String farOffering = ids.offering();
         api.createBusiness(new CreateBusinessRequest(
-                businessId, "Availability Group", ids.emailFor(businessId), "+27821234567", null))
+                nearBusiness, "Cape Availability Group", ids.emailFor(nearBusiness), "+27821234567", null))
                 .andExpect(status().isCreated());
-        api.createBranch(businessId, branch(nearBranch, "Cape Town", "-33.9249", "18.4241"))
+        api.createBusiness(new CreateBusinessRequest(
+                farBusiness, "Gauteng Availability Group", ids.emailFor(farBusiness), "+27821234568", null))
                 .andExpect(status().isCreated());
-        api.createBranch(businessId, branch(farBranch, "Johannesburg", "-26.2041", "28.0473"))
+        api.createBranch(nearBusiness, branch(nearBranch, "Cape Town", "-33.9249", "18.4241"))
+                .andExpect(status().isCreated());
+        api.createBranch(farBusiness, branch(farBranch, "Johannesburg", "-26.2041", "28.0473"))
                 .andExpect(status().isCreated());
         ReplaceOperatingHoursRequest hours = new ReplaceOperatingHoursRequest(List.of(
                 new WeeklyOperatingIntervalRequest(
@@ -239,7 +381,7 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
                 serviceId, "Premium Wash", "Reusable wash", new BigDecimal("80.00"), 20))
                 .andExpect(status().isCreated());
         api.createServiceOffering(nearBranch, new CreateServiceOfferingRequest(
-                nearOffering, serviceId, new BigDecimal("100.00"), 30, 1))
+                nearOffering, serviceId, new BigDecimal("100.00"), 30, nearCapacity))
                 .andExpect(status().isCreated());
         api.createServiceOffering(farBranch, new CreateServiceOfferingRequest(
                 farOffering, serviceId, new BigDecimal("175.50"), 60, 2))
@@ -249,7 +391,7 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
         api.createUser(user).andExpect(status().isCreated());
         CreateVehicleRequest vehicle = VehicleFixtureBuilder.valid(ids, user.userId()).build();
         api.createVehicle(vehicle).andExpect(status().isCreated());
-        return new Fixture(nearBranch, farBranch, serviceId, nearOffering, farOffering,
+        return new Fixture(nearBusiness, farBusiness, nearBranch, farBranch, serviceId, nearOffering, farOffering,
                 user.userId(), vehicle.vehicleId());
     }
 
@@ -265,6 +407,8 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
     }
 
     private record Fixture(
+            String nearBusiness,
+            String farBusiness,
             String nearBranch,
             String farBranch,
             String serviceId,
