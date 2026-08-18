@@ -171,6 +171,14 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
         mockMvc.perform(get("/api/availability/branches")
+                        .with(reader()).param("serviceId", fixture.serviceId()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+        mockMvc.perform(get("/api/availability/branches")
+                        .with(reader()).param("at", AT))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+        mockMvc.perform(get("/api/availability/branches")
                         .with(reader()).param("serviceId", fixture.serviceId()).param("at", AT)
                         .param("latitude", "-33"))
                 .andExpect(status().isBadRequest())
@@ -179,6 +187,11 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
                         .with(reader()).param("serviceId", fixture.serviceId()).param("at", AT)
                         .param("radiusKm", "5"))
                 .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/availability/branches")
+                        .with(reader()).param("serviceId", fixture.serviceId()).param("at", AT)
+                        .param("latitude", "-33").param("longitude", "18").param("radiusKm", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         mockMvc.perform(get("/api/availability/branches")
                         .with(reader()).param("serviceId", "missing-service").param("at", AT))
                 .andExpect(status().isNotFound())
