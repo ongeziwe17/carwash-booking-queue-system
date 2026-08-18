@@ -171,13 +171,13 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
         mockMvc.perform(get("/api/availability/branches")
-                        .with(reader()).param("serviceId", fixture.serviceId()))
+                .with(reader()).param("serviceId", fixture.serviceId()))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+                .andExpect(jsonPath("$.code").value("MISSING_PARAMETER"));
         mockMvc.perform(get("/api/availability/branches")
-                        .with(reader()).param("at", AT))
+                .with(reader()).param("at", AT))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+                .andExpect(jsonPath("$.code").value("MISSING_PARAMETER"));
         mockMvc.perform(get("/api/availability/branches")
                         .with(reader()).param("serviceId", fixture.serviceId()).param("at", AT)
                         .param("latitude", "-33"))
