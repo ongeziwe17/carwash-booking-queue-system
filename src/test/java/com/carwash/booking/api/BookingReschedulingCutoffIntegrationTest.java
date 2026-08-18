@@ -16,6 +16,7 @@ import org.springframework.test.context.TestPropertySource;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Map;
 
@@ -31,14 +32,16 @@ class BookingReschedulingCutoffIntegrationTest extends ApiIntegrationTestSupport
 
     @Test
     void rescheduleInsideConfiguredCutoffReturnsStandardBusinessRuleError() throws Exception {
-        LocalDateTime currentSchedule = LocalDateTime.now(clock).plusHours(1);
+        LocalDateTime branchLocalNow = LocalDateTime.ofInstant(
+                clock.instant(), ZoneId.of("Africa/Johannesburg"));
+        LocalDateTime currentSchedule = branchLocalNow.plusHours(1);
         BookingApiFixture.CreatedBooking created = new BookingApiFixture(api, ids).createBooking(currentSchedule);
 
         mockMvc.perform(post("/api/bookings/{id}/reschedule", created.booking().bookingId())
                         .with(authentication.platformAdminJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "scheduledDateTime", LocalDateTime.now(clock).plusHours(3).toString()))))
+                                "scheduledDateTime", branchLocalNow.plusHours(3).toString()))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"))
                 .andExpect(jsonPath("$.message").value("Booking rescheduling window has closed"))
