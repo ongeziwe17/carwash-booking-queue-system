@@ -16,6 +16,8 @@ import com.carwash.testsupport.ServiceTestSupport;
 import com.carwash.testsupport.TestDates;
 import com.carwash.vehicle.domain.Vehicle;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -23,10 +25,66 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BranchScopedOperationsServiceTest extends ServiceTestSupport {
+
+    @ParameterizedTest
+    @EnumSource(OperationalParent.class)
+    void deactivationBlocksNewAndPreStartWorkButAllowsStartedWorkToComplete(OperationalParent parent) {
+        String branchId = ensureDefaultBranch();
+        Service service = createService();
+        String offeringId = createOffering(branchId, service, 15);
+
+        Booking startedBooking = confirmedBooking(
+                branchId, offeringId, service, TestDates.futureDays(20));
+        QueueEntry started = queueService.createQueueEntry(
+                ids.queueEntry(), startedBooking.getBookingId(), service.getServiceId());
+        queueService.callQueueEntry(started.getQueueEntryId());
+        queueService.startService(started.getQueueEntryId());
+
+        Booking waitingBooking = confirmedBooking(
+                branchId, offeringId, service, TestDates.futureDays(21));
+        QueueEntry waiting = queueService.createQueueEntry(
+                ids.queueEntry(), waitingBooking.getBookingId(), service.getServiceId());
+
+        Booking calledBooking = confirmedBooking(
+                branchId, offeringId, service, TestDates.futureDays(22));
+        QueueEntry called = queueService.createQueueEntry(
+                ids.queueEntry(), calledBooking.getBookingId(), service.getServiceId());
+        queueService.callQueueEntry(called.getQueueEntryId());
+
+        Booking queueCandidate = confirmedBooking(
+                branchId, offeringId, service, TestDates.futureDays(23));
+        User newUser = registerUser();
+        Vehicle newVehicle = createVehicle(newUser);
+
+        deactivate(parent, branchId, offeringId, service);
+
+        assertThrows(BusinessRuleViolationException.class, () -> bookingService.createBooking(new Booking(
+                ids.booking(), newUser, newVehicle, branchId, offeringId, service,
+                TestDates.futureDays(24), "inactive parent")));
+        assertThrows(BusinessRuleViolationException.class, () -> queueService.createQueueEntry(
+                ids.queueEntry(), queueCandidate.getBookingId(), service.getServiceId()));
+        assertThrows(BusinessRuleViolationException.class,
+                () -> queueService.callQueueEntry(waiting.getQueueEntryId()));
+        assertThrows(BusinessRuleViolationException.class,
+                () -> queueService.startService(called.getQueueEntryId()));
+
+        QueueEntry completed = queueService.completeQueueEntry(started.getQueueEntryId());
+
+        assertEquals(QueueStatus.COMPLETED, completed.getQueueStatus());
+        assertEquals(com.carwash.booking.domain.BookingStatus.COMPLETED, completed.getBooking().getStatus());
+        assertNotNull(completed.getCompletedAt());
+        assertEquals(List.of(1, 2), queueService.findAll(branchId).stream()
+                .filter(entry -> entry.getQueueStatus().isActive())
+                .map(QueueEntry::getPosition)
+                .toList());
+        assertTrue(notificationRepository.findByBookingId(startedBooking.getBookingId()).stream()
+                .anyMatch(notification -> "SERVICE_COMPLETED".equals(notification.getType())));
+    }
 
     @Test
     void bookingScopeIsCanonicalAndOnlySameBranchOfferingCanChange() {
@@ -209,5 +267,26 @@ class BranchScopedOperationsServiceTest extends ServiceTestSupport {
         serviceOfferingService.createOffering(branchId, new CreateServiceOfferingCommand(
                 offeringId, service.getServiceId(), BigDecimal.valueOf(durationMinutes), durationMinutes, 2));
         return offeringId;
+    }
+
+    private void deactivate(
+            OperationalParent parent,
+            String branchId,
+            String offeringId,
+            Service service
+    ) {
+        switch (parent) {
+            case BUSINESS -> marketplaceService.deactivateBusiness(defaultBusinessId);
+            case BRANCH -> marketplaceService.deactivateBranch(branchId);
+            case OFFERING -> serviceOfferingService.deactivateOffering(offeringId);
+            case SERVICE -> catalogService.deactivateService(service.getServiceId());
+        }
+    }
+
+    private enum OperationalParent {
+        BUSINESS,
+        BRANCH,
+        OFFERING,
+        SERVICE
     }
 }

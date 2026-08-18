@@ -28,6 +28,7 @@ The current backend includes:
 - REST APIs for booking and queue workflows.
 - In-app notification record lookup.
 - Basic daily summary reporting from in-memory data.
+- Marketplace businesses/branches with validated coordinates, scheduling, offerings, branch-scoped operations, and authenticated nearby discovery.
 - Swagger/OpenAPI documentation.
 - Secure BCrypt credential storage, JWT authentication, RBAC, and ownership authorization.
 - Standardized API errors and validated runtime/business policy configuration.
@@ -82,6 +83,12 @@ The current backend does not include a frontend application, durable PostgreSQL 
 **Description:** The system provides a daily summary endpoint for exactly one branch or owning-business scope, computed with branch-local date semantics from current in-memory data.
 
 **Status:** Partially implemented. Rich dashboards, revenue reports, and production analytics are future work.
+
+### FR7: Nearby Branch Discovery
+
+**Description:** The system returns only effective active, public-discovery-enabled Marketplace branches for required coordinates and supports optional bounded radius, effective service-offering, and explicit-instant open filters with deterministic straight-line distance ordering.
+
+**Status:** Implemented in memory with Haversine distance and no external maps, routing, traffic, or geocoding provider.
 
 ## 4. Planned/Future Functional Requirements
 

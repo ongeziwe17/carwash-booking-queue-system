@@ -20,6 +20,7 @@ This matrix is derived from `RoleCatalog`, controller `@PreAuthorize` expression
 | Read another user's notifications | ❌ | ❌ | ❌ | ✅ |
 | Read daily reports | ❌ | ❌ | ✅ | ✅ |
 | Read discoverable Marketplace branches | ✅ | ✅ | ✅ | ✅ |
+| Read nearby Marketplace branch discovery | ✅ | ✅ | ✅ | ✅ |
 | Read Marketplace branch open status | ✅ | ✅ | ✅ | ✅ |
 | Read discoverable Marketplace offerings | ✅ | ✅ | ✅ | ✅ |
 | Manage Marketplace businesses/branches/hours/closures/offerings | ❌ | ❌ | ✅ | ✅ |
@@ -36,4 +37,4 @@ Operational roles are STAFF, BUSINESS_OWNER, and PLATFORM_ADMIN for vehicle, boo
 
 OPS-001 branch filters, branch call-next, and branch/business report scopes constrain returned or selected data, but they do not establish tenant ownership authorization. STAFF and BUSINESS_OWNER operational access remains global until TENANT-001.
 
-Marketplace management is intentionally global for BUSINESS_OWNER and PLATFORM_ADMIN until TENANT-001 introduces owner/business scoping. `MARKETPLACE_READ` exposes bounded branch/offering discovery and operational open-status decisions; the public-discovery flag does not change whether a branch is operationally open. Offering discovery derives parent activity and branch public discovery but does not evaluate operating hours.
+Marketplace management is intentionally global for BUSINESS_OWNER and PLATFORM_ADMIN until TENANT-001 introduces owner/business scoping. `MARKETPLACE_READ` exposes bounded branch/offering/nearby discovery and operational open-status decisions; the public-discovery flag does not change whether a branch is operationally open or make the endpoint anonymous. Nearby discovery may explicitly reuse open status and effective offerings, while basic branch/offering discovery retains its existing semantics.

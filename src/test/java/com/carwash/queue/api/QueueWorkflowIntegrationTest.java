@@ -327,6 +327,25 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
     }
 
     @Test
+    void inProgressQueueWorkCompletesAfterOwningBusinessIsDeactivated() throws Exception {
+        BookingApiFixture.CreatedBooking booking = bookingFixture().createBooking(TestDates.futureDays(68));
+        CreateQueueEntryRequest queue = createQueue(booking);
+        postQueueAction(queue, "call");
+        postQueueAction(queue, "start");
+        mockMvc.perform(post("/api/marketplace/businesses/{id}/deactivate",
+                        booking.resources().business().businessId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/queue-entries/{id}/complete", queue.queueEntryId())
+                        .with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.queueStatus").value("COMPLETED"))
+                .andExpect(jsonPath("$.booking.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.completedAt").exists());
+    }
+
+    @Test
     void trueCallNextSkipsNonWaitingEntriesAndPreservesPositionsAndWaits() throws Exception {
         CreateQueueEntryRequest first = createQueue(createBookingWithDuration(10, 60), 1, 0);
         CreateQueueEntryRequest second = createQueue(createBookingWithDuration(20, 61), 2, 10);

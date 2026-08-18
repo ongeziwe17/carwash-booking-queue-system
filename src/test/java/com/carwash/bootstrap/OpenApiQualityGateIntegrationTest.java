@@ -65,6 +65,7 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
             "GET /api/marketplace/businesses/{businessId}/branches",
             "POST /api/marketplace/businesses/{businessId}/branches",
             "GET /api/marketplace/branches/discoverable",
+            "GET /api/marketplace/branches/discoverable/nearby",
             "GET /api/marketplace/branches/{branchId}", "PUT /api/marketplace/branches/{branchId}",
             "POST /api/marketplace/branches/{branchId}/activate",
             "POST /api/marketplace/branches/{branchId}/deactivate",
@@ -306,6 +307,42 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
                 .path("/api/marketplace/branches/{branchId}/offerings/discoverable").path("get");
         assertTrue(discovery.path("description").asText().contains("Operating hours"));
         assertTrue(discovery.path("description").asText().contains("remaining capacity"));
+    }
+
+    @Test
+    void nearbyDiscoveryContractIsBoundedExplicitAndDocumentsDistanceSemantics() throws Exception {
+        JsonNode document = openApi();
+        JsonNode operation = document.path("paths")
+                .path("/api/marketplace/branches/discoverable/nearby").path("get");
+
+        Map<String, JsonNode> parameters = new java.util.HashMap<>();
+        operation.path("parameters").forEach(parameter ->
+                parameters.put(parameter.path("name").asText(), parameter));
+        assertEquals(Set.of("latitude", "longitude", "radiusKm", "serviceId", "openAt", "sort"),
+                parameters.keySet());
+        assertTrue(parameters.get("latitude").path("required").asBoolean());
+        assertTrue(parameters.get("longitude").path("required").asBoolean());
+        for (String optional : Set.of("radiusKm", "serviceId", "openAt", "sort")) {
+            assertFalse(parameters.get(optional).path("required").asBoolean());
+        }
+        assertEquals("date-time", parameters.get("openAt").path("schema").path("format").asText());
+        assertTrue(operation.path("description").asText().contains("unrounded Haversine distance"));
+        assertTrue(operation.path("description").asText().contains("HALF_UP"));
+        assertTrue(operation.path("description").asText().contains("branch-ID order"));
+        assertTrue(operation.path("description").asText().contains("branch ID as the tie-breaker"));
+
+        JsonNode schema = document.path("components").path("schemas").path("NearbyBranchResponse");
+        assertEquals(Set.of("branchId", "businessId", "branchName", "addressLine1", "addressLine2",
+                        "city", "province", "postalCode", "countryCode", "latitude", "longitude",
+                        "timezone", "distanceKm"),
+                propertyNames(schema));
+        for (String forbidden : Set.of("business", "branch", "offerings", "schedule", "closures", "status",
+                "effectiveActive", "publicDiscoveryEnabled", "createdAt", "updatedAt")) {
+            assertFalse(schema.path("properties").has(forbidden));
+        }
+        for (String response : Set.of("200", "400", "401", "403", "404", "405", "500")) {
+            assertTrue(operation.path("responses").has(response), "Missing nearby discovery response " + response);
+        }
     }
 
     @Test

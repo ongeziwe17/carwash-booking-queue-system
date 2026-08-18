@@ -1,0 +1,16 @@
+info: { name: Owner creates closure for open filter workflow, type: http, seq: 6, tags: [discovery, schedule, owner, workflow] }
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceBranchId}}/closures"
+  headers: [{ name: Content-Type, value: application/json }]
+  body:
+    type: json
+    data: '{"closureId":"{{geoClosureId}}","startAt":"2030-01-07T07:00:00Z","endAt":"2030-01-07T09:00:00Z","reason":"Discovery workflow maintenance"}'
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("creates active closure", function() { expect(res.body.closureId).to.equal(bru.getVar("geoClosureId")); expect(res.body.status).to.equal("ACTIVE"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

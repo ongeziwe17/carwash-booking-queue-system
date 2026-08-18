@@ -1,6 +1,6 @@
 # Car Wash Booking Queue System
 
-Spring Boot backend foundation for car wash booking, queue management, and Marketplace onboarding/scheduling. The code is organized as a capability-based modular monolith with explicit `bootstrap`, `shared`, `identity`, `access`, `vehicle`, `catalog`, `booking`, `queue`, `notification`, `reporting`, and `marketplace` boundaries enforced by ArchUnit. The current codebase exposes APIs for users, vehicles, reusable global services, branch-specific offerings, bookings, queues, notifications, daily reporting, Marketplace businesses, physical branches, weekly branch hours, temporary closures, and timezone-aware open-status decisions over in-memory repositories.
+Spring Boot backend foundation for car wash booking, queue management, and Marketplace onboarding/scheduling. The code is organized as a capability-based modular monolith with explicit `bootstrap`, `shared`, `identity`, `access`, `vehicle`, `catalog`, `booking`, `queue`, `notification`, `reporting`, `marketplace`, and `discovery` boundaries enforced by ArchUnit. The current codebase exposes APIs for users, vehicles, reusable global services, branch-specific offerings, bookings, queues, notifications, daily reporting, Marketplace businesses, physical branches, weekly branch hours, temporary closures, timezone-aware open-status decisions, and authenticated nearby branch discovery over in-memory repositories.
 
 ## Current backend foundation
 
@@ -16,6 +16,7 @@ Spring Boot backend foundation for car wash booking, queue management, and Marke
 - Marketplace business/branch registration, bounded lifecycle management, coordinates, timezones, and basic active/public branch discovery.
 - Marketplace branch scheduling with atomic weekly intervals, overnight/week-boundary support, temporary closure history, and explicit-instant open-status decisions.
 - Catalog-owned branch service offerings with independent price, duration, configured concurrent capacity, lifecycle, and parent-aware discovery.
+- Nearby branch discovery with deterministic Haversine distance, optional raw-distance radius filtering, service-offering and explicit-instant open filters, and bounded customer responses.
 - Swagger/OpenAPI documentation.
 - Java 21 Maven, Docker, Docker Compose, and GitHub Actions delivery support.
 
@@ -24,6 +25,7 @@ Spring Boot backend foundation for car wash booking, queue management, and Marke
 - Storage is in-memory and is lost when the application restarts.
 - Staff and business-owner operational access remains global until tenant isolation is implemented.
 - External SMS/email delivery is not implemented.
+- Nearby distance is straight-line only; no routing, traffic, geocoding, or external maps provider is used.
 - Payments, branch-aware availability, configured-capacity calculations, PostgreSQL, production observability, and deployment hardening remain future work.
 - The application does not yet expose dedicated Actuator liveness or readiness endpoints.
 

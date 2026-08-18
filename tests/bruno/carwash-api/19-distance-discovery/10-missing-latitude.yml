@@ -1,0 +1,10 @@
+info: { name: Missing latitude is rejected, type: http, seq: 10, tags: [discovery, validation] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/discoverable/nearby?longitude=18.4241"
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: 'test("returns standard 400", function() { expect(res.status).to.equal(400); expect(res.body.code).to.equal("MISSING_PARAMETER"); });'
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -17,7 +17,7 @@ class ModularMonolithArchitectureTest {
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .importPackages("com.carwash");
     private static final String[] BUSINESS_MODULES = {
-            "access", "booking", "catalog", "identity", "marketplace", "notification", "queue", "reporting",
+            "access", "booking", "catalog", "discovery", "identity", "marketplace", "notification", "queue", "reporting",
             "vehicle"
     };
 
@@ -141,6 +141,27 @@ class ModularMonolithArchitectureTest {
                         "com.carwash.booking..",
                         "com.carwash.queue.."
                 )
+                .check(APPLICATION);
+    }
+
+    @Test
+    void discovery_orchestrates_only_through_published_marketplace_and_catalog_contracts() {
+        noClasses().that().resideInAPackage("com.carwash.discovery..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.carwash.marketplace.api..",
+                        "com.carwash.marketplace.domain..",
+                        "com.carwash.marketplace.infrastructure..",
+                        "com.carwash.catalog.api..",
+                        "com.carwash.catalog.domain..",
+                        "com.carwash.catalog.infrastructure.."
+                )
+                .check(APPLICATION);
+    }
+
+    @Test
+    void marketplace_and_catalog_do_not_depend_on_discovery() {
+        noClasses().that().resideInAnyPackage("com.carwash.marketplace..", "com.carwash.catalog..")
+                .should().dependOnClassesThat().resideInAPackage("com.carwash.discovery..")
                 .check(APPLICATION);
     }
 

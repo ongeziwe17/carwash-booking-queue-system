@@ -28,6 +28,7 @@ Implemented in the current backend:
 - Validated runtime policy configuration and standardized safe API errors.
 - Local Docker and Maven workflows.
 - In-memory Marketplace business/branch registration plus timezone-aware weekly hours, temporary closures, explicit-instant open-status decisions, and Catalog-owned branch service offerings.
+- Authenticated nearby discovery over existing branch coordinates with deterministic straight-line distance and optional radius, effective-offering, and explicit-instant open filters.
 
 ## Partially Implemented Foundation
 
@@ -52,6 +53,7 @@ Implemented in the current backend:
 | FR-10 | Manage Marketplace businesses/branches and evaluate branch operating status from weekly hours and temporary closures. | Implemented |
 | FR-11 | Configure and discover branch-specific service price, duration, configured concurrent capacity, and activation state. | Implemented |
 | FR-12 | Include bounded branch/offering notification context and require explicit branch/business daily report scope. | Implemented |
+| FR-13 | Discover effective public branches by validated coordinates using deterministic distance, radius/service/open filters, and bounded responses. | Implemented |
 
 ## Functional Requirements: Planned/Future
 
@@ -91,7 +93,8 @@ Implemented in the current backend:
 - Daily reports require exactly one branch or business scope and apply branch-local date boundaries; scopes do not enforce tenant authorization.
 - Branch open status requires active business/branch state, a matching half-open weekly interval in the branch timezone, and no active covering temporary closure; public discovery is a separate decision.
 - An offering is effectively active only when its stored state, reusable global service, branch, and owning business are active; discovery additionally requires branch public discovery. Configured concurrent capacity is not remaining capacity.
+- Nearby discovery uses raw Haversine kilometres for filtering/sorting, rounds only output to two decimals with `HALF_UP`, defaults to branch-ID order, and never treats public visibility as anonymous authorization.
 
 ## Out of Current Scope
 
-The current backend implements in-memory Marketplace registration/scheduling/offerings and branch-scoped operational workflows, but does not implement PostgreSQL persistence, payments, tenant isolation, remaining-capacity calculation, branch-aware availability, external notification delivery, observability, frontend applications, or production SaaS readiness. Authentication, RBAC, ownership authorization, and secure credential storage are implemented foundations.
+The current backend implements in-memory Marketplace registration/scheduling/offerings, nearby straight-line branch discovery, and branch-scoped operational workflows, but does not implement PostgreSQL persistence, payments, tenant isolation, driving routes/traffic/geocoding, remaining-capacity calculation, branch-aware availability, external notification delivery, observability, frontend applications, or production SaaS readiness. Authentication, RBAC, ownership authorization, and secure credential storage are implemented foundations.

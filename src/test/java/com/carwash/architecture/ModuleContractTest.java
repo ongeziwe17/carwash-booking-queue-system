@@ -3,10 +3,16 @@ package com.carwash.architecture;
 import com.carwash.booking.application.BookingQuery;
 import com.carwash.booking.domain.Booking;
 import com.carwash.catalog.domain.Service;
+import com.carwash.catalog.application.ServiceDefinitionQuery;
+import com.carwash.catalog.application.ServiceOfferingQuery;
+import com.carwash.discovery.application.DistanceCalculator;
+import com.carwash.discovery.application.NearbyBranchDiscoveryService;
 import com.carwash.identity.application.UserQuery;
 import com.carwash.identity.domain.User;
 import com.carwash.queue.application.QueueQuery;
 import com.carwash.queue.domain.QueueEntry;
+import com.carwash.marketplace.application.BranchScheduleQuery;
+import com.carwash.marketplace.application.MarketplaceQuery;
 import com.carwash.testsupport.ServiceTestSupport;
 import com.carwash.vehicle.application.VehicleQuery;
 import com.carwash.vehicle.domain.Vehicle;
@@ -14,6 +20,8 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.Set;
 
 class ModuleContractTest extends ServiceTestSupport {
 
@@ -58,5 +66,18 @@ class ModuleContractTest extends ServiceTestSupport {
                 .findFirst()
                 .orElseThrow();
         assertEquals(booking.getBookingId(), publishedQueueEntry.bookingId());
+    }
+
+    @Test
+    void discovery_constructor_depends_only_on_published_queries_and_distance_port() {
+        Set<Class<?>> dependencies = Set.of(
+                NearbyBranchDiscoveryService.class.getConstructors()[0].getParameterTypes());
+
+        assertEquals(Set.of(
+                MarketplaceQuery.class,
+                BranchScheduleQuery.class,
+                ServiceOfferingQuery.class,
+                ServiceDefinitionQuery.class,
+                DistanceCalculator.class), dependencies);
     }
 }

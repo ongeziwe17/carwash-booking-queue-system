@@ -198,7 +198,8 @@ public class QueueManagementService implements QueueQuery {
                 throw new BusinessRuleViolationException("Queue entry cannot start service in current state");
             }
             Booking booking = requireCanonicalBooking(queueEntry);
-            validateCanonicalOperationalScope(queueEntry, booking);
+            CanonicalQueueScope scope = validateCanonicalScopeIntegrity(queueEntry, booking);
+            validateOperationalEligibility(scope);
             if (booking.getStatus() != BookingStatus.CONFIRMED) {
                 throw new BusinessRuleViolationException("Booking must be confirmed before service can start");
             }
@@ -233,7 +234,7 @@ public class QueueManagementService implements QueueQuery {
                 throw new BusinessRuleViolationException("Queue entry cannot be completed in current state");
             }
             Booking booking = requireCanonicalBooking(queueEntry);
-            validateCanonicalOperationalScope(queueEntry, booking);
+            validateCanonicalScopeIntegrity(queueEntry, booking);
             if (booking.getStatus() != BookingStatus.IN_SERVICE) {
                 throw new BusinessRuleViolationException("Booking must be in service before queue completion");
             }
@@ -360,7 +361,8 @@ public class QueueManagementService implements QueueQuery {
             throw new BusinessRuleViolationException("Queue entry cannot be called in current state");
         }
         Booking booking = requireCanonicalBooking(queueEntry);
-        validateCanonicalOperationalScope(queueEntry, booking);
+        CanonicalQueueScope scope = validateCanonicalScopeIntegrity(queueEntry, booking);
+        validateOperationalEligibility(scope);
         queueEntry.setBooking(booking);
         LifecycleStateSnapshot.QueueEntryState queueState = LifecycleStateSnapshot.queueEntry(queueEntry);
         try {
@@ -455,8 +457,9 @@ public class QueueManagementService implements QueueQuery {
         if (booking.getStatus() != BookingStatus.CONFIRMED) {
             throw new BusinessRuleViolationException("Only confirmed bookings can join the queue");
         }
-        validateCanonicalOperationalScope(queueEntry, booking);
-        ServiceOfferingSnapshot offering = requireOffering(booking.getServiceOfferingId());
+        CanonicalQueueScope scope = validateBookingScopeIntegrity(booking);
+        validateOperationalEligibility(scope);
+        ServiceOfferingSnapshot offering = scope.offering();
         if (!offering.serviceId().equals(suppliedServiceId)) {
             throw new BusinessRuleViolationException("Queue entry service must match booking service offering");
         }
@@ -473,26 +476,44 @@ public class QueueManagementService implements QueueQuery {
         queueEntry.assignOperationalScope(booking.getBranchId(), booking.getServiceOfferingId());
     }
 
-    private void validateCanonicalOperationalScope(QueueEntry queueEntry, Booking booking) {
+    private CanonicalQueueScope validateBookingScopeIntegrity(Booking booking) {
         BranchSnapshot branch = requireBranch(booking.getBranchId());
-        if (!branch.effectiveActive()) {
-            throw new BusinessRuleViolationException(
-                    "Inactive branch or owning business cannot accept queue work");
-        }
         ServiceOfferingSnapshot offering = requireOffering(booking.getServiceOfferingId());
         if (!branch.branchId().equals(offering.branchId())) {
             throw new BusinessRuleViolationException("Booking offering does not belong to its branch");
         }
-        if (!offering.effectiveActive()) {
+        if (booking.getService() == null
+                || !offering.serviceId().equals(booking.getService().getServiceId())) {
             throw new BusinessRuleViolationException(
-                    "Inactive service offering or reusable service cannot join the queue");
+                    "Booking service association is inconsistent with its offering");
         }
-        if (queueEntry.getBranchId() != null && !branch.branchId().equals(queueEntry.getBranchId())) {
+        return new CanonicalQueueScope(branch, offering);
+    }
+
+    private CanonicalQueueScope validateCanonicalScopeIntegrity(QueueEntry queueEntry, Booking booking) {
+        CanonicalQueueScope scope = validateBookingScopeIntegrity(booking);
+        if (!scope.branch().branchId().equals(queueEntry.getBranchId())) {
             throw new BusinessRuleViolationException("Queue entry branch does not match its booking");
         }
-        if (queueEntry.getServiceOfferingId() != null
-                && !offering.offeringId().equals(queueEntry.getServiceOfferingId())) {
+        if (!scope.offering().offeringId().equals(queueEntry.getServiceOfferingId())) {
             throw new BusinessRuleViolationException("Queue entry offering does not match its booking");
+        }
+        if (queueEntry.getService() == null
+                || !scope.offering().serviceId().equals(queueEntry.getService().getServiceId())) {
+            throw new BusinessRuleViolationException(
+                    "Queue entry service association is inconsistent with its booking offering");
+        }
+        return scope;
+    }
+
+    private void validateOperationalEligibility(CanonicalQueueScope scope) {
+        if (!scope.branch().effectiveActive()) {
+            throw new BusinessRuleViolationException(
+                    "Inactive branch or owning business cannot accept queue work");
+        }
+        if (!scope.offering().effectiveActive()) {
+            throw new BusinessRuleViolationException(
+                    "Inactive service offering or reusable service cannot join the queue");
         }
     }
 
@@ -622,5 +643,8 @@ public class QueueManagementService implements QueueQuery {
         snapshot.setActive(source.isActive());
         snapshot.setCreatedAt(source.getCreatedAt());
         return snapshot;
+    }
+
+    private record CanonicalQueueScope(BranchSnapshot branch, ServiceOfferingSnapshot offering) {
     }
 }

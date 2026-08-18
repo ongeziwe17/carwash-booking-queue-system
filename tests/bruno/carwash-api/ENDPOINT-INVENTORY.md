@@ -1,8 +1,8 @@
 # Current Endpoint Inventory
 
-Inventory source: the controllers and OpenAPI quality gate for OPS-001. Generated `/v3/api-docs` is authoritative when wording differs.
+Inventory source: the controllers and OpenAPI quality gate for GEO-001. Generated `/v3/api-docs` is authoritative when wording differs.
 
-**Total HTTP operations: 66.**
+**Total HTTP operations: 67.**
 
 | Method | Path | Authentication | Role / permission | Ownership | Request DTO | Success | 400/401/403/404 | Important rules |
 |---|---|---|---|---|---|---:|---|---|
@@ -25,7 +25,7 @@ Inventory source: the controllers and OpenAPI quality gate for OPS-001. Generate
 | `DELETE` | `/api/queue-entries/{id}` | Bearer | STAFF, BUSINESS_OWNER, PLATFORM_ADMIN | Operational access | `—` | 204 | 400,401,403,404 | Physical delete only while WAITING. |
 | `GET` | `/api/queue-entries/{id}` | Bearer | CUSTOMER: booking owner; STAFF/OWNER/ADMIN: operational | Booking owner for CUSTOMER | `—` | 200 | 400,401,403,404 | Customer can read own queue entry. |
 | `POST` | `/api/queue-entries/{id}/call` | Bearer | STAFF, BUSINESS_OWNER, PLATFORM_ADMIN | Operational access | `—` | 200 | 400,401,403,404 | Explicit operator override that marks the supplied WAITING entry CALLED. |
-| `POST` | `/api/queue-entries/{id}/complete` | Bearer | STAFF, BUSINESS_OWNER, PLATFORM_ADMIN | Operational access | `—` | 200 | 400,401,403,404 | IN_PROGRESS -> COMPLETED. |
+| `POST` | `/api/queue-entries/{id}/complete` | Bearer | STAFF, BUSINESS_OWNER, PLATFORM_ADMIN | Operational access | `—` | 200 | 400,401,403,404 | IN_PROGRESS -> COMPLETED with canonical scope integrity; parent deactivation after start does not block terminal recovery. |
 | `PUT` | `/api/queue-entries/{id}/position` | Bearer | STAFF, BUSINESS_OWNER, PLATFORM_ADMIN | Operational access | `UpdateQueuePositionRequest` | 200 | 400,401,403,404 | Move a WAITING entry within branch active size and rebalance only that branch. |
 | `POST` | `/api/queue-entries/{id}/start` | Bearer | STAFF, BUSINESS_OWNER, PLATFORM_ADMIN | Operational access | `—` | 200 | 400,401,403,404 | CALLED -> IN_PROGRESS. |
 | `GET` | `/api/reports/daily-summary` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Exactly one branch/business scope; not tenant authorization | Query `date` plus `branchId` or `businessId` | 200 | 400,401,403,404 | Branch-local date semantics; no scope/both scopes/unknown scope rejected. |
@@ -55,6 +55,7 @@ Inventory source: the controllers and OpenAPI quality gate for OPS-001. Generate
 | `GET` | `/api/marketplace/businesses/{businessId}/branches` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Lists branches owned by the exact business. |
 | `POST` | `/api/marketplace/businesses/{businessId}/branches` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Tenant ownership not yet enforced | `CreateBranchRequest` | 201 | 400,401,403,404 | Validates coordinates/timezone; duplicate ID rejected. |
 | `GET` | `/api/marketplace/branches/discoverable` | Bearer | All roles via MARKETPLACE_READ | Public-discovery view | `—` | 200 | 401,403 | Active owner + active branch + discovery enabled; no ranking/distance. |
+| `GET` | `/api/marketplace/branches/discoverable/nearby` | Bearer | All roles via MARKETPLACE_READ | Public-discovery view; not tenant authorization | Required `latitude`,`longitude`; optional `radiusKm`,`serviceId`,`openAt`,`sort` | 200 | 400,401,403,404 | Raw Haversine km drives radius/sort; output is 2-decimal HALF_UP; service uses effective discoverable offerings; openAt reuses branch scheduling. |
 | `GET` | `/api/marketplace/branches/{branchId}` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Bounded branch response. |
 | `PUT` | `/api/marketplace/branches/{branchId}` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Ownership cannot change | `UpdateBranchRequest` | 200 | 400,401,403,404 | Preserves branch/business IDs and status. |
 | `POST` | `/api/marketplace/branches/{branchId}/activate` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Tenant ownership not yet enforced | `—` | 200 | 400,401,403,404 | Effective activity still requires active owner business. |

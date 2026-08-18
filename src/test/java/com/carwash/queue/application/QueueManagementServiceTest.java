@@ -314,6 +314,40 @@ class QueueManagementServiceTest extends ServiceTestSupport {
     }
 
     @Test
+    void completionRejectsQueueEntryWithCrossBranchScope() {
+        Booking booking = createConfirmedBooking(TestDates.futureDays(66));
+        String otherBranch = ids.branch();
+        marketplaceService.createBranch(defaultBusinessId, new com.carwash.marketplace.application.CreateBranchCommand(
+                otherBranch, "Other Branch", "2 Test Street", null, "Cape Town", "Western Cape", "8001", "ZA",
+                new BigDecimal("-33.9250"), new BigDecimal("18.4250"), "Africa/Johannesburg", true));
+        QueueEntry queueEntry = insertInProgressEntry(
+                booking, otherBranch, booking.getServiceOfferingId());
+
+        BusinessRuleViolationException exception = assertThrows(BusinessRuleViolationException.class,
+                () -> queueService.completeQueueEntry(queueEntry.getQueueEntryId()));
+
+        assertEquals("Queue entry branch does not match its booking", exception.getMessage());
+        assertEquals(QueueStatus.IN_PROGRESS, queueEntry.getQueueStatus());
+        assertEquals(BookingStatus.IN_SERVICE, booking.getStatus());
+    }
+
+    @Test
+    void completionRejectsQueueEntryWithMismatchedOfferingScope() {
+        Booking booking = createConfirmedBooking(TestDates.futureDays(67));
+        Service otherService = createService();
+        String otherOffering = createOffering(otherService);
+        QueueEntry queueEntry = insertInProgressEntry(
+                booking, booking.getBranchId(), otherOffering);
+
+        BusinessRuleViolationException exception = assertThrows(BusinessRuleViolationException.class,
+                () -> queueService.completeQueueEntry(queueEntry.getQueueEntryId()));
+
+        assertEquals("Queue entry offering does not match its booking", exception.getMessage());
+        assertEquals(QueueStatus.IN_PROGRESS, queueEntry.getQueueStatus());
+        assertEquals(BookingStatus.IN_SERVICE, booking.getStatus());
+    }
+
+    @Test
     void queueMetricsRejectInvalidValues() {
         QueueEntry queueEntry = new QueueEntry();
 
@@ -764,6 +798,24 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         QueueEntry created = queueService.createQueueEntry(ids.queueEntry(), booking.getBookingId(),
                 booking.getService().getServiceId());
         return queueRepository.findById(created.getQueueEntryId()).orElseThrow();
+    }
+
+    private QueueEntry insertInProgressEntry(Booking booking, String branchId, String offeringId) {
+        QueueEntry queueEntry = new QueueEntry();
+        queueEntry.setQueueEntryId(ids.queueEntry());
+        queueEntry.setBooking(booking);
+        queueEntry.setService(booking.getService());
+        queueEntry.assignOperationalScope(branchId, offeringId);
+        queueEntry.setQueueStatus(QueueStatus.IN_PROGRESS);
+        queueEntry.setJoinedAt(LocalDateTime.now(clock));
+        queueEntry.setCalledAt(LocalDateTime.now(clock));
+        queueEntry.setStartedAt(LocalDateTime.now(clock));
+        queueEntry.updateQueueMetrics(1, 0);
+        booking.setStatus(BookingStatus.IN_SERVICE);
+        booking.attachQueueEntry(queueEntry);
+        assertTrue(bookingRepository.update(booking));
+        assertTrue(queueRepository.insert(queueEntry));
+        return queueEntry;
     }
 
     private void assertQueueMetrics(QueueEntry queueEntry, int position, int estimatedWaitMin) {

@@ -1,0 +1,12 @@
+info: { name: Combined radius service open and distance filters, type: http, seq: 5, tags: [discovery, geo, offering, schedule, workflow] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/discoverable/nearby?latitude=-33.908&longitude=18.42&radiusKm=1&serviceId={{serviceId}}&openAt=2030-01-07T08:00:00Z&sort=distance"
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("returns only the matching open origin branch", function() { expect(res.body.map(b => b.branchId)).to.deep.equal([bru.getVar("marketplaceBranchId")]); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -1,0 +1,21 @@
+info:
+  name: Customer discovers nearby branches in default branch-ID order
+  type: http
+  seq: 1
+  tags: [discovery, customer, geo, workflow]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/branches/discoverable/nearby?latitude=-33.908&longitude=18.42"
+  auth: { type: bearer, token: "{{customerToken}}" }
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("contains both effective public Marketplace branches", function() { const ids = res.body.map(b => b.branchId); expect(ids).to.include(bru.getVar("marketplaceBranchId")); expect(ids).to.include(bru.getVar("marketplaceSecondBranchId")); });
+        test("uses deterministic default branch-ID order", function() { const ids = res.body.map(b => b.branchId); expect(ids.indexOf(bru.getVar("marketplaceBranchId"))).to.be.lessThan(ids.indexOf(bru.getVar("marketplaceSecondBranchId"))); });
+        test("returns a bounded customer-safe distance projection", function() { const item = res.body.find(b => b.branchId === bru.getVar("marketplaceBranchId")); expect(item.distanceKm).to.equal(0); expect(item.timezone).to.equal("Africa/Johannesburg"); for (const forbidden of ["status", "effectiveActive", "publicDiscoveryEnabled", "offerings", "schedule", "business"]) expect(item).to.not.have.property(forbidden); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

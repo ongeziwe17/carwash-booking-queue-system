@@ -89,6 +89,7 @@ runtime:
           marketplaceInvalidOfferingId: `marketplace-offering-invalid-${runId}`,
           marketplaceDeniedOfferingId: `marketplace-offering-denied-${runId}`,
           marketplaceUnauthOfferingId: `marketplace-offering-unauth-${runId}`,
+          geoClosureId: `geo-closure-${runId}`,
           branchOpsFirstBookingId: `branch-ops-booking-first-${runId}`,
           branchOpsSecondBookingId: `branch-ops-booking-second-${runId}`,
           branchOpsFirstQueueId: `branch-ops-queue-first-${runId}`,
