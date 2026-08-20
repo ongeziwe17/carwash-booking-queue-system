@@ -53,7 +53,7 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
             "GET /api/queue-entries", "POST /api/queue-entries", "POST /api/queue-entries/{id}/start",
             "POST /api/queue-entries/{id}/complete", "POST /api/queue-entries/{id}/call",
             "POST /api/queue-entries/call-next",
-            "GET /api/availability", "GET /api/availability/branches",
+            "GET /api/availability", "GET /api/availability/branches", "GET /api/recommendations/branches",
             "GET /api/bookings", "POST /api/bookings", "POST /api/bookings/{id}/confirm",
             "POST /api/bookings/{id}/cancel", "POST /api/auth/login", "GET /api/reports/daily-summary",
             "GET /api/queue-entries/{id}", "DELETE /api/queue-entries/{id}",
@@ -380,6 +380,53 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
     }
 
     @Test
+    void recommendationContractIsBoundedExplainableAndDocumentsRankingSemantics() throws Exception {
+        JsonNode document = openApi();
+        JsonNode operation = document.path("paths").path("/api/recommendations/branches").path("get");
+        Map<String, JsonNode> parameters = new java.util.HashMap<>();
+        operation.path("parameters").forEach(parameter ->
+                parameters.put(parameter.path("name").asText(), parameter));
+        assertEquals(Set.of("latitude", "longitude", "serviceId", "at", "preference", "maxRadiusKm"),
+                parameters.keySet());
+        for (String required : Set.of("latitude", "longitude", "serviceId", "at", "preference")) {
+            assertTrue(parameters.get(required).path("required").asBoolean());
+        }
+        assertFalse(parameters.get("maxRadiusKm").path("required").asBoolean());
+        assertEquals("date-time", parameters.get("at").path("schema").path("format").asText());
+        JsonNode preferenceSchema = resolveLocalSchema(document, parameters.get("preference").path("schema"));
+        assertEquals(Set.of("NEAREST", "SHORTEST_QUEUE", "FASTEST_TOTAL_TIME", "LOWEST_PRICE", "BEST_OVERALL"),
+                java.util.stream.StreamSupport.stream(
+                                preferenceSchema.path("enum").spliterator(), false)
+                        .map(JsonNode::asText)
+                        .collect(java.util.stream.Collectors.toSet()));
+        assertTrue(operation.path("description").asText().contains("AVAIL-002 candidate set"));
+        assertTrue(operation.path("description").asText().contains("do not reserve capacity"));
+        assertTrue(operation.path("description").asText().contains("branchId"));
+        assertTrue(operation.path("description").asText().contains("six decimals"));
+
+        JsonNode schema = document.path("components").path("schemas").path("BranchRecommendationResponse");
+        assertEquals(Set.of("rank", "businessId", "businessName", "branchId", "branchName",
+                        "serviceOfferingId", "serviceId", "serviceName", "branchTimezone",
+                        "availableStartAt", "estimatedEndAt", "distanceKm", "queueWaitEstimateMin",
+                        "serviceDurationMin", "estimatedTotalTimeMin", "price", "concurrentCapacity",
+                        "remainingCapacity", "appliedPreference", "recommendationScore", "scoreBreakdown",
+                        "explanation"),
+                propertyNames(schema));
+        for (String forbidden : Set.of("reason", "eligible", "repository", "securityContext", "configuration",
+                "bookings", "queueEntries", "effectiveActive", "publicDiscoveryEnabled")) {
+            assertFalse(schema.path("properties").has(forbidden));
+        }
+        JsonNode component = document.path("components").path("schemas")
+                .path("RecommendationScoreComponentResponse");
+        assertEquals(Set.of("rawValue", "available", "normalizedScore", "configuredWeight",
+                "weightedContribution"), propertyNames(component));
+        for (String response : Set.of("200", "400", "401", "403", "404", "405", "500")) {
+            assertTrue(operation.path("responses").has(response),
+                    "Missing recommendation response " + response);
+        }
+    }
+
+    @Test
     void bookingUpdateAndRescheduleSchemasKeepScheduleMutationSeparate() throws Exception {
         JsonNode document = openApi();
         JsonNode schemas = document.path("components").path("schemas");
@@ -525,6 +572,11 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         Set<String> names = new HashSet<>();
         schema.path("required").forEach(field -> names.add(field.asText()));
         return names;
+    }
+
+    private JsonNode resolveLocalSchema(JsonNode document, JsonNode schema) {
+        String reference = schema.path("$ref").asText();
+        return reference.startsWith("#/") ? document.at(reference.substring(1)) : schema;
     }
 
     private void assertLocalComponentReferencesResolve(JsonNode document, JsonNode node, String location) {

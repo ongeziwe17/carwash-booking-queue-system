@@ -4,6 +4,7 @@ import com.carwash.shared.config.RuntimeProperties;
 import com.carwash.booking.application.BookingPolicyProperties;
 import com.carwash.queue.application.QueuePolicyProperties;
 import com.carwash.notification.application.NotificationPolicyProperties;
+import com.carwash.recommendation.application.RecommendationProperties;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.validation.autoconfigure.ValidationConfigurationCustomizer;
@@ -17,6 +18,7 @@ import java.time.Clock;
         BookingPolicyProperties.class,
         NotificationPolicyProperties.class,
         QueuePolicyProperties.class,
+        RecommendationProperties.class,
         RuntimeProperties.class
 })
 public class RuntimePolicyConfig {

@@ -1,6 +1,7 @@
 package com.carwash.architecture;
 
 import com.carwash.booking.application.BookingQuery;
+import com.carwash.booking.application.BranchAvailabilityCandidateQuery;
 import com.carwash.booking.domain.Booking;
 import com.carwash.catalog.domain.Service;
 import com.carwash.catalog.application.ServiceDefinitionQuery;
@@ -16,6 +17,9 @@ import com.carwash.marketplace.application.MarketplaceQuery;
 import com.carwash.testsupport.ServiceTestSupport;
 import com.carwash.vehicle.application.VehicleQuery;
 import com.carwash.vehicle.domain.Vehicle;
+import com.carwash.recommendation.application.RecommendationMetricProvider;
+import com.carwash.recommendation.application.RecommendationProperties;
+import com.carwash.recommendation.application.RecommendationService;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -79,5 +83,17 @@ class ModuleContractTest extends ServiceTestSupport {
                 ServiceOfferingQuery.class,
                 ServiceDefinitionQuery.class,
                 DistanceCalculator.class), dependencies);
+    }
+
+    @Test
+    void recommendation_constructor_uses_booking_candidate_contract_configuration_and_metric_ports() {
+        Set<Class<?>> dependencies = Set.of(
+                RecommendationService.class.getConstructors()[0].getParameterTypes());
+
+        assertEquals(Set.of(
+                BranchAvailabilityCandidateQuery.class,
+                RecommendationProperties.class,
+                java.util.List.class), dependencies);
+        assertTrue(RecommendationMetricProvider.class.isInterface());
     }
 }

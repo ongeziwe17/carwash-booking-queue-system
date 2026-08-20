@@ -1,0 +1,13 @@
+info: { name: Customer requests best overall recommendations, type: http, seq: 5, tags: [recommendation, customer, ranking, overall] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/recommendations/branches?latitude=-33.9249&longitude=18.4241&serviceId={{serviceId}}&at={{future47}}Z&preference=BEST_OVERALL"
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("keeps the identical eligible candidate set", function() { expect(JSON.stringify(res.body.map(item => item.branchId).sort())).to.equal(bru.getVar("recommendationCandidateIds")); });
+        test("weighted contributions reconcile exactly", function() { const item = res.body[0]; const b = item.scoreBreakdown; const sum = b.distance.weightedContribution + b.queueWait.weightedContribution + b.totalTime.weightedContribution + b.price.weightedContribution; expect(Number(sum.toFixed(6))).to.equal(item.recommendationScore); expect(item.appliedPreference).to.equal("BEST_OVERALL"); expect(item.explanation).to.include("Weighted balance"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

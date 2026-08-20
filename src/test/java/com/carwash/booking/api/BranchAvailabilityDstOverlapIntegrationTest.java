@@ -70,7 +70,13 @@ class BranchAvailabilityDstOverlapIntegrationTest extends ApiIntegrationTestSupp
         search(serviceId, "2090-11-05T01:30:00-04:00")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
+        recommend(serviceId, "2090-11-05T01:30:00-04:00")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
         search(serviceId, "2090-11-05T01:30:00-05:00")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+        recommend(serviceId, "2090-11-05T01:30:00-05:00")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
 
@@ -116,6 +122,11 @@ class BranchAvailabilityDstOverlapIntegrationTest extends ApiIntegrationTestSupp
                 .andExpect(jsonPath("$[*].branchId", contains(branchId)))
                 .andExpect(jsonPath("$[0].availableStartAt").value(requestedAt))
                 .andExpect(jsonPath("$[0].reason").doesNotExist());
+        recommend(serviceId, requestedAt)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].branchId", contains(branchId)))
+                .andExpect(jsonPath("$[0].availableStartAt").value(requestedAt))
+                .andExpect(jsonPath("$[0].reason").doesNotExist());
 
         CreateBookingRequest booking = BookingFixtureBuilder.valid(
                         ids, userId, vehicleId, branchId, offeringId)
@@ -135,6 +146,18 @@ class BranchAvailabilityDstOverlapIntegrationTest extends ApiIntegrationTestSupp
                         "dst-customer", "CUSTOMER", "ROLE_CUSTOMER", "PERM_SERVICE_READ"))
                 .param("serviceId", serviceId)
                 .param("at", requestedAt));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions recommend(String serviceId, String requestedAt)
+            throws Exception {
+        return mockMvc.perform(get("/api/recommendations/branches")
+                .with(authentication.roleJwt(
+                        "dst-customer", "CUSTOMER", "ROLE_CUSTOMER", "PERM_MARKETPLACE_READ"))
+                .param("latitude", "40.7128")
+                .param("longitude", "-74.0060")
+                .param("serviceId", serviceId)
+                .param("at", requestedAt)
+                .param("preference", "NEAREST"));
     }
 
     @TestConfiguration(proxyBeanMethods = false)

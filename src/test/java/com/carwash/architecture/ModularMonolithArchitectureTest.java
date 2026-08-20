@@ -18,7 +18,7 @@ class ModularMonolithArchitectureTest {
             .importPackages("com.carwash");
     private static final String[] BUSINESS_MODULES = {
             "access", "booking", "catalog", "discovery", "identity", "marketplace", "notification", "queue", "reporting",
-            "vehicle"
+            "recommendation", "vehicle"
     };
 
     @Test
@@ -175,6 +175,42 @@ class ModularMonolithArchitectureTest {
                 .check(APPLICATION);
         noClasses().that().resideInAPackage("com.carwash.discovery..")
                 .should().dependOnClassesThat().resideInAPackage("com.carwash.booking..")
+                .check(APPLICATION);
+    }
+
+    @Test
+    void recommendation_consumes_only_published_application_contracts() {
+        noClasses().that().resideInAPackage("com.carwash.recommendation..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.carwash.booking.api..",
+                        "com.carwash.booking.domain..",
+                        "com.carwash.booking.infrastructure..",
+                        "com.carwash.catalog.api..",
+                        "com.carwash.catalog.domain..",
+                        "com.carwash.catalog.infrastructure..",
+                        "com.carwash.discovery.api..",
+                        "com.carwash.discovery.domain..",
+                        "com.carwash.discovery.infrastructure..",
+                        "com.carwash.marketplace.api..",
+                        "com.carwash.marketplace.domain..",
+                        "com.carwash.marketplace.infrastructure..",
+                        "com.carwash.queue.api..",
+                        "com.carwash.queue.domain..",
+                        "com.carwash.queue.infrastructure.."
+                )
+                .check(APPLICATION);
+    }
+
+    @Test
+    void candidate_providers_do_not_depend_on_recommendation() {
+        noClasses().that().resideInAnyPackage(
+                        "com.carwash.booking..",
+                        "com.carwash.catalog..",
+                        "com.carwash.discovery..",
+                        "com.carwash.marketplace..",
+                        "com.carwash.queue.."
+                )
+                .should().dependOnClassesThat().resideInAPackage("com.carwash.recommendation..")
                 .check(APPLICATION);
     }
 

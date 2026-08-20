@@ -26,6 +26,7 @@ Priority guide:
 | Notifications | In-app notification creation and bounded recent lookup with branch/offering context | Read-status lifecycle and external delivery are incomplete. |
 | Reports | In-memory daily summary with exactly one branch or business scope and branch-local dates | Tenant-authorized dashboards, revenue, and durable analytics are future work. |
 | Marketplace | Businesses/branches, location/lifecycle/discovery, schedules/closures/open status, offerings, branch-scoped operations, nearby straight-line discovery, and branch-aware availability | Tenant isolation, routing/geocoding, reservations, and resource calendars remain future work. |
+| Recommendations | Point-in-time ranked branch recommendations for five preferences over one AVAIL-002 candidate set, with normalized component scores, validated weights, stable ties, and customer-safe explanations | No reservation, ML/personalization, traffic routing, sponsored ranking, or dynamic pricing. |
 | API/Docs | Generated Swagger/OpenAPI plus human-readable API documentation and contract quality gates | DOCS-001 keeps written and generated contracts aligned. |
 | Testing | Unit/integration suites plus deterministic repeatability, OpenAPI gates, and Bruno HTTP acceptance | Production persistence testing remains future work. |
 | Packaging | Maven, Docker, Docker Compose, and staging-aligned GitHub Actions | Production deployment hardening remains future work. |
@@ -57,6 +58,8 @@ Completed issue cleanup:
 - #117 — Branch-specific service offerings and configured capacity (SERVICE-001).
 - #118 — Branch-scoped bookings, queues, notifications, and reports (OPS-001).
 - #119 — Deterministic branch distance and nearby discovery (GEO-001).
+- #120 — Authoritative branch-aware availability search (AVAIL-002).
+- #121 — Explainable rule-based Marketplace recommendations (REC-001).
 
 ## 3. Phase 0 — Immediate Hardening
 
@@ -113,7 +116,7 @@ Phase exit criteria:
 
 | ID | GitHub | Backlog Item | Priority | Depends On |
 | --- | ---: | --- | --- | --- |
-| REC-001 | #121 | Build explainable rule-based Marketplace recommendations | P1/P2 | QUEUE-002, AVAIL-002, GEO-001, SERVICE-001, CONFIG-001 |
+| REC-001 | #121 | Build explainable rule-based Marketplace recommendations — implemented | P1/P2 | QUEUE-002, AVAIL-002, GEO-001, SERVICE-001, CONFIG-001 |
 
 Recommendation MVP preferences:
 
@@ -132,6 +135,8 @@ Recommendation MVP outputs:
 - Estimated total completion time.
 - Price and capacity remaining.
 - Score breakdown and human-readable reason.
+
+REC-001 uses raw Haversine distance, branch-scoped queue estimates when meaningful, offering duration and price, decimal-safe min-max normalization, validated equal weights by default, and branch/offering ID tie-breaking. Missing future queue/total metrics remain `null` and receive a component score of zero without removing the candidate. Booking creation remains the reserving authority and revalidates every recommendation.
 
 ## 7. Phase 4 — Persistence, Tenant Isolation, and Production Security Hardening
 

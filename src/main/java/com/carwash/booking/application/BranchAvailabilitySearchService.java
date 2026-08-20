@@ -7,6 +7,7 @@ import com.carwash.catalog.application.ServiceOfferingSnapshot;
 import com.carwash.discovery.application.DistanceCalculator;
 import com.carwash.discovery.domain.GeoCoordinate;
 import com.carwash.marketplace.application.BranchSnapshot;
+import com.carwash.marketplace.application.BusinessSnapshot;
 import com.carwash.marketplace.application.MarketplaceQuery;
 import com.carwash.queue.application.QueueQuery;
 import com.carwash.shared.exception.BusinessRuleViolationException;
@@ -23,7 +24,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
-public final class BranchAvailabilitySearchService {
+public final class BranchAvailabilitySearchService implements BranchAvailabilityCandidateQuery {
 
     public static final int RESPONSE_DISTANCE_SCALE = 2;
     public static final RoundingMode RESPONSE_DISTANCE_ROUNDING = RoundingMode.HALF_UP;
@@ -60,14 +61,34 @@ public final class BranchAvailabilitySearchService {
     }
 
     public List<BranchAvailabilitySnapshot> findAvailableBranches(BranchAvailabilitySearchCriteria criteria) {
+        validateSearch(criteria);
+        return coordinator.read(() -> orderedCandidates(criteria).stream()
+                .map(this::publicSnapshot)
+                .toList());
+    }
+
+    @Override
+    public List<BranchAvailabilityCandidateSnapshot> findEligibleCandidates(
+            BranchAvailabilitySearchCriteria criteria
+    ) {
+        validateSearch(criteria);
+        if (!criteria.hasOrigin()) {
+            throw new BusinessRuleViolationException(
+                    "Recommendation candidates require latitude and longitude");
+        }
+        return coordinator.read(() -> orderedCandidates(criteria).stream()
+                .map(this::candidateSnapshot)
+                .toList());
+    }
+
+    private void validateSearch(BranchAvailabilitySearchCriteria criteria) {
         Objects.requireNonNull(criteria, "Branch availability search criteria are required");
         if (!criteria.startsAt().isAfter(clock.instant())) {
             throw new BusinessRuleViolationException("Availability start instant must be in the future");
         }
-        return coordinator.read(() -> search(criteria));
     }
 
-    private List<BranchAvailabilitySnapshot> search(BranchAvailabilitySearchCriteria criteria) {
+    private List<Candidate> orderedCandidates(BranchAvailabilitySearchCriteria criteria) {
         ServiceDefinitionSnapshot service = serviceDefinitionQuery
                 .findServiceDefinitionOptional(criteria.serviceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Service not found: " + criteria.serviceId()));
@@ -113,17 +134,14 @@ public final class BranchAvailabilitySearchService {
             Integer queueWait = queueRelevant(criteria, branch)
                     ? queueQuery.estimateWaitMinutesForNewWork(branch.branchId())
                     : null;
-            candidates.add(new Candidate(
-                    rawDistance,
-                    snapshot(branch, decision, queueWait, origin == null ? null : rawDistance)
-            ));
+            candidates.add(new Candidate(rawDistance, origin != null, branch, decision, queueWait));
         }
 
         Comparator<Candidate> order = origin == null
-                ? Comparator.comparing(candidate -> candidate.snapshot().branchId())
+                ? Comparator.comparing(candidate -> candidate.branch().branchId())
                 : Comparator.comparingDouble(Candidate::rawDistanceKm)
-                        .thenComparing(candidate -> candidate.snapshot().branchId());
-        return candidates.stream().sorted(order).map(Candidate::snapshot).toList();
+                        .thenComparing(candidate -> candidate.branch().branchId());
+        return candidates.stream().sorted(order).toList();
     }
 
     private boolean canonicalDiscoverableOffering(
@@ -154,13 +172,10 @@ public final class BranchAvailabilitySearchService {
         }
     }
 
-    private BranchAvailabilitySnapshot snapshot(
-            BranchSnapshot branch,
-            BranchAvailabilityDecisionSnapshot decision,
-            Integer queueWait,
-            Double rawDistance
-    ) {
-        BigDecimal distance = rawDistance == null ? null : BigDecimal.valueOf(rawDistance)
+    private BranchAvailabilitySnapshot publicSnapshot(Candidate candidate) {
+        BranchSnapshot branch = candidate.branch();
+        BranchAvailabilityDecisionSnapshot decision = candidate.decision();
+        BigDecimal distance = !candidate.hasOrigin() ? null : rawDistance(candidate)
                 .setScale(RESPONSE_DISTANCE_SCALE, RESPONSE_DISTANCE_ROUNDING);
         return new BranchAvailabilitySnapshot(
                 branch.branchId(), branch.businessId(), branch.branchName(), branch.addressLine1(),
@@ -168,9 +183,33 @@ public final class BranchAvailabilitySearchService {
                 branch.latitude(), branch.longitude(), branch.timezone(), decision.serviceOfferingId(),
                 decision.serviceId(), decision.serviceName(), decision.price(), decision.estimatedDurationMin(),
                 decision.branchLocalStartsAt(), decision.branchLocalEndsAt(), decision.concurrentCapacity(),
-                decision.capacityRemaining(), queueWait, distance);
+                decision.capacityRemaining(), candidate.queueWaitEstimateMin(), distance);
     }
 
-    private record Candidate(double rawDistanceKm, BranchAvailabilitySnapshot snapshot) {
+    private BranchAvailabilityCandidateSnapshot candidateSnapshot(Candidate candidate) {
+        BranchSnapshot branch = candidate.branch();
+        BranchAvailabilityDecisionSnapshot decision = candidate.decision();
+        BusinessSnapshot business = marketplaceQuery.findBusinessOptional(branch.businessId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Discoverable branch has no owning business projection: " + branch.branchId()));
+        return new BranchAvailabilityCandidateSnapshot(
+                business.businessId(), business.businessName(), branch.branchId(), branch.branchName(),
+                branch.timezone(), decision.serviceOfferingId(), decision.serviceId(), decision.serviceName(),
+                decision.price(), decision.estimatedDurationMin(), decision.branchLocalStartsAt(),
+                decision.branchLocalEndsAt(), decision.concurrentCapacity(), decision.capacityRemaining(),
+                candidate.queueWaitEstimateMin(), rawDistance(candidate));
+    }
+
+    private BigDecimal rawDistance(Candidate candidate) {
+        return BigDecimal.valueOf(candidate.rawDistanceKm());
+    }
+
+    private record Candidate(
+            double rawDistanceKm,
+            boolean hasOrigin,
+            BranchSnapshot branch,
+            BranchAvailabilityDecisionSnapshot decision,
+            Integer queueWaitEstimateMin
+    ) {
     }
 }

@@ -58,9 +58,9 @@ Stories are grouped by delivery phase so planned capabilities are not confused w
 
 | Story ID | GitHub | User Story | Acceptance Summary |
 | --- | ---: | --- | --- |
-| US-REC-001 | #121 | As a customer, I want ranked car wash recommendations based on my location, service need, time, queue, availability, and price. | Support nearest, shortest queue, fastest total time, lowest price, and best overall; exclude ineligible branches; return score breakdown and reason. |
+| US-REC-001 | #121 | As a customer, I want ranked car wash recommendations based on my location, service need, time, queue, availability, and price. | Implemented: one AVAIL-002 candidate set supports nearest, shortest queue, fastest total time, lowest price, and weighted best overall; raw metrics drive deterministic ranking; bounded responses include normalized score components and a customer-safe explanation. |
 
-The first recommendation implementation must remain rule-based, deterministic, and explainable. Machine learning is not part of this phase.
+REC-001 is implemented as a point-in-time, non-reserving read. Future-date queue and total-time metrics remain `null`, all ties end with branch ID then offering ID, and booking creation performs authoritative revalidation. The implementation remains rule-based, deterministic, and explainable; machine learning is not part of this phase.
 
 ## 7. Phase 4 — Persistence, Security, and Tenant Isolation
 

@@ -1,0 +1,11 @@
+info: { name: Unauthenticated recommendation rejected, type: http, seq: 8, tags: [recommendation, security, unauthenticated] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/recommendations/branches?latitude=-33.9249&longitude=18.4241&serviceId={{serviceId}}&at={{future47}}Z&preference=NEAREST"
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 401", function() { expect(res.status).to.equal(401); });
+        test("uses standard authentication error", function() { expect(res.body.code).to.equal("AUTHENTICATION_REQUIRED"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

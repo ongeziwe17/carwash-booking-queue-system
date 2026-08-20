@@ -1,0 +1,6 @@
+info:
+  name: Explainable recommendations
+  type: folder
+  seq: 21
+
+auth: inherit

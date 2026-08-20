@@ -4,6 +4,7 @@ import com.carwash.booking.application.BookingPolicyProperties;
 import com.carwash.bootstrap.RuntimePolicyConfig;
 import com.carwash.notification.application.NotificationPolicyProperties;
 import com.carwash.queue.application.QueuePolicyProperties;
+import com.carwash.recommendation.application.RecommendationProperties;
 import com.carwash.shared.config.RuntimeProperties;
 
 import com.carwash.booking.api.dto.CreateBookingRequest;
@@ -22,6 +23,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.math.BigDecimal;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -42,6 +44,11 @@ class RuntimePolicyConfigurationTest {
                     "carwash.policy.booking.slot-interval=PT30M",
                     "carwash.policy.notification.recent-limit=10",
                     "carwash.policy.queue.default-service-duration=PT10M",
+                    "carwash.recommendation.weights.distance=0.25",
+                    "carwash.recommendation.weights.queue-wait=0.25",
+                    "carwash.recommendation.weights.total-time=0.25",
+                    "carwash.recommendation.weights.price=0.25",
+                    "carwash.recommendation.max-radius-km=50.00",
                     "carwash.runtime.time-zone=UTC"
             );
 
@@ -67,6 +74,29 @@ class RuntimePolicyConfigurationTest {
             assertEquals(Duration.ofMinutes(15), context.getBean(QueuePolicyProperties.class).defaultServiceDuration());
             assertEquals(ZoneId.of("Africa/Johannesburg"), context.getBean(RuntimeProperties.class).timeZone());
             assertEquals(ZoneId.of("Africa/Johannesburg"), context.getBean(Clock.class).getZone());
+            assertEquals(new BigDecimal("0.25"),
+                    context.getBean(RecommendationProperties.class).weights().distance());
+            assertEquals(new BigDecimal("50.00"),
+                    context.getBean(RecommendationProperties.class).maxRadiusKm());
+        });
+    }
+
+    @Test
+    void recommendationOverridesBindAsDecimalSafeTypedProperties() {
+        contextRunner.withPropertyValues(
+                "carwash.recommendation.weights.distance=0.10",
+                "carwash.recommendation.weights.queue-wait=0.20",
+                "carwash.recommendation.weights.total-time=0.30",
+                "carwash.recommendation.weights.price=0.40",
+                "carwash.recommendation.max-radius-km=125.50"
+        ).run(context -> {
+            assertNull(context.getStartupFailure());
+            RecommendationProperties recommendations = context.getBean(RecommendationProperties.class);
+            assertEquals(new BigDecimal("0.10"), recommendations.weights().distance());
+            assertEquals(new BigDecimal("0.20"), recommendations.weights().queueWait());
+            assertEquals(new BigDecimal("0.30"), recommendations.weights().totalTime());
+            assertEquals(new BigDecimal("0.40"), recommendations.weights().price());
+            assertEquals(new BigDecimal("125.50"), recommendations.maxRadiusKm());
         });
     }
 
@@ -157,6 +187,30 @@ class RuntimePolicyConfigurationTest {
     @Test
     void negativeQueueFallbackDurationFailsStartupValidation() {
         assertInvalid("carwash.policy.queue.default-service-duration=-PT1M", "default service duration");
+    }
+
+    @Test
+    void recommendationWeightOutsideUnitRangeFailsStartupValidation() {
+        contextRunner.withPropertyValues(
+                "carwash.recommendation.weights.distance=1.01",
+                "carwash.recommendation.weights.queue-wait=-0.51"
+        ).run(context -> {
+            Throwable failure = context.getStartupFailure();
+            assertNotNull(failure);
+            String messages = failureMessages(failure).toLowerCase();
+            assertTrue(messages.contains("distance") || messages.contains("queuewait"),
+                    () -> "Expected invalid recommendation weight field but was: " + messages);
+        });
+    }
+
+    @Test
+    void recommendationWeightsMustSumExactlyToOne() {
+        assertInvalid("carwash.recommendation.weights.price=0.24", "sum exactly to 1");
+    }
+
+    @Test
+    void nonPositiveRecommendationRadiusFailsStartupValidation() {
+        assertInvalid("carwash.recommendation.max-radius-km=0", "maximum radius");
     }
 
     private void assertInvalid(String property, String expectedCause) {

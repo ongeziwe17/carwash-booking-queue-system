@@ -29,6 +29,7 @@ Implemented in the current backend:
 - Local Docker and Maven workflows.
 - In-memory Marketplace business/branch registration plus timezone-aware weekly hours, temporary closures, explicit-instant open-status decisions, and Catalog-owned branch service offerings.
 - Authenticated nearby discovery over existing branch coordinates with deterministic straight-line distance and optional radius, effective-offering, and explicit-instant open filters.
+- Authenticated explainable recommendations over authoritative branch availability using five deterministic preferences and configurable normalized scoring.
 
 ## Partially Implemented Foundation
 
@@ -55,6 +56,7 @@ Implemented in the current backend:
 | FR-12 | Include bounded branch/offering notification context and require explicit branch/business daily report scope. | Implemented |
 | FR-13 | Discover effective public branches by validated coordinates using deterministic distance, radius/service/open filters, and bounded responses. | Implemented |
 | FR-14 | Search branch-aware availability at an explicit instant using unambiguous branch-local starts, continuous-window-anchored slots, complete operating windows, closures, offering terms/capacity, active bookings, branch queues, and optional distance. | Implemented |
+| FR-15 | Rank the same booking-valid branch candidates by nearest, shortest queue, fastest total time, lowest price, or validated weighted balance and return a deterministic customer-safe explanation. | Implemented |
 
 ## Functional Requirements: Planned/Future
 
@@ -70,6 +72,7 @@ Implemented in the current backend:
 | Ratings and feedback.                                              | Future product capability       |
 | Rich reporting dashboards and analytics.                           | Future product capability       |
 | Monitoring, observability, and production deployment hardening.    | Future SaaS hardening           |
+| Personalization, ML ranking, traffic-aware routing, sponsored placement, and dynamic pricing. | Future/out of REC-001 scope |
 
 ## Non-Functional Requirements
 

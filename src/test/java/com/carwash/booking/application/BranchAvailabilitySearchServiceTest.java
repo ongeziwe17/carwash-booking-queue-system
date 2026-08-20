@@ -76,6 +76,11 @@ class BranchAvailabilitySearchServiceTest {
         assertEquals(List.of("branch-b", "branch-a"),
                 ordered.stream().map(BranchAvailabilitySnapshot::branchId).toList());
         assertEquals(new BigDecimal("10.00"), ordered.get(1).distanceKm());
+
+        List<BranchAvailabilityCandidateSnapshot> recommendationCandidates = search.findEligibleCandidates(
+                criteria("0", "0", null, START));
+        assertEquals(new BigDecimal("10.004"), recommendationCandidates.get(1).rawDistanceKm());
+        assertEquals("Business business-1", recommendationCandidates.get(1).businessName());
     }
 
     @Test
@@ -97,6 +102,8 @@ class BranchAvailabilitySearchServiceTest {
                 () -> criteria("91", "0", null, START));
         assertThrows(BusinessRuleViolationException.class,
                 () -> criteria("0", "0", "20000.01", START));
+        assertThrows(BusinessRuleViolationException.class,
+                () -> search.findEligibleCandidates(criteria(null, null, null, START)));
     }
 
     @Test
@@ -121,7 +128,12 @@ class BranchAvailabilitySearchServiceTest {
             Boolean serviceActive
     ) {
         MarketplaceQuery marketplace = new MarketplaceQuery() {
-            public Optional<BusinessSnapshot> findBusinessOptional(String businessId) { return Optional.empty(); }
+            public Optional<BusinessSnapshot> findBusinessOptional(String businessId) {
+                return Optional.of(new BusinessSnapshot(
+                        businessId, "Business " + businessId, "owner@example.test", "+27820000000", null,
+                        com.carwash.marketplace.domain.BusinessStatus.ACTIVE,
+                        LocalDateTime.MIN, LocalDateTime.MIN));
+            }
             public Optional<BranchSnapshot> findBranchOptional(String branchId) {
                 return branches.stream().filter(branch -> branch.branchId().equals(branchId)).findFirst();
             }

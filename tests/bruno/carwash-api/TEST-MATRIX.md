@@ -27,6 +27,7 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 | `POST` | `/api/queue-entries/{id}/complete` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
 | `PUT` | `/api/queue-entries/{id}/position` | ✅ | ✅ | ✅ | ✅ | N/A — not user-owned | ✅ | N/A — not needed in multi-step journey |
 | `POST` | `/api/queue-entries/{id}/start` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
+| `GET` | `/api/recommendations/branches` | ✅ — all five preferences | ✅ — coordinates/service/time/preference/server radius | ✅ | N/A — all current roles have MARKETPLACE_READ | N/A — public discovery view | ✅ — shared AVAIL-002 eligibility/raw metrics/null estimates/ties | ✅ — recommendation remains booking-valid |
 | `GET` | `/api/reports/daily-summary` | ✅ | ✅ — exactly one scope | ✅ | ✅ | N/A — scope is not tenant authorization | ✅ — branch/business isolation | ✅ |
 | `GET` | `/api/services` | ✅ | ✅ | ✅ | N/A — public or no wrong-role case | N/A — not user-owned | N/A — no state/dependency mutation | ✅ |
 | `POST` | `/api/services` | ✅ | ✅ | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
@@ -75,14 +76,14 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 
 ## Totals
 
-- API operations: **68**
-- Happy-path functional coverage: **68/68**
-- 401 coverage: **66/66 protected operations** (2 public operations are N/A)
+- API operations: **69**
+- Happy-path functional coverage: **69/69**
+- 401 coverage: **67/67 protected operations** (2 public operations are N/A)
 - RBAC/403 applicability covered: **57 operations/capabilities**
 - Ownership/identity applicability covered: **16 operations**
-- Validation applicability covered: **30 operations**
-- HTTP-visible integrity applicability covered: **48 operations**
-- Operations used in multi-step workflows: **57**
-- Bruno requests/tests: **512 requests / 1,664 tests**
+- Validation applicability covered: **31 operations**
+- HTTP-visible integrity applicability covered: **49 operations**
+- Operations used in multi-step workflows: **58**
+- Bruno requests/tests: **520 requests / 1,685 tests**
 
 The full authorization suite also exercises each significant role/capability allow/deny cell rather than relying only on per-operation counts.

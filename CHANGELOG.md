@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Added explainable rule-based Marketplace branch recommendations with five preferences, one AVAIL-002 candidate set, raw-value deterministic ranking, normalized BigDecimal score breakdowns, validated weights/radius, customer-safe explanations, RBAC, OpenAPI, Bruno, and architecture coverage.
 - Excluded both offset-specific occurrences of an ambiguous DST fall-back branch-local start from AVAIL-002 search, keeping every advertised result representable by the current branch-local booking contract while preserving gap/overlap rejection on booking writes.
 - Corrected branch-aware slot alignment to start at each continuous Marketplace operating window (including merged adjacent and overnight intervals), with split windows resetting the anchor; added multi-business capacity-isolation and real branch-queue estimate regressions.
 - Added branch-aware exact-instant availability search with complete Marketplace schedule/closure windows, branch offering terms and overlapping configured capacity, same-day queue estimates, optional Haversine radius filtering, and one shared authoritative booking decision.
