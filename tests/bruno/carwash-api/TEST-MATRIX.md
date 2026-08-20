@@ -8,7 +8,7 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 | `POST` | `/api/auth/login` | ✅ | ✅ | N/A — public endpoint | N/A — public or no wrong-role case | N/A — not user-owned | N/A — no state/dependency mutation | ✅ |
 | `GET` | `/api/auth/me` | ✅ | N/A — no request body/typed input case | ✅ | N/A — public or no wrong-role case | N/A — not user-owned | N/A — no state/dependency mutation | ✅ |
 | `GET` | `/api/availability` | ✅ | ✅ | ✅ | N/A — all current roles have SERVICE_READ | N/A — service/date capacity view | ✅ | ✅ |
-| `GET` | `/api/availability/branches` | ✅ | ✅ — required instant/service, coordinate pair, radius | ✅ | N/A — all current roles have SERVICE_READ | N/A — public discovery view | ✅ — lifecycle/hours/closure/offering capacity | ✅ |
+| `GET` | `/api/availability/branches` | ✅ | ✅ — required instant/service, coordinate pair, radius | ✅ | N/A — all current roles have SERVICE_READ | N/A — public discovery view | ✅ — unambiguous local start/lifecycle/hours/closure/offering capacity | ✅ |
 | `GET` | `/api/bookings` | ✅ | ✅ — invalid/unknown branch filter | ✅ | ✅ | N/A — filter is not tenant authorization | ✅ — no cross-branch leakage | ✅ |
 | `POST` | `/api/bookings` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `DELETE` | `/api/bookings/{id}` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | ✅ | ✅ | N/A — not needed in multi-step journey |

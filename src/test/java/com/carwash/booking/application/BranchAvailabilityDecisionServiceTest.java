@@ -17,6 +17,7 @@ import com.carwash.marketplace.application.BranchSnapshot;
 import com.carwash.marketplace.application.BusinessSnapshot;
 import com.carwash.marketplace.application.MarketplaceQuery;
 import com.carwash.marketplace.domain.BranchStatus;
+import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.vehicle.domain.Vehicle;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BranchAvailabilityDecisionServiceTest {
@@ -157,6 +159,46 @@ class BranchAvailabilityDecisionServiceTest {
                         opening.plusMinutes(45).minusNanos(100_000_000).toInstant(), null).reason());
     }
 
+    @Test
+    void ambiguousBranchLocalStartsAreUnavailableForBothOverlapInstants() {
+        ZoneId zone = ZoneId.of("America/New_York");
+        LocalDateTime opening = LocalDateTime.of(2090, 11, 5, 0, 0);
+        LocalDateTime ambiguous = LocalDateTime.of(2090, 11, 5, 1, 30);
+        BranchAvailabilityDecisionService newYork = new BranchAvailabilityDecisionService(
+                bookings,
+                marketplace(true, zone.getId()),
+                schedules(zone, true, opening.atZone(zone)),
+                offerings(true),
+                definitions(true),
+                policy(),
+                clock());
+
+        List<ZoneOffset> overlapOffsets = zone.getRules().getValidOffsets(ambiguous);
+        assertEquals(2, overlapOffsets.size());
+        for (ZoneOffset offset : overlapOffsets) {
+            BranchAvailabilityDecisionSnapshot decision = newYork.evaluate(
+                    "branch-1", "offering-1", ambiguous.toInstant(offset), null);
+            assertFalse(decision.available());
+            assertEquals(BranchAvailabilityReason.INVALID_LOCAL_TIME, decision.reason());
+        }
+
+        assertTrue(newYork.evaluate("branch-1", "offering-1",
+                LocalDateTime.of(2090, 11, 5, 0, 30).atZone(zone).toInstant(), null).available());
+        assertTrue(newYork.evaluate("branch-1", "offering-1",
+                LocalDateTime.of(2090, 11, 5, 2, 30).atZone(zone).toInstant(), null).available());
+        BusinessRuleViolationException exception = assertThrows(
+                BusinessRuleViolationException.class,
+                () -> newYork.evaluateLocal("branch-1", "offering-1", ambiguous, null));
+        assertEquals("Scheduled date/time is ambiguous in the branch timezone", exception.getMessage());
+
+        LocalDateTime gap = LocalDateTime.of(2090, 3, 12, 2, 30);
+        assertTrue(zone.getRules().getValidOffsets(gap).isEmpty());
+        BusinessRuleViolationException gapException = assertThrows(
+                BusinessRuleViolationException.class,
+                () -> newYork.evaluateLocal("branch-1", "offering-1", gap, null));
+        assertEquals("Scheduled date/time does not exist in the branch timezone", gapException.getMessage());
+    }
+
     private BranchAvailabilityDecisionService service(
             boolean branchActive,
             boolean offeringActive,
@@ -179,7 +221,14 @@ class BranchAvailabilityDecisionServiceTest {
     }
 
     private BranchScheduleQuery schedules(boolean open, ZonedDateTime operatingWindowStartsAt) {
-        ZoneId zone = ZoneId.of("Africa/Johannesburg");
+        return schedules(ZoneId.of("Africa/Johannesburg"), open, operatingWindowStartsAt);
+    }
+
+    private BranchScheduleQuery schedules(
+            ZoneId zone,
+            boolean open,
+            ZonedDateTime operatingWindowStartsAt
+    ) {
         return new BranchScheduleQuery() {
             @Override
             public BranchOpenStatusSnapshot getOpenStatus(String branchId, Instant requestedAt) {
@@ -202,9 +251,13 @@ class BranchAvailabilityDecisionServiceTest {
     }
 
     private MarketplaceQuery marketplace(boolean active) {
+        return marketplace(active, "Africa/Johannesburg");
+    }
+
+    private MarketplaceQuery marketplace(boolean active, String timezone) {
         BranchSnapshot branch = new BranchSnapshot(
                 "branch-1", "business-1", "Branch", "1 Main Road", null, "Cape Town", "Western Cape",
-                "8001", "ZA", new BigDecimal("-33.9"), new BigDecimal("18.4"), "Africa/Johannesburg",
+                "8001", "ZA", new BigDecimal("-33.9"), new BigDecimal("18.4"), timezone,
                 active ? BranchStatus.ACTIVE : BranchStatus.INACTIVE, true, active, active,
                 LocalDateTime.MIN, LocalDateTime.MIN);
         return new MarketplaceQuery() {
