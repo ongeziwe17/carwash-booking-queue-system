@@ -101,6 +101,23 @@ class RuntimePolicyConfigurationTest {
     }
 
     @Test
+    void recommendationWeightsRetainPrecisionBeyondResponseScale() {
+        contextRunner.withPropertyValues(
+                "carwash.recommendation.weights.distance=0.1666666",
+                "carwash.recommendation.weights.queue-wait=0.1666666",
+                "carwash.recommendation.weights.total-time=0.1666666",
+                "carwash.recommendation.weights.price=0.5000002"
+        ).run(context -> {
+            assertNull(context.getStartupFailure());
+            RecommendationProperties.Weights weights = context.getBean(RecommendationProperties.class).weights();
+            assertEquals(new BigDecimal("0.1666666"), weights.distance());
+            assertEquals(new BigDecimal("0.1666666"), weights.queueWait());
+            assertEquals(new BigDecimal("0.1666666"), weights.totalTime());
+            assertEquals(new BigDecimal("0.5000002"), weights.price());
+        });
+    }
+
+    @Test
     void slotIntervalMayBeAnyPositiveWholeMinuteDuration() {
         contextRunner.withPropertyValues("carwash.policy.booking.slot-interval=PT45M")
                 .run(context -> {

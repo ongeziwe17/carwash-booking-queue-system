@@ -13,7 +13,7 @@ public record RecommendationScoreComponentResponse(
         BigDecimal normalizedScore,
         @Schema(description = "Configured decimal-safe BEST_OVERALL weight.")
         BigDecimal configuredWeight,
-        @Schema(description = "Internal normalized score multiplied by weight, rounded to six decimals.")
+        @Schema(description = "Six-decimal normalized-score contribution; BEST_OVERALL display residuals use deterministic largest-remainder reconciliation.")
         BigDecimal weightedContribution
 ) {
 }

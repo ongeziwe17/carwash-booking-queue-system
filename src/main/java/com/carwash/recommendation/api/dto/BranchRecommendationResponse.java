@@ -30,7 +30,7 @@ public record BranchRecommendationResponse(
         int concurrentCapacity,
         int remainingCapacity,
         RecommendationPreference appliedPreference,
-        @Schema(description = "Objective or weighted score from 0 to 1, rounded to six decimals.")
+        @Schema(description = "Objective or weighted score from 0 to 1; the internal total is rounded once to six decimals.")
         BigDecimal recommendationScore,
         RecommendationScoreBreakdownResponse scoreBreakdown,
         String explanation

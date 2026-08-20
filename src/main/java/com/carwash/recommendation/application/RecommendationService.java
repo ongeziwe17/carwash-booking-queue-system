@@ -22,6 +22,12 @@ public final class RecommendationService {
     public static final int RESPONSE_PRICE_SCALE = 2;
     public static final RoundingMode RESPONSE_ROUNDING = RoundingMode.HALF_UP;
     private static final MathContext CALCULATION_CONTEXT = MathContext.DECIMAL128;
+    private static final BigDecimal RESPONSE_SCORE_UNIT = BigDecimal.ONE.movePointLeft(RESPONSE_SCORE_SCALE);
+    private static final List<RecommendationMetric> DISPLAY_RECONCILIATION_ORDER = List.of(
+            RecommendationMetric.DISTANCE,
+            RecommendationMetric.QUEUE_WAIT,
+            RecommendationMetric.TOTAL_TIME,
+            RecommendationMetric.PRICE);
 
     private final BranchAvailabilityCandidateQuery candidateQuery;
     private final RecommendationProperties properties;
@@ -151,10 +157,12 @@ public final class RecommendationService {
             CandidateScore score
     ) {
         BranchAvailabilityCandidateSnapshot candidate = score.candidate();
-        RecommendationScoreBreakdownSnapshot breakdown = breakdown(score);
         BigDecimal recommendationScore = preference == RecommendationPreference.BEST_OVERALL
-                ? responseOverall(breakdown)
-                : responseScore(score.normalized(metric(preference)));
+                ? responseOverall(score)
+                : responseBoundedScore(score.normalized(metric(preference)));
+        RecommendationScoreBreakdownSnapshot breakdown = breakdown(
+                score,
+                preference == RecommendationPreference.BEST_OVERALL ? recommendationScore : null);
         Integer totalTime = candidate.queueWaitEstimateMin() == null
                 ? null
                 : Math.addExact(candidate.queueWaitEstimateMin(), candidate.serviceDurationMin());
@@ -183,12 +191,23 @@ public final class RecommendationService {
                 explanation(preference, candidate, recommendationScore, totalTime));
     }
 
-    private RecommendationScoreBreakdownSnapshot breakdown(CandidateScore score) {
+    private RecommendationScoreBreakdownSnapshot breakdown(
+            CandidateScore score,
+            BigDecimal displayedOverall
+    ) {
+        EnumMap<RecommendationMetric, RecommendationScoreComponentSnapshot> components =
+                new EnumMap<>(RecommendationMetric.class);
+        for (RecommendationMetric metric : DISPLAY_RECONCILIATION_ORDER) {
+            components.put(metric, component(score, metric));
+        }
+        if (displayedOverall != null) {
+            reconcileDisplayedContributions(score, components, displayedOverall);
+        }
         return new RecommendationScoreBreakdownSnapshot(
-                component(score, RecommendationMetric.DISTANCE),
-                component(score, RecommendationMetric.QUEUE_WAIT),
-                component(score, RecommendationMetric.TOTAL_TIME),
-                component(score, RecommendationMetric.PRICE));
+                components.get(RecommendationMetric.DISTANCE),
+                components.get(RecommendationMetric.QUEUE_WAIT),
+                components.get(RecommendationMetric.TOTAL_TIME),
+                components.get(RecommendationMetric.PRICE));
     }
 
     private RecommendationScoreComponentSnapshot component(
@@ -199,21 +218,75 @@ public final class RecommendationService {
         return new RecommendationScoreComponentSnapshot(
                 responseRaw(metric, raw),
                 raw != null,
-                responseScore(score.normalized(metric)),
+                responseBoundedScore(score.normalized(metric)),
                 properties.weight(metric),
-                responseScore(score.contribution(metric)));
+                responseBoundedScore(score.contribution(metric)));
     }
 
-    private BigDecimal responseOverall(RecommendationScoreBreakdownSnapshot breakdown) {
-        return breakdown.distance().weightedContribution()
-                .add(breakdown.queueWait().weightedContribution())
-                .add(breakdown.totalTime().weightedContribution())
-                .add(breakdown.price().weightedContribution())
-                .setScale(RESPONSE_SCORE_SCALE, RESPONSE_ROUNDING);
+    private void reconcileDisplayedContributions(
+            CandidateScore score,
+            EnumMap<RecommendationMetric, RecommendationScoreComponentSnapshot> components,
+            BigDecimal displayedOverall
+    ) {
+        EnumMap<RecommendationMetric, BigDecimal> displayed = new EnumMap<>(RecommendationMetric.class);
+        EnumMap<RecommendationMetric, BigDecimal> remainders = new EnumMap<>(RecommendationMetric.class);
+        BigDecimal displayedTotal = BigDecimal.ZERO;
+        for (RecommendationMetric metric : DISPLAY_RECONCILIATION_ORDER) {
+            BigDecimal internal = boundedScore(score.contribution(metric));
+            BigDecimal floor = internal.setScale(RESPONSE_SCORE_SCALE, RoundingMode.DOWN);
+            displayed.put(metric, floor);
+            remainders.put(metric, internal.subtract(floor));
+            displayedTotal = displayedTotal.add(floor);
+        }
+
+        int units = displayedOverall.subtract(displayedTotal)
+                .movePointRight(RESPONSE_SCORE_SCALE)
+                .intValueExact();
+        List<RecommendationMetric> allocationOrder = new ArrayList<>(DISPLAY_RECONCILIATION_ORDER);
+        allocationOrder.sort((left, right) -> {
+            int remainderOrder = remainders.get(right).compareTo(remainders.get(left));
+            if (remainderOrder != 0) {
+                return remainderOrder;
+            }
+            return Integer.compare(
+                    DISPLAY_RECONCILIATION_ORDER.indexOf(left),
+                    DISPLAY_RECONCILIATION_ORDER.indexOf(right));
+        });
+        if (units < 0 || units > allocationOrder.size()) {
+            throw new IllegalStateException("Invalid recommendation contribution display residual");
+        }
+        for (int index = 0; index < units; index++) {
+            RecommendationMetric metric = allocationOrder.get(index);
+            displayed.put(metric, displayed.get(metric).add(RESPONSE_SCORE_UNIT));
+        }
+
+        for (RecommendationMetric metric : DISPLAY_RECONCILIATION_ORDER) {
+            RecommendationScoreComponentSnapshot component = components.get(metric);
+            components.put(metric, new RecommendationScoreComponentSnapshot(
+                    component.rawValue(),
+                    component.available(),
+                    component.normalizedScore(),
+                    component.configuredWeight(),
+                    responseBoundedScore(displayed.get(metric))));
+        }
+        BigDecimal reconciled = DISPLAY_RECONCILIATION_ORDER.stream()
+                .map(metric -> components.get(metric).weightedContribution())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (reconciled.compareTo(displayedOverall) != 0) {
+            throw new IllegalStateException("Unable to reconcile displayed recommendation contributions");
+        }
     }
 
-    private BigDecimal responseScore(BigDecimal value) {
-        return value.setScale(RESPONSE_SCORE_SCALE, RESPONSE_ROUNDING);
+    private BigDecimal responseOverall(CandidateScore score) {
+        return responseBoundedScore(score.overall());
+    }
+
+    private BigDecimal responseBoundedScore(BigDecimal value) {
+        return boundedScore(value).setScale(RESPONSE_SCORE_SCALE, RESPONSE_ROUNDING);
+    }
+
+    private BigDecimal boundedScore(BigDecimal value) {
+        return value.max(BigDecimal.ZERO).min(BigDecimal.ONE);
     }
 
     private BigDecimal responseRaw(RecommendationMetric metric, BigDecimal value) {
