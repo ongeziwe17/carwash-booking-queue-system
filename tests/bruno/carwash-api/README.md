@@ -102,6 +102,7 @@ bru run --env local --tags=rbac
 bru run --env local --tags=security
 bru run --env local --tags=availability
 bru run --env local --tags=marketplace
+bru run --env local --tags=recommendation
 ```
 
 Bruno executes sequentially by default; do **not** use `--parallel` for the full stateful workflow suite.
@@ -156,6 +157,7 @@ The collection verifies:
 - OPS-001 required booking branch/offering scope, same-branch offering changes, cross-branch rejection, inherited queue scope, branch filters, branch-partitioned call-next/positions/waits, explicit branch/business reports, and bounded notification context;
 - GEO-001 deterministic Haversine distance, radius/service/open-at filters, output rounding, lifecycle/public visibility, Marketplace-read authorization, validation, and temporary-closure workflows;
 - AVAIL-002 shared booking/search decisions, unambiguous branch-local starts, continuous-window slot anchors, complete branch schedule windows and closures, effective offering terms, overlapping configured capacity, same-day branch-isolated queue estimates, optional raw-distance filtering, bounded multi-business responses, and service-read authorization;
+- REC-001 reuse of one AVAIL-002 candidate set across all five preferences, deterministic raw-metric ranking/ties, normalized component and weighted-contribution reconciliation, future null queue/total behavior, bounded explanations, server radius enforcement, and Marketplace-read authorization;
 - current queue states (`WAITING`, `CALLED`, `IN_PROGRESS`, `COMPLETED`);
 - real role changes and token acquisition;
 - final-platform-administrator protection without deleting or demoting the bootstrap admin.
@@ -172,7 +174,7 @@ responsibilities because the acceptance environment does not expose test-only cl
 
 The run-scoped legacy availability workflow uses an isolated future date and services. It proves that its global exact-start slot disappears at configured capacity, authoritative creation enforces the selected offering's own capacity, cancellation restores both views, and a 60-minute service is never advertised past the closing boundary. Availability reads remain point-in-time snapshots and do not reserve capacity.
 
-The run-scoped Marketplace workflow registers businesses and branches, exercises every onboarding, scheduling, and offering operation, proves parent lifecycle and public-discovery filtering without rewriting child state, validates coordinate/timezone and offering-term rules, and checks customer read/management-denial behavior. A following operational workflow books the same reusable service at those two branches and proves branch isolation. GEO exercises authenticated nearby discovery and raw-distance filtering; AVAIL-002 then proves bounded multi-business branch/offering availability, independent terms, deterministic distance order/radius, validation, and authentication. Deterministic Java integration tests additionally exercise both New York fall-back offsets and bookable controls, preserved DST-gap rejection, `PT45M` window anchors, business lifecycle/capacity isolation, current-date real queue estimates, terminal queue exclusion, and future-date null estimates. Neither workflow implies tenant isolation, driving routes, reservations, or staff/bay allocation.
+The run-scoped Marketplace workflow registers businesses and branches, exercises every onboarding, scheduling, and offering operation, proves parent lifecycle and public-discovery filtering without rewriting child state, validates coordinate/timezone and offering-term rules, and checks customer read/management-denial behavior. A following operational workflow books the same reusable service at those two branches and proves branch isolation. GEO exercises authenticated nearby discovery and raw-distance filtering; AVAIL-002 then proves bounded multi-business branch/offering availability, independent terms, deterministic distance order/radius, validation, and authentication. REC-001 runs all five preferences over that same eligible snapshot, reconciles the best-overall breakdown, preserves null future estimates, and checks radius, preference, and unauthenticated failures. Deterministic Java integration tests additionally exercise both New York fall-back offsets and bookable controls, preserved DST-gap rejection, `PT45M` window anchors, business lifecycle/capacity isolation, current-date real queue estimates, terminal queue exclusion, future-date null estimates, exact/near score ties, released cancellation capacity, and authoritative booking revalidation. Neither workflow implies tenant isolation, driving routes, reservations, personalization, dynamic pricing, or staff/bay allocation.
 
 ## Cleanup
 

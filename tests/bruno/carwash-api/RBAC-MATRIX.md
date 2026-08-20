@@ -22,6 +22,7 @@ This matrix is derived from `RoleCatalog`, controller `@PreAuthorize` expression
 | Read daily reports | ❌ | ❌ | ✅ | ✅ |
 | Read discoverable Marketplace branches | ✅ | ✅ | ✅ | ✅ |
 | Read nearby Marketplace branch discovery | ✅ | ✅ | ✅ | ✅ |
+| Read Marketplace branch recommendations | ✅ | ✅ | ✅ | ✅ |
 | Read Marketplace branch open status | ✅ | ✅ | ✅ | ✅ |
 | Read discoverable Marketplace offerings | ✅ | ✅ | ✅ | ✅ |
 | Manage Marketplace businesses/branches/hours/closures/offerings | ❌ | ❌ | ✅ | ✅ |
@@ -38,6 +39,6 @@ Operational roles are STAFF, BUSINESS_OWNER, and PLATFORM_ADMIN for vehicle, boo
 
 OPS-001 branch filters, branch call-next, and branch/business report scopes constrain returned or selected data, but they do not establish tenant ownership authorization. STAFF and BUSINESS_OWNER operational access remains global until TENANT-001.
 
-Marketplace management is intentionally global for BUSINESS_OWNER and PLATFORM_ADMIN until TENANT-001 introduces owner/business scoping. `MARKETPLACE_READ` exposes bounded branch/offering/nearby discovery and operational open-status decisions; the public-discovery flag does not change whether a branch is operationally open or make the endpoint anonymous. Branch availability uses `SERVICE_READ`, applies public visibility as an eligibility filter, and does not establish tenant authorization.
+Marketplace management is intentionally global for BUSINESS_OWNER and PLATFORM_ADMIN until TENANT-001 introduces owner/business scoping. `MARKETPLACE_READ` exposes bounded branch/offering/nearby discovery, recommendations, and operational open-status decisions; the public-discovery flag does not change whether a branch is operationally open or make an endpoint anonymous. Branch availability uses `SERVICE_READ`, applies public visibility as an eligibility filter, and does not establish tenant authorization. Recommendations use the least-privilege `MARKETPLACE_READ` convention and expose only detached customer-safe fields; a token without that permission receives 403.
 
 Operating-window slot alignment, ambiguous-local-time exclusion, and branch-isolated capacity/queue calculations do not alter this authorization matrix or imply business-owner tenant isolation.

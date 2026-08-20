@@ -1,0 +1,12 @@
+info: { name: Recommendation rejects unknown preference, type: http, seq: 7, tags: [recommendation, validation, preference] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/recommendations/branches?latitude=-33.9249&longitude=18.4241&serviceId={{serviceId}}&at={{future47}}Z&preference=POPULAR"
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 400", function() { expect(res.status).to.equal(400); });
+        test("uses standard invalid parameter error", function() { expect(res.body.code).to.equal("INVALID_PARAMETER"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

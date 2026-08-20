@@ -1,6 +1,6 @@
 # Car Wash Booking Queue System
 
-Spring Boot backend foundation for car wash booking, queue management, and Marketplace onboarding/scheduling. The code is organized as a capability-based modular monolith with explicit `bootstrap`, `shared`, `identity`, `access`, `vehicle`, `catalog`, `booking`, `queue`, `notification`, `reporting`, `marketplace`, and `discovery` boundaries enforced by ArchUnit. The current codebase exposes APIs for users, vehicles, reusable global services, branch-specific offerings, bookings, queues, notifications, daily reporting, Marketplace businesses, physical branches, weekly branch hours, temporary closures, timezone-aware open-status decisions, authenticated nearby branch discovery, and branch-aware availability over in-memory repositories.
+Spring Boot backend foundation for car wash booking, queue management, and Marketplace onboarding/scheduling. The code is organized as a capability-based modular monolith with explicit `bootstrap`, `shared`, `identity`, `access`, `vehicle`, `catalog`, `booking`, `queue`, `notification`, `reporting`, `marketplace`, `discovery`, and `recommendation` boundaries enforced by ArchUnit. The current codebase exposes APIs for users, vehicles, reusable global services, branch-specific offerings, bookings, queues, notifications, daily reporting, Marketplace businesses, physical branches, weekly branch hours, temporary closures, timezone-aware open-status decisions, authenticated nearby branch discovery, branch-aware availability, and explainable rule-based recommendations over in-memory repositories.
 
 ## Current backend foundation
 
@@ -18,6 +18,7 @@ Spring Boot backend foundation for car wash booking, queue management, and Marke
 - Marketplace branch scheduling with atomic weekly intervals, overnight/week-boundary support, temporary closure history, and explicit-instant open-status decisions.
 - Catalog-owned branch service offerings with independent price, duration, configured concurrent capacity, lifecycle, and parent-aware discovery.
 - Nearby branch discovery with deterministic Haversine distance, optional raw-distance radius filtering, service-offering and explicit-instant open filters, and bounded customer responses.
+- Explainable branch recommendations with five deterministic preferences, raw-value ranking, normalized component scores, validated weights, stable ties, and AVAIL-002-owned eligibility.
 - Swagger/OpenAPI documentation.
 - Java 21 Maven, Docker, Docker Compose, and GitHub Actions delivery support.
 
@@ -28,6 +29,7 @@ Spring Boot backend foundation for car wash booking, queue management, and Marke
 - External SMS/email delivery is not implemented.
 - Nearby distance is straight-line only; no routing, traffic, geocoding, or external maps provider is used.
 - Payments, capacity reservations, concurrent bay/staff scheduling, PostgreSQL, production observability, and deployment hardening remain future work.
+- Recommendations are point-in-time rules only; personalization, machine learning, sponsored ranking, dynamic pricing, traffic-aware routing, and holds are not implemented.
 - The application does not yet expose dedicated Actuator liveness or readiness endpoints.
 
 ## Tech stack
@@ -120,7 +122,7 @@ The Compose file intentionally contains only the API. PostgreSQL remains tracked
 
 ## Runtime policy configuration
 
-Booking, availability, notification, queue, and application-time policies use validated typed Spring configuration with safe defaults and environment-variable overrides. See [Runtime Policy Configuration](documentation/CONFIGURATION.md) for the supported properties, scheduling-window rules, validation, cancellation cutoff semantics, duration syntax, and override examples.
+Booking, availability, notification, queue, recommendation, and application-time policies use validated typed Spring configuration with safe defaults and environment-variable overrides. See [Runtime Policy Configuration](documentation/CONFIGURATION.md) for the supported properties, scheduling-window rules, recommendation weights/radius, validation, cancellation cutoff semantics, duration syntax, and override examples.
 
 ## Testing
 
@@ -227,6 +229,7 @@ Bootstrap administration is disabled by default. Configure all `SECURE_BOOTSTRAP
 - `/api/marketplace/businesses`
 - `/api/marketplace/branches`
 - `/api/marketplace/offerings`
+- `/api/recommendations/branches`
 - `/api/notifications`
 - `/api/reports/daily-summary`
 

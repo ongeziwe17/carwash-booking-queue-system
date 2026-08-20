@@ -2,9 +2,11 @@
 
 TEST-001 separates fast unit/repository/service tests from Spring API integration tests and makes isolation, test data, execution order, and release-gate behaviour explicit.
 
-## Current AVAIL-002 inventory
+## Current REC-001 inventory
 
-AVAIL-002 plus its focused corrections covers complete-window scheduling, `PT45M` and offset-opening grids, adjacent/split/overnight anchors, shared booking/search decisions, both offset occurrences of a New York DST fall-back overlap, valid unambiguous controls on each side of the overlap, preserved DST-gap rejection, multi-business offering/capacity isolation, real branch-queue estimates, cancellation release, distance boundary/order, API/security, architecture, and OpenAPI metadata. The expected inventory is **347 unit tests**, **164 integration tests**, exactly **68 OpenAPI operations**, and **512 Bruno requests / 1,664 Bruno tests**; CI results remain authoritative. The complete suite remains randomized and repeatable under seeds `11001` and `11002`, with the existing JaCoCo, Docker, workflow, and vulnerability thresholds unchanged.
+REC-001 retains all AVAIL-002 complete-window, slot-grid, timezone/DST, lifecycle, offering, overlap-capacity, queue, distance, cancellation, and isolation regressions, then adds one authoritative detached candidate contract and deterministic recommendation coverage. Focused tests exercise all five preferences over the same candidates, different winners, exact and near ties, equal-value normalization, missing queue/total metrics, weighted contribution reconciliation, repeated ordering, public-response safety, booking revalidation, configuration validation, RBAC, OpenAPI, Bruno, and architecture direction. The expected inventory is **362 unit tests**, **170 integration tests**, exactly **69 OpenAPI operations**, and **520 Bruno requests / 1,685 Bruno tests**; CI results remain authoritative. The complete suite remains randomized and repeatable under seeds `11001` and `11002`, with the existing JaCoCo, Docker, workflow, and vulnerability thresholds unchanged.
+
+REC-001 adds 15 unit tests (8 recommendation scoring, 4 configuration, and 3 architecture/contract rules) and 6 integration tests (5 recommendation workflows plus 1 OpenAPI contract test) without deleting or weakening an existing test. `RecommendationWorkflowIntegrationTest` uses a fixed clock and isolated deterministic businesses, branches, schedules, offerings, bookings, and queues. `BranchAvailabilityDstOverlapIntegrationTest` additionally proves that both overlap occurrences are excluded from recommendations while unambiguous controls before and after remain recommendable and bookable.
 
 ## Baseline inventory before TEST-001
 

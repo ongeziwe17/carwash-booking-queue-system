@@ -29,6 +29,7 @@ The current backend includes:
 - In-app notification record lookup.
 - Basic daily summary reporting from in-memory data.
 - Marketplace businesses/branches with validated coordinates, scheduling, offerings, branch-scoped operations, and authenticated nearby discovery.
+- Authenticated, explainable Marketplace branch recommendations using authoritative availability eligibility and deterministic rule-based scoring.
 - Swagger/OpenAPI documentation.
 - Secure BCrypt credential storage, JWT authentication, RBAC, and ownership authorization.
 - Standardized API errors and validated runtime/business policy configuration.
@@ -89,6 +90,12 @@ The current backend does not include a frontend application, durable PostgreSQL 
 **Description:** The system returns only effective active, public-discovery-enabled Marketplace branches for required coordinates and supports optional bounded radius, effective service-offering, and explicit-instant open filters with deterministic straight-line distance ordering.
 
 **Status:** Implemented in memory with Haversine distance and no external maps, routing, traffic, or geocoding provider.
+
+### FR8: Explainable Branch Recommendations
+
+**Description:** The system returns a deterministically ranked point-in-time view of booking-eligible branches for an exact requested service and offset-aware desired start. It supports nearest, shortest known queue, fastest known total time, lowest price, and weighted best-overall preferences over the same AVAIL-002 candidate set. Scores use raw internal metrics and decimal-safe min-max normalization; responses expose rounded metrics, component scores, configured weights, contributions, and customer-safe explanations.
+
+**Status:** Implemented in memory. Unknown future branch-local queue and total-time values remain `null` and rank last for dependent preferences. Recommendations do not reserve capacity, and booking creation performs authoritative revalidation.
 
 ## 4. Planned/Future Functional Requirements
 

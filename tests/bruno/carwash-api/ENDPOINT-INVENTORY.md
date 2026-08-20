@@ -1,8 +1,8 @@
 # Current Endpoint Inventory
 
-Inventory source: the controllers and OpenAPI quality gate for AVAIL-002. Generated `/v3/api-docs` is authoritative when wording differs.
+Inventory source: the controllers and OpenAPI quality gate for REC-001. Generated `/v3/api-docs` is authoritative when wording differs.
 
-**Total HTTP operations: 68.**
+**Total HTTP operations: 69.**
 
 | Method | Path | Authentication | Role / permission | Ownership | Request DTO | Success | 400/401/403/404 | Important rules |
 |---|---|---|---|---|---|---:|---|---|
@@ -25,6 +25,7 @@ Inventory source: the controllers and OpenAPI quality gate for AVAIL-002. Genera
 | `POST` | `/api/queue-entries/call-next` | Bearer | STAFF, BUSINESS_OWNER, PLATFORM_ADMIN | Operational access | Required query `branchId` | 200 | 400,401,403,404 | Selects first WAITING entry only in that branch; validates canonical associations. |
 | `DELETE` | `/api/queue-entries/{id}` | Bearer | STAFF, BUSINESS_OWNER, PLATFORM_ADMIN | Operational access | `—` | 204 | 400,401,403,404 | Physical delete only while WAITING. |
 | `GET` | `/api/queue-entries/{id}` | Bearer | CUSTOMER: booking owner; STAFF/OWNER/ADMIN: operational | Booking owner for CUSTOMER | `—` | 200 | 400,401,403,404 | Customer can read own queue entry. |
+| `GET` | `/api/recommendations/branches` | Bearer | All roles via MARKETPLACE_READ | Public-discovery view; not tenant authorization | Required `latitude`,`longitude`,`serviceId`,`at`,`preference`; optional `maxRadiusKm` | 200 | 400,401,403,404 | One AVAIL-002 eligible candidate set; raw metrics drive five deterministic rankings; future queue/total remains null; branch/offering tie-break; point-in-time read does not reserve capacity. |
 | `POST` | `/api/queue-entries/{id}/call` | Bearer | STAFF, BUSINESS_OWNER, PLATFORM_ADMIN | Operational access | `—` | 200 | 400,401,403,404 | Explicit operator override that marks the supplied WAITING entry CALLED. |
 | `POST` | `/api/queue-entries/{id}/complete` | Bearer | STAFF, BUSINESS_OWNER, PLATFORM_ADMIN | Operational access | `—` | 200 | 400,401,403,404 | IN_PROGRESS -> COMPLETED with canonical scope integrity; parent deactivation after start does not block terminal recovery. |
 | `PUT` | `/api/queue-entries/{id}/position` | Bearer | STAFF, BUSINESS_OWNER, PLATFORM_ADMIN | Operational access | `UpdateQueuePositionRequest` | 200 | 400,401,403,404 | Move a WAITING entry within branch active size and rebalance only that branch. |

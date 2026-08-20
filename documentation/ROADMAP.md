@@ -22,6 +22,7 @@ Implemented on `staging`:
 - BCrypt credential storage, JWT authentication, RBAC, ownership authorization, and platform-admin role assignment.
 - Bounded user/request contracts and standardized safe API errors.
 - Validated runtime policy configuration for booking, notification, queue, and application-time behavior.
+- Explainable branch recommendations over the authoritative AVAIL-002 candidate set with five deterministic preferences, configurable validated weights, raw-metric ranking, and customer-safe score breakdowns.
 - Swagger/OpenAPI with CI contract export/quality gates, Maven tests, Docker, Docker Compose, and Bruno HTTP acceptance coverage.
 
 Current limitations include some non-user domain response schemas, in-memory-only storage, Marketplace operations without tenant isolation, legacy single-location availability and operating-window rules, no payments/external notification delivery, and no production observability platform. Authentication and RBAC are implemented but branch filters and report scopes do not provide tenant isolation.
@@ -77,7 +78,7 @@ Expected outcome: the backend understands which business and branch is being con
 
 ## Phase 3 — Explainable Rule-Based Recommendations
 
-1. **REC-001** — Build explainable rule-based Marketplace recommendations (#121).
+1. **REC-001** — Build explainable rule-based Marketplace recommendations (#121) — implemented.
 
 The first recommendation release should:
 
@@ -88,6 +89,8 @@ The first recommendation release should:
 - Return ranked options with a score breakdown and human-readable reason.
 
 Machine learning is intentionally excluded from the first recommendation release.
+
+Phase 3 is complete. Recommendation reads do not reserve capacity; a later booking request revalidates the branch, offering, time, and current capacity through the authoritative booking decision.
 
 ## Phase 4 — Persistence, Tenant Isolation, and Production Security Hardening
 

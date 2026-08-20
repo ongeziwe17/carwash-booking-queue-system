@@ -1,0 +1,12 @@
+info: { name: Recommendation rejects radius above server maximum, type: http, seq: 6, tags: [recommendation, validation, radius] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/recommendations/branches?latitude=-33.9249&longitude=18.4241&serviceId={{serviceId}}&at={{future47}}Z&preference=NEAREST&maxRadiusKm=50.01"
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 400", function() { expect(res.status).to.equal(400); });
+        test("uses standard business-rule error", function() { expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); expect(res.body.message).to.include("configured maximum"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

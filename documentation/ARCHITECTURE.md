@@ -25,12 +25,13 @@ flowchart TD
 | `reporting` | Explicit branch/business daily summaries composed from published immutable queries and report HTTP API |
 | `marketplace` | Business/branch aggregates, weekly schedules, temporary closures, `MarketplaceQuery`/`BranchScheduleQuery`, lifecycle/scheduling services, module-owned repositories, bounded DTO mapping, and Marketplace HTTP APIs |
 | `discovery` | Nearby-search orchestration, immutable coordinate/search/result values, the `DistanceCalculator` port, Haversine adapter, and bounded discovery HTTP API |
+| `recommendation` | Rule-based ranking orchestration, replaceable metric-provider ports, validated weights/radius, detached score projections, and bounded recommendation HTTP API |
 | `shared` | Standard API errors, common exceptions, generic repository primitives, runtime settings, and the single in-memory coordinator |
 | `bootstrap` | Explicit Spring bean composition and runtime/OpenAPI configuration |
 
 A module publishes its domain types and repository/application contracts only where another capability genuinely needs them. Infrastructure implementations are internal. Existing aggregate references (for example Booking to User, Vehicle, and Service) remain intentional published-domain dependencies; this refactor does not duplicate them into snapshots.
 
-The narrow cross-module read contracts are `UserQuery`, `VehicleQuery`, `BookingQuery`, `BranchAvailabilityQuery`, `QueueQuery`, `MarketplaceQuery`, `BranchScheduleQuery`, `ServiceDefinitionQuery`, `ServiceOfferingQuery`, and `ServiceDefinitionUsageQuery`. Booking owns the shared availability policy and consumes detached Marketplace/Catalog snapshots, Queue's published estimate, and Discovery's distance-calculation port; Queue consumes Marketplace/Catalog contracts; Reporting consumes immutable booking/queue snapshots plus Marketplace scope; Discovery consumes only Marketplace/Catalog application contracts. Marketplace publishes instant and complete-window schedule decisions. Catalog's reference-check port remains implemented in bootstrap, and neither Marketplace nor Catalog depends on Booking or Discovery, so no cycle is introduced.
+The narrow cross-module read contracts are `UserQuery`, `VehicleQuery`, `BookingQuery`, `BranchAvailabilityQuery`, `BranchAvailabilityCandidateQuery`, `QueueQuery`, `MarketplaceQuery`, `BranchScheduleQuery`, `ServiceDefinitionQuery`, `ServiceOfferingQuery`, and `ServiceDefinitionUsageQuery`. Booking owns the shared availability policy and consumes detached Marketplace/Catalog snapshots, Queue's published estimate, and Discovery's distance-calculation port; Queue consumes Marketplace/Catalog contracts; Reporting consumes immutable booking/queue snapshots plus Marketplace scope; Discovery consumes only Marketplace/Catalog application contracts. Recommendation consumes only Booking's detached eligible-candidate query, which retains raw internal distance without changing the rounded public availability contract. Marketplace publishes instant and complete-window schedule decisions. Candidate providers never depend back on Recommendation, so no cycle is introduced.
 
 ## Composition and dependencies
 
@@ -48,6 +49,7 @@ flowchart LR
     Bootstrap --> Reporting
     Bootstrap --> Marketplace
     Bootstrap --> Discovery
+    Bootstrap --> Recommendation
     Access --> Identity
     Access --> Vehicle
     Access --> Booking
@@ -76,6 +78,7 @@ flowchart LR
     Catalog --> Marketplace
     Discovery --> Marketplace
     Discovery --> Catalog
+    Recommendation --> Booking
     Shared --> Runtime[Low-level runtime only]
     Access --> Shared
     Identity --> Shared
@@ -86,6 +89,7 @@ flowchart LR
     Notification --> Shared
     Reporting --> Shared
     Discovery --> Shared
+    Recommendation --> Shared
 ```
 
 Cross-capability workflows depend on owning-module repository or application contracts and stable domain types, never a foreign module's `infrastructure` package. Each in-memory repository implementation resides in its owning capability. `insert` remains create-only and `update` remains existing-only; no upsert-style `save` abstraction is introduced.
@@ -110,6 +114,7 @@ The rules also keep Marketplace independent of Catalog, keep Catalog domain inde
 OPS-001 additionally prevents Booking, Queue, and Reporting application code from accessing Marketplace/Catalog API or infrastructure packages, and prevents Catalog from depending on Booking or Queue.
 GEO-001 additionally confines Discovery's cross-capability access to published Marketplace/Catalog application contracts and prevents Marketplace or Catalog from depending on Discovery.
 AVAIL-002 permits Booking application code to consume Discovery's public distance port/domain coordinate and Queue's published read contract, while prohibiting Discovery, Marketplace, and Catalog from depending on Booking.
+REC-001 permits Recommendation to consume only detached application contracts, prohibits access to foreign API/domain/infrastructure/repositories, and prevents Booking, Marketplace, Catalog, Queue, and Discovery from depending on Recommendation.
 
 ## Decisions
 
@@ -125,6 +130,7 @@ AVAIL-002 permits Booking application code to consume Discovery's public distanc
 - **Reporting scope is explicit:** one `branchId` or `businessId` is required; tenant authorization remains deliberately separate.
 - **Distance is replaceable:** Discovery owns a narrow `DistanceCalculator` application port; the current infrastructure adapter uses the IUGG mean Earth radius (`6371.0088 km`) and no external network service.
 - **Availability is one decision:** Booking owns a detached `BranchAvailabilityQuery`; search and coordinated booking writes share lifecycle, branch-timezone offset uniqueness, continuous-window-anchored slot alignment, complete-window, and offering-capacity rules while customer/vehicle conflicts remain command-specific. An offset-aware search instant whose branch-local start is ambiguous is rejected internally so it cannot advertise a value the current local-date-time booking contract cannot identify. Marketplace publishes the immutable applicable window anchor without exposing its repositories or schedule aggregates.
+- **Recommendation ranks; Booking decides:** Booking publishes detached eligible candidates from the exact AVAIL-002 search path, including raw distance for internal ranking. Recommendation owns no repositories or eligibility rules, and its point-in-time results do not reserve capacity; booking creation revalidates authoritatively.
 - **Spring Modulith deferred:** package conventions plus ArchUnit meet the current need without adding a second architecture framework.
 
 ## Current limitations

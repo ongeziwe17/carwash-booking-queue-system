@@ -13,6 +13,11 @@ Runtime policy values are bound to validated Spring `@ConfigurationProperties` r
 | `carwash.policy.booking.slot-interval` | `CARWASH_BOOKING_SLOT_INTERVAL` | `Duration` | `PT30M` | positive whole minutes; at least one minute | Interval between appointment starts, measured from the applicable operating-window start. |
 | `carwash.policy.notification.recent-limit` | `CARWASH_NOTIFICATION_RECENT_LIMIT` | integer | `10` | `>= 1` | Default maximum returned by the recent-notification lookup. Explicit internal caller limits still take precedence. |
 | `carwash.policy.queue.default-service-duration` | `CARWASH_QUEUE_DEFAULT_SERVICE_DURATION` | `Duration` | `PT10M` | greater than zero | Retained validated CONFIG-001 compatibility setting. OPS-001 queue entries always resolve their offering duration and never fall back to this value. |
+| `carwash.recommendation.weights.distance` | `CARWASH_RECOMMENDATION_WEIGHT_DISTANCE` | decimal | `0.25` | finite; `0..1`; all four weights sum exactly to `1` | BEST_OVERALL distance weight. |
+| `carwash.recommendation.weights.queue-wait` | `CARWASH_RECOMMENDATION_WEIGHT_QUEUE_WAIT` | decimal | `0.25` | finite; `0..1`; all four weights sum exactly to `1` | BEST_OVERALL queue-wait weight. |
+| `carwash.recommendation.weights.total-time` | `CARWASH_RECOMMENDATION_WEIGHT_TOTAL_TIME` | decimal | `0.25` | finite; `0..1`; all four weights sum exactly to `1` | BEST_OVERALL queue-plus-service total-time weight. |
+| `carwash.recommendation.weights.price` | `CARWASH_RECOMMENDATION_WEIGHT_PRICE` | decimal | `0.25` | finite; `0..1`; all four weights sum exactly to `1` | BEST_OVERALL branch-offering price weight. |
+| `carwash.recommendation.max-radius-km` | `CARWASH_RECOMMENDATION_MAX_RADIUS_KM` | decimal kilometres | `50.00` | `(0, 20000]` | Default and server maximum radius for recommendation requests. |
 | `carwash.runtime.time-zone` | `CARWASH_TIME_ZONE` | `ZoneId` | `UTC` | valid Java/IANA zone ID | Zone used by the application `Clock` for local date/time policy decisions plus queue and notification lifecycle timestamps. |
 
 `UTC` is the explicit runtime default because the current product documentation does not establish one business operating geography. It avoids inheriting a developer machine or container timezone. An environment with a defined local business zone can override it, for example `Africa/Johannesburg`. Booking request DTOs validate required branch-local date/time syntax, while the shared availability decision resolves future-time validity against the selected branch timezone; a timezone-less Bean Validation `@Future` check is deliberately avoided. A booking start must map to exactly one valid branch offset: DST gaps and ambiguous fall-back local times are rejected. AVAIL-002 also excludes an offset-aware instant when its resolved branch-local start is ambiguous, because the current booking request cannot carry the selected overlap occurrence.
@@ -69,8 +74,20 @@ Runtime policies are operational values that may legitimately vary between envir
 
 Domain invariants remain code. CONFIG-001 does not externalize booking or queue status transitions, the requirement for positive queue positions, ownership rules, terminal-state restrictions, or the initial `WAITING` queue state. The `IN_APP` notification channel is also retained as an implementation constant because external delivery/channel selection is not configurable functionality in the current system.
 
-## Reserved recommendation namespace
+## Recommendation scoring configuration
 
-`carwash.recommendation.*` is reserved for REC-001 and later recommendation work, including future weights and distance limits. No recommendation property is currently registered and no value in that namespace affects runtime behaviour under CONFIG-001.
+REC-001 activates `carwash.recommendation.*`. The four decimal weights must each be between zero and one and must sum exactly to `1`; binary floating-point tolerance is not used. Missing, out-of-range, non-decimal, or invalid-sum values fail startup. The request's optional `maxRadiusKm` cannot exceed the configured maximum; omission applies the configured maximum.
+
+Example override:
+
+```dotenv
+CARWASH_RECOMMENDATION_WEIGHT_DISTANCE=0.40
+CARWASH_RECOMMENDATION_WEIGHT_QUEUE_WAIT=0.20
+CARWASH_RECOMMENDATION_WEIGHT_TOTAL_TIME=0.25
+CARWASH_RECOMMENDATION_WEIGHT_PRICE=0.15
+CARWASH_RECOMMENDATION_MAX_RADIUS_KM=75.00
+```
+
+The values are non-secret and are mapped in `.env.example`, `application.properties`, deterministic test configuration, and Docker Compose. They affect ranking only; they never change AVAIL-002 eligibility or reserve capacity.
 
 Runtime policies are internal configuration only. No public configuration endpoint is exposed.

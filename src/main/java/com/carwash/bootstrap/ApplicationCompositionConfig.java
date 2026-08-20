@@ -30,6 +30,7 @@ import com.carwash.access.application.UserCredentialService;
 import com.carwash.notification.infrastructure.AtomicNotificationIdGenerator;
 import com.carwash.booking.application.AvailabilityService;
 import com.carwash.booking.application.BranchAvailabilityDecisionService;
+import com.carwash.booking.application.BranchAvailabilityCandidateQuery;
 import com.carwash.booking.application.BranchAvailabilityQuery;
 import com.carwash.booking.application.BranchAvailabilitySearchService;
 import com.carwash.booking.application.BookingManagementService;
@@ -54,6 +55,12 @@ import com.carwash.marketplace.application.BranchScheduleQuery;
 import com.carwash.marketplace.application.MarketplaceQuery;
 import com.carwash.identity.application.UserManagementService;
 import com.carwash.vehicle.application.VehicleManagementService;
+import com.carwash.recommendation.application.DistanceRecommendationMetricProvider;
+import com.carwash.recommendation.application.PriceRecommendationMetricProvider;
+import com.carwash.recommendation.application.QueueWaitRecommendationMetricProvider;
+import com.carwash.recommendation.application.RecommendationProperties;
+import com.carwash.recommendation.application.RecommendationService;
+import com.carwash.recommendation.application.TotalTimeRecommendationMetricProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -243,6 +250,42 @@ public class ApplicationCompositionConfig {
                 distanceCalculator,
                 coordinator,
                 clock
+        );
+    }
+
+    @Bean
+    public DistanceRecommendationMetricProvider distanceRecommendationMetricProvider() {
+        return new DistanceRecommendationMetricProvider();
+    }
+
+    @Bean
+    public QueueWaitRecommendationMetricProvider queueWaitRecommendationMetricProvider() {
+        return new QueueWaitRecommendationMetricProvider();
+    }
+
+    @Bean
+    public TotalTimeRecommendationMetricProvider totalTimeRecommendationMetricProvider() {
+        return new TotalTimeRecommendationMetricProvider();
+    }
+
+    @Bean
+    public PriceRecommendationMetricProvider priceRecommendationMetricProvider() {
+        return new PriceRecommendationMetricProvider();
+    }
+
+    @Bean
+    public RecommendationService recommendationService(
+            BranchAvailabilityCandidateQuery candidateQuery,
+            RecommendationProperties recommendationProperties,
+            DistanceRecommendationMetricProvider distance,
+            QueueWaitRecommendationMetricProvider queueWait,
+            TotalTimeRecommendationMetricProvider totalTime,
+            PriceRecommendationMetricProvider price
+    ) {
+        return new RecommendationService(
+                candidateQuery,
+                recommendationProperties,
+                java.util.List.of(distance, queueWait, totalTime, price)
         );
     }
 
