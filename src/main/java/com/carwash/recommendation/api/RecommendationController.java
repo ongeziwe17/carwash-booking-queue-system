@@ -69,9 +69,11 @@ public class RecommendationController {
                     + "offering duration and price. Lower-is-better metrics use min-max normalization. Missing "
                     + "future-date queue and total-time values remain null, score zero, and rank after known values. "
                     + "BEST_OVERALL uses validated weights summing to one. Internal DECIMAL128 values drive ranking; "
-                    + "response scores use six decimals and distance uses two. Ties use branchId then "
-                    + "serviceOfferingId. Results are point-in-time reads, do not reserve capacity, and booking "
-                    + "creation authoritatively revalidates the returned branch, offering, and local start."
+                    + "the overall score is bounded and rounded once to six decimals. Display contributions use "
+                    + "largest-remainder reconciliation, with equal remainders ordered by distance, queue wait, "
+                    + "total time, then price. Distance uses two decimals. Ties use branchId then serviceOfferingId. "
+                    + "Results are point-in-time reads, do not reserve capacity, and booking creation authoritatively "
+                    + "revalidates the returned branch, offering, and local start."
     )
     @ApiResponse(responseCode = "200", description = "Ranked recommendations returned",
             content = @Content(array = @ArraySchema(

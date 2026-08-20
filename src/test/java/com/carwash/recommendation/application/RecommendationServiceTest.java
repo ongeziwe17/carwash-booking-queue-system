@@ -66,6 +66,80 @@ class RecommendationServiceTest {
     }
 
     @Test
+    void highPrecisionWeightsRoundOverallOnceAndReconcileDisplayedContributions() {
+        RecommendationProperties.Weights weights = new RecommendationProperties.Weights(
+                new BigDecimal("0.1666666"),
+                new BigDecimal("0.1666666"),
+                new BigDecimal("0.1666666"),
+                new BigDecimal("0.5000002"));
+        RecommendationService service = service(new RecordingQuery(List.of(
+                candidate("branch-a", "offering-a", "1", 10, 20, "100"))), weights);
+
+        RecommendationSnapshot result = service.recommend(criteria(RecommendationPreference.BEST_OVERALL))
+                .getFirst();
+
+        assertEquals(new BigDecimal("1.000000"), result.recommendationScore());
+        assertEquals(result.recommendationScore(), contributionTotal(result));
+        assertEquals(new BigDecimal("0.166667"),
+                result.scoreBreakdown().distance().weightedContribution());
+        assertEquals(new BigDecimal("0.166667"),
+                result.scoreBreakdown().queueWait().weightedContribution());
+        assertEquals(new BigDecimal("0.166666"),
+                result.scoreBreakdown().totalTime().weightedContribution());
+        assertEquals(new BigDecimal("0.500000"),
+                result.scoreBreakdown().price().weightedContribution());
+    }
+
+    @Test
+    void zeroOneAndMixedOverallScoresRemainBoundedAndReconciled() {
+        RecommendationProperties.Weights weights = new RecommendationProperties.Weights(
+                new BigDecimal("0.1666666"),
+                new BigDecimal("0.1666666"),
+                new BigDecimal("0.1666666"),
+                new BigDecimal("0.5000002"));
+        RecommendationService service = service(new RecordingQuery(List.of(
+                candidate("branch-best", "offering-best", "1", 10, 20, "100"),
+                candidate("branch-mixed", "offering-mixed", "2", 20, 20, "200"),
+                candidate("branch-worst", "offering-worst", "4", 40, 20, "400"))), weights);
+
+        List<RecommendationSnapshot> results = service.recommend(criteria(RecommendationPreference.BEST_OVERALL));
+
+        assertEquals(new BigDecimal("1.000000"), results.get(0).recommendationScore());
+        assertEquals(new BigDecimal("0.666667"), results.get(1).recommendationScore());
+        assertEquals(new BigDecimal("0.000000"), results.get(2).recommendationScore());
+        for (RecommendationSnapshot result : results) {
+            assertScoreBounded(result.recommendationScore());
+            assertEquals(result.recommendationScore(), contributionTotal(result));
+            assertScoreBounded(result.scoreBreakdown().distance().weightedContribution());
+            assertScoreBounded(result.scoreBreakdown().queueWait().weightedContribution());
+            assertScoreBounded(result.scoreBreakdown().totalTime().weightedContribution());
+            assertScoreBounded(result.scoreBreakdown().price().weightedContribution());
+        }
+    }
+
+    @Test
+    void bestOverallNearTieRanksByUnroundedScoreAndRemainsDeterministic() {
+        RecommendationProperties.Weights weights = new RecommendationProperties.Weights(
+                new BigDecimal("0.5000001"),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                new BigDecimal("0.4999999"));
+        RecommendationService service = service(new RecordingQuery(List.of(
+                candidate("branch-a", "offering-a", "2", 10, 20, "100"),
+                candidate("branch-z", "offering-z", "1", 10, 20, "200"))), weights);
+        RecommendationSearchCriteria criteria = criteria(RecommendationPreference.BEST_OVERALL);
+
+        List<RecommendationSnapshot> first = service.recommend(criteria);
+        List<RecommendationSnapshot> second = service.recommend(criteria);
+
+        assertEquals(List.of("branch-z", "branch-a"),
+                first.stream().map(RecommendationSnapshot::branchId).toList());
+        assertEquals(new BigDecimal("0.500000"), first.get(0).recommendationScore());
+        assertEquals(new BigDecimal("0.500000"), first.get(1).recommendationScore());
+        assertEquals(first, second);
+    }
+
+    @Test
     void equalKnownValuesScoreOneAndTieBreakByBranchThenOffering() {
         RecommendationService service = service(new RecordingQuery(List.of(
                 candidate("branch-b", "offering-z", "2", 5, 20, "100"),
@@ -160,7 +234,14 @@ class RecommendationServiceTest {
     }
 
     private RecommendationService service(BranchAvailabilityCandidateQuery query) {
-        return new RecommendationService(query, properties(), List.of(
+        return service(query, properties().weights());
+    }
+
+    private RecommendationService service(
+            BranchAvailabilityCandidateQuery query,
+            RecommendationProperties.Weights weights
+    ) {
+        return new RecommendationService(query, new RecommendationProperties(weights, new BigDecimal("50.00")), List.of(
                 new DistanceRecommendationMetricProvider(),
                 new QueueWaitRecommendationMetricProvider(),
                 new TotalTimeRecommendationMetricProvider(),
@@ -184,6 +265,11 @@ class RecommendationServiceTest {
                 .add(breakdown.queueWait().weightedContribution())
                 .add(breakdown.totalTime().weightedContribution())
                 .add(breakdown.price().weightedContribution());
+    }
+
+    private void assertScoreBounded(BigDecimal score) {
+        assertTrue(score.compareTo(BigDecimal.ZERO) >= 0);
+        assertTrue(score.compareTo(BigDecimal.ONE) <= 0);
     }
 
     private BranchAvailabilityCandidateSnapshot candidate(

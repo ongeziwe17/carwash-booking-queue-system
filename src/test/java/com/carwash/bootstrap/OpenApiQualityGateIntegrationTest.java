@@ -403,6 +403,10 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         assertTrue(operation.path("description").asText().contains("do not reserve capacity"));
         assertTrue(operation.path("description").asText().contains("branchId"));
         assertTrue(operation.path("description").asText().contains("six decimals"));
+        assertTrue(operation.path("description").asText().contains("rounded once"));
+        assertTrue(operation.path("description").asText().contains("largest-remainder"));
+        assertTrue(operation.path("description").asText()
+                .contains("distance, queue wait, total time, then price"));
 
         JsonNode schema = document.path("components").path("schemas").path("BranchRecommendationResponse");
         assertEquals(Set.of("rank", "businessId", "businessName", "branchId", "branchName",
@@ -420,6 +424,8 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
                 .path("RecommendationScoreComponentResponse");
         assertEquals(Set.of("rawValue", "available", "normalizedScore", "configuredWeight",
                 "weightedContribution"), propertyNames(component));
+        assertTrue(component.path("properties").path("weightedContribution").path("description")
+                .asText().contains("largest-remainder"));
         for (String response : Set.of("200", "400", "401", "403", "404", "405", "500")) {
             assertTrue(operation.path("responses").has(response),
                     "Missing recommendation response " + response);
