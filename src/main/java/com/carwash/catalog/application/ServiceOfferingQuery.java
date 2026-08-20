@@ -9,6 +9,10 @@ public interface ServiceOfferingQuery {
 
     List<ServiceOfferingSnapshot> findOfferingsByBranch(String branchId);
 
+    default List<ServiceOfferingSnapshot> findOfferingsByService(String serviceId) {
+        return List.of();
+    }
+
     List<ServiceOfferingSnapshot> findDiscoverableOfferingsByBranch(String branchId);
 
     Optional<ServiceOfferingSnapshot> findOfferingByBranchAndService(String branchId, String serviceId);

@@ -29,6 +29,21 @@ class ModularMonolithArchitectureTest {
     }
 
     @Test
+    void domain_and_application_layers_remain_persistence_framework_agnostic() {
+        noClasses().that().resideInAnyPackage("..domain..", "..application..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "jakarta.persistence..", "org.springframework.data..", "org.hibernate..")
+                .check(APPLICATION);
+    }
+
+    @Test
+    void jpa_types_are_owned_by_module_infrastructure() {
+        noClasses().that().resideOutsideOfPackages(repositoryImplementationPackages())
+                .should().dependOnClassesThat().resideInAPackage("jakarta.persistence..")
+                .check(APPLICATION);
+    }
+
+    @Test
     void business_modules_do_not_reach_into_foreign_infrastructure() {
         for (String owner : BUSINESS_MODULES) {
             String ownerPackage = "com.carwash." + owner + "..";

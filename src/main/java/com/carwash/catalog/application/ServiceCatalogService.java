@@ -3,7 +3,7 @@ package com.carwash.catalog.application;
 import com.carwash.catalog.domain.Service;
 import com.carwash.catalog.domain.ServiceOfferingRepository;
 import com.carwash.catalog.domain.ServiceRepository;
-import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.shared.application.DataTransactionOperations;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
 
@@ -17,14 +17,14 @@ public class ServiceCatalogService implements ServiceDefinitionQuery {
     private final ServiceRepository serviceRepository;
     private final ServiceOfferingRepository serviceOfferingRepository;
     private final ServiceDefinitionUsageQuery serviceUsageQuery;
-    private final InMemoryDataCoordinator coordinator;
+    private final DataTransactionOperations coordinator;
 
 
     public ServiceCatalogService(
             ServiceRepository serviceRepository,
             ServiceOfferingRepository serviceOfferingRepository,
             ServiceDefinitionUsageQuery serviceUsageQuery,
-            InMemoryDataCoordinator coordinator
+            DataTransactionOperations coordinator
     ) {
         this.serviceRepository = Objects.requireNonNull(serviceRepository, "Service repository is required");
         this.serviceOfferingRepository = Objects.requireNonNull(

@@ -4,59 +4,53 @@
 classDiagram
     class Repository~T, ID~ {
         <<interface>>
-        +save(T entity)
+        +insert(T entity) boolean
+        +update(T entity) boolean
         +findById(ID id) Optional~T~
         +findAll() List~T~
-        +delete(ID id)
+        +deleteById(ID id) boolean
     }
 
-    class UserRepository {
+    class ModuleRepositoryPort {
         <<interface>>
-        +findByEmail(String email) Optional~User~
+        +deterministic module queries
     }
 
-    class InMemoryRepository~T, ID~ {
-        <<abstract>>
-        -Map~ID, T~ storage
-        +save(T entity)
-        +findById(ID id) Optional~T~
-        +findAll() List~T~
-        +delete(ID id)
+    class InMemoryRepositoryAdapter {
+        +ConcurrentHashMap storage
     }
 
-    class InMemoryUserRepository {
-        +findByEmail(String email) Optional~User~
+    class PostgresRepositoryAdapter {
+        +map domain to flat JPA entity
+        +translate persistence conflicts
     }
 
-    class DatabaseUserRepository {
-        +save(User entity)
-        +findById(String id) Optional~User~
-        +findAll() List~User~
-        +delete(String id)
-        +findByEmail(String email) Optional~User~
+    class SpringDataRepository {
+        <<infrastructure only>>
     }
 
-    class RepositoryFactory {
-        +getUserRepository(StorageType storageType) UserRepository
-        +getRoleRepository(StorageType storageType) RoleRepository
-        +getVehicleRepository(StorageType storageType) VehicleRepository
+    class DataTransactionOperations {
+        <<interface>>
+        +read(action)
+        +write(action)
+        +afterCommitBestEffort(action)
     }
 
-    class StorageType {
-        <<enumeration>>
-        MEMORY
-        DATABASE
-        FILESYSTEM
-        API
+    class InMemoryDataCoordinator {
+        +fair ReentrantReadWriteLock
     }
 
-    Repository~T, ID~ <|-- UserRepository
-    Repository~T, ID~ <|.. InMemoryRepository~T, ID~
-    InMemoryRepository~T, ID~ <|-- InMemoryUserRepository
-    UserRepository <|.. InMemoryUserRepository
-    UserRepository <|.. DatabaseUserRepository
-    RepositoryFactory ..> UserRepository : creates
-    RepositoryFactory ..> StorageType : uses
+    class PostgresTransactionOperations {
+        +REQUIRED TransactionTemplate
+        +REQUIRES_NEW after commit
+    }
+
+    Repository~T, ID~ <|-- ModuleRepositoryPort
+    ModuleRepositoryPort <|.. InMemoryRepositoryAdapter
+    ModuleRepositoryPort <|.. PostgresRepositoryAdapter
+    PostgresRepositoryAdapter --> SpringDataRepository
+    DataTransactionOperations <|.. InMemoryDataCoordinator
+    DataTransactionOperations <|.. PostgresTransactionOperations
 ```
 
-The repository layer uses interface-based contracts so business logic stays independent of storage concerns. `InMemory*Repository` classes are the active implementation for now, while `DatabaseUserRepository` is a deliberate stub that demonstrates how a future database backend can plug in by implementing the same `UserRepository` interface. `RepositoryFactory` and `StorageType` centralize backend selection and preserve a stable abstraction boundary for future extensions.
+Every domain repository port stays persistence-agnostic. Each capability infrastructure package owns both its in-memory adapter and flat JPA entities/Spring Data repository/PostgreSQL adapter. Application services select adapters by profile through the composition root and never receive JPA entities, proxies, or foreign infrastructure repositories. `insert` is create-only, `update` is update-only, and reads preserve explicit deterministic ordering. The obsolete database-user stub and storage factory are removed.

@@ -9,33 +9,54 @@ import com.carwash.marketplace.application.BranchSnapshot;
 import com.carwash.marketplace.application.MarketplaceQuery;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
-import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.shared.application.DataTransactionOperations;
+import com.carwash.shared.application.MutationLock;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public final class ServiceOfferingService implements ServiceOfferingQuery {
 
     private final ServiceOfferingRepository offeringRepository;
     private final ServiceRepository serviceRepository;
     private final MarketplaceQuery marketplaceQuery;
-    private final InMemoryDataCoordinator coordinator;
+    private final DataTransactionOperations coordinator;
+    private final MutationLock mutationLock;
+    private final ServiceOfferingCapacityQuery capacityQuery;
     private final Clock clock;
 
     public ServiceOfferingService(
             ServiceOfferingRepository offeringRepository,
             ServiceRepository serviceRepository,
             MarketplaceQuery marketplaceQuery,
-            InMemoryDataCoordinator coordinator,
+            DataTransactionOperations coordinator,
+            Clock clock
+    ) {
+        this(offeringRepository, serviceRepository, marketplaceQuery, coordinator,
+                MutationLock.noOp(), ServiceOfferingCapacityQuery.empty(), clock);
+    }
+
+    public ServiceOfferingService(
+            ServiceOfferingRepository offeringRepository,
+            ServiceRepository serviceRepository,
+            MarketplaceQuery marketplaceQuery,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock,
+            ServiceOfferingCapacityQuery capacityQuery,
             Clock clock
     ) {
         this.offeringRepository = Objects.requireNonNull(offeringRepository, "Offering repository is required");
         this.serviceRepository = Objects.requireNonNull(serviceRepository, "Service repository is required");
         this.marketplaceQuery = Objects.requireNonNull(marketplaceQuery, "Marketplace query is required");
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
+        this.mutationLock = Objects.requireNonNull(mutationLock, "Mutation lock is required");
+        this.capacityQuery = Objects.requireNonNull(capacityQuery, "Offering capacity query is required");
         this.clock = Objects.requireNonNull(clock, "Application clock is required");
     }
 
@@ -48,6 +69,7 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
             BranchSnapshot branch = requireBranch(normalizedBranchId);
             Service service = requireService(command.serviceId());
             String offeringId = normalizeId(command.offeringId(), "Offering ID");
+            mutationLock.acquire(MutationLock.offering(offeringId));
             if (offeringRepository.existsById(offeringId)) {
                 throw new BusinessRuleViolationException("Offering ID already exists");
             }
@@ -96,8 +118,25 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
         String normalizedId = normalizeId(branchId, "Branch ID");
         return coordinator.read(() -> {
             BranchSnapshot branch = requireBranch(normalizedId);
+            Map<String, Service> services = serviceRepository.findAll().stream()
+                    .collect(Collectors.toMap(Service::getServiceId, Function.identity()));
             return offeringRepository.findByBranchId(normalizedId).stream()
-                    .map(offering -> snapshot(offering, requireService(offering.getServiceId()), branch))
+                    .map(offering -> snapshot(offering, requireAssociated(
+                            services, offering.getServiceId(), "Service"), branch))
+                    .toList();
+        });
+    }
+
+    @Override
+    public List<ServiceOfferingSnapshot> findOfferingsByService(String serviceId) {
+        String normalizedId = normalizeId(serviceId, "Service ID");
+        return coordinator.read(() -> {
+            Service service = requireService(normalizedId);
+            Map<String, BranchSnapshot> branches = marketplaceQuery.findAllBranches().stream()
+                    .collect(Collectors.toMap(BranchSnapshot::branchId, Function.identity()));
+            return offeringRepository.findByServiceId(normalizedId).stream()
+                    .map(offering -> snapshot(offering, service, requireAssociated(
+                            branches, offering.getBranchId(), "Branch")))
                     .toList();
         });
     }
@@ -123,6 +162,7 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
 
     public ServiceOfferingSnapshot updateOffering(String offeringId, UpdateServiceOfferingCommand command) {
         return coordinator.write(() -> {
+            mutationLock.acquire(MutationLock.offering(offeringId));
             if (command == null) {
                 throw new BusinessRuleViolationException("Offering request is required");
             }
@@ -135,6 +175,12 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
                     command.concurrentCapacity(),
                     LocalDateTime.now(clock)
             );
+            int requiredCapacity = capacityQuery.maximumConcurrentActiveBookings(
+                    updated.getOfferingId(), updated.getEstimatedDurationMin());
+            if (updated.getConcurrentCapacity() < requiredCapacity) {
+                throw new BusinessRuleViolationException(
+                        "Offering capacity cannot be lower than its active booking overlap");
+            }
             updateRecord(updated);
             return snapshot(updated, service, branch);
         });
@@ -150,6 +196,7 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
 
     private ServiceOfferingSnapshot changeStatus(String offeringId, boolean active) {
         return coordinator.write(() -> {
+            mutationLock.acquire(MutationLock.offering(offeringId));
             ServiceOffering existing = requireOffering(offeringId);
             Service service = requireService(existing.getServiceId());
             BranchSnapshot branch = requireBranch(existing.getBranchId());
@@ -205,6 +252,12 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
         if (!offeringRepository.update(offering)) {
             throw new ResourceNotFoundException("Offering not found: " + offering.getOfferingId());
         }
+    }
+
+    private <T> T requireAssociated(Map<String, T> values, String id, String association) {
+        return Optional.ofNullable(values.get(id))
+                .orElseThrow(() -> new IllegalStateException(
+                        association + " is missing for offering association: " + id));
     }
 
     private String normalizeId(String value, String field) {

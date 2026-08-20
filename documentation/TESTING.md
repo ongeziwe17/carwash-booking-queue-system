@@ -2,6 +2,23 @@
 
 TEST-001 separates fast unit/repository/service tests from Spring API integration tests and makes isolation, test data, execution order, and release-gate behaviour explicit.
 
+## Current DATA-002 inventory
+
+DATA-002 retains the **366 unit / 170 integration / 69 OpenAPI operation / 520 Bruno request / 1,685 Bruno assertion** staging baseline. It removes the seven-test unsupported `DatabaseUserRepository` placeholder and adds 16 unit/architecture tests plus 20 real-PostgreSQL integration tests, for **375 unit tests and 190 integration tests**. The HTTP contract remains exactly **69 operations** and Bruno remains **520 requests / 1,685 assertions**.
+
+`PostgresPersistenceIntegrationTest` uses the pinned PostgreSQL 17.6 Testcontainers image—never H2—and covers clean and incremental Flyway migration/checksum validation, every adapter's duplicate contract, missing update, case-insensitive identity constraints, canonical foreign keys/deletion restrictions, offering uniqueness, transaction rollback, optimistic conflicts, lossless nanoseconds, branch timezone/DST overlap behavior, capacity-one races, cancellation/rescheduling/capacity serialization, offering-term reductions, contiguous branch queues, single-winner call-next, queue rollback, branch isolation, and authentication/Marketplace/booking/queue/notification/availability/recommendation reads after API restart. Concurrency calls use independent executor threads, transactions, and pooled connections with barriers or bounded futures; no sleeps are used.
+
+Run all profiles and gates with:
+
+```bash
+./mvnw clean verify
+./mvnw -Dtest.order.seed=11001 clean verify
+./mvnw -Dtest.order.seed=11002 clean verify
+./mvnw -Djacoco.skip=true -Dit.test=PostgresPersistenceIntegrationTest verify
+```
+
+The PostgreSQL class requires a Docker-compatible runtime and is never conditionally disabled. Hosted CI runs it in the normal verification, a focused PostgreSQL job, both deterministic seeds, and the PostgreSQL-backed Bruno workflow.
+
 ## Current REC-001 inventory
 
 REC-001 retains all AVAIL-002 complete-window, slot-grid, timezone/DST, lifecycle, offering, overlap-capacity, queue, distance, cancellation, and isolation regressions, then adds one authoritative detached candidate contract and deterministic recommendation coverage. Focused tests exercise all five preferences over the same candidates, different winners, exact and near ties, equal-value normalization, missing queue/total metrics, weighted contribution reconciliation, repeated ordering, public-response safety, booking revalidation, configuration validation, RBAC, OpenAPI, Bruno, and architecture direction. The score-formatting regression additionally covers high-precision weights, one-time overall rounding, zero/one and mixed bounds, deterministic largest-remainder display reconciliation, and unrounded near-tie ranking. The expected inventory is **366 unit tests**, **170 integration tests**, exactly **69 OpenAPI operations**, and **520 Bruno requests / 1,685 Bruno tests**; CI results remain authoritative. The complete suite remains randomized and repeatable under seeds `11001` and `11002`, with the existing JaCoCo, Docker, workflow, and vulnerability thresholds unchanged.
@@ -30,7 +47,6 @@ The prerequisite CI/CD run #163 executed **187 tests across 20 test classes**. T
 | `UserManagementSecurityTest` | Last-platform-admin concurrency and lifecycle protection | No | Fresh in-memory user repository/service per method | Descriptive local IDs; latches/futures with bounded timeouts | None | Fresh object graph per method | ~170 lines / 4 tests |
 | `InMemoryRepositoryIntegrityTest` | Duplicate insertion, missing update, snapshots and concurrency | No | Method-local repository instances | Local fixed IDs; one wall-clock booking helper; bounded latch/future timeouts | None | New repositories in each test | ~150 lines / 6 tests |
 | `InMemoryRepositoryCrudTest` | Explicit in-memory CRUD/query semantics | No | Method-local repository instances | Local fixed IDs; one wall-clock booking helper | None | New repositories in each test | ~120 lines / 4 tests |
-| `DatabaseUserRepositoryTest` | Unsupported database-repository placeholder contract | No | One immutable/stateless repository instance | Local `U-001` placeholder IDs; no timing | None | Not required; implementation has no mutable data | ~60 lines / 7 tests |
 | `JwtAuthorityConverterTest` | Role catalogue to JWT authority conversion | No | No repositories | Fixed token subject; used `Instant.now()` for token timestamps | Direct JWT conversion | Not applicable | ~100 lines / 7 executions |
 | `RoleCatalogTest` | Built-in role/permission catalogue | No | No repositories | No time/order assumptions | None | Not applicable | ~30 lines / 3 tests |
 | `UserAuthenticationServiceTest` | Authentication timing-equivalence, mutation revalidation and lock scope | No; Mockito extension | Mock repository/credential/token services; fresh coordinator/service per method | Descriptive IDs; latches/futures with 1–2 second bounded waits; no sleeps | Direct service authentication with mocks | Fresh mocks/object graph per method | ~220 lines / 10 tests |
@@ -77,7 +93,6 @@ The original post-TEST-001 verification measured **216 tests across 34 classes**
 | Class | Tests | Responsibility / isolation |
 |---|---:|---|
 | `InMemoryRepositoryIntegrityTest` | 6 | Method-local repositories; deterministic dates; bounded concurrency |
-| `DatabaseUserRepositoryTest` | 7 | Stateless unsupported database-repository contract |
 | `InMemoryRepositoryCrudTest` | 4 | Method-local repositories; deterministic dates |
 | `JwtAuthorityConverterTest` | 7 | Fixed test instants; no repository state |
 | `RoleCatalogTest` | 3 | Pure permission catalogue |

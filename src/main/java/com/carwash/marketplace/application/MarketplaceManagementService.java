@@ -8,7 +8,7 @@ import com.carwash.marketplace.domain.CarWashBusiness;
 import com.carwash.marketplace.domain.CarWashBusinessRepository;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
-import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.shared.application.DataTransactionOperations;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -32,13 +32,13 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
 
     private final CarWashBusinessRepository businessRepository;
     private final CarWashBranchRepository branchRepository;
-    private final InMemoryDataCoordinator coordinator;
+    private final DataTransactionOperations coordinator;
     private final Clock clock;
 
     public MarketplaceManagementService(
             CarWashBusinessRepository businessRepository,
             CarWashBranchRepository branchRepository,
-            InMemoryDataCoordinator coordinator,
+            DataTransactionOperations coordinator,
             Clock clock
     ) {
         this.businessRepository = Objects.requireNonNull(businessRepository, "Business repository is required");
@@ -68,10 +68,24 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
         });
     }
 
+    @Override
     public List<BusinessSnapshot> findAllBusinesses() {
         return coordinator.read(() -> businessRepository.findAll().stream()
                 .map(BusinessSnapshot::from)
                 .toList());
+    }
+
+    @Override
+    public List<BranchSnapshot> findAllBranches() {
+        return coordinator.read(() -> {
+            java.util.Map<String, CarWashBusiness> businesses = businessRepository.findAll().stream()
+                    .collect(java.util.stream.Collectors.toMap(
+                            CarWashBusiness::getBusinessId, java.util.function.Function.identity()));
+            return branchRepository.findAll().stream()
+                    .map(branch -> BranchSnapshot.from(branch, java.util.Objects.requireNonNull(
+                            businesses.get(branch.getBusinessId()), "Branch owner is missing")))
+                    .toList();
+        });
     }
 
     public BusinessSnapshot findBusiness(String businessId) {
@@ -191,10 +205,9 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
 
     @Override
     public List<BranchSnapshot> findDiscoverableBranches() {
-        return coordinator.read(() -> branchRepository.findAll().stream()
-                .map(this::snapshot)
+        return findAllBranches().stream()
                 .filter(BranchSnapshot::discoverable)
-                .toList());
+                .toList();
     }
 
     private BusinessSnapshot changeBusinessStatus(String businessId, boolean active) {

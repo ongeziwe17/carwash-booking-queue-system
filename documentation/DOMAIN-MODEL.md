@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The application is a Spring Boot modular monolith organized by the identity, access, vehicle, catalog, booking, queue, notification, reporting, marketplace, and discovery capabilities. Repository contracts and implementations belong to their owning capabilities, while narrow immutable application queries expose authorization, operational, reporting, Marketplace, Catalog, discovery, and availability reads and one shared coordinator protects the in-memory repositories. Identity owns roles, permissions, and the credential contract; Access implements authentication, BCrypt/JWT infrastructure, and authorization. The current domain covers users, roles, vehicles, reusable services, branch service offerings, branch-scoped bookings and queues, in-app notifications, scoped daily reports, car wash businesses, physical branches, weekly branch schedules, temporary closures, nearby branch projections, and branch-aware availability decisions. PostgreSQL persistence, tenant isolation, payments, capacity reservations, and external notification delivery remain future work.
+The application is a Spring Boot modular monolith organized by capability. Persistence-agnostic repository contracts remain in domain packages; each capability owns in-memory and PostgreSQL infrastructure adapters. Narrow immutable application queries expose cross-capability reads, while a shared transaction port selects either the fair single-JVM in-memory coordinator or real PostgreSQL transactions. Identity owns roles, permissions, and the credential contract; Access implements authentication, BCrypt/JWT infrastructure, and authorization. PostgreSQL persistence is implemented; tenant isolation, payments, capacity reservations, and external notification delivery remain future work.
 
 ## 2. Current Entities
 
@@ -12,7 +12,7 @@ The application is a Spring Boot modular monolith organized by the identity, acc
 | `Role` | Built-in role identity and permission catalogue | Runtime authorization derives permissions from the server-side role catalogue. |
 | `Vehicle` | Customer-owned vehicle details | Ownership cannot change through an ordinary update; plate uniqueness is enforced per owner on create and update. |
 | `Service` | Reusable global service/wash-type definition | Booking/queue references and branch offerings prevent physical deletion; deactivate instead. Legacy global price/duration remain transitional for AVAIL-001 and internal compatibility. |
-| `ServiceOffering` | One branch's price, estimated duration, configured concurrent capacity, and activation state for one reusable service | Offering/branch/service identity is immutable; one record per branch/service pair; inactive records are reactivated, not recreated or deleted. |
+| `ServiceOffering` | One branch's price, estimated duration, configured concurrent capacity, and activation state for one reusable service | Offering/branch/service identity is immutable; one record per branch/service pair; inactive records are reactivated, not recreated or deleted; changed duration/capacity cannot undercut the peak overlap of active bookings. |
 | `Booking` | Customer, vehicle, immutable branch, selected branch offering, derived reusable service, schedule, status, and optional queue link | New records cannot be unscoped; offering replacement must stay in the immutable branch; only future `CREATED` and unqueued `CONFIRMED` bookings are editable or reschedulable. |
 | `QueueEntry` | Booking queue state, immutable inherited branch/offering, branch position, and estimated wait | Requires a confirmed canonically scoped booking and active associations; one active entry is allowed per booking and active metrics are server managed per branch. |
 | `Notification` | In-app notification record for a user and optional booking | Stores scalar `branchId`/`serviceOfferingId`; API responses expose bounded IDs rather than User/Booking graphs. |
@@ -40,22 +40,21 @@ boolean existsById(ID id);
 - `deleteById` reports whether a record was removed.
 - `findAll` returns an immutable, deterministic ID-sorted snapshot.
 - Queue repositories additionally expose branch retrieval and active operational ordering by branch, position, joined time, and queue-entry ID; public queue lists place active records before terminal history.
-- In-memory storage uses `ConcurrentHashMap`; callers cannot access the mutable backing map.
+- In-memory storage uses `ConcurrentHashMap`; callers cannot access the mutable backing map. PostgreSQL adapters map flat module-owned JPA records explicitly and preserve the same insert/update/missing semantics.
 
 Duplicate IDs for users, vehicles, services, service offerings, bookings, queue entries, notifications, businesses, branches, and temporary closures are rejected as `BUSINESS_RULE_VIOLATION` errors without replacing the existing record. Offering queries are branch-scoped and offering-ID ordered; the application also rejects a second record for the same branch/service pair. The schedule repository is keyed by `branchId`; PUT explicitly inserts when absent and updates when present rather than silently upserting.
 
-## 4. Single-JVM Coordination Boundary
+## 4. Transaction and concurrency boundary
 
-`InMemoryDataCoordinator` provides one shared `ReentrantReadWriteLock` for the Spring runtime.
+Application services depend on `DataTransactionOperations` and `MutationLock`, not a persistence implementation.
 
-- Multi-repository and aggregate mutations run under the write lock.
-- Reads that require a consistent aggregate view run under the read lock.
+- The default in-memory adapter runs multi-repository mutations under one fair write lock and consistent reads under its read lock.
 - Cross-module query composition may re-enter the same read lock; write workflows do not perform read-to-write lock upgrades.
 - The last-active-platform-administrator rule uses the same write boundary.
-- The lock protects one application process only.
-- It is not a database transaction or distributed lock.
-
-DATA-002 must replace this mechanism with PostgreSQL constraints, transactions, and suitable database locking before multi-instance deployment.
+- The `postgres` adapter uses REQUIRED database transactions and read-only transactions where applicable. Rollback is authoritative; in-memory-only mutable compensation is not run.
+- Transaction-scoped PostgreSQL advisory locks serialize offering capacity, customer/vehicle conflicts, branch queue ordering, schedules, and last-admin decisions across application instances. Keys use the documented global order.
+- Optimistic versions detect ordinary lost updates. Database constraints enforce canonical ownership/scope, uniqueness, status, precision, and deletion restrictions.
+- Optional notifications run after commit in REQUIRES_NEW; required lifecycle notifications remain atomic with their parent workflow.
 
 ## 5. Aggregate Ownership
 
@@ -75,7 +74,7 @@ Successful booking creation resolves the canonical user, vehicle, Marketplace br
 
 A booking may be physically deleted only when it is cancelled and has no queue entry. Deletion removes it from the repository, removes it from the owning user, and removes associated notifications.
 
-Focused rescheduling changes only `Booking.scheduledDateTime` and preserves canonical owner, vehicle, branch, offering, derived service, and `CREATED`/`CONFIRMED` status. Generic update may select another effective offering only when it belongs to the same immutable branch. The current booking must still be future work and its configured booking-change cutoff must remain open. Canonical ownership, parent lifecycle, offering/service eligibility, customer/vehicle conflicts, and exact-slot capacity are revalidated under the coordinator write lock before mutation. Active queue work blocks updates and rescheduling. A repository update failure restores original state despite mutable in-memory references; the post-commit `BOOKING_RESCHEDULED` notification is best-effort.
+Focused rescheduling changes only `Booking.scheduledDateTime` and preserves canonical owner, vehicle, branch, offering, derived service, and `CREATED`/`CONFIRMED` status. Generic update may select another effective offering only when it belongs to the same immutable branch. Canonical ownership, lifecycle, conflicts, and overlapping capacity are revalidated inside the selected transaction boundary. PostgreSQL acquires old/new offering locks in stable order; active queue work blocks changes. Mutable compensation remains only for in-memory references, while PostgreSQL rolls back. The post-commit `BOOKING_RESCHEDULED` notification is best-effort.
 
 ### Legacy and branch-aware availability
 
@@ -204,4 +203,4 @@ Repositories still hold mutable Java object references. The supported applicatio
 controller -> service -> shared coordinator -> repositories/aggregates
 ```
 
-Direct mutation outside the service layer is unsupported. Repository list and map results are immutable collections, but stored domain objects are not deep-cloned. Cross-module reporting and future consumers use immutable `BookingSnapshot`, `QueueEntrySnapshot`, `BranchSnapshot`, and `ServiceOfferingSnapshot` records; public booking/queue reads construct detached object graphs. Durable isolation is deferred to DATA-002.
+Direct mutation outside the service layer is unsupported. In-memory repository list and map results are immutable collections, but stored domain objects are not deep-cloned. PostgreSQL adapters reconstruct detached bounded graphs and never expose JPA entities, proxies, or lazy collections. Cross-module consumers use immutable snapshots; public booking/queue reads remain detached.

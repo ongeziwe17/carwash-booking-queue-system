@@ -41,6 +41,8 @@ cp .env.example .env
 docker compose up --build
 ```
 
+Compose runs the unchanged collection against the durable `postgres` profile. The named database volume survives API/container restart, and CI starts a clean PostgreSQL service with run-scoped credentials before executing all requests. Use `docker compose down --volumes` only when a deliberate local data reset is intended.
+
 Or use the Maven startup method documented in the root README after exporting the required application variables.
 
 Confirm readiness:
@@ -124,7 +126,7 @@ bru run --env local \
 
 ## Test data and chaining
 
-The first setup request creates one run-scoped identifier such as `20260807-1929-a1b2`. User IDs, emails, vehicles, services, bookings, and queue entries include that run ID. This makes repeated runs against the same in-memory application instance collision-resistant without relying on global IDs such as `u1` or `b1`.
+The first setup request creates one run-scoped identifier such as `20260807-1929-a1b2`. User IDs, emails, vehicles, services, bookings, and queue entries include that run ID. This makes repeated runs against either persistent or in-memory application state collision-resistant without relying on global IDs such as `u1` or `b1`.
 
 The setup workflow:
 

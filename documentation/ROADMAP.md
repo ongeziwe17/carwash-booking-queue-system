@@ -25,7 +25,7 @@ Implemented on `staging`:
 - Explainable branch recommendations over the authoritative AVAIL-002 candidate set with five deterministic preferences, configurable validated weights, raw-metric ranking, and customer-safe score breakdowns.
 - Swagger/OpenAPI with CI contract export/quality gates, Maven tests, Docker, Docker Compose, and Bruno HTTP acceptance coverage.
 
-Current limitations include some non-user domain response schemas, in-memory-only storage, Marketplace operations without tenant isolation, legacy single-location availability and operating-window rules, no payments/external notification delivery, and no production observability platform. Authentication and RBAC are implemented but branch filters and report scopes do not provide tenant isolation.
+Current limitations include some non-user domain response schemas, Marketplace operations without tenant isolation, legacy single-location availability, no managed database provisioning/backups, no payments/external notification delivery, and no production observability platform. PostgreSQL durability is available through the explicit profile; authentication and RBAC are implemented but branch filters and report scopes do not provide tenant isolation.
 
 ## Phase 0 — API, Data, Test, and Delivery Hardening
 
@@ -96,8 +96,8 @@ Phase 3 is complete. Recommendation reads do not reserve capacity; a later booki
 
 Required before public production use:
 
-1. **DATA-002** — Add PostgreSQL persistence, migrations, and transaction boundaries (#122).
-2. **TEST-002** — Add PostgreSQL integration tests with Testcontainers (#123).
+1. **DATA-002** — Add PostgreSQL persistence, migrations, and transaction boundaries (#122) — implemented with module-owned adapters, Flyway, real transactions, invariant locks, Compose, and real-PostgreSQL verification.
+2. **TEST-002** — Add PostgreSQL integration tests with Testcontainers (#123) — core persistence/concurrency coverage delivered with DATA-002; retain #123 for any follow-up test expansion.
 3. **SEC-002** — Authenticate users securely (#13) — implemented foundation; retain and harden as the product evolves.
 4. **SEC-003** — Enforce role-based access control (#22) — implemented foundation; tenant-scoped authorization is still pending.
 5. **TENANT-001** — Enforce Marketplace tenant isolation (#124).

@@ -13,6 +13,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.method.ParameterErrors;
@@ -141,6 +144,20 @@ public class ApiExceptionHandler {
     ) {
         return response(HttpStatus.BAD_REQUEST, ApiErrorCode.BUSINESS_RULE_VIOLATION,
                 ex.getMessage(), request);
+    }
+
+    @ExceptionHandler({DataIntegrityViolationException.class, OptimisticLockingFailureException.class,
+            CannotAcquireLockException.class})
+    public ResponseEntity<ApiErrorResponse> handlePersistenceConflict(
+            RuntimeException ex,
+            ServletWebRequest request
+    ) {
+        String message = ex instanceof OptimisticLockingFailureException
+                ? "Resource was modified concurrently; retry the request"
+                : ex instanceof CannotAcquireLockException
+                ? "Concurrent operation could not be completed; retry the request"
+                : "Request conflicts with current persistent data";
+        return response(HttpStatus.BAD_REQUEST, ApiErrorCode.BUSINESS_RULE_VIOLATION, message, request);
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)

@@ -1,6 +1,6 @@
 # Car Wash Booking Queue System
 
-Spring Boot backend foundation for car wash booking, queue management, and Marketplace onboarding/scheduling. The code is organized as a capability-based modular monolith with explicit `bootstrap`, `shared`, `identity`, `access`, `vehicle`, `catalog`, `booking`, `queue`, `notification`, `reporting`, `marketplace`, `discovery`, and `recommendation` boundaries enforced by ArchUnit. The current codebase exposes APIs for users, vehicles, reusable global services, branch-specific offerings, bookings, queues, notifications, daily reporting, Marketplace businesses, physical branches, weekly branch hours, temporary closures, timezone-aware open-status decisions, authenticated nearby branch discovery, branch-aware availability, and explainable rule-based recommendations over in-memory repositories.
+Spring Boot backend foundation for car wash booking, queue management, and Marketplace onboarding/scheduling. The code is organized as a capability-based modular monolith with explicit `bootstrap`, `shared`, `identity`, `access`, `vehicle`, `catalog`, `booking`, `queue`, `notification`, `reporting`, `marketplace`, `discovery`, and `recommendation` boundaries enforced by ArchUnit. The current codebase exposes APIs for users, vehicles, reusable global services, branch-specific offerings, bookings, queues, notifications, daily reporting, Marketplace businesses, physical branches, weekly branch hours, temporary closures, timezone-aware open-status decisions, authenticated nearby branch discovery, branch-aware availability, and explainable rule-based recommendations. Storage is selectable: the lightweight default/test profile uses in-memory adapters, while the `postgres` profile uses durable module-owned JPA adapters and Flyway migrations.
 
 ## Current backend foundation
 
@@ -19,16 +19,17 @@ Spring Boot backend foundation for car wash booking, queue management, and Marke
 - Catalog-owned branch service offerings with independent price, duration, configured concurrent capacity, lifecycle, and parent-aware discovery.
 - Nearby branch discovery with deterministic Haversine distance, optional raw-distance radius filtering, service-offering and explicit-instant open filters, and bounded customer responses.
 - Explainable branch recommendations with five deterministic preferences, raw-value ranking, normalized component scores, validated weights, stable ties, and AVAIL-002-owned eligibility.
+- PostgreSQL persistence with migration-owned schema, database transactions, optimistic versions, cross-instance booking/queue locks, lossless nanosecond mappings, and restart durability.
 - Swagger/OpenAPI documentation.
 - Java 21 Maven, Docker, Docker Compose, and GitHub Actions delivery support.
 
 ## Important current limitations
 
-- Storage is in-memory and is lost when the application restarts.
+- The default profile is intentionally in-memory and loses data on restart; select `postgres` for durability.
 - Staff and business-owner operational access remains global until tenant isolation is implemented.
 - External SMS/email delivery is not implemented.
 - Nearby distance is straight-line only; no routing, traffic, geocoding, or external maps provider is used.
-- Payments, capacity reservations, concurrent bay/staff scheduling, PostgreSQL, production observability, and deployment hardening remain future work.
+- Payments, capacity reservations, concurrent bay/staff scheduling, production observability, backups/restore automation, and deployment hardening remain future work.
 - Recommendations are point-in-time rules only; personalization, machine learning, sponsored ranking, dynamic pricing, traffic-aware routing, and holds are not implemented.
 - The application does not yet expose dedicated Actuator liveness or readiness endpoints.
 
@@ -39,6 +40,7 @@ Spring Boot backend foundation for car wash booking, queue management, and Marke
 - Maven Wrapper
 - Spring Web MVC and Validation
 - Spring Security OAuth2 Resource Server
+- Spring Data JPA, PostgreSQL, and Flyway
 - Springdoc OpenAPI / Swagger UI
 - JUnit Jupiter and JaCoCo
 - Docker / Docker Compose
@@ -58,7 +60,7 @@ Generate a JWT signing secret:
 openssl rand -base64 32
 ```
 
-Replace `REPLACE_WITH_BASE64_ENCODED_32_BYTE_SECRET` in `.env`. The decoded secret must contain at least 32 random bytes. Never commit `.env`.
+Replace `REPLACE_WITH_BASE64_ENCODED_32_BYTE_SECRET` in `.env`. If using PostgreSQL directly, also replace both database-password placeholders and set `SPRING_PROFILES_ACTIVE=postgres`. Never commit `.env`.
 
 Load the variables into Bash and run the application:
 
@@ -70,6 +72,8 @@ set +a
 ```
 
 The API starts on `http://localhost:8080`.
+
+This command uses the in-memory profile unless `SPRING_PROFILES_ACTIVE=postgres` and the three datasource variables are supplied. PostgreSQL startup runs Flyway and validates its schema with `ddl-auto=validate`; Hibernate never creates or updates tables.
 
 - Swagger UI: `http://localhost:8080/swagger-ui/index.html`
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
@@ -88,7 +92,7 @@ Build the local image:
 docker compose build
 ```
 
-Start in the foreground:
+Set both local placeholders in `.env` (JWT secret and PostgreSQL password), then start the API and PostgreSQL in the foreground:
 
 ```bash
 docker compose up
@@ -106,6 +110,14 @@ Follow application logs:
 docker compose logs -f carwash-api
 ```
 
+Inspect PostgreSQL and applied migrations:
+
+```bash
+docker compose exec postgres psql -U "${POSTGRES_USER:-carwash}" -d "${POSTGRES_DB:-carwash}"
+docker compose exec postgres psql -U "${POSTGRES_USER:-carwash}" -d "${POSTGRES_DB:-carwash}" \
+  -c 'select installed_rank, version, description, success from flyway_schema_history order by installed_rank'
+```
+
 Stop the application:
 
 ```bash
@@ -118,7 +130,13 @@ Remove stopped services and orphan containers without deleting persistent data:
 docker compose down --remove-orphans
 ```
 
-The Compose file intentionally contains only the API. PostgreSQL remains tracked under DATA-002.
+The named `carwash-postgres-data` volume survives those commands and API/container restarts. Deliberately erase local database data only with:
+
+```bash
+docker compose down --volumes --remove-orphans
+```
+
+That last command is destructive and cannot recover the removed local volume.
 
 ## Runtime policy configuration
 
@@ -150,6 +168,8 @@ Start from a clean build directory and run the complete release-gate verificatio
 ```
 
 Tests use the dedicated `test` Spring profile from `src/test/resources/application-test.properties`. It contains only deterministic test-safe configuration, disables bootstrap administration, lowers BCrypt cost for test execution, and uses a clearly test-only signing key. Tests do **not** require a developer `.env` file.
+
+PostgreSQL-specific Failsafe tests use the pinned real PostgreSQL image through Testcontainers; they never use H2. They verify clean/incremental Flyway migration, repository parity, constraints, rollback, restart/authentication durability, nanosecond precision, optimistic conflicts, capacity serialization, and branch queue concurrency. A local Docker daemon is required for those tests; hosted CI is authoritative when Docker is unavailable.
 
 Every Spring API integration test inherits the shared test foundation and begins with empty in-memory application data. Cleanup happens inside one `InMemoryDataCoordinator` write operation in dependency order: notifications, queue entries, bookings, Catalog offerings, Marketplace closures/schedules, branches/businesses, vehicles, services, then users. The Spring application context is reused; `@DirtiesContext` is not the default isolation mechanism.
 

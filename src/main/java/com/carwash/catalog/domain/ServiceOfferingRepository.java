@@ -9,6 +9,8 @@ public interface ServiceOfferingRepository extends Repository<ServiceOffering, S
 
     List<ServiceOffering> findByBranchId(String branchId);
 
+    List<ServiceOffering> findByServiceId(String serviceId);
+
     Optional<ServiceOffering> findByBranchIdAndServiceId(String branchId, String serviceId);
 
     boolean existsByServiceId(String serviceId);

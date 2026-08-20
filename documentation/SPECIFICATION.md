@@ -2,7 +2,7 @@
 
 ## Product Vision
 
-A car wash booking and queue management backend that helps teams validate core customer, booking, queue, service catalog, notification-record, and reporting workflows with an implemented authentication/authorization baseline before adding durable persistence and SaaS platform capabilities.
+A car wash booking and queue management backend with durable PostgreSQL and lightweight in-memory profiles, protected operational workflows, and an incremental path toward tenant-isolated SaaS capabilities.
 
 ## Stakeholders
 
@@ -21,22 +21,23 @@ Implemented in the current backend:
 - Branch/offering-scoped booking creation, retrieval/filtering, same-branch offering update, rescheduling, confirmation, and cancellation.
 - Booking-derived queue scope with branch-filtered retrieval, ordering, rebalance/call-next, offering-duration waits, call/start/complete transitions, and deletion.
 - Bounded in-app notification record lookup by user with branch/offering context.
-- Branch- or business-scoped daily summaries from current in-memory data using branch-local dates.
+- Branch- or business-scoped daily summaries from the selected persistence profile using branch-local dates.
 - Swagger/OpenAPI documentation.
 - Secure BCrypt credential storage and stateless JWT login/current-user APIs.
 - RBAC and ownership authorization for customer, staff, business-owner, and platform-admin workflows.
 - Validated runtime policy configuration and standardized safe API errors.
 - Local Docker and Maven workflows.
-- In-memory Marketplace business/branch registration plus timezone-aware weekly hours, temporary closures, explicit-instant open-status decisions, and Catalog-owned branch service offerings.
+- Marketplace business/branch registration plus timezone-aware weekly hours, temporary closures, explicit-instant open-status decisions, and Catalog-owned branch service offerings.
 - Authenticated nearby discovery over existing branch coordinates with deterministic straight-line distance and optional radius, effective-offering, and explicit-instant open filters.
 - Authenticated explainable recommendations over authoritative branch availability using five deterministic preferences and configurable normalized scoring.
+- Flyway-owned PostgreSQL persistence with module-local adapters, real transactions, optimistic versions, invariant locks, restart durability, and Compose/Testcontainers support.
 
 ## Partially Implemented Foundation
 
 - JWT login and RBAC are implemented, but refresh tokens, logout/revocation, Marketplace tenant isolation, and security audit logging are not.
 - Notification domain objects can track statuses, but no external SMS/email provider sends messages.
 - A daily summary report endpoint exists, but richer dashboards, revenue reporting, filtering, and production analytics are not implemented.
-- Repository abstractions exist, but the running application uses in-memory storage rather than durable PostgreSQL persistence.
+- The default profile is intentionally ephemeral; production-like durability requires the explicit `postgres` profile and an externally managed backup policy.
 
 ## Functional Requirements: Current Backend
 
@@ -57,6 +58,7 @@ Implemented in the current backend:
 | FR-13 | Discover effective public branches by validated coordinates using deterministic distance, radius/service/open filters, and bounded responses. | Implemented |
 | FR-14 | Search branch-aware availability at an explicit instant using unambiguous branch-local starts, continuous-window-anchored slots, complete operating windows, closures, offering terms/capacity, active bookings, branch queues, and optional distance. | Implemented |
 | FR-15 | Rank the same booking-valid branch candidates by nearest, shortest queue, fastest total time, lowest price, or validated weighted balance and return a deterministic customer-safe explanation. | Implemented |
+| FR-16 | Persist every current aggregate through module-owned PostgreSQL adapters and Flyway while preserving in-memory parity, transaction rollback, deterministic ordering, and cross-instance capacity/queue invariants. | Implemented |
 
 ## Functional Requirements: Planned/Future
 
@@ -65,7 +67,6 @@ Implemented in the current backend:
 | Refresh-token/logout/revocation lifecycle, if specified.           | Future security work            |
 | Security and operational audit logging.                            | Future security hardening       |
 | Tenant-scoped authorization for Marketplace businesses/branches.  | Future SaaS hardening           |
-| PostgreSQL persistence and migrations.                             | Planned persistence work        |
 | Capacity reservations, staff/wash-bay allocation, and tenant isolation. | Future Marketplace/SaaS work |
 | External email/SMS notification delivery.                          | Future product/platform work    |
 | Payments.                                                          | Future product/platform work    |
@@ -83,8 +84,8 @@ Implemented in the current backend:
 | API usability   | Swagger/OpenAPI documentation should remain available for local development.                                                       |
 | Extensibility   | Storage implementations should remain replaceable behind repository interfaces.                                                    |
 | Deployment      | Docker and Docker Compose should support repeatable local execution.                                                               |
-| Security        | BCrypt credentials, JWT authentication, RBAC, ownership authorization, and safe errors are implemented; tenant isolation, audit logging, durable persistence, and broader production hardening are still required. |
-| Persistence     | Running application storage is currently in-memory only.                                                                           |
+| Security        | BCrypt credentials, JWT authentication, RBAC, ownership authorization, and safe errors are implemented; tenant isolation, audit logging, and broader production hardening are still required. |
+| Persistence     | Default/test storage is in memory; `postgres` provides Flyway-owned durable storage, transactions, optimistic versions, and database-visible invariant locks. |
 
 ## Business Rules
 
@@ -102,4 +103,4 @@ Implemented in the current backend:
 
 ## Out of Current Scope
 
-The current backend implements in-memory Marketplace registration/scheduling/offerings, nearby straight-line branch discovery, branch-aware point-in-time availability, and branch-scoped operational workflows, but does not implement PostgreSQL persistence, payments, tenant isolation, driving routes/traffic/geocoding, capacity reservations, staff/bay calendars, external notification delivery, observability, frontend applications, or production SaaS readiness. Authentication, RBAC, ownership authorization, and secure credential storage are implemented foundations.
+The current backend implements selectable in-memory/PostgreSQL storage, Marketplace registration/scheduling/offerings, nearby straight-line discovery, branch-aware availability, recommendations, and branch-scoped operations. It does not implement managed database provisioning/backups, payments, tenant isolation, driving routes/traffic/geocoding, capacity reservations, staff/bay calendars, external notification delivery, observability, frontend applications, or production SaaS readiness.

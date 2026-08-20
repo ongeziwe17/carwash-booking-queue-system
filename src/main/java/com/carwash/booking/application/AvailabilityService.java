@@ -7,7 +7,7 @@ import com.carwash.booking.api.dto.ServiceAvailabilityResponse;
 import com.carwash.booking.application.BookingPolicyProperties;
 import com.carwash.catalog.domain.Service;
 import com.carwash.catalog.domain.ServiceRepository;
-import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.shared.application.DataTransactionOperations;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
 
@@ -20,13 +20,13 @@ public final class AvailabilityService {
     private final ServiceRepository serviceRepository;
     private final BookingSlotPolicyService slotPolicy;
     private final BookingPolicyProperties bookingPolicy;
-    private final InMemoryDataCoordinator coordinator;
+    private final DataTransactionOperations coordinator;
 
     public AvailabilityService(
             ServiceRepository serviceRepository,
             BookingSlotPolicyService slotPolicy,
             BookingPolicyProperties bookingPolicy,
-            InMemoryDataCoordinator coordinator
+            DataTransactionOperations coordinator
     ) {
         this.serviceRepository = Objects.requireNonNull(serviceRepository, "Service repository is required");
         this.slotPolicy = Objects.requireNonNull(slotPolicy, "Booking slot policy is required");

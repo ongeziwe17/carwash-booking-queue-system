@@ -7,7 +7,7 @@ import com.carwash.identity.domain.User;
 import com.carwash.booking.domain.BookingRepository;
 import com.carwash.notification.domain.NotificationRepository;
 import com.carwash.identity.domain.UserRepository;
-import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.shared.application.DataTransactionOperations;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
 
@@ -15,7 +15,10 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class NotificationManagementService {
 
@@ -24,7 +27,7 @@ public class NotificationManagementService {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final BookingRepository bookingRepository;
-    private final InMemoryDataCoordinator coordinator;
+    private final DataTransactionOperations coordinator;
     private final NotificationIdGenerator notificationIdGenerator;
     private final NotificationPolicyProperties notificationPolicy;
     private final Clock clock;
@@ -32,7 +35,7 @@ public class NotificationManagementService {
     public NotificationManagementService(NotificationRepository notificationRepository,
                                          UserRepository userRepository,
                                          BookingRepository bookingRepository,
-                                         InMemoryDataCoordinator coordinator,
+                                         DataTransactionOperations coordinator,
                                          NotificationIdGenerator notificationIdGenerator,
                                          NotificationPolicyProperties notificationPolicy,
                                          Clock clock) {
@@ -62,9 +65,13 @@ public class NotificationManagementService {
             }
             canonicalUser.addNotification(notification);
             if (userRepository != null && !userRepository.update(canonicalUser)) {
-                canonicalUser.removeNotification(notification.getNotificationId());
-                notificationRepository.deleteById(notification.getNotificationId());
-                throw new ResourceNotFoundException("User not found: " + canonicalUser.getUserId());
+                ResourceNotFoundException failure =
+                        new ResourceNotFoundException("User not found: " + canonicalUser.getUserId());
+                coordinator.compensate(failure, () -> {
+                    canonicalUser.removeNotification(notification.getNotificationId());
+                    notificationRepository.deleteById(notification.getNotificationId());
+                });
+                throw failure;
             }
             return notification;
         });
@@ -73,7 +80,7 @@ public class NotificationManagementService {
     public List<Notification> findByUserId(String userId) {
         return coordinator.read(() -> {
             validateUserId(userId);
-            return notificationRepository.findByUserId(userId);
+            return hydrateForUser(userId, notificationRepository.findByUserId(userId));
         });
     }
 
@@ -85,7 +92,7 @@ public class NotificationManagementService {
         return coordinator.read(() -> {
             validateUserId(userId);
             if (limit <= 0) throw new BusinessRuleViolationException("Notification limit must be positive");
-            return notificationRepository.findByUserId(userId).stream()
+            return hydrateForUser(userId, notificationRepository.findByUserId(userId)).stream()
                     .sorted(Comparator.comparing(Notification::getSentAt,
                                     Comparator.nullsLast(Comparator.naturalOrder()))
                             .thenComparing(Notification::getNotificationId,
@@ -105,7 +112,7 @@ public class NotificationManagementService {
             if (!notificationRepository.update(notification)) {
                 throw new ResourceNotFoundException("Notification not found: " + notificationId);
             }
-            return notification;
+            return hydrate(notification);
         });
     }
 
@@ -131,5 +138,48 @@ public class NotificationManagementService {
         if (userId == null || userId.isBlank()) {
             throw new BusinessRuleViolationException("User ID is required");
         }
+    }
+
+    private Notification hydrate(Notification source) {
+        User user = source.getUser() == null ? null : resolveUser(source.getUser());
+        Booking booking = source.getBooking() == null ? null : resolveBooking(source.getBooking());
+        return hydrate(source, user, booking);
+    }
+
+    private List<Notification> hydrateForUser(String userId, List<Notification> source) {
+        if (source.isEmpty()) return List.of();
+        User user = userRepository == null
+                ? source.getFirst().getUser()
+                : userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+        Map<String, Booking> bookings = bookingRepository == null
+                ? Map.of()
+                : bookingRepository.findByUserId(userId).stream().collect(Collectors.toMap(
+                        Booking::getBookingId, Function.identity()));
+        return source.stream().map(notification -> {
+            Booking booking = notification.getBooking() == null
+                    ? null
+                    : bookingRepository == null
+                    ? notification.getBooking()
+                    : Objects.requireNonNull(bookings.get(notification.getBooking().getBookingId()),
+                    "Notification booking is missing");
+            return hydrate(notification, user, booking);
+        }).toList();
+    }
+
+    private Notification hydrate(Notification source, User user, Booking booking) {
+        Notification value = new Notification();
+        value.setNotificationId(source.getNotificationId());
+        value.setUser(user);
+        value.setBooking(booking);
+        value.setBranchId(source.getBranchId());
+        value.setServiceOfferingId(source.getServiceOfferingId());
+        value.setType(source.getType());
+        value.setMessage(source.getMessage());
+        value.setChannel(source.getChannel());
+        value.setSentAt(source.getSentAt());
+        value.setReadAt(source.getReadAt());
+        value.setDeliveryStatus(source.getDeliveryStatus());
+        return value;
     }
 }

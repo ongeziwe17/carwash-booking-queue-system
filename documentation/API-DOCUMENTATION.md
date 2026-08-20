@@ -587,7 +587,7 @@ See [Runtime Policy Configuration](CONFIGURATION.md) for defaults, validation, c
 
 ## Current limitations
 
-- Persistence is in-memory only and uses shared single-JVM coordination rather than database transactions.
+- Persistence is profile-selectable. The default/test profiles are in-memory; `postgres` preserves the same HTTP contract with Flyway-owned durable storage, database transactions, optimistic conflict detection, and cross-instance booking/queue serialization.
 - Multi-instance transaction/locking guarantees are not provided.
 - Marketplace businesses/branches are in memory and management access is global until tenant isolation is implemented.
 - Reusable service definitions remain global; new bookings and queue waits use branch offerings, while AVAIL-001 still uses legacy global service/capacity inputs.
@@ -607,7 +607,7 @@ Authentication, secure BCrypt credential storage, JWT validation, RBAC, ownershi
 The following are roadmap capabilities, not implemented endpoints. No paths are assigned here until their owning issues define the contract:
 
 - refresh-token/logout/revocation lifecycle, if later specified;
-- durable PostgreSQL persistence and database-backed transaction boundaries;
+- managed database provisioning, backups, restore automation, and replicas;
 - Marketplace tenant isolation and owner-scoped management;
 - capacity reservations and concurrent staff/wash-bay resource scheduling;
 - payment/refund workflows;
