@@ -92,7 +92,9 @@ public class AvailabilityController {
                     + "requested reusable service for the complete RFC 3339 service window. Capacity is scoped "
                     + "to overlapping active bookings for the exact branch and offering. Coordinates are optional "
                     + "but must be supplied together; radius filtering and ordering use raw Haversine distance, "
-                    + "while response distance is rounded to two decimals. Results do not reserve capacity."
+                    + "while response distance is rounded to two decimals. An instant that resolves to an "
+                    + "ambiguous branch-local start during a DST overlap is excluded so every advertised start "
+                    + "can be represented by the branch-local booking contract. Results do not reserve capacity."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Available branch offerings returned",

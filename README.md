@@ -10,7 +10,7 @@ Spring Boot backend foundation for car wash booking, queue management, and Marke
 - Service catalogue management with activation workflows.
 - Branch-scoped booking management with canonical service offerings, ownership, lifecycle, time, capacity, and vehicle validation.
 - Read-only single-location service availability with configured operating hours, interval slots, service duration, and remaining global capacity.
-- Branch-aware exact-instant availability using effective public branches, operating-window-anchored slot grids, full service-window hours/closures, offering price/duration/capacity, overlapping active bookings, same-day branch queue estimates, and optional raw-distance radius filtering.
+- Branch-aware exact-instant availability using effective public branches, operating-window-anchored slot grids, unambiguous branch-local starts, full service-window hours/closures, offering price/duration/capacity, overlapping active bookings, same-day branch queue estimates, and optional raw-distance radius filtering.
 - Branch-partitioned queue lifecycle, ordering, call-next, and offering-duration wait estimation.
 - In-app notification lookup with bounded branch/offering context.
 - Explicit branch- or business-scoped daily summary reporting.

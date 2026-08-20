@@ -82,6 +82,7 @@ public final class BranchAvailabilityDecisionService implements BranchAvailabili
 
         Instant endsAt = startsAt.plus(Duration.ofMinutes(offering.estimatedDurationMin()));
         ZoneId zone = ZoneId.of(branch.timezone());
+        boolean unambiguousLocalStart = hasExactlyOneValidOffset(startsAt, zone);
         BranchServiceWindowSnapshot window = branchScheduleQuery
                 .getServiceWindowStatus(branch.branchId(), startsAt, endsAt);
         boolean future = startsAt.isAfter(clock.instant());
@@ -92,7 +93,7 @@ public final class BranchAvailabilityDecisionService implements BranchAvailabili
         int remaining = Math.max(0, offering.concurrentCapacity() - occupied);
 
         BranchAvailabilityReason reason = reason(
-                future, aligned, branch, offering, service, window, remaining);
+                unambiguousLocalStart, future, aligned, branch, offering, service, window, remaining);
         boolean available = reason == BranchAvailabilityReason.AVAILABLE;
         return new BranchAvailabilityDecisionSnapshot(
                 branch.branchId(),
@@ -196,6 +197,7 @@ public final class BranchAvailabilityDecisionService implements BranchAvailabili
     }
 
     private BranchAvailabilityReason reason(
+            boolean unambiguousLocalStart,
             boolean future,
             boolean aligned,
             BranchSnapshot branch,
@@ -204,6 +206,7 @@ public final class BranchAvailabilityDecisionService implements BranchAvailabili
             BranchServiceWindowSnapshot window,
             int remaining
     ) {
+        if (!unambiguousLocalStart) return BranchAvailabilityReason.INVALID_LOCAL_TIME;
         if (!future) return BranchAvailabilityReason.NOT_IN_FUTURE;
         if (!aligned) return BranchAvailabilityReason.MISALIGNED_SLOT;
         if (!branch.effectiveActive()) return BranchAvailabilityReason.INACTIVE_BRANCH;
@@ -213,6 +216,11 @@ public final class BranchAvailabilityDecisionService implements BranchAvailabili
         if (window.temporarilyClosed()) return BranchAvailabilityReason.TEMPORARILY_CLOSED;
         if (remaining == 0) return BranchAvailabilityReason.CAPACITY_FULL;
         return BranchAvailabilityReason.AVAILABLE;
+    }
+
+    private boolean hasExactlyOneValidOffset(Instant startsAt, ZoneId zone) {
+        LocalDateTime branchLocalStart = LocalDateTime.ofInstant(startsAt, zone);
+        return zone.getRules().getValidOffsets(branchLocalStart).size() == 1;
     }
 
     private String message(BranchAvailabilityReason reason) {
