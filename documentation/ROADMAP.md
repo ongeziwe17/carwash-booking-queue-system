@@ -97,7 +97,7 @@ Phase 3 is complete. Recommendation reads do not reserve capacity; a later booki
 Required before public production use:
 
 1. **DATA-002** — Add PostgreSQL persistence, migrations, and transaction boundaries (#122) — implemented with module-owned adapters, Flyway, real transactions, invariant locks, Compose, and real-PostgreSQL verification.
-2. **TEST-002** — Add PostgreSQL integration tests with Testcontainers (#123) — core persistence/concurrency coverage delivered with DATA-002; retain #123 for any follow-up test expansion.
+2. **TEST-002** — Add PostgreSQL integration tests with Testcontainers (#123) — implemented by PR #179 with production Flyway migrations, repository/constraint/transaction coverage, restart durability, and independent-transaction booking/queue concurrency tests.
 3. **SEC-002** — Authenticate users securely (#13) — implemented foundation; retain and harden as the product evolves.
 4. **SEC-003** — Enforce role-based access control (#22) — implemented foundation; tenant-scoped authorization is still pending.
 5. **TENANT-001** — Enforce Marketplace tenant isolation (#124).
