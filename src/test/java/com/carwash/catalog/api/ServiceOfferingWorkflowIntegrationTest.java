@@ -287,7 +287,7 @@ class ServiceOfferingWorkflowIntegrationTest extends ApiIntegrationTestSupport {
 
     private CreateBusinessRequest business(String id) {
         return new CreateBusinessRequest(
-                id, "Wash Group", "owner@example.test", "+27 82 123 4567", "REG-001");
+                id, "Wash Group", "owner@example.test", "+27 82 123 4567", "REG-" + id);
     }
 
     private CreateBranchRequest branch(String id, boolean publicDiscovery) {
