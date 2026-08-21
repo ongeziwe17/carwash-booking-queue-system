@@ -12,7 +12,7 @@ import com.carwash.queue.domain.QueueStatus;
 import com.carwash.reporting.api.dto.DailySummaryReportResponse;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
-import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.shared.application.DataTransactionOperations;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -29,13 +29,13 @@ public class DailySummaryReportService {
     private final BookingQuery bookingQuery;
     private final QueueQuery queueQuery;
     private final MarketplaceQuery marketplaceQuery;
-    private final InMemoryDataCoordinator coordinator;
+    private final DataTransactionOperations coordinator;
 
     public DailySummaryReportService(
             BookingQuery bookingQuery,
             QueueQuery queueQuery,
             MarketplaceQuery marketplaceQuery,
-            InMemoryDataCoordinator coordinator
+            DataTransactionOperations coordinator
     ) {
         this.bookingQuery = Objects.requireNonNull(bookingQuery, "Booking query is required");
         this.queueQuery = Objects.requireNonNull(queueQuery, "Queue query is required");

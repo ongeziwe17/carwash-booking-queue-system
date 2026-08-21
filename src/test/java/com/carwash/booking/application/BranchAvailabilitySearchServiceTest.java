@@ -149,6 +149,9 @@ class BranchAvailabilitySearchServiceTest {
             public List<ServiceOfferingSnapshot> findOfferingsByBranch(String branchId) {
                 return List.of(offering(branchId));
             }
+            public List<ServiceOfferingSnapshot> findOfferingsByService(String serviceId) {
+                return branches.stream().map(branch -> offering(branch.branchId())).toList();
+            }
             public List<ServiceOfferingSnapshot> findDiscoverableOfferingsByBranch(String branchId) {
                 return List.of(offering(branchId));
             }

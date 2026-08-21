@@ -5,7 +5,7 @@ import com.carwash.vehicle.domain.Vehicle;
 import com.carwash.booking.domain.BookingRepository;
 import com.carwash.identity.domain.UserRepository;
 import com.carwash.vehicle.domain.VehicleRepository;
-import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.shared.application.DataTransactionOperations;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
 
@@ -18,14 +18,14 @@ public class VehicleManagementService implements VehicleQuery {
     private final VehicleRepository vehicleRepository;
     private final UserRepository userRepository;
     private final BookingRepository bookingRepository;
-    private final InMemoryDataCoordinator coordinator;
+    private final DataTransactionOperations coordinator;
 
 
     public VehicleManagementService(
             VehicleRepository vehicleRepository,
             UserRepository userRepository,
             BookingRepository bookingRepository,
-            InMemoryDataCoordinator coordinator
+            DataTransactionOperations coordinator
     ) {
         this.vehicleRepository = Objects.requireNonNull(vehicleRepository, "Vehicle repository is required");
         this.userRepository = Objects.requireNonNull(userRepository, "User repository is required");
@@ -50,9 +50,12 @@ public class VehicleManagementService implements VehicleQuery {
             }
             owner.addVehicle(vehicle);
             if (!userRepository.update(owner)) {
-                owner.removeVehicle(vehicle.getVehicleId());
-                vehicleRepository.deleteById(vehicle.getVehicleId());
-                throw new ResourceNotFoundException("User not found: " + userId);
+                ResourceNotFoundException failure = new ResourceNotFoundException("User not found: " + userId);
+                coordinator.compensate(failure, () -> {
+                    owner.removeVehicle(vehicle.getVehicleId());
+                    vehicleRepository.deleteById(vehicle.getVehicleId());
+                });
+                throw failure;
             }
             return vehicle;
         });

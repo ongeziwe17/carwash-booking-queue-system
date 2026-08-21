@@ -5,7 +5,8 @@ import com.carwash.catalog.application.ServiceOfferingQuery;
 import com.carwash.catalog.application.ServiceOfferingSnapshot;
 import com.carwash.queue.domain.QueueEntry;
 import com.carwash.queue.domain.QueueEntryRepository;
-import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.shared.application.DataTransactionOperations;
+import com.carwash.shared.application.MutationLock;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
 
@@ -20,15 +21,25 @@ import java.util.Objects;
 public final class QueueOrderingService {
 
     private final QueueEntryRepository queueEntryRepository;
-    private final InMemoryDataCoordinator coordinator;
+    private final DataTransactionOperations coordinator;
+    private final MutationLock mutationLock;
     private final ServiceOfferingQuery serviceOfferingQuery;
 
     public QueueOrderingService(QueueEntryRepository queueEntryRepository,
-                                InMemoryDataCoordinator coordinator,
+                                DataTransactionOperations coordinator,
+                                QueuePolicyProperties queuePolicy,
+                                ServiceOfferingQuery serviceOfferingQuery) {
+        this(queueEntryRepository, coordinator, MutationLock.noOp(), queuePolicy, serviceOfferingQuery);
+    }
+
+    public QueueOrderingService(QueueEntryRepository queueEntryRepository,
+                                DataTransactionOperations coordinator,
+                                MutationLock mutationLock,
                                 QueuePolicyProperties queuePolicy,
                                 ServiceOfferingQuery serviceOfferingQuery) {
         this.queueEntryRepository = Objects.requireNonNull(queueEntryRepository, "Queue repository is required");
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
+        this.mutationLock = Objects.requireNonNull(mutationLock, "Mutation lock is required");
         Objects.requireNonNull(queuePolicy, "Queue policy is required");
         this.serviceOfferingQuery = Objects.requireNonNull(
                 serviceOfferingQuery, "Service offering query is required");
@@ -42,6 +53,7 @@ public final class QueueOrderingService {
                     .map(QueueEntry::getBranchId)
                     .filter(Objects::nonNull)
                     .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+            mutationLock.acquire(branchIds.stream().map(MutationLock::queueBranch).toList());
             branchIds.forEach(branchId -> applyQueueMetrics(
                     queueEntryRepository.findActiveOrderedByBranch(branchId)));
             List<QueueEntry> legacyEntries = activeEntries.stream()
@@ -53,8 +65,10 @@ public final class QueueOrderingService {
 
     public void rebalanceActiveQueue(String branchId) {
         String normalizedBranchId = requireBranchId(branchId);
-        coordinator.write(() -> applyQueueMetrics(
-                queueEntryRepository.findActiveOrderedByBranch(normalizedBranchId)));
+        coordinator.write(() -> {
+            mutationLock.acquire(MutationLock.queueBranch(normalizedBranchId));
+            applyQueueMetrics(queueEntryRepository.findActiveOrderedByBranch(normalizedBranchId));
+        });
     }
 
     public void rebalanceActiveQueue(List<QueueEntry> orderedActiveQueue) {
@@ -65,6 +79,7 @@ public final class QueueOrderingService {
             if (mixedBranches) {
                 throw new IllegalArgumentException("Queue rebalancing cannot mix branches");
             }
+            if (branchId != null) mutationLock.acquire(MutationLock.queueBranch(branchId));
             applyQueueMetrics(orderedActiveQueue);
         });
     }

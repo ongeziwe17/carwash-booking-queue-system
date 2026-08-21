@@ -22,6 +22,11 @@ public final class InMemoryServiceOfferingRepository
     }
 
     @Override
+    public List<ServiceOffering> findByServiceId(String serviceId) {
+        return findMatching(offering -> serviceId.equals(offering.getServiceId()));
+    }
+
+    @Override
     public Optional<ServiceOffering> findByBranchIdAndServiceId(String branchId, String serviceId) {
         return findMatching(offering -> branchId.equals(offering.getBranchId())
                         && serviceId.equals(offering.getServiceId()))

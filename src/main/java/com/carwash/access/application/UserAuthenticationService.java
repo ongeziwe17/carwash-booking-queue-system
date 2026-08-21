@@ -3,7 +3,7 @@ package com.carwash.access.application;
 import com.carwash.identity.domain.User;
 import com.carwash.identity.domain.AccountStatus;
 import com.carwash.identity.domain.UserRepository;
-import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.shared.application.DataTransactionOperations;
 import org.springframework.stereotype.Service;
 
 import java.util.Locale;
@@ -15,14 +15,14 @@ public class UserAuthenticationService {
     private final UserRepository users;
     private final UserCredentialService credentials;
     private final JwtTokenService tokens;
-    private final InMemoryDataCoordinator coordinator;
+    private final DataTransactionOperations coordinator;
     private final String dummyEncodedPassword;
 
     public UserAuthenticationService(
             UserRepository users,
             UserCredentialService credentials,
             JwtTokenService tokens,
-            InMemoryDataCoordinator coordinator
+            DataTransactionOperations coordinator
     ) {
         this.users = Objects.requireNonNull(users, "User repository is required");
         this.credentials = Objects.requireNonNull(credentials, "Credential service is required");

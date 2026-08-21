@@ -8,7 +8,9 @@ The system remains one repository, one Maven project, one Spring Boot applicatio
 flowchart TD
     Client[Web or mobile client] --> App[Single Spring Boot application]
     App --> Modules[Capability-based modular monolith]
-    Modules --> Memory[Shared in-memory persistence coordinator]
+    Modules --> Tx[Persistence-neutral transaction port]
+    Tx --> Memory[In-memory fair lock adapter]
+    Tx --> PostgreSQL[(PostgreSQL + Flyway)]
 ```
 
 ## Module ownership
@@ -26,7 +28,7 @@ flowchart TD
 | `marketplace` | Business/branch aggregates, weekly schedules, temporary closures, `MarketplaceQuery`/`BranchScheduleQuery`, lifecycle/scheduling services, module-owned repositories, bounded DTO mapping, and Marketplace HTTP APIs |
 | `discovery` | Nearby-search orchestration, immutable coordinate/search/result values, the `DistanceCalculator` port, Haversine adapter, and bounded discovery HTTP API |
 | `recommendation` | Rule-based ranking orchestration, replaceable metric-provider ports, validated weights/radius, detached score projections, and bounded recommendation HTTP API |
-| `shared` | Standard API errors, common exceptions, generic repository primitives, runtime settings, and the single in-memory coordinator |
+| `shared` | Standard API errors, common exceptions, generic repository primitives, runtime settings, persistence-neutral transaction/lock ports, and their in-memory/PostgreSQL implementations |
 | `bootstrap` | Explicit Spring bean composition and runtime/OpenAPI configuration |
 
 A module publishes its domain types and repository/application contracts only where another capability genuinely needs them. Infrastructure implementations are internal. Existing aggregate references (for example Booking to User, Vehicle, and Service) remain intentional published-domain dependencies; this refactor does not duplicate them into snapshots.
@@ -96,13 +98,61 @@ Cross-capability workflows depend on owning-module repository or application con
 
 ## Consistency and rollback
 
-There is deliberately one `shared.infrastructure.InMemoryDataCoordinator`. Booking creation resolves branch/offering/service state atomically, and booking cancellation/branch rebalance plus queue start/completion retain a single-JVM write-lock boundary. Cross-module Marketplace/Catalog/reporting/ownership queries may re-enter the same reentrant lock; no read-to-write upgrade is performed. Write workflows do not delegate to another coordinator or introduce an independent lock. Existing package-private state snapshots and restoration remain in Booking and Queue because repositories retain mutable canonical references.
+Application services depend on `shared.application.DataTransactionOperations`, never on a storage implementation. The in-memory adapter retains the fair reentrant read/write lock and invokes the existing mutable-aggregate compensation. The `postgres` adapter supplies read-only reads and REQUIRED writes through Spring transactions; nested lifecycle calls participate in the same transaction. Database rollback is authoritative, so mutable in-memory compensation is skipped. Optional notifications are registered after a successful commit and run in an isolated REQUIRES_NEW transaction; mandatory lifecycle notifications remain in the parent transaction and roll it back on failure.
+
+Every persistence adapter is owned by its capability infrastructure package. Flat JPA entities, Spring Data repositories, and mappers reconstruct bounded domain objects without annotating domain aggregates or exposing proxies/lazy collections. Database foreign keys may cross capability tables, but Java modules cannot import another module's infrastructure. Hibernate Open Session in View is disabled and `ddl-auto=validate`; only immutable Flyway migrations own schema changes.
+
+## Relational schema
+
+```mermaid
+erDiagram
+    ROLES ||--o{ ROLE_PERMISSIONS : grants
+    ROLES ||--o{ USER_ROLE_ASSIGNMENTS : assigned
+    USERS ||--|| USER_CREDENTIALS : authenticates
+    USERS ||--|| USER_ROLE_ASSIGNMENTS : has
+    USERS ||--o{ VEHICLES : owns
+    BUSINESSES ||--o{ BRANCHES : operates
+    BRANCHES ||--o{ SERVICE_OFFERINGS : publishes
+    SERVICE_DEFINITIONS ||--o{ SERVICE_OFFERINGS : defines
+    BRANCHES ||--o| BRANCH_OPERATING_SCHEDULES : schedules
+    BRANCH_OPERATING_SCHEDULES ||--o{ WEEKLY_OPERATING_INTERVALS : owns
+    BRANCHES ||--o{ TEMPORARY_BRANCH_CLOSURES : closes
+    USERS ||--o{ BOOKINGS : creates
+    VEHICLES ||--o{ BOOKINGS : serves
+    BRANCHES ||--o{ BOOKINGS : hosts
+    SERVICE_OFFERINGS ||--o{ BOOKINGS : prices
+    SERVICE_DEFINITIONS ||--o{ BOOKINGS : identifies
+    BOOKINGS ||--o| QUEUE_ENTRIES : queues
+    USERS ||--o{ NOTIFICATIONS : receives
+    BOOKINGS ||--o{ NOTIFICATIONS : contextualizes
+```
+
+Case-insensitive indexes enforce unique user email and owner/plate pairs. A retained offering is unique per branch/service. One schedule row owns ordered interval rows. Queue rows repeat canonical booking scope only to enforce a composite foreign key back to the booking; application mappers never treat those repeated scalars as an alternate authority. Deletes are restrictive except for role permissions, user credentials/role assignment, and schedule intervals, which are private owned records.
+
+Java `LocalDateTime` values are stored as PostgreSQL `timestamp(6)` plus a `0..999` nanosecond remainder. Weekly `LocalTime` uses nano-of-day. Absolute closures use epoch-second plus nano. These mappings round-trip all supported Java nanoseconds and retain branch-local/timezone semantics.
+
+## Transaction and locking matrix
+
+All PostgreSQL locks are transaction-scoped advisory locks derived with `hashtextextended`. One acquisition call sorts distinct stable keys lexicographically. Workflows use the global namespace order below and never depend on a JVM-wide lock.
+
+| Protected invariant | Transaction | Lock/guard | Acquisition order |
+|---|---|---|---|
+| Booking identity and lifecycle | REQUIRED write | `booking:{bookingId}` | 1 |
+| Offering overlap capacity, including term changes, reschedule, and release | REQUIRED write | every old/new `offering:{id}` | 2, sorted by ID |
+| Same-customer simultaneous booking conflict | REQUIRED write | `customer:{userId}` | 3 |
+| Same-vehicle simultaneous booking conflict | REQUIRED write | `vehicle:{vehicleId}` | 4 |
+| Queue join/position/call/start/complete/delete/rebalance | REQUIRED write | `queue-branch:{branchId}` | 5 |
+| Schedule replacement and closure-overlap decisions | REQUIRED write | `schedule-branch:{branchId}` | 6 |
+| Last active platform-admin delete/demotion | REQUIRED write | `platform-administrators` | 7 |
+
+Rescheduling acquires both offering keys together. Catalogue term changes hold the same offering key and use Booking's detached active-overlap query to reject a duration/capacity combination below the existing peak. Queue lifecycle operations acquire booking, offering, and branch keys together after a preliminary identifier lookup, then reload canonical state. A deferred unique `(branch_id, active_position)` constraint permits collision-free intermediate rebalance statements and validates the final committed branch order. Optimistic `version` columns detect ordinary lost updates; integrity, optimistic-lock, and lock-acquisition failures are translated to the standard customer-safe business-error contract.
 
 ## Enforced rules
 
 ArchUnit runs with the normal Maven test suite and enforces:
 
 - domain packages do not depend on API, infrastructure, or bootstrap;
+- domain and application packages do not depend on JPA, Spring Data, or Hibernate, and JPA types remain infrastructure-owned;
 - modules do not use another capability's infrastructure;
 - shared does not depend on a business capability;
 - business modules do not depend on bootstrap;
@@ -119,10 +169,10 @@ REC-001 permits Recommendation to consume only detached application contracts, p
 ## Decisions
 
 - **Modular monolith now:** capability ownership makes the next Marketplace phase safer without changing operational topology.
-- **Not microservices:** current workflows require atomic in-memory changes and have no demonstrated independent scaling/deployment need.
+- **Not microservices:** current workflows require atomic cross-aggregate transactions and have no demonstrated independent scaling/deployment need.
 - **Package by capability:** related API, policy, domain, and persistence code changes together and is easier to discover.
 - **ArchUnit:** package intent needs executable regression protection rather than documentation alone.
-- **Global coordinator:** it preserves existing cross-aggregate atomicity in the single JVM.
+- **Selectable persistence:** the lightweight adapter preserves single-JVM behavior; the `postgres` adapter supplies durable transactions and database-visible invariant locks without copying application services.
 - **Marketplace as a module:** business and branch onboarding now extends the architecture without placing feature code in global technical packages.
 - **Scheduling stays inside Marketplace:** weekly local-time recurrence, absolute temporary closures, and the open-status query are one capability; no calendar, event, or shared-module abstraction is introduced.
 - **Offerings stay inside Catalog:** `ServiceOffering` owns branch/service identifiers and commercial/capacity terms; only Catalog application code looks up detached branch state through `MarketplaceQuery`.
@@ -135,4 +185,4 @@ REC-001 permits Recommendation to consume only detached application contracts, p
 
 ## Current limitations
 
-Persistence is in memory, elevated operational/Marketplace access remains global until tenant isolation, notifications are in-app only, and reporting remains a basic scoped snapshot. Nearby distance is straight-line rather than driving distance and has no traffic, route, geocoding, external maps, cache, or geospatial index. Availability is a non-reserving snapshot; concurrent bay/staff allocation, PostgreSQL, messaging, and distributed transactions remain intentionally absent.
+The default lightweight profile remains in memory; durability requires `postgres`. Elevated operational/Marketplace access remains global until tenant isolation, notifications are in-app only, and reporting remains a basic scoped snapshot. Nearby distance is straight-line rather than driving distance and has no traffic, route, geocoding, external maps, cache, or geospatial index. Availability is a non-reserving snapshot; concurrent bay/staff allocation, managed database provisioning, backups, replicas, messaging, and distributed transactions remain intentionally absent.

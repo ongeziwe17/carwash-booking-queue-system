@@ -10,6 +10,7 @@ import com.carwash.marketplace.application.RegisterBusinessCommand;
 import com.carwash.marketplace.application.UpdateBranchCommand;
 import com.carwash.marketplace.infrastructure.InMemoryCarWashBranchRepository;
 import com.carwash.marketplace.infrastructure.InMemoryCarWashBusinessRepository;
+import com.carwash.shared.application.MutationLock;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
 import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
@@ -20,6 +21,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,11 +35,13 @@ class ServiceOfferingServiceTest {
     private InMemoryServiceRepository services;
     private MarketplaceManagementService marketplace;
     private ServiceOfferingService offeringService;
+    private InMemoryDataCoordinator coordinator;
+    private Clock clock;
 
     @BeforeEach
     void setUp() {
-        InMemoryDataCoordinator coordinator = new InMemoryDataCoordinator();
-        Clock clock = Clock.fixed(Instant.parse("2030-01-01T08:00:00Z"), ZoneOffset.UTC);
+        coordinator = new InMemoryDataCoordinator();
+        clock = Clock.fixed(Instant.parse("2030-01-01T08:00:00Z"), ZoneOffset.UTC);
         offerings = new InMemoryServiceOfferingRepository();
         services = new InMemoryServiceRepository();
         marketplace = new MarketplaceManagementService(
@@ -102,6 +106,31 @@ class ServiceOfferingServiceTest {
         assertFalse(offeringService.deactivateOffering("offering-001").discoverable());
         assertTrue(offeringService.findDiscoverableOfferingsByBranch("branch-001").isEmpty());
         assertTrue(offeringService.activateOffering("offering-001").discoverable());
+    }
+
+    @Test
+    void normalizesOfferingIdsBeforeAcquiringMutationLocks() {
+        List<String> acquiredKeys = new ArrayList<>();
+        MutationLock recordingLock = acquiredKeys::addAll;
+        offeringService = new ServiceOfferingService(
+                offerings,
+                services,
+                marketplace,
+                coordinator,
+                recordingLock,
+                ServiceOfferingCapacityQuery.empty(),
+                clock);
+        offeringService.createOffering(
+                "branch-001", command("offering-001", "service-001", "100.00", 30, 2));
+
+        acquiredKeys.clear();
+        offeringService.updateOffering(
+                " offering-001 ", new UpdateServiceOfferingCommand(new BigDecimal("120.00"), 40, 3));
+        assertEquals(List.of(MutationLock.offering("offering-001")), acquiredKeys);
+
+        acquiredKeys.clear();
+        offeringService.deactivateOffering(" offering-001 ");
+        assertEquals(List.of(MutationLock.offering("offering-001")), acquiredKeys);
     }
 
     @Test

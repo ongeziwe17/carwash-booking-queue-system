@@ -144,8 +144,8 @@ SEC-002 (#13) authentication and SEC-003 (#22) RBAC/ownership authorization were
 
 | ID | GitHub | Backlog Item | Priority | Depends On |
 | --- | ---: | --- | --- | --- |
-| DATA-002 | #122 | Add PostgreSQL persistence, migrations, and transaction boundaries | P1 | Stable Marketplace domain |
-| TEST-002 | #123 | Add PostgreSQL integration tests with Testcontainers | P1 | DATA-002 |
+| DATA-002 | #122 | Add PostgreSQL persistence, migrations, and transaction boundaries — implemented | P1 | Stable Marketplace domain |
+| TEST-002 | #123 | Expand PostgreSQL integration coverage beyond the DATA-002 Testcontainers/concurrency baseline | P1 | DATA-002 |
 | TENANT-001 | #124 | Enforce Marketplace tenant isolation | P0 before production | MKT-001, DATA-002, SEC-002, SEC-003 |
 | AUDIT-001 | #125 | Add security and operational audit logging | P2 | DATA-002, SEC-002, SEC-003, TENANT-001 |
 

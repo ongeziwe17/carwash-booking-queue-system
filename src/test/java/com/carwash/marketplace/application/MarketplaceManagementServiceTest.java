@@ -65,6 +65,24 @@ class MarketplaceManagementServiceTest {
     }
 
     @Test
+    void registrationNumbersRemainCaseInsensitiveAndUniqueAcrossProfiles() {
+        marketplace.registerBusiness(validBusiness("business-001"));
+
+        BusinessRuleViolationException createFailure = assertThrows(BusinessRuleViolationException.class,
+                () -> marketplace.registerBusiness(new RegisterBusinessCommand(
+                        "business-002", "Second Wash", "second@example.test", "+27 21 555 0101",
+                        "reg-business-001")));
+        assertEquals("Business registration number already exists", createFailure.getMessage());
+
+        marketplace.registerBusiness(validBusiness("business-002"));
+        BusinessRuleViolationException updateFailure = assertThrows(BusinessRuleViolationException.class,
+                () -> marketplace.updateBusiness("business-002", new UpdateBusinessCommand(
+                        "Second Wash", "second@example.test", "+27 21 555 0101", "REG-BUSINESS-001")));
+        assertEquals("Business registration number already exists", updateFailure.getMessage());
+        assertEquals("REG-business-002", marketplace.findBusiness("business-002").registrationNumber());
+    }
+
+    @Test
     void businessUpdatePreservesIdentityAndLifecycle() {
         BusinessSnapshot created = marketplace.registerBusiness(validBusiness("business-001"));
         BusinessSnapshot updated = marketplace.updateBusiness("business-001", new UpdateBusinessCommand(
@@ -201,7 +219,7 @@ class MarketplaceManagementServiceTest {
 
         assertNotNull(business.registeredAt());
         assertNotNull(business.updatedAt());
-        assertEquals("REG-001", business.registrationNumber());
+        assertEquals("REG-business-001", business.registrationNumber());
         assertEquals("1 Main Road", branch.addressLine1());
         assertNull(branch.addressLine2());
         assertEquals(BigDecimal.valueOf(-33.9249), branch.latitude());
@@ -210,7 +228,7 @@ class MarketplaceManagementServiceTest {
 
     private RegisterBusinessCommand validBusiness(String businessId) {
         return new RegisterBusinessCommand(
-                businessId, "Wash Group", "info@example.test", "+27 82 123 4567", "REG-001");
+                businessId, "Wash Group", "info@example.test", "+27 82 123 4567", "REG-" + businessId);
     }
 
     private CreateBranchCommand validBranch(String branchId, boolean discoverable) {

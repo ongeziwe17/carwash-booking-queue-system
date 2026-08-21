@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Added an explicit PostgreSQL persistence profile with Flyway-owned schema, module-local JPA adapters for every repository port, transaction/after-commit abstraction, optimistic versions, cross-instance advisory locks for booking capacity and queue ordering, lossless nanosecond mappings, persistent Docker Compose storage, Testcontainers concurrency/restart tests, and CI acceptance coverage.
 - Corrected BEST_OVERALL response formatting to round the unrounded internal score once, keep scores bounded, and deterministically reconcile six-decimal component contributions without changing ranking.
 - Added explainable rule-based Marketplace branch recommendations with five preferences, one AVAIL-002 candidate set, raw-value deterministic ranking, normalized BigDecimal score breakdowns, validated weights/radius, customer-safe explanations, RBAC, OpenAPI, Bruno, and architecture coverage.
 - Excluded both offset-specific occurrences of an ambiguous DST fall-back branch-local start from AVAIL-002 search, keeping every advertised result representable by the current branch-local booking contract while preserving gap/overlap rejection on booking writes.

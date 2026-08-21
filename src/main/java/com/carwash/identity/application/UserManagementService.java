@@ -6,7 +6,8 @@ import com.carwash.booking.domain.BookingRepository;
 import com.carwash.notification.domain.NotificationRepository;
 import com.carwash.identity.domain.UserRepository;
 import com.carwash.vehicle.domain.VehicleRepository;
-import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.shared.application.DataTransactionOperations;
+import com.carwash.shared.application.MutationLock;
 import com.carwash.identity.domain.RoleCatalog;
 import com.carwash.identity.domain.RoleName;
 import com.carwash.identity.application.CreateUserCommand;
@@ -25,7 +26,8 @@ public class UserManagementService implements UserQuery {
     private final VehicleRepository vehicleRepository;
     private final BookingRepository bookingRepository;
     private final NotificationRepository notificationRepository;
-    private final InMemoryDataCoordinator coordinator;
+    private final DataTransactionOperations coordinator;
+    private final MutationLock mutationLock;
 
 
     public UserManagementService(
@@ -34,7 +36,20 @@ public class UserManagementService implements UserQuery {
             VehicleRepository vehicleRepository,
             BookingRepository bookingRepository,
             NotificationRepository notificationRepository,
-            InMemoryDataCoordinator coordinator
+            DataTransactionOperations coordinator
+    ) {
+        this(userRepository, credentialService, vehicleRepository, bookingRepository,
+                notificationRepository, coordinator, MutationLock.noOp());
+    }
+
+    public UserManagementService(
+            UserRepository userRepository,
+            CredentialService credentialService,
+            VehicleRepository vehicleRepository,
+            BookingRepository bookingRepository,
+            NotificationRepository notificationRepository,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock
     ) {
         this.userRepository = Objects.requireNonNull(userRepository, "User repository is required");
         this.credentialService = Objects.requireNonNull(credentialService, "Credential service is required");
@@ -42,6 +57,7 @@ public class UserManagementService implements UserQuery {
         this.bookingRepository = bookingRepository;
         this.notificationRepository = notificationRepository;
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
+        this.mutationLock = Objects.requireNonNull(mutationLock, "Mutation lock is required");
     }
 
     public User createUser(CreateUserCommand command) {
@@ -103,6 +119,7 @@ public class UserManagementService implements UserQuery {
 
     public void deleteUser(String userId) {
         coordinator.write(() -> {
+            mutationLock.acquire(MutationLock.platformAdministrators());
             User user = requireUser(userId);
             if (isLastActivePlatformAdministrator(user)) {
                 throw new BusinessRuleViolationException("The last active platform administrator cannot be deleted");
@@ -123,6 +140,7 @@ public class UserManagementService implements UserQuery {
 
     public User assignRole(String userId, RoleName roleName) {
         return coordinator.write(() -> {
+            mutationLock.acquire(MutationLock.platformAdministrators());
             User user = requireUser(userId);
             if (isLastActivePlatformAdministrator(user) && roleName != RoleName.PLATFORM_ADMIN) {
                 throw new BusinessRuleViolationException("The last active platform administrator cannot be demoted");

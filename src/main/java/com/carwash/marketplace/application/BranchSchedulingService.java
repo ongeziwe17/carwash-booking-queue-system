@@ -12,7 +12,8 @@ import com.carwash.marketplace.domain.TemporaryBranchClosureRepository;
 import com.carwash.marketplace.domain.WeeklyOperatingInterval;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
-import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.shared.application.DataTransactionOperations;
+import com.carwash.shared.application.MutationLock;
 
 import java.time.Clock;
 import java.time.DayOfWeek;
@@ -32,7 +33,8 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
     private final CarWashBranchRepository branchRepository;
     private final BranchOperatingScheduleRepository scheduleRepository;
     private final TemporaryBranchClosureRepository closureRepository;
-    private final InMemoryDataCoordinator coordinator;
+    private final DataTransactionOperations coordinator;
+    private final MutationLock mutationLock;
     private final Clock clock;
 
     public BranchSchedulingService(
@@ -40,7 +42,20 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
             CarWashBranchRepository branchRepository,
             BranchOperatingScheduleRepository scheduleRepository,
             TemporaryBranchClosureRepository closureRepository,
-            InMemoryDataCoordinator coordinator,
+            DataTransactionOperations coordinator,
+            Clock clock
+    ) {
+        this(businessRepository, branchRepository, scheduleRepository, closureRepository,
+                coordinator, MutationLock.noOp(), clock);
+    }
+
+    public BranchSchedulingService(
+            CarWashBusinessRepository businessRepository,
+            CarWashBranchRepository branchRepository,
+            BranchOperatingScheduleRepository scheduleRepository,
+            TemporaryBranchClosureRepository closureRepository,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock,
             Clock clock
     ) {
         this.businessRepository = Objects.requireNonNull(businessRepository, "Business repository is required");
@@ -48,6 +63,7 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
         this.scheduleRepository = Objects.requireNonNull(scheduleRepository, "Schedule repository is required");
         this.closureRepository = Objects.requireNonNull(closureRepository, "Closure repository is required");
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
+        this.mutationLock = Objects.requireNonNull(mutationLock, "Mutation lock is required");
         this.clock = Objects.requireNonNull(clock, "Application clock is required");
     }
 
@@ -67,6 +83,7 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
     ) {
         return coordinator.write(() -> {
             CarWashBranch branch = requireBranch(branchId);
+            mutationLock.acquire(MutationLock.scheduleBranch(branch.getBranchId()));
             if (command == null || command.intervals() == null) {
                 throw new BusinessRuleViolationException("Operating intervals are required");
             }
@@ -102,6 +119,7 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
     ) {
         return coordinator.write(() -> {
             CarWashBranch branch = requireBranch(branchId);
+            mutationLock.acquire(MutationLock.scheduleBranch(branch.getBranchId()));
             if (command == null) {
                 throw new BusinessRuleViolationException("Temporary closure request is required");
             }
@@ -141,6 +159,7 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
             TemporaryBranchClosure existing = closureRepository.findById(normalizedId)
                     .orElseThrow(() -> new ResourceNotFoundException("Closure not found: " + normalizedId));
             requireBranch(existing.getBranchId());
+            mutationLock.acquire(MutationLock.scheduleBranch(existing.getBranchId()));
             if (!existing.isActive()) {
                 return TemporaryBranchClosureSnapshot.from(existing);
             }

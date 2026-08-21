@@ -12,7 +12,7 @@ import com.carwash.marketplace.application.MarketplaceQuery;
 import com.carwash.queue.application.QueueQuery;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
-import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.shared.application.DataTransactionOperations;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -22,7 +22,10 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public final class BranchAvailabilitySearchService implements BranchAvailabilityCandidateQuery {
 
@@ -35,7 +38,7 @@ public final class BranchAvailabilitySearchService implements BranchAvailability
     private final BranchAvailabilityQuery branchAvailabilityQuery;
     private final QueueQuery queueQuery;
     private final DistanceCalculator distanceCalculator;
-    private final InMemoryDataCoordinator coordinator;
+    private final DataTransactionOperations coordinator;
     private final Clock clock;
 
     public BranchAvailabilitySearchService(
@@ -45,7 +48,7 @@ public final class BranchAvailabilitySearchService implements BranchAvailability
             BranchAvailabilityQuery branchAvailabilityQuery,
             QueueQuery queueQuery,
             DistanceCalculator distanceCalculator,
-            InMemoryDataCoordinator coordinator,
+            DataTransactionOperations coordinator,
             Clock clock
     ) {
         this.marketplaceQuery = Objects.requireNonNull(marketplaceQuery, "Marketplace query is required");
@@ -97,15 +100,21 @@ public final class BranchAvailabilitySearchService implements BranchAvailability
         }
 
         GeoCoordinate origin = criteria.hasOrigin() ? criteria.origin() : null;
+        Map<String, BusinessSnapshot> businesses = marketplaceQuery.findAllBusinesses().stream()
+                .collect(Collectors.toMap(BusinessSnapshot::businessId, Function.identity()));
+        List<ServiceOfferingSnapshot> offeringsByService = serviceOfferingQuery
+                .findOfferingsByService(service.serviceId());
+        Map<String, ServiceOfferingSnapshot> offeringByBranch = offeringsByService.stream()
+                .collect(Collectors.toMap(ServiceOfferingSnapshot::branchId, Function.identity()));
         List<Candidate> candidates = new ArrayList<>();
         for (BranchSnapshot branch : marketplaceQuery.findDiscoverableBranches()) {
             if (!branch.discoverable() || !branch.effectiveActive() || !branch.publicDiscoveryEnabled()) {
                 continue;
             }
-            ServiceOfferingSnapshot offering = serviceOfferingQuery
-                    .findOfferingByBranchAndService(branch.branchId(), service.serviceId())
-                    .filter(candidate -> canonicalDiscoverableOffering(candidate, branch, service.serviceId()))
-                    .orElse(null);
+            ServiceOfferingSnapshot offering = offeringByBranch.get(branch.branchId());
+            if (offering != null && !canonicalDiscoverableOffering(offering, branch, service.serviceId())) {
+                offering = null;
+            }
             if (offering == null) {
                 continue;
             }
@@ -134,7 +143,13 @@ public final class BranchAvailabilitySearchService implements BranchAvailability
             Integer queueWait = queueRelevant(criteria, branch)
                     ? queueQuery.estimateWaitMinutesForNewWork(branch.branchId())
                     : null;
-            candidates.add(new Candidate(rawDistance, origin != null, branch, decision, queueWait));
+            BusinessSnapshot business = businesses.get(branch.businessId());
+            if (business == null) {
+                business = marketplaceQuery.findBusinessOptional(branch.businessId()).orElseThrow(
+                        () -> new IllegalStateException(
+                                "Discoverable branch has no owning business projection: " + branch.branchId()));
+            }
+            candidates.add(new Candidate(rawDistance, origin != null, business, branch, decision, queueWait));
         }
 
         Comparator<Candidate> order = origin == null
@@ -189,9 +204,7 @@ public final class BranchAvailabilitySearchService implements BranchAvailability
     private BranchAvailabilityCandidateSnapshot candidateSnapshot(Candidate candidate) {
         BranchSnapshot branch = candidate.branch();
         BranchAvailabilityDecisionSnapshot decision = candidate.decision();
-        BusinessSnapshot business = marketplaceQuery.findBusinessOptional(branch.businessId())
-                .orElseThrow(() -> new IllegalStateException(
-                        "Discoverable branch has no owning business projection: " + branch.branchId()));
+        BusinessSnapshot business = candidate.business();
         return new BranchAvailabilityCandidateSnapshot(
                 business.businessId(), business.businessName(), branch.branchId(), branch.branchName(),
                 branch.timezone(), decision.serviceOfferingId(), decision.serviceId(), decision.serviceName(),
@@ -207,6 +220,7 @@ public final class BranchAvailabilitySearchService implements BranchAvailability
     private record Candidate(
             double rawDistanceKm,
             boolean hasOrigin,
+            BusinessSnapshot business,
             BranchSnapshot branch,
             BranchAvailabilityDecisionSnapshot decision,
             Integer queueWaitEstimateMin

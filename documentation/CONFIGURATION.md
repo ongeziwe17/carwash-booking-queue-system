@@ -2,6 +2,32 @@
 
 Runtime policy values are bound to validated Spring `@ConfigurationProperties` records at startup. Invalid values fail application startup instead of being accepted silently. These non-secret settings have explicit application defaults and can be overridden through environment variables; a local `.env` file is convenient for Docker Compose but is not required by the application configuration model.
 
+## Persistence profiles
+
+The default and `test` profiles use module-owned in-memory repositories. Activate `postgres` for durable storage; this enables the PostgreSQL driver, Flyway, Spring Data JPA adapters, real REQUIRED transactions, and cross-instance advisory locks. Open Session in View is disabled. Hibernate runs only `ddl-auto=validate`; it never creates or changes schema objects.
+
+| Environment variable | Required with `postgres` | Meaning |
+|---|---:|---|
+| `SPRING_DATASOURCE_URL` | yes | JDBC URL, for example `jdbc:postgresql://localhost:5432/carwash`. |
+| `SPRING_DATASOURCE_USERNAME` | yes | PostgreSQL login name. |
+| `SPRING_DATASOURCE_PASSWORD` | yes | PostgreSQL password; never commit it. |
+| `SPRING_DATASOURCE_MAX_POOL_SIZE` | no (`20`) | Maximum Hikari connections. |
+| `SPRING_DATASOURCE_MIN_IDLE` | no (`2`) | Minimum idle Hikari connections. |
+| `SPRING_DATASOURCE_CONNECTION_TIMEOUT_MS` | no (`30000`) | Pool acquisition timeout in milliseconds. |
+
+Example direct startup:
+
+```bash
+export SPRING_PROFILES_ACTIVE=postgres
+export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/carwash
+export SPRING_DATASOURCE_USERNAME=carwash
+read -s -p 'Database password: ' SPRING_DATASOURCE_PASSWORD && echo
+export SPRING_DATASOURCE_PASSWORD
+./mvnw spring-boot:run
+```
+
+Compose activates `postgres` automatically and requires `POSTGRES_PASSWORD` in the ignored `.env`. Flyway applies `V{number}__description.sql` files in order and validates their checksums at every startup. Never edit an applied migration; add the next version. Neither profile creates production seed users or credentials. The four built-in authorization roles and permission catalogue are immutable reference data, not login accounts.
+
 ## Supported settings
 
 | Property | Environment variable | Type | Default | Validation | Meaning |

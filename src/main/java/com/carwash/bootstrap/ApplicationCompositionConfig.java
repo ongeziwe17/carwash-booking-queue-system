@@ -13,9 +13,13 @@ import com.carwash.queue.domain.QueueEntryRepository;
 import com.carwash.catalog.domain.ServiceRepository;
 import com.carwash.catalog.domain.ServiceOfferingRepository;
 import com.carwash.identity.domain.UserRepository;
+import com.carwash.identity.domain.RoleRepository;
 import com.carwash.vehicle.domain.VehicleRepository;
 import com.carwash.booking.infrastructure.InMemoryBookingRepository;
 import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.shared.infrastructure.InMemoryMutationLock;
+import com.carwash.shared.application.DataTransactionOperations;
+import com.carwash.shared.application.MutationLock;
 import com.carwash.notification.infrastructure.InMemoryNotificationRepository;
 import com.carwash.marketplace.infrastructure.InMemoryCarWashBranchRepository;
 import com.carwash.marketplace.infrastructure.InMemoryCarWashBusinessRepository;
@@ -25,6 +29,7 @@ import com.carwash.queue.infrastructure.InMemoryQueueEntryRepository;
 import com.carwash.catalog.infrastructure.InMemoryServiceRepository;
 import com.carwash.catalog.infrastructure.InMemoryServiceOfferingRepository;
 import com.carwash.identity.infrastructure.InMemoryUserRepository;
+import com.carwash.identity.infrastructure.InMemoryRoleRepository;
 import com.carwash.vehicle.infrastructure.InMemoryVehicleRepository;
 import com.carwash.access.application.UserCredentialService;
 import com.carwash.notification.infrastructure.AtomicNotificationIdGenerator;
@@ -34,6 +39,7 @@ import com.carwash.booking.application.BranchAvailabilityCandidateQuery;
 import com.carwash.booking.application.BranchAvailabilityQuery;
 import com.carwash.booking.application.BranchAvailabilitySearchService;
 import com.carwash.booking.application.BookingManagementService;
+import com.carwash.booking.application.BookingCapacityQuery;
 import com.carwash.booking.application.BookingSlotPolicyService;
 import com.carwash.reporting.application.DailySummaryReportService;
 import com.carwash.notification.application.NotificationIdGenerator;
@@ -48,6 +54,7 @@ import com.carwash.catalog.application.ServiceDefinitionQuery;
 import com.carwash.catalog.application.ServiceDefinitionUsageQuery;
 import com.carwash.catalog.application.ServiceOfferingQuery;
 import com.carwash.catalog.application.ServiceOfferingService;
+import com.carwash.catalog.application.ServiceOfferingCapacityQuery;
 import com.carwash.discovery.application.DistanceCalculator;
 import com.carwash.discovery.application.NearbyBranchDiscoveryService;
 import com.carwash.discovery.infrastructure.HaversineDistanceCalculator;
@@ -63,6 +70,7 @@ import com.carwash.recommendation.application.RecommendationService;
 import com.carwash.recommendation.application.TotalTimeRecommendationMetricProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 import java.time.Clock;
 
@@ -70,66 +78,91 @@ import java.time.Clock;
 public class ApplicationCompositionConfig {
 
     @Bean
+    @Profile("!postgres")
     public InMemoryDataCoordinator inMemoryDataCoordinator() {
         return new InMemoryDataCoordinator();
     }
 
     @Bean
+    @Profile("!postgres")
+    public MutationLock inMemoryMutationLock() {
+        return new InMemoryMutationLock();
+    }
+
+    @Bean
+    @Profile("!postgres")
     public UserRepository userRepository() {
         return new InMemoryUserRepository();
     }
 
     @Bean
+    @Profile("!postgres")
+    public RoleRepository roleRepository() {
+        return new InMemoryRoleRepository();
+    }
+
+    @Bean
+    @Profile("!postgres")
     public VehicleRepository vehicleRepository() {
         return new InMemoryVehicleRepository();
     }
 
     @Bean
+    @Profile("!postgres")
     public ServiceRepository serviceRepository() {
         return new InMemoryServiceRepository();
     }
 
     @Bean
+    @Profile("!postgres")
     public ServiceOfferingRepository serviceOfferingRepository() {
         return new InMemoryServiceOfferingRepository();
     }
 
     @Bean
+    @Profile("!postgres")
     public BookingRepository bookingRepository() {
         return new InMemoryBookingRepository();
     }
 
     @Bean
+    @Profile("!postgres")
     public QueueEntryRepository queueEntryRepository() {
         return new InMemoryQueueEntryRepository();
     }
 
     @Bean
+    @Profile("!postgres")
     public NotificationRepository notificationRepository() {
         return new InMemoryNotificationRepository();
     }
 
     @Bean
+    @Profile("!postgres")
     public CarWashBusinessRepository carWashBusinessRepository() {
         return new InMemoryCarWashBusinessRepository();
     }
 
     @Bean
+    @Profile("!postgres")
     public CarWashBranchRepository carWashBranchRepository() {
         return new InMemoryCarWashBranchRepository();
     }
 
     @Bean
+    @Profile("!postgres")
     public BranchOperatingScheduleRepository branchOperatingScheduleRepository() {
         return new InMemoryBranchOperatingScheduleRepository();
     }
 
     @Bean
+    @Profile("!postgres")
     public TemporaryBranchClosureRepository temporaryBranchClosureRepository() {
         return new InMemoryTemporaryBranchClosureRepository();
     }
 
     @Bean
+    @Profile("!postgres")
     public NotificationIdGenerator notificationIdGenerator() {
         return new AtomicNotificationIdGenerator();
     }
@@ -138,7 +171,7 @@ public class ApplicationCompositionConfig {
     public MarketplaceManagementService marketplaceManagementService(
             CarWashBusinessRepository businessRepository,
             CarWashBranchRepository branchRepository,
-            InMemoryDataCoordinator coordinator,
+            DataTransactionOperations coordinator,
             Clock clock
     ) {
         return new MarketplaceManagementService(businessRepository, branchRepository, coordinator, clock);
@@ -150,7 +183,8 @@ public class ApplicationCompositionConfig {
             CarWashBranchRepository branchRepository,
             BranchOperatingScheduleRepository scheduleRepository,
             TemporaryBranchClosureRepository closureRepository,
-            InMemoryDataCoordinator coordinator,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock,
             Clock clock
     ) {
         return new BranchSchedulingService(
@@ -159,6 +193,7 @@ public class ApplicationCompositionConfig {
                 scheduleRepository,
                 closureRepository,
                 coordinator,
+                mutationLock,
                 clock
         );
     }
@@ -199,7 +234,7 @@ public class ApplicationCompositionConfig {
             ServiceRepository serviceRepository,
             BookingSlotPolicyService bookingSlotPolicyService,
             BookingPolicyProperties bookingPolicy,
-            InMemoryDataCoordinator coordinator
+            DataTransactionOperations coordinator
     ) {
         return new AvailabilityService(
                 serviceRepository,
@@ -238,7 +273,7 @@ public class ApplicationCompositionConfig {
             BranchAvailabilityQuery branchAvailabilityQuery,
             QueueQuery queueQuery,
             DistanceCalculator distanceCalculator,
-            InMemoryDataCoordinator coordinator,
+            DataTransactionOperations coordinator,
             Clock clock
     ) {
         return new BranchAvailabilitySearchService(
@@ -292,11 +327,13 @@ public class ApplicationCompositionConfig {
     @Bean
     public QueueOrderingService queueOrderingService(
             QueueEntryRepository queueEntryRepository,
-            InMemoryDataCoordinator coordinator,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock,
             QueuePolicyProperties queuePolicy,
             ServiceOfferingQuery serviceOfferingQuery
     ) {
-        return new QueueOrderingService(queueEntryRepository, coordinator, queuePolicy, serviceOfferingQuery);
+        return new QueueOrderingService(
+                queueEntryRepository, coordinator, mutationLock, queuePolicy, serviceOfferingQuery);
     }
 
     @Bean
@@ -324,7 +361,8 @@ public class ApplicationCompositionConfig {
             VehicleRepository vehicleRepository,
             BookingRepository bookingRepository,
             NotificationRepository notificationRepository,
-            InMemoryDataCoordinator coordinator
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock
     ) {
         return new UserManagementService(
                 userRepository,
@@ -332,7 +370,8 @@ public class ApplicationCompositionConfig {
                 vehicleRepository,
                 bookingRepository,
                 notificationRepository,
-                coordinator
+                coordinator,
+                mutationLock
         );
     }
 
@@ -341,7 +380,7 @@ public class ApplicationCompositionConfig {
             VehicleRepository vehicleRepository,
             UserRepository userRepository,
             BookingRepository bookingRepository,
-            InMemoryDataCoordinator coordinator
+            DataTransactionOperations coordinator
     ) {
         return new VehicleManagementService(
                 vehicleRepository,
@@ -355,7 +394,7 @@ public class ApplicationCompositionConfig {
     public ServiceCatalogService serviceCatalogService(
             ServiceRepository serviceRepository,
             ServiceOfferingRepository serviceOfferingRepository,
-            InMemoryDataCoordinator coordinator,
+            DataTransactionOperations coordinator,
             ServiceDefinitionUsageQuery serviceDefinitionUsageQuery
     ) {
         return new ServiceCatalogService(
@@ -371,7 +410,9 @@ public class ApplicationCompositionConfig {
             ServiceOfferingRepository serviceOfferingRepository,
             ServiceRepository serviceRepository,
             MarketplaceQuery marketplaceQuery,
-            InMemoryDataCoordinator coordinator,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock,
+            ServiceOfferingCapacityQuery capacityQuery,
             Clock clock
     ) {
         return new ServiceOfferingService(
@@ -379,8 +420,15 @@ public class ApplicationCompositionConfig {
                 serviceRepository,
                 marketplaceQuery,
                 coordinator,
+                mutationLock,
+                capacityQuery,
                 clock
         );
+    }
+
+    @Bean
+    public ServiceOfferingCapacityQuery serviceOfferingCapacityQuery(BookingRepository bookingRepository) {
+        return new BookingCapacityQuery(bookingRepository);
     }
 
     @Bean
@@ -388,7 +436,7 @@ public class ApplicationCompositionConfig {
             NotificationRepository notificationRepository,
             UserRepository userRepository,
             BookingRepository bookingRepository,
-            InMemoryDataCoordinator coordinator,
+            DataTransactionOperations coordinator,
             NotificationIdGenerator notificationIdGenerator,
             NotificationPolicyProperties notificationPolicy,
             Clock clock
@@ -416,7 +464,8 @@ public class ApplicationCompositionConfig {
             NotificationRepository notificationRepository,
             NotificationManagementService notificationManagementService,
             QueueOrderingService queueOrderingService,
-            InMemoryDataCoordinator coordinator,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock,
             BookingPolicyProperties bookingPolicy,
             BookingSlotPolicyService bookingSlotPolicyService,
             BranchAvailabilityDecisionService branchAvailabilityDecisionService,
@@ -434,6 +483,7 @@ public class ApplicationCompositionConfig {
                 notificationManagementService,
                 queueOrderingService,
                 coordinator,
+                mutationLock,
                 bookingPolicy,
                 bookingSlotPolicyService,
                 branchAvailabilityDecisionService,
@@ -448,7 +498,8 @@ public class ApplicationCompositionConfig {
             ServiceOfferingQuery serviceOfferingQuery,
             MarketplaceQuery marketplaceQuery,
             NotificationManagementService notificationManagementService,
-            InMemoryDataCoordinator coordinator,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock,
             QueueOrderingService queueOrderingService,
             Clock clock
     ) {
@@ -459,6 +510,7 @@ public class ApplicationCompositionConfig {
                 marketplaceQuery,
                 notificationManagementService,
                 coordinator,
+                mutationLock,
                 queueOrderingService,
                 clock
         );
@@ -469,7 +521,7 @@ public class ApplicationCompositionConfig {
             BookingManagementService bookingManagementService,
             QueueManagementService queueManagementService,
             MarketplaceQuery marketplaceQuery,
-            InMemoryDataCoordinator coordinator
+            DataTransactionOperations coordinator
     ) {
         return new DailySummaryReportService(
                 bookingManagementService,

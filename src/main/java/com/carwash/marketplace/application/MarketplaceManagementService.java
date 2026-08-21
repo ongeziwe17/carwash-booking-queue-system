@@ -8,7 +8,7 @@ import com.carwash.marketplace.domain.CarWashBusiness;
 import com.carwash.marketplace.domain.CarWashBusinessRepository;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
-import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.shared.application.DataTransactionOperations;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -32,13 +32,13 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
 
     private final CarWashBusinessRepository businessRepository;
     private final CarWashBranchRepository branchRepository;
-    private final InMemoryDataCoordinator coordinator;
+    private final DataTransactionOperations coordinator;
     private final Clock clock;
 
     public MarketplaceManagementService(
             CarWashBusinessRepository businessRepository,
             CarWashBranchRepository branchRepository,
-            InMemoryDataCoordinator coordinator,
+            DataTransactionOperations coordinator,
             Clock clock
     ) {
         this.businessRepository = Objects.requireNonNull(businessRepository, "Business repository is required");
@@ -50,6 +50,11 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
     public BusinessSnapshot registerBusiness(RegisterBusinessCommand command) {
         return coordinator.write(() -> {
             validateBusiness(command);
+            String businessId = normalizeRequiredId(command.businessId(), "Business ID");
+            if (businessRepository.findById(businessId).isPresent()) {
+                throw new BusinessRuleViolationException("Business ID already exists");
+            }
+            rejectDuplicateRegistrationNumber(command.registrationNumber(), null);
             LocalDateTime now = LocalDateTime.now(clock);
             CarWashBusiness business = new CarWashBusiness(
                     command.businessId(),
@@ -68,10 +73,24 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
         });
     }
 
+    @Override
     public List<BusinessSnapshot> findAllBusinesses() {
         return coordinator.read(() -> businessRepository.findAll().stream()
                 .map(BusinessSnapshot::from)
                 .toList());
+    }
+
+    @Override
+    public List<BranchSnapshot> findAllBranches() {
+        return coordinator.read(() -> {
+            java.util.Map<String, CarWashBusiness> businesses = businessRepository.findAll().stream()
+                    .collect(java.util.stream.Collectors.toMap(
+                            CarWashBusiness::getBusinessId, java.util.function.Function.identity()));
+            return branchRepository.findAll().stream()
+                    .map(branch -> BranchSnapshot.from(branch, java.util.Objects.requireNonNull(
+                            businesses.get(branch.getBusinessId()), "Branch owner is missing")))
+                    .toList();
+        });
     }
 
     public BusinessSnapshot findBusiness(String businessId) {
@@ -88,6 +107,7 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
         return coordinator.write(() -> {
             CarWashBusiness existing = requireBusiness(businessId);
             validateBusiness(command);
+            rejectDuplicateRegistrationNumber(command.registrationNumber(), existing.getBusinessId());
             CarWashBusiness updated = existing.updateDetails(
                     command.businessName(),
                     command.contactEmail(),
@@ -191,10 +211,9 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
 
     @Override
     public List<BranchSnapshot> findDiscoverableBranches() {
-        return coordinator.read(() -> branchRepository.findAll().stream()
-                .map(this::snapshot)
+        return findAllBranches().stream()
                 .filter(BranchSnapshot::discoverable)
-                .toList());
+                .toList();
     }
 
     private BusinessSnapshot changeBusinessStatus(String businessId, boolean active) {
@@ -244,6 +263,13 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
     private void updateBranchRecord(CarWashBranch branch) {
         if (!branchRepository.update(branch)) {
             throw new ResourceNotFoundException("Branch not found: " + branch.getBranchId());
+        }
+    }
+
+    private void rejectDuplicateRegistrationNumber(String registrationNumber, String excludedBusinessId) {
+        if (businessRepository.existsByRegistrationNumberIgnoreCase(
+                registrationNumber, excludedBusinessId)) {
+            throw new BusinessRuleViolationException("Business registration number already exists");
         }
     }
 

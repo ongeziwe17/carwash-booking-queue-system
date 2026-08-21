@@ -21,7 +21,8 @@ import com.carwash.queue.domain.QueueEntryRepository;
 import com.carwash.queue.domain.QueueStatus;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
-import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.shared.application.DataTransactionOperations;
+import com.carwash.shared.application.MutationLock;
 import com.carwash.vehicle.domain.Vehicle;
 import com.carwash.vehicle.domain.VehicleRepository;
 import org.slf4j.Logger;
@@ -48,7 +49,8 @@ public class BookingManagementService implements BookingQuery {
     private final NotificationRepository notificationRepository;
     private final NotificationManagementService notificationManagementService;
     private final QueueOrderingService queueOrdering;
-    private final InMemoryDataCoordinator coordinator;
+    private final DataTransactionOperations coordinator;
+    private final MutationLock mutationLock;
     private final BookingPolicyProperties bookingPolicy;
     private final BookingSlotPolicyService slotPolicy;
     private final BranchAvailabilityDecisionService branchAvailability;
@@ -65,7 +67,31 @@ public class BookingManagementService implements BookingQuery {
             NotificationRepository notificationRepository,
             NotificationManagementService notificationManagementService,
             QueueOrderingService queueOrdering,
-            InMemoryDataCoordinator coordinator,
+            DataTransactionOperations coordinator,
+            BookingPolicyProperties bookingPolicy,
+            BookingSlotPolicyService slotPolicy,
+            BranchAvailabilityDecisionService branchAvailability,
+            Clock clock
+    ) {
+        this(bookingRepository, userRepository, vehicleRepository, serviceDefinitionQuery, serviceOfferingQuery,
+                marketplaceQuery, queueEntryRepository, notificationRepository, notificationManagementService,
+                queueOrdering, coordinator, MutationLock.noOp(), bookingPolicy, slotPolicy,
+                branchAvailability, clock);
+    }
+
+    public BookingManagementService(
+            BookingRepository bookingRepository,
+            UserRepository userRepository,
+            VehicleRepository vehicleRepository,
+            ServiceDefinitionQuery serviceDefinitionQuery,
+            ServiceOfferingQuery serviceOfferingQuery,
+            MarketplaceQuery marketplaceQuery,
+            QueueEntryRepository queueEntryRepository,
+            NotificationRepository notificationRepository,
+            NotificationManagementService notificationManagementService,
+            QueueOrderingService queueOrdering,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock,
             BookingPolicyProperties bookingPolicy,
             BookingSlotPolicyService slotPolicy,
             BranchAvailabilityDecisionService branchAvailability,
@@ -83,6 +109,7 @@ public class BookingManagementService implements BookingQuery {
         this.notificationManagementService = notificationManagementService;
         this.queueOrdering = Objects.requireNonNull(queueOrdering, "Queue ordering service is required");
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
+        this.mutationLock = Objects.requireNonNull(mutationLock, "Mutation lock is required");
         this.bookingPolicy = Objects.requireNonNull(bookingPolicy, "Booking policy is required");
         this.slotPolicy = Objects.requireNonNull(slotPolicy, "Booking slot policy is required");
         this.branchAvailability = Objects.requireNonNull(branchAvailability,
@@ -109,6 +136,7 @@ public class BookingManagementService implements BookingQuery {
 
     public Booking createBooking(Booking booking) {
         return coordinator.write(() -> {
+            lockNewBooking(booking);
             validateAndResolveNewBooking(booking);
             if (!bookingRepository.insert(booking)) {
                 throw new BusinessRuleViolationException("Booking ID already exists");
@@ -116,9 +144,13 @@ public class BookingManagementService implements BookingQuery {
             User owner = booking.getUser();
             owner.addBooking(booking);
             if (!userRepository.update(owner)) {
-                owner.removeBooking(booking.getBookingId());
-                bookingRepository.deleteById(booking.getBookingId());
-                throw new ResourceNotFoundException("User not found: " + owner.getUserId());
+                ResourceNotFoundException failure =
+                        new ResourceNotFoundException("User not found: " + owner.getUserId());
+                coordinator.compensate(failure, () -> {
+                    owner.removeBooking(booking.getBookingId());
+                    bookingRepository.deleteById(booking.getBookingId());
+                });
+                throw failure;
             }
             return booking;
         });
@@ -187,7 +219,14 @@ public class BookingManagementService implements BookingQuery {
             String specialRequest
     ) {
         return coordinator.write(() -> {
+            mutationLock.acquire(MutationLock.booking(bookingId));
             Booking existing = requireBooking(bookingId);
+            mutationLock.acquire(java.util.List.of(
+                    MutationLock.offering(existing.getServiceOfferingId()),
+                    MutationLock.offering(serviceOfferingId),
+                    MutationLock.customer(existing.getUser().getUserId()),
+                    MutationLock.vehicle(vehicleId)
+            ));
             requireModifiableBooking(existing);
             if (queueEntryRepository.existsActiveByBookingId(bookingId)) {
                 throw new BusinessRuleViolationException("Booking cannot be updated while it has an active queue entry");
@@ -214,9 +253,11 @@ public class BookingManagementService implements BookingQuery {
                     throw new ResourceNotFoundException("Booking not found: " + bookingId);
                 }
             } catch (RuntimeException exception) {
-                existing.setVehicle(originalVehicle);
-                existing.changeServiceOffering(originalOfferingId, originalService);
-                existing.setSpecialRequest(originalSpecialRequest);
+                coordinator.compensate(exception, () -> {
+                    existing.setVehicle(originalVehicle);
+                    existing.changeServiceOffering(originalOfferingId, originalService);
+                    existing.setSpecialRequest(originalSpecialRequest);
+                });
                 throw exception;
             }
             return existing;
@@ -225,7 +266,9 @@ public class BookingManagementService implements BookingQuery {
 
     public Booking rescheduleBooking(String bookingId, LocalDateTime scheduledDateTime) {
         return coordinator.write(() -> {
+            mutationLock.acquire(MutationLock.booking(bookingId));
             Booking booking = requireBooking(bookingId);
+            lockExistingBookingDecision(booking, false);
             requireReschedulableBooking(booking);
             LocalDateTime now = currentBranchLocalDateTime(booking);
             requireCurrentFutureSchedule(booking, now);
@@ -251,7 +294,8 @@ public class BookingManagementService implements BookingQuery {
                     throw new ResourceNotFoundException("Booking not found: " + bookingId);
                 }
             } catch (RuntimeException exception) {
-                booking.setScheduledDateTime(originalScheduledDateTime);
+                coordinator.compensate(exception,
+                        () -> booking.setScheduledDateTime(originalScheduledDateTime));
                 throw exception;
             }
 
@@ -266,7 +310,9 @@ public class BookingManagementService implements BookingQuery {
 
     public Booking cancelBooking(String bookingId, String customerId) {
         return coordinator.write(() -> {
+            mutationLock.acquire(MutationLock.booking(bookingId));
             Booking booking = requireBooking(bookingId);
+            lockExistingBookingDecision(booking, true);
             validateCancellationRequest(booking, customerId);
             QueueEntry activeQueueEntry = findActiveQueueEntry(bookingId);
             if (activeQueueEntry != null && activeQueueEntry.getQueueStatus() == QueueStatus.IN_PROGRESS) {
@@ -304,7 +350,8 @@ public class BookingManagementService implements BookingQuery {
                     queueOrdering.rebalanceActiveQueue(booking.getBranchId());
                 }
             } catch (RuntimeException exception) {
-                rollbackCancellation(exception, bookingState, queueStates);
+                coordinator.compensate(exception,
+                        () -> rollbackCancellation(exception, bookingState, queueStates));
                 throw exception;
             }
             notifyCustomerBestEffort(booking, "BOOKING_CANCELLED", "Your booking has been cancelled.");
@@ -321,7 +368,9 @@ public class BookingManagementService implements BookingQuery {
 
     public Booking confirmBooking(String bookingId) {
         return coordinator.write(() -> {
+            mutationLock.acquire(MutationLock.booking(bookingId));
             Booking booking = requireBooking(bookingId);
+            mutationLock.acquire(MutationLock.offering(booking.getServiceOfferingId()));
             resolveOperationalOffering(booking.getBranchId(), booking.getServiceOfferingId());
             if (booking.getStatus() == BookingStatus.CANCELLED) {
                 throw new BusinessRuleViolationException("Cancelled booking cannot be confirmed");
@@ -339,7 +388,12 @@ public class BookingManagementService implements BookingQuery {
 
     public void deleteBooking(String bookingId) {
         coordinator.write(() -> {
+            mutationLock.acquire(MutationLock.booking(bookingId));
             Booking booking = requireBooking(bookingId);
+            mutationLock.acquire(java.util.List.of(
+                    MutationLock.offering(booking.getServiceOfferingId()),
+                    MutationLock.queueBranch(booking.getBranchId())
+            ));
             if (booking.getStatus() != BookingStatus.CANCELLED) {
                 throw new BusinessRuleViolationException("Only cancelled bookings can be deleted");
             }
@@ -588,12 +642,35 @@ public class BookingManagementService implements BookingQuery {
     }
 
     private void notifyCustomerBestEffort(Booking booking, String type, String message) {
-        try {
-            notifyCustomer(booking, type, message);
-        } catch (RuntimeException exception) {
-            LOGGER.warn("Unable to create {} notification for booking {}",
-                    type, booking.getBookingId(), exception);
+        coordinator.afterCommitBestEffort(
+                () -> notifyCustomer(booking, type, message),
+                exception -> LOGGER.warn("Unable to create {} notification for booking {}",
+                        type, booking.getBookingId(), exception));
+    }
+
+    private void lockNewBooking(Booking booking) {
+        if (booking == null) return;
+        java.util.ArrayList<String> keys = new java.util.ArrayList<>();
+        if (booking.getBookingId() != null) keys.add(MutationLock.booking(booking.getBookingId().trim()));
+        if (booking.getServiceOfferingId() != null) {
+            keys.add(MutationLock.offering(booking.getServiceOfferingId().trim()));
         }
+        if (booking.getUser() != null && booking.getUser().getUserId() != null) {
+            keys.add(MutationLock.customer(booking.getUser().getUserId().trim()));
+        }
+        if (booking.getVehicle() != null && booking.getVehicle().getVehicleId() != null) {
+            keys.add(MutationLock.vehicle(booking.getVehicle().getVehicleId().trim()));
+        }
+        if (!keys.isEmpty()) mutationLock.acquire(keys);
+    }
+
+    private void lockExistingBookingDecision(Booking booking, boolean queueMutation) {
+        java.util.ArrayList<String> keys = new java.util.ArrayList<>();
+        keys.add(MutationLock.offering(booking.getServiceOfferingId()));
+        if (booking.getUser() != null) keys.add(MutationLock.customer(booking.getUser().getUserId()));
+        if (booking.getVehicle() != null) keys.add(MutationLock.vehicle(booking.getVehicle().getVehicleId()));
+        if (queueMutation) keys.add(MutationLock.queueBranch(booking.getBranchId()));
+        mutationLock.acquire(keys);
     }
 
     private BookingSnapshot snapshot(Booking booking) {

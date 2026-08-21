@@ -5,6 +5,14 @@ import java.util.Optional;
 
 public interface MarketplaceQuery {
 
+    default List<BusinessSnapshot> findAllBusinesses() {
+        return List.of();
+    }
+
+    default List<BranchSnapshot> findAllBranches() {
+        return findDiscoverableBranches();
+    }
+
     Optional<BusinessSnapshot> findBusinessOptional(String businessId);
 
     Optional<BranchSnapshot> findBranchOptional(String branchId);

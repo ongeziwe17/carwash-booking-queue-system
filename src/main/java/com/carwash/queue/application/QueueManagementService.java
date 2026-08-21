@@ -16,7 +16,8 @@ import com.carwash.queue.domain.QueueEntryRepository;
 import com.carwash.queue.domain.QueueStatus;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
-import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.shared.application.DataTransactionOperations;
+import com.carwash.shared.application.MutationLock;
 import com.carwash.vehicle.domain.Vehicle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,6 +26,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -37,7 +39,8 @@ public class QueueManagementService implements QueueQuery {
     private final ServiceOfferingQuery serviceOfferingQuery;
     private final MarketplaceQuery marketplaceQuery;
     private final NotificationManagementService notificationManagementService;
-    private final InMemoryDataCoordinator coordinator;
+    private final DataTransactionOperations coordinator;
+    private final MutationLock mutationLock;
     private final QueueOrderingService queueOrdering;
     private final Clock clock;
 
@@ -47,7 +50,22 @@ public class QueueManagementService implements QueueQuery {
             ServiceOfferingQuery serviceOfferingQuery,
             MarketplaceQuery marketplaceQuery,
             NotificationManagementService notificationManagementService,
-            InMemoryDataCoordinator coordinator,
+            DataTransactionOperations coordinator,
+            QueueOrderingService queueOrdering,
+            Clock clock
+    ) {
+        this(queueEntryRepository, bookingRepository, serviceOfferingQuery, marketplaceQuery,
+                notificationManagementService, coordinator, MutationLock.noOp(), queueOrdering, clock);
+    }
+
+    public QueueManagementService(
+            QueueEntryRepository queueEntryRepository,
+            BookingRepository bookingRepository,
+            ServiceOfferingQuery serviceOfferingQuery,
+            MarketplaceQuery marketplaceQuery,
+            NotificationManagementService notificationManagementService,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock,
             QueueOrderingService queueOrdering,
             Clock clock
     ) {
@@ -57,6 +75,7 @@ public class QueueManagementService implements QueueQuery {
         this.marketplaceQuery = Objects.requireNonNull(marketplaceQuery, "Marketplace query is required");
         this.notificationManagementService = notificationManagementService;
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
+        this.mutationLock = Objects.requireNonNull(mutationLock, "Mutation lock is required");
         this.queueOrdering = Objects.requireNonNull(queueOrdering, "Queue ordering service is required");
         this.clock = Objects.requireNonNull(clock, "Application clock is required");
     }
@@ -71,6 +90,7 @@ public class QueueManagementService implements QueueQuery {
 
     public QueueEntry createQueueEntry(QueueEntry queueEntry) {
         return coordinator.write(() -> {
+            lockQueueCreation(queueEntry);
             validateAndResolveQueueEntry(queueEntry);
             Booking booking = queueEntry.getBooking();
             if (booking.getQueueEntry() != null
@@ -93,10 +113,11 @@ public class QueueManagementService implements QueueQuery {
                 }
                 queueOrdering.rebalanceActiveQueue(branchId);
             } catch (RuntimeException exception) {
-                rollbackQueueCreation(exception, queueEntry, bookingState, queueStates);
+                coordinator.compensate(exception,
+                        () -> rollbackQueueCreation(exception, queueEntry, bookingState, queueStates));
                 throw exception;
             }
-            return snapshotQueueEntry(queueEntry);
+            return snapshotQueueEntry(requireQueueEntry(queueEntry.getQueueEntryId()));
         });
     }
 
@@ -117,24 +138,20 @@ public class QueueManagementService implements QueueQuery {
                 String normalizedBranchId = requireBranch(branchId).branchId();
                 source = queueEntryRepository.findByBranchId(normalizedBranchId);
             }
-            return source.stream().map(this::snapshotQueueEntry).toList();
+            return snapshotQueueEntries(source);
         });
     }
 
     @Override
     public List<QueueEntrySnapshot> findQueueEntrySnapshots() {
-        return coordinator.read(() -> queueEntryRepository.findAllOrdered().stream()
-                .map(this::snapshot)
-                .toList());
+        return coordinator.read(() -> queueEntrySnapshots(queueEntryRepository.findAllOrdered()));
     }
 
     @Override
     public List<QueueEntrySnapshot> findQueueEntrySnapshotsByBranch(String branchId) {
         return coordinator.read(() -> {
             String normalizedBranchId = requireBranch(branchId).branchId();
-            return queueEntryRepository.findByBranchId(normalizedBranchId).stream()
-                    .map(this::snapshot)
-                    .toList();
+            return queueEntrySnapshots(queueEntryRepository.findByBranchId(normalizedBranchId));
         });
     }
 
@@ -155,6 +172,8 @@ public class QueueManagementService implements QueueQuery {
     public Optional<String> findOwnerId(String queueEntryId) {
         return coordinator.read(() -> queueEntryRepository.findById(queueEntryId)
                 .map(QueueEntry::getBooking)
+                .map(Booking::getBookingId)
+                .flatMap(bookingRepository::findById)
                 .map(Booking::getUser)
                 .map(User::getUserId));
     }
@@ -165,9 +184,7 @@ public class QueueManagementService implements QueueQuery {
     }
 
     public List<QueueEntry> findByServiceId(String serviceId) {
-        return coordinator.read(() -> queueEntryRepository.findByServiceId(serviceId).stream()
-                .map(this::snapshotQueueEntry)
-                .toList());
+        return coordinator.read(() -> snapshotQueueEntries(queueEntryRepository.findByServiceId(serviceId)));
     }
 
     public QueueEntry updatePosition(String queueEntryId, int position) {
@@ -175,6 +192,8 @@ public class QueueManagementService implements QueueQuery {
             if (position <= 0) {
                 throw new BusinessRuleViolationException("Queue position must be positive");
             }
+            QueueEntry initial = requireQueueEntry(queueEntryId);
+            mutationLock.acquire(MutationLock.queueBranch(initial.getBranchId()));
             QueueEntry queueEntry = requireQueueEntry(queueEntryId);
             if (queueEntry.getQueueStatus() != QueueStatus.WAITING) {
                 throw new BusinessRuleViolationException("Only waiting queue entries can be repositioned");
@@ -194,6 +213,7 @@ public class QueueManagementService implements QueueQuery {
     public QueueEntry callNext(String branchId) {
         return coordinator.write(() -> {
             String normalizedBranchId = requireBranch(branchId).branchId();
+            mutationLock.acquire(MutationLock.queueBranch(normalizedBranchId));
             return callWaitingEntry(queueEntryRepository.findNextWaitingByBranch(normalizedBranchId)
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "No waiting queue entry available for branch: " + normalizedBranchId)));
@@ -201,11 +221,17 @@ public class QueueManagementService implements QueueQuery {
     }
 
     public QueueEntry callQueueEntry(String queueEntryId) {
-        return coordinator.write(() -> callWaitingEntry(requireQueueEntry(queueEntryId)));
+        return coordinator.write(() -> {
+            QueueEntry initial = requireQueueEntry(queueEntryId);
+            mutationLock.acquire(MutationLock.queueBranch(initial.getBranchId()));
+            return callWaitingEntry(requireQueueEntry(queueEntryId));
+        });
     }
 
     public QueueEntry startService(String queueEntryId) {
         return coordinator.write(() -> {
+            QueueEntry initial = requireQueueEntry(queueEntryId);
+            lockQueueLifecycle(initial);
             QueueEntry queueEntry = requireQueueEntry(queueEntryId);
             if (queueEntry.getQueueStatus() != QueueStatus.CALLED) {
                 throw new BusinessRuleViolationException("Queue entry cannot start service in current state");
@@ -229,7 +255,8 @@ public class QueueManagementService implements QueueQuery {
                 updateQueueEntry(queueEntry);
                 updateBooking(booking);
             } catch (RuntimeException exception) {
-                rollbackLifecycle(exception, bookingState, List.of(queueState));
+                coordinator.compensate(exception,
+                        () -> rollbackLifecycle(exception, bookingState, List.of(queueState)));
                 throw exception;
             }
             notifyCustomerBestEffort(queueEntry, "SERVICE_STARTED", "Your service has started.");
@@ -239,6 +266,8 @@ public class QueueManagementService implements QueueQuery {
 
     public QueueEntry completeQueueEntry(String queueEntryId) {
         return coordinator.write(() -> {
+            QueueEntry initial = requireQueueEntry(queueEntryId);
+            lockQueueLifecycle(initial);
             QueueEntry queueEntry = requireQueueEntry(queueEntryId);
             if (queueEntry.getStartedAt() == null) {
                 throw new BusinessRuleViolationException("Queue entry cannot be completed before it has started");
@@ -266,7 +295,8 @@ public class QueueManagementService implements QueueQuery {
                 updateBooking(booking);
                 queueOrdering.rebalanceActiveQueue(queueEntry.getBranchId());
             } catch (RuntimeException exception) {
-                rollbackLifecycle(exception, bookingState, queueStates);
+                coordinator.compensate(exception,
+                        () -> rollbackLifecycle(exception, bookingState, queueStates));
                 throw exception;
             }
             notifyCustomerBestEffort(queueEntry, "SERVICE_COMPLETED", "Your service has been completed.");
@@ -276,11 +306,13 @@ public class QueueManagementService implements QueueQuery {
 
     public void deleteQueueEntry(String queueEntryId) {
         coordinator.write(() -> {
+            QueueEntry initial = requireQueueEntry(queueEntryId);
+            lockQueueLifecycle(initial);
             QueueEntry queueEntry = requireQueueEntry(queueEntryId);
             if (queueEntry.getQueueStatus() != QueueStatus.WAITING) {
                 throw new BusinessRuleViolationException("Only waiting queue entries can be deleted");
             }
-            Booking booking = queueEntry.getBooking();
+            Booking booking = requireCanonicalBooking(queueEntry);
             List<LifecycleStateSnapshot.QueueEntryState> queueStates = LifecycleStateSnapshot.queueEntries(
                     queueEntryRepository.findActiveOrderedByBranch(queueEntry.getBranchId()));
             LifecycleStateSnapshot.BookingState bookingState = booking == null
@@ -296,7 +328,8 @@ public class QueueManagementService implements QueueQuery {
                 }
                 queueOrdering.rebalanceActiveQueue(queueEntry.getBranchId());
             } catch (RuntimeException exception) {
-                rollbackQueueDeletion(exception, bookingState, queueStates);
+                coordinator.compensate(exception,
+                        () -> rollbackQueueDeletion(exception, bookingState, queueStates));
                 throw exception;
             }
         });
@@ -386,7 +419,7 @@ public class QueueManagementService implements QueueQuery {
             notifyCustomer(queueEntry, "QUEUE_CALLED", "Your vehicle is next in the queue.");
             return snapshotQueueEntry(queueEntry);
         } catch (RuntimeException exception) {
-            rollbackQueueCall(exception, queueState);
+            coordinator.compensate(exception, () -> rollbackQueueCall(exception, queueState));
             throw exception;
         }
     }
@@ -444,12 +477,36 @@ public class QueueManagementService implements QueueQuery {
     }
 
     private void notifyCustomerBestEffort(QueueEntry queueEntry, String type, String message) {
-        try {
-            notifyCustomer(queueEntry, type, message);
-        } catch (RuntimeException exception) {
-            LOGGER.warn("Unable to create {} notification for queue entry {}",
-                    type, queueEntry.getQueueEntryId(), exception);
+        coordinator.afterCommitBestEffort(
+                () -> notifyCustomer(queueEntry, type, message),
+                exception -> LOGGER.warn("Unable to create {} notification for queue entry {}",
+                        type, queueEntry.getQueueEntryId(), exception));
+    }
+
+    private void lockQueueCreation(QueueEntry queueEntry) {
+        if (queueEntry == null || queueEntry.getBooking() == null
+                || queueEntry.getBooking().getBookingId() == null) return;
+        String bookingId = queueEntry.getBooking().getBookingId().trim();
+        mutationLock.acquire(MutationLock.booking(bookingId));
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found: " + bookingId));
+        mutationLock.acquire(java.util.List.of(
+                MutationLock.offering(booking.getServiceOfferingId()),
+                MutationLock.queueBranch(booking.getBranchId())
+        ));
+    }
+
+    private void lockQueueLifecycle(QueueEntry queueEntry) {
+        Booking booking = queueEntry.getBooking();
+        if (booking == null || booking.getBookingId() == null) {
+            mutationLock.acquire(MutationLock.queueBranch(queueEntry.getBranchId()));
+            return;
         }
+        mutationLock.acquire(java.util.List.of(
+                MutationLock.booking(booking.getBookingId()),
+                MutationLock.offering(queueEntry.getServiceOfferingId()),
+                MutationLock.queueBranch(queueEntry.getBranchId())
+        ));
     }
 
     private void validateAndResolveQueueEntry(QueueEntry queueEntry) {
@@ -563,7 +620,10 @@ public class QueueManagementService implements QueueQuery {
     }
 
     private QueueEntrySnapshot snapshot(QueueEntry source) {
-        Booking booking = source.getBooking();
+        return snapshot(source, canonicalBookingForSnapshot(source.getBooking()));
+    }
+
+    private QueueEntrySnapshot snapshot(QueueEntry source, Booking booking) {
         return new QueueEntrySnapshot(
                 source.getQueueEntryId(),
                 booking == null ? null : booking.getBookingId(),
@@ -583,9 +643,13 @@ public class QueueManagementService implements QueueQuery {
     }
 
     private QueueEntry snapshotQueueEntry(QueueEntry source) {
+        return snapshotQueueEntry(source, canonicalBookingForSnapshot(source.getBooking()));
+    }
+
+    private QueueEntry snapshotQueueEntry(QueueEntry source, Booking booking) {
         QueueEntry snapshot = new QueueEntry();
         snapshot.setQueueEntryId(source.getQueueEntryId());
-        snapshot.setBooking(snapshotBooking(source.getBooking()));
+        snapshot.setBooking(snapshotBooking(booking));
         snapshot.setService(snapshotService(source.getService()));
         if (source.getBranchId() != null && source.getServiceOfferingId() != null) {
             snapshot.assignOperationalScope(source.getBranchId(), source.getServiceOfferingId());
@@ -598,6 +662,34 @@ public class QueueManagementService implements QueueQuery {
         snapshot.setCompletedAt(source.getCompletedAt());
         snapshot.setEstimatedWaitMin(source.getEstimatedWaitMin());
         return snapshot;
+    }
+
+    private List<QueueEntry> snapshotQueueEntries(List<QueueEntry> source) {
+        Map<String, Booking> bookings = canonicalBookings(source);
+        return source.stream().map(entry -> snapshotQueueEntry(
+                entry, bookings.getOrDefault(bookingId(entry), entry.getBooking()))).toList();
+    }
+
+    private List<QueueEntrySnapshot> queueEntrySnapshots(List<QueueEntry> source) {
+        Map<String, Booking> bookings = canonicalBookings(source);
+        return source.stream().map(entry -> snapshot(
+                entry, bookings.getOrDefault(bookingId(entry), entry.getBooking()))).toList();
+    }
+
+    private Map<String, Booking> canonicalBookings(List<QueueEntry> entries) {
+        return bookingRepository.findByIds(entries.stream().map(this::bookingId)
+                        .filter(Objects::nonNull).toList()).stream()
+                .collect(java.util.stream.Collectors.toMap(Booking::getBookingId,
+                        java.util.function.Function.identity()));
+    }
+
+    private String bookingId(QueueEntry entry) {
+        return entry.getBooking() == null ? null : entry.getBooking().getBookingId();
+    }
+
+    private Booking canonicalBookingForSnapshot(Booking associated) {
+        if (associated == null || associated.getBookingId() == null) return associated;
+        return bookingRepository.findById(associated.getBookingId()).orElse(associated);
     }
 
     private Booking snapshotBooking(Booking source) {

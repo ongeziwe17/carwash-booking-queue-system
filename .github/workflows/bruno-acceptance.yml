@@ -35,6 +35,20 @@ jobs:
   bruno-acceptance:
     name: Bruno API acceptance
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.6-alpine3.22
+        env:
+          POSTGRES_DB: carwash
+          POSTGRES_USER: carwash
+          POSTGRES_PASSWORD: bruno-${{ github.run_id }}-${{ github.run_attempt }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U carwash -d carwash"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -91,6 +105,11 @@ jobs:
 
       - name: Start verified API for Bruno
         shell: bash
+        env:
+          SPRING_PROFILES_ACTIVE: postgres
+          SPRING_DATASOURCE_URL: jdbc:postgresql://127.0.0.1:5432/carwash
+          SPRING_DATASOURCE_USERNAME: carwash
+          SPRING_DATASOURCE_PASSWORD: bruno-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           set -euo pipefail
           java -jar target/carwash-api.jar > target/bruno-application.log 2>&1 &

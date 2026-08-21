@@ -17,7 +17,7 @@ Stories are grouped by delivery phase so planned capabilities are not confused w
 | US-CUR-005 | As staff, I want to manage queue entries. | Inherit scope from bookings; branch-filter, order, rebalance, call, start, complete, and delete entries. | Implemented with branch-isolated ordering, offering-duration waits, and synchronized booking lifecycle. |
 | US-CUR-006 | As a customer, I want to see recent in-app notifications. | Booking/queue events create bounded records with branch/offering context that can be listed by user. | Partially implemented; external delivery/read lifecycle remain future work. |
 | US-CUR-007 | As an operator, I want a daily operational summary. | Return booking/queue counts for exactly one branch or owning-business scope using branch-local dates. | Implemented basic in-memory summary; tenant authorization and analytics remain future work. |
-| US-CUR-008 | As a business owner, I want to register Marketplace businesses and branches. | Valid contact/location data, immutable branch ownership, lifecycle actions, offerings, and bounded discovery views. | Implemented in memory; tenant isolation remains future work. |
+| US-CUR-008 | As a business owner, I want to register Marketplace businesses and branches. | Valid contact/location data, immutable branch ownership, lifecycle actions, offerings, and bounded discovery views. | Implemented under both persistence profiles; tenant isolation remains future work. |
 
 ## 3. Phase 0 — API, Data, Security, Test, and Delivery Hardening
 
@@ -66,8 +66,8 @@ REC-001 is implemented as a point-in-time, non-reserving read. Future-date queue
 
 | Story ID | GitHub | User Story | Acceptance Summary |
 | --- | ---: | --- | --- |
-| US-DATA-002 | #122 | As an operator, I want data persisted in PostgreSQL so records survive restarts and workflows are transactionally safe. | Migrations, constraints, indexes, transactions, concurrency handling, Docker profile. |
-| US-TEST-002 | #123 | As a maintainer, I want PostgreSQL integration tests so migrations and persistence behaviour are verified. | Testcontainers, real constraints, rollback and concurrency tests. |
+| US-DATA-002 | #122 | As an operator, I want data persisted in PostgreSQL so records survive restarts and workflows are transactionally safe. | Implemented: migrations, constraints, indexes, transactions, cross-instance locks, Docker profile, and restart durability. |
+| US-TEST-002 | #123 | As a maintainer, I want PostgreSQL integration tests so migrations and persistence behaviour are verified. | Core Testcontainers, real-constraint, rollback, restart, precision, and concurrency baseline delivered by DATA-002; follow-up expansion remains tracked. |
 | US-SEC-002 | #13 | As a user, I want to authenticate securely so protected functionality can identify me. | Safe login, credential verification, token/session expiry, HTTP 401 paths. |
 | US-SEC-003 | #22 | As a platform administrator, I want RBAC so customer, staff, owner, and admin actions are protected. | Explicit role matrix and 401/403 coverage. |
 | US-TENANT-001 | #124 | As a business owner, I want strict tenant isolation so no other business can access my private operational data. | Tenant-scoped APIs/repositories/reports; cross-tenant access denied and tested. |
@@ -100,6 +100,6 @@ REC-001 is implemented as a point-in-time, non-reserving read. Future-date queue
 
 - Eligibility and availability rules remain deterministic even when recommendation ranking evolves.
 - Stories should be implemented in dependency order rather than issue-number order.
-- Security, tenant isolation, persistence, and observability are required before production Marketplace use.
+- Tenant isolation, backup/restore operations, security auditability, and observability are required before production Marketplace use.
 - The modular monolith remains the default architecture until scaling or team boundaries justify extraction.
 - No story should describe a planned capability as already implemented.

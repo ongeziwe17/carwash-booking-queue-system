@@ -74,6 +74,8 @@ Pull requests into `staging`, `develop`, and `master` run:
 11. Container startup and public OpenAPI smoke testing with bounded retries and cleanup.
 12. A Trivy `HIGH` and `CRITICAL` vulnerability baseline report.
 13. A blocking gate for fixed `CRITICAL` findings.
+14. Real PostgreSQL clean/incremental migration, adapter, rollback, restart, precision, optimistic-lock, capacity, and queue concurrency verification.
+15. Complete Bruno acceptance against the PostgreSQL profile.
 
 PR validation does not require Docker Hub credentials and never publishes JAR releases or images.
 
@@ -106,7 +108,7 @@ Create a local runtime file from the safe template:
 cp .env.example .env
 ```
 
-Replace `REPLACE_WITH_BASE64_ENCODED_32_BYTE_SECRET` with a locally generated value. Never commit `.env`.
+Replace both secret placeholders with locally generated JWT and database passwords. Never commit `.env`.
 
 Validate and run:
 
@@ -126,6 +128,8 @@ Logs:
 
 ```bash
 docker compose logs -f carwash-api
+
+docker compose exec postgres psql -U "${POSTGRES_USER:-carwash}" -d "${POSTGRES_DB:-carwash}"
 ```
 
 Shutdown:
@@ -140,7 +144,7 @@ Remove stopped services and orphan containers without deleting persistent data:
 docker compose down --remove-orphans
 ```
 
-The current application has no PostgreSQL service and no dedicated liveness/readiness endpoint. CI smoke testing uses the existing public OpenAPI endpoint. Database persistence belongs to DATA-002, while production health endpoints and deployment hardening belong to OBS-001 and DEPLOY-001.
+The named PostgreSQL volume survives ordinary `down`/restart. Deliberately erase local database data only with `docker compose down --volumes`; this is destructive and cannot be recovered without a backup. PostgreSQL has a database health check and the API waits for it. The API still has no dedicated liveness/readiness endpoint, so CI smoke testing uses the public OpenAPI endpoint; production health endpoints remain OBS-001/DEPLOY-001 work.
 
 ## Docker image design
 
