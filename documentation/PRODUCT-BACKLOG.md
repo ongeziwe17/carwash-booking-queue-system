@@ -28,7 +28,7 @@ Priority guide:
 | Marketplace | Businesses/branches, location/lifecycle/discovery, schedules/closures/open status, offerings, branch-scoped operations, nearby straight-line discovery, and branch-aware availability | Tenant isolation, routing/geocoding, reservations, and resource calendars remain future work. |
 | Recommendations | Point-in-time ranked branch recommendations for five preferences over one AVAIL-002 candidate set, with normalized component scores, validated weights, stable ties, and customer-safe explanations | No reservation, ML/personalization, traffic routing, sponsored ranking, or dynamic pricing. |
 | API/Docs | Generated Swagger/OpenAPI plus human-readable API documentation and contract quality gates | DOCS-001 keeps written and generated contracts aligned. |
-| Testing | Unit/integration suites plus deterministic repeatability, OpenAPI gates, and Bruno HTTP acceptance | Production persistence testing remains future work. |
+| Testing | Unit/integration suites plus deterministic repeatability, real-PostgreSQL Testcontainers coverage, OpenAPI gates, and Bruno HTTP acceptance | TEST-002 persistence, migration, transaction, restart, and concurrency coverage is delivered. |
 | Packaging | Maven, Docker, Docker Compose, and staging-aligned GitHub Actions | Production deployment hardening remains future work. |
 
 Completed issue cleanup:
@@ -60,6 +60,8 @@ Completed issue cleanup:
 - #119 — Deterministic branch distance and nearby discovery (GEO-001).
 - #120 — Authoritative branch-aware availability search (AVAIL-002).
 - #121 — Explainable rule-based Marketplace recommendations (REC-001).
+- #122 — PostgreSQL persistence, migrations, and transaction boundaries (DATA-002).
+- #123 — PostgreSQL integration tests with Testcontainers (TEST-002), delivered by PR #179.
 
 ## 3. Phase 0 — Immediate Hardening
 
@@ -145,7 +147,7 @@ SEC-002 (#13) authentication and SEC-003 (#22) RBAC/ownership authorization were
 | ID | GitHub | Backlog Item | Priority | Depends On |
 | --- | ---: | --- | --- | --- |
 | DATA-002 | #122 | Add PostgreSQL persistence, migrations, and transaction boundaries — implemented | P1 | Stable Marketplace domain |
-| TEST-002 | #123 | Expand PostgreSQL integration coverage beyond the DATA-002 Testcontainers/concurrency baseline | P1 | DATA-002 |
+| TEST-002 | #123 | Add PostgreSQL integration tests with Testcontainers — implemented by PR #179 | P1 | DATA-002 |
 | TENANT-001 | #124 | Enforce Marketplace tenant isolation | P0 before production | MKT-001, DATA-002, SEC-002, SEC-003 |
 | AUDIT-001 | #125 | Add security and operational audit logging | P2 | DATA-002, SEC-002, SEC-003, TENANT-001 |
 

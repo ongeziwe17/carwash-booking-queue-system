@@ -67,7 +67,7 @@ REC-001 is implemented as a point-in-time, non-reserving read. Future-date queue
 | Story ID | GitHub | User Story | Acceptance Summary |
 | --- | ---: | --- | --- |
 | US-DATA-002 | #122 | As an operator, I want data persisted in PostgreSQL so records survive restarts and workflows are transactionally safe. | Implemented: migrations, constraints, indexes, transactions, cross-instance locks, Docker profile, and restart durability. |
-| US-TEST-002 | #123 | As a maintainer, I want PostgreSQL integration tests so migrations and persistence behaviour are verified. | Core Testcontainers, real-constraint, rollback, restart, precision, and concurrency baseline delivered by DATA-002; follow-up expansion remains tracked. |
+| US-TEST-002 | #123 | As a maintainer, I want PostgreSQL integration tests so migrations and persistence behaviour are verified. | Implemented by PR #179 with PostgreSQL 17.6 Testcontainers, production Flyway migrations, repository/constraint/rollback coverage, restart durability, precision round trips, and booking/queue concurrency tests. |
 | US-SEC-002 | #13 | As a user, I want to authenticate securely so protected functionality can identify me. | Safe login, credential verification, token/session expiry, HTTP 401 paths. |
 | US-SEC-003 | #22 | As a platform administrator, I want RBAC so customer, staff, owner, and admin actions are protected. | Explicit role matrix and 401/403 coverage. |
 | US-TENANT-001 | #124 | As a business owner, I want strict tenant isolation so no other business can access my private operational data. | Tenant-scoped APIs/repositories/reports; cross-tenant access denied and tested. |
