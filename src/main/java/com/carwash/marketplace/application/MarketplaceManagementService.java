@@ -50,6 +50,10 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
     public BusinessSnapshot registerBusiness(RegisterBusinessCommand command) {
         return coordinator.write(() -> {
             validateBusiness(command);
+            String businessId = normalizeRequiredId(command.businessId(), "Business ID");
+            if (businessRepository.findById(businessId).isPresent()) {
+                throw new BusinessRuleViolationException("Business ID already exists");
+            }
             rejectDuplicateRegistrationNumber(command.registrationNumber(), null);
             LocalDateTime now = LocalDateTime.now(clock);
             CarWashBusiness business = new CarWashBusiness(
