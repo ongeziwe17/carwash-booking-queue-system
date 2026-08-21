@@ -36,7 +36,7 @@ class UserJpaEntity {
     @Id @Column(name = "user_id", length = 64) String id;
     @Column(name = "full_name", nullable = false, length = 160) String fullName;
     @Column(nullable = false, length = 320) String email;
-    @Column(nullable = false, length = 32) String phone;
+    @Column(nullable = false, length = 40) String phone;
     @Column(name = "account_status", nullable = false, length = 24) String accountStatus;
     @Column(name = "created_at", nullable = false, columnDefinition = "timestamp(6)") LocalDateTime createdAt;
     @Column(name = "created_at_nano_remainder", nullable = false) short createdAtNano;

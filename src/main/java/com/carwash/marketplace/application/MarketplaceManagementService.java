@@ -50,6 +50,7 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
     public BusinessSnapshot registerBusiness(RegisterBusinessCommand command) {
         return coordinator.write(() -> {
             validateBusiness(command);
+            rejectDuplicateRegistrationNumber(command.registrationNumber(), null);
             LocalDateTime now = LocalDateTime.now(clock);
             CarWashBusiness business = new CarWashBusiness(
                     command.businessId(),
@@ -102,6 +103,7 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
         return coordinator.write(() -> {
             CarWashBusiness existing = requireBusiness(businessId);
             validateBusiness(command);
+            rejectDuplicateRegistrationNumber(command.registrationNumber(), existing.getBusinessId());
             CarWashBusiness updated = existing.updateDetails(
                     command.businessName(),
                     command.contactEmail(),
@@ -257,6 +259,13 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
     private void updateBranchRecord(CarWashBranch branch) {
         if (!branchRepository.update(branch)) {
             throw new ResourceNotFoundException("Branch not found: " + branch.getBranchId());
+        }
+    }
+
+    private void rejectDuplicateRegistrationNumber(String registrationNumber, String excludedBusinessId) {
+        if (businessRepository.existsByRegistrationNumberIgnoreCase(
+                registrationNumber, excludedBusinessId)) {
+            throw new BusinessRuleViolationException("Business registration number already exists");
         }
     }
 

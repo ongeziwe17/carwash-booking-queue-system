@@ -157,6 +157,12 @@ class PostgresPersistenceIntegrationTest {
         assertEquals("User email already exists",duplicate.getMessage());
         vehicles.createVehicle("contract-user","vehicle-one"," CA 123 ","SUV","A","B","C",null);
         assertThrows(BusinessRuleViolationException.class,()->vehicles.createVehicle("contract-user","vehicle-two","ca 123","SUV","A","B","C",null));
+        String maximumPhone="+"+"1".repeat(39);
+        users.createUser(new CreateUserCommand("phone-user","Phone User","phone@example.test",maximumPhone,PASSWORD));
+        assertEquals(maximumPhone,userRepository.findById("phone-user").orElseThrow().getPhone());
+        marketplace.registerBusiness(new RegisterBusinessCommand("registration-one","First","first-business@example.test","0123456789","REGISTRATION-001"));
+        BusinessRuleViolationException registrationDuplicate=assertThrows(BusinessRuleViolationException.class,()->marketplace.registerBusiness(new RegisterBusinessCommand("registration-two","Second","second-business@example.test","0123456789","registration-001")));
+        assertEquals("Business registration number already exists",registrationDuplicate.getMessage());
     }
 
     @Test void everyPostgresAdapterHonorsDuplicateInsertAndDeterministicReadContracts(){

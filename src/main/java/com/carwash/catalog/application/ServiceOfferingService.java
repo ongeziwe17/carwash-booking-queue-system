@@ -162,11 +162,12 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
 
     public ServiceOfferingSnapshot updateOffering(String offeringId, UpdateServiceOfferingCommand command) {
         return coordinator.write(() -> {
-            mutationLock.acquire(MutationLock.offering(offeringId));
+            String normalizedOfferingId = normalizeId(offeringId, "Offering ID");
+            mutationLock.acquire(MutationLock.offering(normalizedOfferingId));
             if (command == null) {
                 throw new BusinessRuleViolationException("Offering request is required");
             }
-            ServiceOffering existing = requireOffering(offeringId);
+            ServiceOffering existing = requireOffering(normalizedOfferingId);
             Service service = requireService(existing.getServiceId());
             BranchSnapshot branch = requireBranch(existing.getBranchId());
             ServiceOffering updated = existing.updateTerms(
@@ -196,8 +197,9 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
 
     private ServiceOfferingSnapshot changeStatus(String offeringId, boolean active) {
         return coordinator.write(() -> {
-            mutationLock.acquire(MutationLock.offering(offeringId));
-            ServiceOffering existing = requireOffering(offeringId);
+            String normalizedOfferingId = normalizeId(offeringId, "Offering ID");
+            mutationLock.acquire(MutationLock.offering(normalizedOfferingId));
+            ServiceOffering existing = requireOffering(normalizedOfferingId);
             Service service = requireService(existing.getServiceId());
             BranchSnapshot branch = requireBranch(existing.getBranchId());
             ServiceOffering updated = active

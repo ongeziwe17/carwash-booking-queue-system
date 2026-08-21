@@ -48,7 +48,7 @@ CREATE TABLE users (
     user_id varchar(64) PRIMARY KEY,
     full_name varchar(160) NOT NULL,
     email varchar(320) NOT NULL,
-    phone varchar(32) NOT NULL,
+    phone varchar(40) NOT NULL,
     account_status varchar(24) NOT NULL,
     created_at timestamp(6) NOT NULL,
     created_at_nano_remainder smallint NOT NULL DEFAULT 0,
