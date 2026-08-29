@@ -178,7 +178,8 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         CreateQueueEntryRequest second = createQueue(createBookingWithDuration(25, 21), 2, 10);
         CreateQueueEntryRequest third = createQueue(createBookingWithDuration(15, 22), 3, 35);
 
-        mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt()))
+        mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt())
+                        .param("businessId", api.defaultBusiness().businessId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].queueEntryId").value(first.queueEntryId()))
                 .andExpect(jsonPath("$[0].position").value(1))
@@ -205,7 +206,8 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(jsonPath("$.queueStatus").value("COMPLETED"))
                 .andExpect(jsonPath("$.estimatedWaitMin").value(0));
 
-        mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt()))
+        mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt())
+                        .param("businessId", api.defaultBusiness().businessId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].queueEntryId").value(second.queueEntryId()))
                 .andExpect(jsonPath("$[0].position").value(1))
@@ -227,7 +229,8 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt()))
+        mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt())
+                        .param("businessId", api.defaultBusiness().businessId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].queueEntryId").value(first.queueEntryId()))
@@ -253,7 +256,8 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(jsonPath("$.position").value(1))
                 .andExpect(jsonPath("$.estimatedWaitMin").value(0));
 
-        mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt()))
+        mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt())
+                        .param("businessId", api.defaultBusiness().businessId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].queueEntryId").value(third.queueEntryId()))
                 .andExpect(jsonPath("$[0].position").value(1))
@@ -364,7 +368,8 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(jsonPath("$.estimatedWaitMin").value(10))
                 .andExpect(jsonPath("$.calledAt").exists());
 
-        mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt()))
+        mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt())
+                        .param("businessId", api.defaultBusiness().businessId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].queueEntryId").value(first.queueEntryId()))
                 .andExpect(jsonPath("$[0].queueStatus").value("IN_PROGRESS"))

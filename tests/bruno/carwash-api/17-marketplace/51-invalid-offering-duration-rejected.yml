@@ -1,7 +1,7 @@
 info:
   name: Invalid offering duration is rejected
   type: http
-  seq: 51
+  seq: 61
   tags: [marketplace, offering, validation]
 
 http:

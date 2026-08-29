@@ -1,0 +1,17 @@
+info:
+  name: Admin removes operational membership and demotes user
+  type: http
+  seq: 6
+  tags: [workflow, admin, tenant, security]
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/admin/users/{{adminJourneyUserId}}/tenant-membership"
+  auth: { type: bearer, token: "{{adminToken}}" }
+
+runtime:
+  scripts:
+    - type: tests
+      code: test("removes assignment without exposing data", function() { expect(res.status).to.equal(204); });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

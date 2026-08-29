@@ -1,7 +1,7 @@
 info:
   name: Customer cannot update offering
   type: http
-  seq: 72
+  seq: 82
   tags: [marketplace, offering, customer, rbac, security]
 
 http:

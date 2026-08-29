@@ -1,7 +1,7 @@
 info:
   name: Login Customer A
   type: http
-  seq: 9
+  seq: 10
   tags:
     - auth
     - smoke

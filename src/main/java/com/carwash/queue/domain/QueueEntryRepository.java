@@ -16,6 +16,11 @@ public interface QueueEntryRepository extends Repository<QueueEntry, String> {
     List<QueueEntry> findByBookingId(String bookingId);
     List<QueueEntry> findByServiceId(String serviceId);
     List<QueueEntry> findByBranchId(String branchId);
+    List<QueueEntry> findByBusinessId(String businessId);
+    List<QueueEntry> findByBranchIdAndBusinessId(String branchId, String businessId);
+    Optional<QueueEntry> findByIdAndBusinessId(String queueEntryId, String businessId);
+    Optional<QueueEntry> findByIdAndUserId(String queueEntryId, String userId);
+    Optional<QueueEntry> findNextWaitingByBranchIdAndBusinessId(String branchId, String businessId);
 
     boolean existsByBookingId(String bookingId);
     boolean existsActiveByBookingId(String bookingId);

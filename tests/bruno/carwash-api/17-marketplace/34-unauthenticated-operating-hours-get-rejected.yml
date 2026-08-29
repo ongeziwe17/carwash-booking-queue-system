@@ -1,7 +1,7 @@
 info:
   name: Unauthenticated operating hours lookup is rejected
   type: http
-  seq: 34
+  seq: 40
   tags: [marketplace, auth, security]
 
 http:

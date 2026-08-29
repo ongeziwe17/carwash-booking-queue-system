@@ -1,7 +1,7 @@
 info:
   name: Login Business owner
   type: http
-  seq: 12
+  seq: 13
   tags:
     - auth
     - rbac

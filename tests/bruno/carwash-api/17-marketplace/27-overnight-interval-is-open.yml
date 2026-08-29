@@ -1,7 +1,7 @@
 info:
   name: Overnight interval remains open after midnight
   type: http
-  seq: 27
+  seq: 33
   tags: [marketplace, customer, workflow]
 
 http:

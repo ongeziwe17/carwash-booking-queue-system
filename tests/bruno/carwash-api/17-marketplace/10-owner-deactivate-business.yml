@@ -1,7 +1,7 @@
 info:
   name: Business owner deactivates Marketplace business
   type: http
-  seq: 10
+  seq: 16
   tags: [marketplace, owner, workflow]
 
 http:

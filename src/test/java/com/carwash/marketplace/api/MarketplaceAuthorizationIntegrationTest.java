@@ -14,13 +14,26 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class MarketplaceAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
 
     @Test
-    void businessOwnerAndPlatformAdminCanManageMarketplace() throws Exception {
+    void businessOwnerCanManageOnlyAnAssignedMarketplaceAndPlatformAdminCanRegisterBusinesses() throws Exception {
         CreateBusinessRequest ownerBusiness = business(ids.business());
         mockMvc.perform(post("/api/marketplace/businesses")
-                        .with(role("owner", "BUSINESS_OWNER", "PERM_MARKETPLACE_READ", "PERM_MARKETPLACE_MANAGE"))
+                        .with(authentication.platformAdminJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(ownerBusiness)))
                 .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/marketplace/businesses/{id}", ownerBusiness.businessId())
+                        .with(tenantRole("owner", "BUSINESS_OWNER", ownerBusiness.businessId(),
+                                "PERM_MARKETPLACE_READ", "PERM_MARKETPLACE_MANAGE")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.businessId").value(ownerBusiness.businessId()));
+
+        mockMvc.perform(post("/api/marketplace/businesses")
+                        .with(tenantRole("owner", "BUSINESS_OWNER", ownerBusiness.businessId(),
+                                "PERM_MARKETPLACE_READ", "PERM_MARKETPLACE_MANAGE"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(business(ids.business()))))
+                .andExpect(status().isForbidden());
 
         mockMvc.perform(get("/api/marketplace/businesses/{id}", ownerBusiness.businessId())
                         .with(authentication.platformAdminJwt()))
@@ -65,6 +78,18 @@ class MarketplaceAuthorizationIntegrationTest extends ApiIntegrationTestSupport 
         authorities[0] = "ROLE_" + role;
         System.arraycopy(permissions, 0, authorities, 1, permissions.length);
         return authentication.roleJwt(subject, role, authorities);
+    }
+
+    private RequestPostProcessor tenantRole(
+            String subject,
+            String role,
+            String businessId,
+            String... permissions
+    ) {
+        String[] authorities = new String[permissions.length + 1];
+        authorities[0] = "ROLE_" + role;
+        System.arraycopy(permissions, 0, authorities, 1, permissions.length);
+        return authentication.tenantRoleJwt(subject, role, businessId, authorities);
     }
 
     private CreateBusinessRequest business(String businessId) {

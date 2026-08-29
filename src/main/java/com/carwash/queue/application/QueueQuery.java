@@ -10,6 +10,13 @@ public interface QueueQuery {
 
     List<QueueEntrySnapshot> findQueueEntrySnapshotsByBranch(String branchId);
 
+    List<QueueEntrySnapshot> findQueueEntrySnapshotsByBusiness(String businessId);
+
+    List<QueueEntrySnapshot> findQueueEntrySnapshotsByBranchAndBusiness(
+            String branchId,
+            String businessId
+    );
+
     /** Deterministic sequential wait estimate for work joining the branch's active queue now. */
     int estimateWaitMinutesForNewWork(String branchId);
 

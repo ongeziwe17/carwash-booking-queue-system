@@ -16,6 +16,8 @@ public class PostgresTemporaryBranchClosureRepository implements TemporaryBranch
     private final ClosureSpringDataRepository repository;
     public PostgresTemporaryBranchClosureRepository(ClosureSpringDataRepository repository){this.repository=repository;}
     @Override public List<TemporaryBranchClosure> findByBranchId(String id){return repository.findByBranchIdOrderByIdAsc(id).stream().map(this::domain).toList();}
+    @Override public List<TemporaryBranchClosure> findByBranchIdAndBusinessId(String branchId,String businessId){return repository.findByBranchTenant(branchId,businessId).stream().map(this::domain).toList();}
+    @Override public Optional<TemporaryBranchClosure> findByIdAndBusinessId(String closureId,String businessId){return repository.findTenantScoped(closureId,businessId).map(this::domain);}
     @Override public boolean insert(TemporaryBranchClosure v){if(repository.existsById(v.getClosureId()))return false;repository.saveAndFlush(entity(v));return true;}
     @Override public boolean update(TemporaryBranchClosure v){Optional<ClosureJpaEntity> found=repository.findById(v.getClosureId());if(found.isEmpty())return false;apply(v,found.get());repository.saveAndFlush(found.get());return true;}
     @Override public Optional<TemporaryBranchClosure> findById(String id){return repository.findById(id).map(this::domain);}

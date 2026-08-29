@@ -1,7 +1,7 @@
 info:
   name: Customer discovers independently priced second branch offering
   type: http
-  seq: 48
+  seq: 58
   tags: [marketplace, offering, customer, workflow]
 
 http:

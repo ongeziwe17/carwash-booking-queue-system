@@ -1,13 +1,12 @@
 package com.carwash.identity.api;
 
-import com.carwash.identity.domain.Role;
-import com.carwash.identity.domain.User;
-
 import com.carwash.shared.api.error.ApiErrorResponse;
 import com.carwash.identity.api.dto.AssignRoleRequest;
 import com.carwash.identity.api.dto.UserResponse;
 import com.carwash.identity.api.mapper.UserMapper;
-import com.carwash.identity.application.UserManagementService;
+import com.carwash.identity.application.TenantMembershipManagementService;
+import com.carwash.identity.api.dto.AssignTenantMembershipRequest;
+import com.carwash.identity.api.dto.TenantMembershipResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -21,6 +20,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,12 +31,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/admin/users")
 public class AdminUserController {
 
-    private final UserManagementService users;
     private final UserMapper mapper;
+    private final TenantMembershipManagementService memberships;
 
-    public AdminUserController(UserManagementService users, UserMapper mapper) {
-        this.users = users;
+    public AdminUserController(
+            UserMapper mapper,
+            TenantMembershipManagementService memberships
+    ) {
         this.mapper = mapper;
+        this.memberships = memberships;
     }
 
     @PutMapping("/{userId}/role")
@@ -64,6 +67,49 @@ public class AdminUserController {
             @PathVariable @NotBlank @Size(max = 64) String userId,
             @Valid @RequestBody AssignRoleRequest request
     ) {
-        return mapper.toResponse(users.assignRole(userId, request.roleName()));
+        return mapper.toResponse(memberships.assignRole(userId, request.roleName(), request.businessId()));
+    }
+
+    @PutMapping("/{userId}/tenant-membership")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
+    @Operation(summary = "Assign or replace an operational user's tenant membership")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Tenant membership assigned",
+                    content = @Content(schema = @Schema(implementation = TenantMembershipResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid role or assignment",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Authentication required",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Platform administrator access required",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "User or business not found",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    })
+    public TenantMembershipResponse assignTenantMembership(
+            @PathVariable @NotBlank @Size(max = 64) String userId,
+            @Valid @RequestBody AssignTenantMembershipRequest request
+    ) {
+        var membership = memberships.assignOrReplace(userId, request.businessId());
+        return new TenantMembershipResponse(
+                membership.userId(), membership.businessId(), membership.assignedAt());
+    }
+
+    @DeleteMapping("/{userId}/tenant-membership")
+    @PreAuthorize("hasRole('PLATFORM_ADMIN')")
+    @Operation(summary = "Remove a tenant membership and demote the operational user to CUSTOMER")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Tenant membership removed"),
+            @ApiResponse(responseCode = "401", description = "Authentication required",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Platform administrator access required",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "User not found",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    })
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
+    public void removeTenantMembership(
+            @PathVariable @NotBlank @Size(max = 64) String userId
+    ) {
+        memberships.removeAndDemote(userId);
     }
 }

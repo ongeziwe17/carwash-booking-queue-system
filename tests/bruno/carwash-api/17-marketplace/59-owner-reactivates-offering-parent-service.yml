@@ -1,7 +1,7 @@
 info:
   name: Business owner reactivates offering parent service
   type: http
-  seq: 59
+  seq: 69
   tags: [marketplace, offering, owner, workflow]
 
 http:

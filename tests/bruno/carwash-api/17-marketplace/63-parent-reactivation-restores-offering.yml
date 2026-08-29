@@ -1,7 +1,7 @@
 info:
   name: Parent reactivation restores offering discovery
   type: http
-  seq: 63
+  seq: 73
   tags: [marketplace, offering, customer, workflow]
 
 http:

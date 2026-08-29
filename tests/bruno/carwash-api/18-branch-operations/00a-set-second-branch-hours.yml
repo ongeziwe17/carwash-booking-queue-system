@@ -1,7 +1,7 @@
 info:
   name: Configure second branch for operational bookings
   type: http
-  seq: 0
+  seq: 1
   tags: [ops, booking, branch, availability]
 http:
   method: PUT
@@ -19,7 +19,7 @@ http:
         {"dayOfWeek":"SATURDAY","opensAt":"08:00:00","closesAt":"17:00:00"},
         {"dayOfWeek":"SUNDAY","opensAt":"08:00:00","closesAt":"17:00:00"}
       ]}
-  auth: { type: bearer, token: "{{ownerToken}}" }
+  auth: { type: bearer, token: "{{adminToken}}" }
 runtime:
   scripts:
     - type: tests

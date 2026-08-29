@@ -1,7 +1,7 @@
 info:
   name: Customer cannot activate offering
   type: http
-  seq: 73
+  seq: 83
   tags: [marketplace, offering, customer, rbac, security]
 
 http:

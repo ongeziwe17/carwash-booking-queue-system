@@ -1,7 +1,7 @@
 info:
   name: Promote business owner candidate
   type: http
-  seq: 8
+  seq: 9
   tags:
     - admin
     - rbac
@@ -17,7 +17,8 @@ http:
     type: json
     data: |-
       {
-        "roleName": "BUSINESS_OWNER"
+        "roleName": "BUSINESS_OWNER",
+        "businessId": "{{opsBusinessId}}"
       }
   auth:
     type: bearer

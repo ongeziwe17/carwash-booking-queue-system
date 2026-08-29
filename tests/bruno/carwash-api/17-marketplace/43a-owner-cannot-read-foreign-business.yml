@@ -1,0 +1,10 @@
+info: { name: Owner receives safe 404 for foreign business, type: http, seq: 50, tags: [tenant, owner, security] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/businesses/{{marketplaceSecondBusinessId}}"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("foreign business is indistinguishable from missing", function() { expect(res.status).to.equal(404); expect(res.body.code).to.equal("RESOURCE_NOT_FOUND"); expect(res.body.message).to.equal("Business not found"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

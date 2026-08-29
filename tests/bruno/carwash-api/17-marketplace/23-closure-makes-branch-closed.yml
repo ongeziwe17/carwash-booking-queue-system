@@ -1,7 +1,7 @@
 info:
   name: Temporary closure makes branch closed
   type: http
-  seq: 23
+  seq: 29
   tags: [marketplace, customer, workflow]
 
 http:

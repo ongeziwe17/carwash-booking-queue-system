@@ -4,6 +4,7 @@ import com.carwash.shared.api.error.ApiErrorResponse;
 import com.carwash.notification.domain.Notification;
 import com.carwash.notification.application.NotificationManagementService;
 import com.carwash.notification.api.dto.NotificationResponse;
+import com.carwash.access.application.TenantAccessContextProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
@@ -28,13 +30,18 @@ import java.util.List;
 public class NotificationController {
 
     private final NotificationManagementService service;
+    private final TenantAccessContextProvider tenantAccess;
 
-    public NotificationController(NotificationManagementService service) {
+    public NotificationController(
+            NotificationManagementService service,
+            TenantAccessContextProvider tenantAccess
+    ) {
         this.service = service;
+        this.tenantAccess = tenantAccess;
     }
 
     @GetMapping("/user/{userId}")
-    @PreAuthorize("@resourceAuthorization.canAccessNotifications(authentication, #userId)")
+    @PreAuthorize("hasAnyAuthority('PERM_NOTIFICATION_SELF_READ','PERM_BOOKING_OPERATE')")
     @Operation(
             summary = "List recent notifications for a user",
             description = "Returns the deployment-configured recent-item limit, newest first. Notifications are in-app only."
@@ -53,9 +60,11 @@ public class NotificationController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public List<NotificationResponse> getRecentByUserId(
-            @PathVariable @NotBlank @Size(max = 64) String userId
+            @PathVariable @NotBlank @Size(max = 64) String userId,
+            @RequestParam(required = false) @Size(max = 64) String businessId
     ) {
-        return service.findRecentByUserId(userId).stream().map(this::response).toList();
+        return service.findRecentByUserId(tenantAccess.current(), userId, businessId).stream()
+                .map(this::response).toList();
     }
 
     private NotificationResponse response(Notification notification) {

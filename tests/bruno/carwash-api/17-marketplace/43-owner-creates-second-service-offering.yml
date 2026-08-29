@@ -1,7 +1,7 @@
 info:
-  name: Business owner offers same service at second branch
+  name: Platform admin offers same service at second branch
   type: http
-  seq: 43
+  seq: 49
   tags: [marketplace, offering, owner, workflow]
 
 http:
@@ -22,7 +22,7 @@ http:
       }
   auth:
     type: bearer
-    token: "{{ownerToken}}"
+    token: "{{adminToken}}"
 
 runtime:
   scripts:

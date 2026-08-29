@@ -102,7 +102,8 @@ class ModularMonolithArchitectureTest {
     void marketplace_isolated_foundation_does_not_depend_on_existing_business_capabilities() {
         noClasses().that().resideInAPackage("com.carwash.marketplace..")
                 .should().dependOnClassesThat().resideInAnyPackage(
-                        "com.carwash.access..",
+                        "com.carwash.access.api..",
+                        "com.carwash.access.infrastructure..",
                         "com.carwash.booking..",
                         "com.carwash.catalog..",
                         "com.carwash.identity..",

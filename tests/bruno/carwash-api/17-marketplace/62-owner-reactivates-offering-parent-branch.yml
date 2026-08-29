@@ -1,7 +1,7 @@
 info:
   name: Business owner reactivates offering parent branch
   type: http
-  seq: 62
+  seq: 72
   tags: [marketplace, offering, owner, workflow]
 
 http:

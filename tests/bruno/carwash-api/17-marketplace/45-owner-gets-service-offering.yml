@@ -1,7 +1,7 @@
 info:
   name: Business owner gets branch service offering
   type: http
-  seq: 45
+  seq: 55
   tags: [marketplace, offering, owner]
 
 http:

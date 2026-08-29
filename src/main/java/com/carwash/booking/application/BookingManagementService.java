@@ -11,6 +11,7 @@ import com.carwash.catalog.domain.Service;
 import com.carwash.identity.domain.Role;
 import com.carwash.identity.domain.User;
 import com.carwash.identity.domain.UserRepository;
+import com.carwash.access.application.TenantAccessContext;
 import com.carwash.marketplace.application.BranchSnapshot;
 import com.carwash.marketplace.application.MarketplaceQuery;
 import com.carwash.notification.application.NotificationManagementService;
@@ -34,6 +35,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import org.springframework.security.access.AccessDeniedException;
 
 public class BookingManagementService implements BookingQuery {
 
@@ -134,6 +136,29 @@ public class BookingManagementService implements BookingQuery {
                 bookingId, user, vehicle, branchId, serviceOfferingId, null, scheduledDateTime, specialRequest));
     }
 
+    public Booking createBooking(
+            TenantAccessContext access,
+            String bookingId,
+            String userId,
+            String vehicleId,
+            String branchId,
+            String serviceOfferingId,
+            LocalDateTime scheduledDateTime,
+            String specialRequest
+    ) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        if (access.isCustomer() && !access.userId().equals(userId)) {
+            throw new AccessDeniedException("Customer self-service access is required");
+        }
+        if (access.isOperational()) {
+            marketplaceQuery.findBranchOptionalByBusiness(
+                            normalizeId(branchId, "Branch ID"), access.requireBusinessId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
+        }
+        return createBooking(bookingId, userId, vehicleId, branchId, serviceOfferingId,
+                scheduledDateTime, specialRequest);
+    }
+
     public Booking createBooking(Booking booking) {
         return coordinator.write(() -> {
             lockNewBooking(booking);
@@ -160,6 +185,10 @@ public class BookingManagementService implements BookingQuery {
         return coordinator.read(() -> snapshotBooking(requireBooking(bookingId)));
     }
 
+    public Booking findById(TenantAccessContext access, String bookingId) {
+        return coordinator.read(() -> snapshotBooking(requireAccessibleBooking(access, bookingId)));
+    }
+
     public List<Booking> findAll() {
         return findAll(null);
     }
@@ -177,6 +206,47 @@ public class BookingManagementService implements BookingQuery {
         });
     }
 
+    public List<Booking> findAll(TenantAccessContext access, String branchId) {
+        return findAll(access, branchId, null);
+    }
+
+    public List<Booking> findAll(
+            TenantAccessContext access,
+            String branchId,
+            String administratorBusinessId
+    ) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        if (access.isPlatformAdministrator()) {
+            String businessId = normalizeId(administratorBusinessId, "Business ID");
+            return coordinator.read(() -> {
+                if (branchId == null) return bookingRepository.findByBusinessId(businessId).stream()
+                        .map(this::snapshotBooking).toList();
+                String normalizedBranchId = normalizeId(branchId, "Branch ID");
+                marketplaceQuery.findBranchOptionalByBusiness(normalizedBranchId, businessId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
+                return bookingRepository.findByBranchIdAndBusinessId(normalizedBranchId, businessId).stream()
+                        .map(this::snapshotBooking).toList();
+            });
+        }
+        if (!access.isOperational()) throw new AccessDeniedException("Operational booking access is required");
+        if (administratorBusinessId != null) {
+            throw new BusinessRuleViolationException("Tenant identity is derived from authentication");
+        }
+        String tenantId = access.requireBusinessId();
+        return coordinator.read(() -> {
+            List<Booking> source;
+            if (branchId == null) {
+                source = bookingRepository.findByBusinessId(tenantId);
+            } else {
+                String normalizedBranchId = normalizeId(branchId, "Branch ID");
+                marketplaceQuery.findBranchOptionalByBusiness(normalizedBranchId, tenantId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
+                source = bookingRepository.findByBranchIdAndBusinessId(normalizedBranchId, tenantId);
+            }
+            return source.stream().map(this::snapshotBooking).toList();
+        });
+    }
+
     @Override
     public List<BookingSnapshot> findBookingSnapshots() {
         return coordinator.read(() -> bookingRepository.findAll().stream().map(this::snapshot).toList());
@@ -188,6 +258,18 @@ public class BookingManagementService implements BookingQuery {
             String normalizedBranchId = requireBranch(branchId).branchId();
             return bookingRepository.findByBranchId(normalizedBranchId).stream().map(this::snapshot).toList();
         });
+    }
+
+    @Override
+    public List<BookingSnapshot> findBookingSnapshotsByBusiness(String businessId) {
+        return coordinator.read(() -> bookingRepository.findByBusinessId(businessId).stream()
+                .map(this::snapshot).toList());
+    }
+
+    @Override
+    public List<BookingSnapshot> findBookingSnapshotsByBranchAndBusiness(String branchId, String businessId) {
+        return coordinator.read(() -> bookingRepository.findByBranchIdAndBusinessId(branchId, businessId).stream()
+                .map(this::snapshot).toList());
     }
 
     @Override
@@ -264,6 +346,17 @@ public class BookingManagementService implements BookingQuery {
         });
     }
 
+    public Booking updateBooking(
+            TenantAccessContext access,
+            String bookingId,
+            String vehicleId,
+            String serviceOfferingId,
+            String specialRequest
+    ) {
+        requireAccessibleBooking(access, bookingId);
+        return updateBooking(bookingId, vehicleId, serviceOfferingId, specialRequest);
+    }
+
     public Booking rescheduleBooking(String bookingId, LocalDateTime scheduledDateTime) {
         return coordinator.write(() -> {
             mutationLock.acquire(MutationLock.booking(bookingId));
@@ -306,6 +399,15 @@ public class BookingManagementService implements BookingQuery {
             );
             return booking;
         });
+    }
+
+    public Booking rescheduleBooking(
+            TenantAccessContext access,
+            String bookingId,
+            LocalDateTime scheduledDateTime
+    ) {
+        requireAccessibleBooking(access, bookingId);
+        return rescheduleBooking(bookingId, scheduledDateTime);
     }
 
     public Booking cancelBooking(String bookingId, String customerId) {
@@ -366,6 +468,11 @@ public class BookingManagementService implements BookingQuery {
         });
     }
 
+    public Booking cancelBooking(TenantAccessContext access, String bookingId) {
+        requireAccessibleBooking(access, bookingId);
+        return cancelBooking(bookingId);
+    }
+
     public Booking confirmBooking(String bookingId) {
         return coordinator.write(() -> {
             mutationLock.acquire(MutationLock.booking(bookingId));
@@ -384,6 +491,12 @@ public class BookingManagementService implements BookingQuery {
             notifyCustomer(booking, "BOOKING_CONFIRMED", "Your booking has been confirmed.");
             return booking;
         });
+    }
+
+    public Booking confirmBooking(TenantAccessContext access, String bookingId) {
+        if (access.isCustomer()) throw new AccessDeniedException("Operational booking access is required");
+        requireAccessibleBooking(access, bookingId);
+        return confirmBooking(bookingId);
     }
 
     public void deleteBooking(String bookingId) {
@@ -418,9 +531,25 @@ public class BookingManagementService implements BookingQuery {
         });
     }
 
+    public void deleteBooking(TenantAccessContext access, String bookingId) {
+        requireAccessibleBooking(access, bookingId);
+        deleteBooking(bookingId);
+    }
+
     private Booking requireBooking(String bookingId) {
         return bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found: " + bookingId));
+    }
+
+    private Booking requireAccessibleBooking(TenantAccessContext access, String bookingId) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        String normalizedId = normalizeId(bookingId, "Booking ID");
+        Optional<Booking> accessible = access.isPlatformAdministrator()
+                ? bookingRepository.findById(normalizedId)
+                : access.isOperational()
+                ? bookingRepository.findByIdAndBusinessId(normalizedId, access.requireBusinessId())
+                : bookingRepository.findByIdAndUserId(normalizedId, access.userId());
+        return accessible.orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
     }
 
     private void validateAndResolveNewBooking(Booking booking) {

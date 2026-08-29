@@ -1,7 +1,7 @@
 info:
   name: Public branch restores offering discovery
   type: http
-  seq: 67
+  seq: 77
   tags: [marketplace, offering, customer, workflow]
 
 http:

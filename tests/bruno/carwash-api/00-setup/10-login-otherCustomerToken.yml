@@ -1,7 +1,7 @@
 info:
   name: Login Customer B
   type: http
-  seq: 10
+  seq: 11
   tags:
     - auth
     - rbac

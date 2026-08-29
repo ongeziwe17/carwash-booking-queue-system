@@ -14,6 +14,7 @@ import com.carwash.catalog.domain.ServiceRepository;
 import com.carwash.catalog.domain.ServiceOfferingRepository;
 import com.carwash.identity.domain.UserRepository;
 import com.carwash.identity.domain.RoleRepository;
+import com.carwash.identity.domain.TenantMembershipRepository;
 import com.carwash.vehicle.domain.VehicleRepository;
 import com.carwash.booking.infrastructure.InMemoryBookingRepository;
 import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
@@ -30,6 +31,7 @@ import com.carwash.catalog.infrastructure.InMemoryServiceRepository;
 import com.carwash.catalog.infrastructure.InMemoryServiceOfferingRepository;
 import com.carwash.identity.infrastructure.InMemoryUserRepository;
 import com.carwash.identity.infrastructure.InMemoryRoleRepository;
+import com.carwash.identity.infrastructure.InMemoryTenantMembershipRepository;
 import com.carwash.vehicle.infrastructure.InMemoryVehicleRepository;
 import com.carwash.access.application.UserCredentialService;
 import com.carwash.notification.infrastructure.AtomicNotificationIdGenerator;
@@ -61,6 +63,8 @@ import com.carwash.discovery.infrastructure.HaversineDistanceCalculator;
 import com.carwash.marketplace.application.BranchScheduleQuery;
 import com.carwash.marketplace.application.MarketplaceQuery;
 import com.carwash.identity.application.UserManagementService;
+import com.carwash.identity.application.TenantBusinessQuery;
+import com.carwash.identity.application.TenantMembershipManagementService;
 import com.carwash.vehicle.application.VehicleManagementService;
 import com.carwash.recommendation.application.DistanceRecommendationMetricProvider;
 import com.carwash.recommendation.application.PriceRecommendationMetricProvider;
@@ -103,8 +107,14 @@ public class ApplicationCompositionConfig {
 
     @Bean
     @Profile("!postgres")
-    public VehicleRepository vehicleRepository() {
-        return new InMemoryVehicleRepository();
+    public TenantMembershipRepository tenantMembershipRepository() {
+        return new InMemoryTenantMembershipRepository();
+    }
+
+    @Bean
+    @Profile("!postgres")
+    public VehicleRepository vehicleRepository(BookingRepository bookingRepository) {
+        return new InMemoryVehicleRepository(bookingRepository);
     }
 
     @Bean
@@ -115,26 +125,26 @@ public class ApplicationCompositionConfig {
 
     @Bean
     @Profile("!postgres")
-    public ServiceOfferingRepository serviceOfferingRepository() {
-        return new InMemoryServiceOfferingRepository();
+    public ServiceOfferingRepository serviceOfferingRepository(MarketplaceQuery marketplaceQuery) {
+        return new InMemoryServiceOfferingRepository(marketplaceQuery);
     }
 
     @Bean
     @Profile("!postgres")
-    public BookingRepository bookingRepository() {
-        return new InMemoryBookingRepository();
+    public BookingRepository bookingRepository(MarketplaceQuery marketplaceQuery) {
+        return new InMemoryBookingRepository(marketplaceQuery);
     }
 
     @Bean
     @Profile("!postgres")
-    public QueueEntryRepository queueEntryRepository() {
-        return new InMemoryQueueEntryRepository();
+    public QueueEntryRepository queueEntryRepository(MarketplaceQuery marketplaceQuery) {
+        return new InMemoryQueueEntryRepository(marketplaceQuery);
     }
 
     @Bean
     @Profile("!postgres")
-    public NotificationRepository notificationRepository() {
-        return new InMemoryNotificationRepository();
+    public NotificationRepository notificationRepository(MarketplaceQuery marketplaceQuery) {
+        return new InMemoryNotificationRepository(marketplaceQuery);
     }
 
     @Bean
@@ -151,14 +161,18 @@ public class ApplicationCompositionConfig {
 
     @Bean
     @Profile("!postgres")
-    public BranchOperatingScheduleRepository branchOperatingScheduleRepository() {
-        return new InMemoryBranchOperatingScheduleRepository();
+    public BranchOperatingScheduleRepository branchOperatingScheduleRepository(
+            CarWashBranchRepository branchRepository
+    ) {
+        return new InMemoryBranchOperatingScheduleRepository(branchRepository);
     }
 
     @Bean
     @Profile("!postgres")
-    public TemporaryBranchClosureRepository temporaryBranchClosureRepository() {
-        return new InMemoryTemporaryBranchClosureRepository();
+    public TemporaryBranchClosureRepository temporaryBranchClosureRepository(
+            CarWashBranchRepository branchRepository
+    ) {
+        return new InMemoryTemporaryBranchClosureRepository(branchRepository);
     }
 
     @Bean
@@ -361,6 +375,7 @@ public class ApplicationCompositionConfig {
             VehicleRepository vehicleRepository,
             BookingRepository bookingRepository,
             NotificationRepository notificationRepository,
+            TenantMembershipRepository tenantMembershipRepository,
             DataTransactionOperations coordinator,
             MutationLock mutationLock
     ) {
@@ -370,8 +385,33 @@ public class ApplicationCompositionConfig {
                 vehicleRepository,
                 bookingRepository,
                 notificationRepository,
+                tenantMembershipRepository,
                 coordinator,
                 mutationLock
+        );
+    }
+
+    @Bean
+    public TenantBusinessQuery tenantBusinessQuery(MarketplaceQuery marketplaceQuery) {
+        return businessId -> marketplaceQuery.findBusinessOptional(businessId).isPresent();
+    }
+
+    @Bean
+    public TenantMembershipManagementService tenantMembershipManagementService(
+            UserRepository userRepository,
+            TenantMembershipRepository tenantMembershipRepository,
+            TenantBusinessQuery tenantBusinessQuery,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock,
+            Clock clock
+    ) {
+        return new TenantMembershipManagementService(
+                userRepository,
+                tenantMembershipRepository,
+                tenantBusinessQuery,
+                coordinator,
+                mutationLock,
+                clock
         );
     }
 

@@ -17,8 +17,8 @@ flowchart TD
 
 | Module | Published/owned surface |
 | --- | --- |
-| `identity` | Users, roles/permissions, user lifecycle, `UserQuery`/`CredentialService`, repository contracts, and user/admin HTTP API |
-| `access` | Authentication HTTP API, JWT/BCrypt infrastructure, the identity credential-contract implementation, and resource authorization |
+| `identity` | Users, roles/permissions, operational `TenantMembership`, membership lifecycle/query contracts, user lifecycle, `UserQuery`/`CredentialService`, repository contracts, and user/admin HTTP API |
+| `access` | Authentication HTTP API, JWT/BCrypt infrastructure, canonical claim validation, bounded `TenantAccessContext`, the identity credential-contract implementation, and resource authorization |
 | `vehicle` | Vehicles, lifecycle service, `VehicleQuery`, repository contract/implementation, and HTTP API |
 | `catalog` | Reusable global services, branch-specific `ServiceOffering` aggregates, offering lifecycle/query contracts, module-owned repositories, and service/offering HTTP APIs |
 | `booking` | Canonically branch/offering-scoped bookings, immutable `BookingSnapshot` queries, scheduling/availability policies, persistence, and booking/availability HTTP APIs |
@@ -94,7 +94,9 @@ flowchart LR
     Recommendation --> Shared
 ```
 
-Cross-capability workflows depend on owning-module repository or application contracts and stable domain types, never a foreign module's `infrastructure` package. Each in-memory repository implementation resides in its owning capability. `insert` remains create-only and `update` remains existing-only; no upsert-style `save` abstraction is introduced.
+Cross-capability workflows depend on owning-module repository or application contracts and stable domain types, never a foreign module's `infrastructure` package. Each in-memory repository implementation resides in its owning capability. `insert` remains create-only and `update` remains existing-only; no upsert-style `save` abstraction is introduced. Tenant-specific business logic stays in Identity, Access, and the owning operational capability; `shared` contains no tenant membership or authorization policy.
+
+Operational controllers resolve the already-validated authentication once into `TenantAccessContext`. Application services select customer subject scope, operator tenant scope, or an explicit platform-administrator path. Tenant-owned repository contracts require the relevant `businessId`, and PostgreSQL adapters carry that predicate into SQL. See [Marketplace Tenant Isolation](TENANT-ISOLATION.md) for the trust boundary and endpoint policy.
 
 ## Consistency and rollback
 
@@ -110,6 +112,8 @@ erDiagram
     ROLES ||--o{ USER_ROLE_ASSIGNMENTS : assigned
     USERS ||--|| USER_CREDENTIALS : authenticates
     USERS ||--|| USER_ROLE_ASSIGNMENTS : has
+    USERS ||--o| TENANT_MEMBERSHIPS : assigned
+    BUSINESSES ||--o{ TENANT_MEMBERSHIPS : employs
     USERS ||--o{ VEHICLES : owns
     BUSINESSES ||--o{ BRANCHES : operates
     BRANCHES ||--o{ SERVICE_OFFERINGS : publishes
@@ -127,7 +131,7 @@ erDiagram
     BOOKINGS ||--o{ NOTIFICATIONS : contextualizes
 ```
 
-Case-insensitive indexes enforce unique user email and owner/plate pairs. A retained offering is unique per branch/service. One schedule row owns ordered interval rows. Queue rows repeat canonical booking scope only to enforce a composite foreign key back to the booking; application mappers never treat those repeated scalars as an alternate authority. Deletes are restrictive except for role permissions, user credentials/role assignment, and schedule intervals, which are private owned records.
+Case-insensitive indexes enforce unique user email and owner/plate pairs. `tenant_memberships.user_id` permits at most one operational tenant, and deferred final-state triggers require operational roles to have one membership while forbidding memberships for customers/platform administrators. A retained offering is unique per branch/service. One schedule row owns ordered interval rows. Queue and notification rows repeat canonical operational scope only so composite foreign keys reject cross-tenant relationships; application mappers never treat repeated scalars as an alternate authority. Tenant indexes cover business/branch, offering, booking, queue, report, and notification query paths. Deletes are restrictive except for private owned records documented by the schema.
 
 Java `LocalDateTime` values are stored as PostgreSQL `timestamp(6)` plus a `0..999` nanosecond remainder. Weekly `LocalTime` uses nano-of-day. Absolute closures use epoch-second plus nano. These mappings round-trip all supported Java nanoseconds and retain branch-local/timezone semantics.
 
@@ -185,4 +189,4 @@ REC-001 permits Recommendation to consume only detached application contracts, p
 
 ## Current limitations
 
-The default lightweight profile remains in memory; durability requires `postgres`. Elevated operational/Marketplace access remains global until tenant isolation, notifications are in-app only, and reporting remains a basic scoped snapshot. Nearby distance is straight-line rather than driving distance and has no traffic, route, geocoding, external maps, cache, or geospatial index. Availability is a non-reserving snapshot; concurrent bay/staff allocation, managed database provisioning, backups, replicas, messaging, and distributed transactions remain intentionally absent.
+The default lightweight profile remains in memory; durability requires `postgres`. Elevated operational/Marketplace access is tenant-scoped, notifications remain in-app only, and reporting remains a basic tenant-scoped snapshot. Nearby distance is straight-line rather than driving distance and has no traffic, route, geocoding, external maps, cache, or geospatial index. Availability is a non-reserving snapshot; audit logging, concurrent bay/staff allocation, managed database provisioning, backups, replicas, messaging, and distributed transactions remain intentionally absent.

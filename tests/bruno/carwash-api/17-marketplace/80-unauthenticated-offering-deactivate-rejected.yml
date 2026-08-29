@@ -1,7 +1,7 @@
 info:
   name: Unauthenticated offering deactivation is rejected
   type: http
-  seq: 80
+  seq: 90
   tags: [marketplace, offering, auth, security]
 
 http:

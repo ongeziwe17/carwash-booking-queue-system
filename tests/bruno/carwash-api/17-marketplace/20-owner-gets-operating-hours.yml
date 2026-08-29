@@ -1,7 +1,7 @@
 info:
   name: Business owner gets branch operating hours
   type: http
-  seq: 20
+  seq: 26
   tags: [marketplace, owner]
 
 http:

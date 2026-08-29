@@ -8,37 +8,38 @@ This matrix is derived from `RoleCatalog`, controller `@PreAuthorize` expression
 | Another user's profile | ❌ | ❌ | ❌ | ✅ |
 | List all users | ❌ | ❌ | ❌ | ✅ |
 | Create/manage own vehicle | ✅ | ✅ | ✅ | ✅ |
-| Operate/list another user's vehicles | ❌ | ✅ | ✅ | ✅ |
+| Operate/list another user's vehicles | ❌ | ✅ assigned tenant | ✅ assigned tenant | ✅ explicit admin path |
 | Read service catalogue | ✅ | ✅ | ✅ | ✅ |
 | Read branch-aware availability | ✅ | ✅ | ✅ | ✅ |
-| Manage service catalogue | ❌ | ❌ | ✅ | ✅ |
+| Manage global service catalogue | ❌ | ❌ | ❌ | ✅ |
 | Create/manage own booking | ✅ | ✅ | ✅ | ✅ |
-| Operate/list another user's bookings | ❌ | ✅ | ✅ | ✅ |
+| Operate/list another user's bookings | ❌ | ✅ assigned tenant | ✅ assigned tenant | ✅ explicit admin path |
 | Confirm bookings | ❌ | ✅ | ✅ | ✅ |
 | Read own queue entry | ✅ | ✅ | ✅ | ✅ |
-| Operate/list queue entries | ❌ | ✅ | ✅ | ✅ |
+| Operate/list queue entries | ❌ | ✅ assigned tenant | ✅ assigned tenant | ✅ explicit admin path |
 | Read own notifications | ✅ | ✅ | ✅ | ✅ |
-| Read another user's notifications | ❌ | ❌ | ❌ | ✅ |
-| Read daily reports | ❌ | ❌ | ✅ | ✅ |
+| Read another user's operational notifications | ❌ | ✅ assigned tenant | ✅ assigned tenant | ✅ explicit admin path |
+| Read daily reports | ❌ | ❌ | ✅ assigned tenant | ✅ explicit scope |
 | Read discoverable Marketplace branches | ✅ | ✅ | ✅ | ✅ |
 | Read nearby Marketplace branch discovery | ✅ | ✅ | ✅ | ✅ |
 | Read Marketplace branch recommendations | ✅ | ✅ | ✅ | ✅ |
 | Read Marketplace branch open status | ✅ | ✅ | ✅ | ✅ |
 | Read discoverable Marketplace offerings | ✅ | ✅ | ✅ | ✅ |
-| Manage Marketplace businesses/branches/hours/closures/offerings | ❌ | ❌ | ✅ | ✅ |
-| Assign roles | ❌ | ❌ | ❌ | ✅ |
+| Manage Marketplace businesses/branches/hours/closures/offerings | ❌ | ❌ | ✅ assigned tenant | ✅ explicit admin path |
+| Register a Marketplace business | ❌ | ❌ | ❌ | ✅ |
+| Assign roles or tenant memberships | ❌ | ❌ | ❌ | ✅ |
 
 ## Permission catalogue
 
 - **CUSTOMER:** `USER_SELF_MANAGE`, `VEHICLE_SELF_MANAGE`, `SERVICE_READ`, `BOOKING_SELF_MANAGE`, `QUEUE_SELF_READ`, `NOTIFICATION_SELF_READ`, `MARKETPLACE_READ`
 - **STAFF:** all CUSTOMER permissions plus `VEHICLE_OPERATE`, `BOOKING_OPERATE`, `QUEUE_OPERATE`
-- **BUSINESS_OWNER:** all STAFF permissions plus `SERVICE_MANAGE`, `REPORT_READ`, `MARKETPLACE_MANAGE`
+- **BUSINESS_OWNER:** all STAFF permissions plus `REPORT_READ` and `MARKETPLACE_MANAGE`; no global `SERVICE_MANAGE`
 - **PLATFORM_ADMIN:** all current permissions, including `USER_ADMIN` and `ROLE_ASSIGN`
 
-Operational roles are STAFF, BUSINESS_OWNER, and PLATFORM_ADMIN for vehicle, booking, and queue resource authorization. Notifications are stricter: only the user themselves or PLATFORM_ADMIN may read them.
+`STAFF` and `BUSINESS_OWNER` are operational tenant roles and require exactly one canonical membership. Their vehicle, booking, queue, notification, report, and Marketplace operations use that membership. `PLATFORM_ADMIN` has no membership or wildcard tenant and uses explicit administrator paths/scopes. Customers remain subject-scoped.
 
-OPS-001 branch filters, branch call-next, and branch/business report scopes constrain returned or selected data, but they do not establish tenant ownership authorization. STAFF and BUSINESS_OWNER operational access remains global until TENANT-001.
+Branch filters, branch call-next, and branch/business report scopes are validated against the operator's tenant and carried into repository predicates. A foreign valid ID and missing ID both return a generic `404`; a role lacking the permission receives `403`.
 
-Marketplace management is intentionally global for BUSINESS_OWNER and PLATFORM_ADMIN until TENANT-001 introduces owner/business scoping. `MARKETPLACE_READ` exposes bounded branch/offering/nearby discovery, recommendations, and operational open-status decisions; the public-discovery flag does not change whether a branch is operationally open or make an endpoint anonymous. Branch availability uses `SERVICE_READ`, applies public visibility as an eligibility filter, and does not establish tenant authorization. Recommendations use the least-privilege `MARKETPLACE_READ` convention and expose only detached customer-safe fields; a token without that permission receives 403.
+Marketplace management is tenant-scoped for owners and explicitly scoped for platform administrators. `MARKETPLACE_READ` exposes bounded branch/offering/nearby discovery, recommendations, and operational open-status decisions; the public-discovery flag does not make an endpoint anonymous. Discovery uses customer-safe DTO allowlists. Recommendations use the least-privilege `MARKETPLACE_READ` convention; a token without it receives `403`.
 
-Operating-window slot alignment, ambiguous-local-time exclusion, and branch-isolated capacity/queue calculations do not alter this authorization matrix or imply business-owner tenant isolation.
+Operating-window slot alignment, ambiguous-local-time exclusion, capacity, booking, and queue invariants remain unchanged inside the tenant boundary.

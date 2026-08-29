@@ -1,7 +1,7 @@
 info:
   name: Weekly boundary overlap is rejected
   type: http
-  seq: 28
+  seq: 34
   tags: [marketplace, validation]
 
 http:

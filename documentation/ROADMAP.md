@@ -20,12 +20,13 @@ Implemented on `staging`:
 - In-app notification creation and recent bounded lookup with branch/offering context.
 - Branch- or business-scoped daily booking and queue summary reporting using branch-local dates.
 - BCrypt credential storage, JWT authentication, RBAC, ownership authorization, and platform-admin role assignment.
+- Identity-owned operational tenant memberships, canonical `tenant_id` JWT validation, tenant-scoped repositories/services, and explicit administrator cross-tenant paths.
 - Bounded user/request contracts and standardized safe API errors.
 - Validated runtime policy configuration for booking, notification, queue, and application-time behavior.
 - Explainable branch recommendations over the authoritative AVAIL-002 candidate set with five deterministic preferences, configurable validated weights, raw-metric ranking, and customer-safe score breakdowns.
 - Swagger/OpenAPI with CI contract export/quality gates, Maven tests, Docker, Docker Compose, and Bruno HTTP acceptance coverage.
 
-Current limitations include some non-user domain response schemas, Marketplace operations without tenant isolation, legacy single-location availability, no managed database provisioning/backups, no payments/external notification delivery, and no production observability platform. PostgreSQL durability is available through the explicit profile; authentication and RBAC are implemented but branch filters and report scopes do not provide tenant isolation.
+Current limitations include some non-user domain response schemas, legacy single-location availability, no managed database provisioning/backups, no payments/external notification delivery, no audit subsystem, and no production observability platform. PostgreSQL durability and Marketplace tenant isolation are available through the explicit profiles and application contracts.
 
 ## Phase 0 — API, Data, Test, and Delivery Hardening
 
@@ -99,11 +100,11 @@ Required before public production use:
 1. **DATA-002** — Add PostgreSQL persistence, migrations, and transaction boundaries (#122) — implemented with module-owned adapters, Flyway, real transactions, invariant locks, Compose, and real-PostgreSQL verification.
 2. **TEST-002** — Add PostgreSQL integration tests with Testcontainers (#123) — implemented by PR #179 with production Flyway migrations, repository/constraint/transaction coverage, restart durability, and independent-transaction booking/queue concurrency tests.
 3. **SEC-002** — Authenticate users securely (#13) — implemented foundation; retain and harden as the product evolves.
-4. **SEC-003** — Enforce role-based access control (#22) — implemented foundation; tenant-scoped authorization is still pending.
-5. **TENANT-001** — Enforce Marketplace tenant isolation (#124).
+4. **SEC-003** — Enforce role-based access control (#22) — implemented foundation and extended by TENANT-001.
+5. **TENANT-001** — Enforce Marketplace tenant isolation (#124) — implemented with canonical membership/JWT trust, scoped services/repositories, V4 constraints/indexes, safe DTOs, and in-memory/PostgreSQL parity.
 6. **AUDIT-001** — Add security and operational audit logging (#125).
 
-Expected outcome: durable and transactionally safe data plus verified separation between independent car wash businesses, building on the existing protected API and customer/staff/owner/admin role foundation.
+Expected outcome: durable and transactionally safe data plus verified separation between independent car wash businesses. Persistence and tenant isolation are delivered; AUDIT-001 and wider production hardening remain.
 
 ## Phase 5 — Product and Platform Expansion
 

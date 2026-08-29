@@ -1,7 +1,7 @@
 info:
   name: Business owner lists owned branches
   type: http
-  seq: 6
+  seq: 12
   tags: [marketplace, owner]
 
 http:

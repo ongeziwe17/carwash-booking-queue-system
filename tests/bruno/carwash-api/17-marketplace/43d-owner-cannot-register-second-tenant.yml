@@ -1,0 +1,21 @@
+info: { name: Owner cannot register an unrelated second tenant, type: http, seq: 53, tags: [tenant, owner, security] }
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/businesses"
+  headers: [{ name: Content-Type, value: application/json }]
+  body:
+    type: json
+    data: |-
+      {
+        "businessId": "forbidden-owner-business-{{runId}}",
+        "businessName": "Forbidden Owner Business",
+        "contactEmail": "forbidden-owner-{{runId}}@example.test",
+        "contactPhone": "+27821234567",
+        "registrationNumber": null
+      }
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("platform onboarding is required", function() { expect(res.status).to.equal(403); expect(res.body.code).to.equal("ACCESS_DENIED"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

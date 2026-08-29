@@ -7,6 +7,7 @@ import com.carwash.queue.api.dto.CreateQueueEntryRequest;
 import com.carwash.queue.api.dto.UpdateQueuePositionRequest;
 import com.carwash.queue.domain.QueueEntry;
 import com.carwash.queue.application.QueueManagementService;
+import com.carwash.access.application.TenantAccessContextProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -39,9 +40,11 @@ import java.util.List;
 public class QueueController {
 
     private final QueueManagementService service;
+    private final TenantAccessContextProvider tenantAccess;
 
-    public QueueController(QueueManagementService service) {
+    public QueueController(QueueManagementService service, TenantAccessContextProvider tenantAccess) {
         this.service = service;
+        this.tenantAccess = tenantAccess;
     }
 
     @GetMapping
@@ -66,13 +69,14 @@ public class QueueController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public List<QueueEntry> getAll(
-            @RequestParam(required = false) @Size(max = 64) String branchId
+            @RequestParam(required = false) @Size(max = 64) String branchId,
+            @RequestParam(required = false) @Size(max = 64) String businessId
     ) {
-        return service.findAll(branchId);
+        return service.findAll(tenantAccess.current(), branchId, businessId);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("@resourceAuthorization.canAccessQueueEntry(authentication, #id)")
+    @PreAuthorize("hasAnyAuthority('PERM_QUEUE_SELF_READ','PERM_QUEUE_OPERATE')")
     @Operation(summary = "Get queue entry by ID")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Queue entry returned"),
@@ -90,7 +94,7 @@ public class QueueController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public QueueEntry getById(@PathVariable @NotBlank @Size(max = 64) String id) {
-        return service.findById(id);
+        return service.findById(tenantAccess.current(), id);
     }
 
     @PostMapping
@@ -122,6 +126,7 @@ public class QueueController {
     })
     public QueueEntry create(@Valid @RequestBody CreateQueueEntryRequest request) {
         return service.createQueueEntry(
+                tenantAccess.current(),
                 request.queueEntryId(),
                 request.bookingId(),
                 request.serviceId()
@@ -156,7 +161,7 @@ public class QueueController {
             @PathVariable @NotBlank @Size(max = 64) String id,
             @Valid @RequestBody UpdateQueuePositionRequest request
     ) {
-        return service.updatePosition(id, request.position());
+        return service.updatePosition(tenantAccess.current(), id, request.position());
     }
 
     @PostMapping("/call-next")
@@ -184,7 +189,7 @@ public class QueueController {
     public QueueEntry callNext(
             @RequestParam @NotBlank @Size(max = 64) String branchId
     ) {
-        return service.callNext(branchId);
+        return service.callNext(tenantAccess.current(), branchId);
     }
 
     @PostMapping("/{id}/call")
@@ -209,7 +214,7 @@ public class QueueController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public QueueEntry callQueueEntry(@PathVariable @NotBlank @Size(max = 64) String id) {
-        return service.callQueueEntry(id);
+        return service.callQueueEntry(tenantAccess.current(), id);
     }
 
     @PostMapping("/{id}/start")
@@ -235,7 +240,7 @@ public class QueueController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public QueueEntry start(@PathVariable @NotBlank @Size(max = 64) String id) {
-        return service.startService(id);
+        return service.startService(tenantAccess.current(), id);
     }
 
     @PostMapping("/{id}/complete")
@@ -261,7 +266,7 @@ public class QueueController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public QueueEntry complete(@PathVariable @NotBlank @Size(max = 64) String id) {
-        return service.completeQueueEntry(id);
+        return service.completeQueueEntry(tenantAccess.current(), id);
     }
 
     @DeleteMapping("/{id}")
@@ -284,6 +289,6 @@ public class QueueController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public void delete(@PathVariable @NotBlank @Size(max = 64) String id) {
-        service.deleteQueueEntry(id);
+        service.deleteQueueEntry(tenantAccess.current(), id);
     }
 }

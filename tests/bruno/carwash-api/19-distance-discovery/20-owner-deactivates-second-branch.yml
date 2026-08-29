@@ -1,8 +1,8 @@
-info: { name: Owner deactivates second branch for visibility workflow, type: http, seq: 20, tags: [discovery, lifecycle, owner, workflow] }
+info: { name: Admin deactivates second branch for visibility workflow, type: http, seq: 20, tags: [discovery, lifecycle, admin, workflow] }
 http:
   method: POST
   url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceSecondBranchId}}/deactivate"
-  auth: { type: bearer, token: "{{ownerToken}}" }
+  auth: { type: bearer, token: "{{adminToken}}" }
 runtime:
   scripts:
     - type: tests

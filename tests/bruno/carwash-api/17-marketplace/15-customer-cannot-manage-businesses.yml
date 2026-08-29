@@ -1,7 +1,7 @@
 info:
   name: Customer cannot manage Marketplace businesses
   type: http
-  seq: 15
+  seq: 21
   tags: [marketplace, customer, rbac, security]
 
 http:

@@ -1,0 +1,14 @@
+info: { name: Owner business enumeration is tenant scoped, type: http, seq: 52, tags: [tenant, owner, security] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/businesses"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns only the canonical owner tenant", function() {
+          expect(res.status).to.equal(200);
+          expect(res.body.map(item => item.businessId)).to.deep.equal([bru.getVar("marketplaceBusinessId")]);
+        });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

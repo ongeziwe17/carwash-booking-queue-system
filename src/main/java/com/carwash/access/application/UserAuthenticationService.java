@@ -66,12 +66,14 @@ public class UserAuthenticationService {
             throw new InvalidCredentialsException();
         }
 
+        // Resolve canonical role and membership before mutating login state. An unassigned
+        // operational user must fail closed without attempting an otherwise-invalid write.
+        JwtTokenService.IssuedToken token = tokens.issue(currentUser);
+
         currentUser.recordSuccessfulLogin();
         if (!users.update(currentUser)) {
             throw new InvalidCredentialsException();
         }
-
-        JwtTokenService.IssuedToken token = tokens.issue(currentUser);
         return new AuthenticationResult(
                 currentUser,
                 token.value(),

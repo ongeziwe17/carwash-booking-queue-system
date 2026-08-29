@@ -1,4 +1,4 @@
-info: { name: First branch report excludes second branch, type: http, seq: 10, tags: [ops, report, branch, workflow] }
+info: { name: First branch report excludes second branch, type: http, seq: 11, tags: [ops, report, branch, workflow] }
 http:
   method: GET
   url: "{{baseUrl}}/api/reports/daily-summary?date={{branchOpsReportDate}}&branchId={{marketplaceBranchId}}"

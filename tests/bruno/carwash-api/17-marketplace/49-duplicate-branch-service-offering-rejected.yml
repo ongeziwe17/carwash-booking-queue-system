@@ -1,7 +1,7 @@
 info:
   name: Duplicate branch and service offering is rejected
   type: http
-  seq: 49
+  seq: 59
   tags: [marketplace, offering, validation, integrity]
 
 http:

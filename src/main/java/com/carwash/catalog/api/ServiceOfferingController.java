@@ -8,6 +8,7 @@ import com.carwash.catalog.application.CreateServiceOfferingCommand;
 import com.carwash.catalog.application.ServiceOfferingService;
 import com.carwash.catalog.application.UpdateServiceOfferingCommand;
 import com.carwash.shared.api.error.ApiErrorResponse;
+import com.carwash.access.application.TenantAccessContextProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -55,9 +56,11 @@ import java.util.List;
 public class ServiceOfferingController {
 
     private final ServiceOfferingService offerings;
+    private final TenantAccessContextProvider tenantAccess;
 
-    public ServiceOfferingController(ServiceOfferingService offerings) {
+    public ServiceOfferingController(ServiceOfferingService offerings, TenantAccessContextProvider tenantAccess) {
         this.offerings = offerings;
+        this.tenantAccess = tenantAccess;
     }
 
     @GetMapping("/branches/{branchId}/offerings")
@@ -68,7 +71,7 @@ public class ServiceOfferingController {
     public List<ServiceOfferingResponse> listByBranch(
             @PathVariable @NotBlank @Size(max = 64) String branchId
     ) {
-        return offerings.findOfferingsByBranch(branchId).stream()
+        return offerings.findOfferingsByBranch(tenantAccess.current(), branchId).stream()
                 .map(ServiceOfferingMapper::toManagementResponse)
                 .toList();
     }
@@ -84,6 +87,7 @@ public class ServiceOfferingController {
             @Valid @RequestBody CreateServiceOfferingRequest request
     ) {
         return ServiceOfferingMapper.toManagementResponse(offerings.createOffering(
+                tenantAccess.current(),
                 branchId,
                 new CreateServiceOfferingCommand(
                         request.offeringId(),
@@ -101,7 +105,8 @@ public class ServiceOfferingController {
     public ServiceOfferingResponse findById(
             @PathVariable @NotBlank @Size(max = 64) String offeringId
     ) {
-        return ServiceOfferingMapper.toManagementResponse(offerings.findOffering(offeringId));
+        return ServiceOfferingMapper.toManagementResponse(
+                offerings.findOffering(tenantAccess.current(), offeringId));
     }
 
     @PutMapping("/offerings/{offeringId}")
@@ -114,6 +119,7 @@ public class ServiceOfferingController {
             @Valid @RequestBody UpdateServiceOfferingRequest request
     ) {
         return ServiceOfferingMapper.toManagementResponse(offerings.updateOffering(
+                tenantAccess.current(),
                 offeringId,
                 new UpdateServiceOfferingCommand(
                         request.price(),
@@ -130,7 +136,8 @@ public class ServiceOfferingController {
     public ServiceOfferingResponse activate(
             @PathVariable @NotBlank @Size(max = 64) String offeringId
     ) {
-        return ServiceOfferingMapper.toManagementResponse(offerings.activateOffering(offeringId));
+        return ServiceOfferingMapper.toManagementResponse(
+                offerings.activateOffering(tenantAccess.current(), offeringId));
     }
 
     @PostMapping("/offerings/{offeringId}/deactivate")
@@ -141,7 +148,8 @@ public class ServiceOfferingController {
     public ServiceOfferingResponse deactivate(
             @PathVariable @NotBlank @Size(max = 64) String offeringId
     ) {
-        return ServiceOfferingMapper.toManagementResponse(offerings.deactivateOffering(offeringId));
+        return ServiceOfferingMapper.toManagementResponse(
+                offerings.deactivateOffering(tenantAccess.current(), offeringId));
     }
 
     @GetMapping("/branches/{branchId}/offerings/discoverable")

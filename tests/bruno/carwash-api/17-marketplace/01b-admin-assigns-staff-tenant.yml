@@ -1,0 +1,31 @@
+info:
+  name: Platform admin assigns staff to Marketplace tenant
+  type: http
+  seq: 4
+  tags: [marketplace, admin, tenant, security]
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/admin/users/{{staffUserId}}/tenant-membership"
+  headers: [{ name: Content-Type, value: application/json }]
+  body:
+    type: json
+    data: |-
+      {
+        "businessId": "{{marketplaceBusinessId}}"
+      }
+  auth: { type: bearer, token: "{{adminToken}}" }
+
+runtime:
+  scripts:
+    - type: before-request
+      code: bru.setVar("staleStaffToken", bru.getVar("staffToken"));
+    - type: tests
+      code: |-
+        test("assigns exactly one staff tenant", function() {
+          expect(res.status).to.equal(200);
+          expect(res.body.userId).to.equal(bru.getVar("staffUserId"));
+          expect(res.body.businessId).to.equal(bru.getVar("marketplaceBusinessId"));
+        });
+
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

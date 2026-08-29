@@ -1,7 +1,7 @@
 info:
   name: Unauthenticated offering activation is rejected
   type: http
-  seq: 79
+  seq: 89
   tags: [marketplace, offering, auth, security]
 
 http:

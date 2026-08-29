@@ -4,12 +4,23 @@ import com.carwash.shared.infrastructure.InMemoryRepository;
 
 import com.carwash.booking.domain.Booking;
 import com.carwash.booking.domain.BookingRepository;
+import com.carwash.marketplace.application.MarketplaceQuery;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 public class InMemoryBookingRepository extends InMemoryRepository<Booking, String>
         implements BookingRepository {
+
+    private final MarketplaceQuery marketplace;
+
+    public InMemoryBookingRepository() {
+        this(null);
+    }
+
+    public InMemoryBookingRepository(MarketplaceQuery marketplace) {
+        this.marketplace = marketplace;
+    }
 
     @Override
     public List<Booking> findByUserId(String userId) {
@@ -47,6 +58,35 @@ public class InMemoryBookingRepository extends InMemoryRepository<Booking, Strin
     }
 
     @Override
+    public List<Booking> findByBusinessId(String businessId) {
+        return findMatching(booking -> branchBelongsTo(booking.getBranchId(), businessId));
+    }
+
+    @Override
+    public List<Booking> findByBranchIdAndBusinessId(String branchId, String businessId) {
+        if (!branchBelongsTo(branchId, businessId)) return List.of();
+        return findByBranchId(branchId);
+    }
+
+    @Override
+    public List<Booking> findByUserIdAndBusinessId(String userId, String businessId) {
+        return findMatching(booking -> booking.getUser() != null
+                && userId.equals(booking.getUser().getUserId())
+                && branchBelongsTo(booking.getBranchId(), businessId));
+    }
+
+    @Override
+    public java.util.Optional<Booking> findByIdAndBusinessId(String bookingId, String businessId) {
+        return findById(bookingId).filter(booking -> branchBelongsTo(booking.getBranchId(), businessId));
+    }
+
+    @Override
+    public java.util.Optional<Booking> findByIdAndUserId(String bookingId, String userId) {
+        return findById(bookingId).filter(booking -> booking.getUser() != null
+                && userId.equals(booking.getUser().getUserId()));
+    }
+
+    @Override
     public boolean existsByUserId(String userId) {
         return anyMatch(booking -> booking.getUser() != null
                 && userId.equals(booking.getUser().getUserId()));
@@ -73,5 +113,10 @@ public class InMemoryBookingRepository extends InMemoryRepository<Booking, Strin
     @Override
     protected String getId(Booking entity) {
         return entity.getBookingId();
+    }
+
+    private boolean branchBelongsTo(String branchId, String businessId) {
+        return marketplace != null && marketplace.findBranchOptional(branchId)
+                .filter(branch -> businessId.equals(branch.businessId())).isPresent();
     }
 }

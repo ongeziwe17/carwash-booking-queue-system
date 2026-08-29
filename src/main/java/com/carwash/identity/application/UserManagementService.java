@@ -5,6 +5,8 @@ import com.carwash.identity.domain.AccountStatus;
 import com.carwash.booking.domain.BookingRepository;
 import com.carwash.notification.domain.NotificationRepository;
 import com.carwash.identity.domain.UserRepository;
+import com.carwash.identity.domain.TenantMembership;
+import com.carwash.identity.domain.TenantMembershipRepository;
 import com.carwash.vehicle.domain.VehicleRepository;
 import com.carwash.shared.application.DataTransactionOperations;
 import com.carwash.shared.application.MutationLock;
@@ -26,6 +28,7 @@ public class UserManagementService implements UserQuery {
     private final VehicleRepository vehicleRepository;
     private final BookingRepository bookingRepository;
     private final NotificationRepository notificationRepository;
+    private final TenantMembershipRepository tenantMembershipRepository;
     private final DataTransactionOperations coordinator;
     private final MutationLock mutationLock;
 
@@ -39,7 +42,7 @@ public class UserManagementService implements UserQuery {
             DataTransactionOperations coordinator
     ) {
         this(userRepository, credentialService, vehicleRepository, bookingRepository,
-                notificationRepository, coordinator, MutationLock.noOp());
+                notificationRepository, null, coordinator, MutationLock.noOp());
     }
 
     public UserManagementService(
@@ -51,11 +54,26 @@ public class UserManagementService implements UserQuery {
             DataTransactionOperations coordinator,
             MutationLock mutationLock
     ) {
+        this(userRepository, credentialService, vehicleRepository, bookingRepository,
+                notificationRepository, null, coordinator, mutationLock);
+    }
+
+    public UserManagementService(
+            UserRepository userRepository,
+            CredentialService credentialService,
+            VehicleRepository vehicleRepository,
+            BookingRepository bookingRepository,
+            NotificationRepository notificationRepository,
+            TenantMembershipRepository tenantMembershipRepository,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock
+    ) {
         this.userRepository = Objects.requireNonNull(userRepository, "User repository is required");
         this.credentialService = Objects.requireNonNull(credentialService, "Credential service is required");
         this.vehicleRepository = vehicleRepository;
         this.bookingRepository = bookingRepository;
         this.notificationRepository = notificationRepository;
+        this.tenantMembershipRepository = tenantMembershipRepository;
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
         this.mutationLock = Objects.requireNonNull(mutationLock, "Mutation lock is required");
     }
@@ -134,7 +152,18 @@ public class UserManagementService implements UserQuery {
             }
             if (notificationRepository != null) notificationRepository.deleteByUserId(userId);
             user.clearNotifications();
-            if (!userRepository.deleteById(userId)) throw new ResourceNotFoundException("User not found: " + userId);
+            TenantMembership membership = tenantMembershipRepository == null
+                    ? null : tenantMembershipRepository.findById(userId).orElse(null);
+            if (membership != null && !tenantMembershipRepository.deleteById(userId)) {
+                throw new ResourceNotFoundException("Tenant membership not found");
+            }
+            if (!userRepository.deleteById(userId)) {
+                ResourceNotFoundException failure = new ResourceNotFoundException("User not found: " + userId);
+                coordinator.compensate(failure, () -> {
+                    if (membership != null) tenantMembershipRepository.insert(membership);
+                });
+                throw failure;
+            }
         });
     }
 
@@ -142,6 +171,11 @@ public class UserManagementService implements UserQuery {
         return coordinator.write(() -> {
             mutationLock.acquire(MutationLock.platformAdministrators());
             User user = requireUser(userId);
+            RoleName current = RoleCatalog.name(user.getRole());
+            if (isOperational(current) || isOperational(roleName)) {
+                throw new BusinessRuleViolationException(
+                        "Operational role changes require the tenant membership operation");
+            }
             if (isLastActivePlatformAdministrator(user) && roleName != RoleName.PLATFORM_ADMIN) {
                 throw new BusinessRuleViolationException("The last active platform administrator cannot be demoted");
             }
@@ -167,6 +201,10 @@ public class UserManagementService implements UserQuery {
     private boolean isActivePlatformAdministrator(User user) {
         return user != null && user.getAccountStatus() == AccountStatus.ACTIVE && user.getRole() != null
                 && RoleName.PLATFORM_ADMIN.name().equals(user.getRole().getRoleName());
+    }
+
+    private boolean isOperational(RoleName role) {
+        return role == RoleName.STAFF || role == RoleName.BUSINESS_OWNER;
     }
 
     private void validateNewUser(CreateUserCommand command) {

@@ -1,7 +1,7 @@
 info:
   name: Customer discovers active public branch
   type: http
-  seq: 9
+  seq: 15
   tags: [marketplace, customer, rbac, workflow]
 
 http:

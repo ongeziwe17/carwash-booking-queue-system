@@ -1,0 +1,10 @@
+info: { name: Owner receives safe 404 for foreign offering, type: http, seq: 51, tags: [tenant, owner, security] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/offerings/{{marketplaceSecondOfferingId}}"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("foreign offering is hidden", function() { expect(res.status).to.equal(404); expect(res.body.code).to.equal("RESOURCE_NOT_FOUND"); expect(res.body.message).to.equal("Offering not found"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

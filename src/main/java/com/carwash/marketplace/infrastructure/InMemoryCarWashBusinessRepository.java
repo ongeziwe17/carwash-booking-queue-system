@@ -4,6 +4,8 @@ import com.carwash.marketplace.domain.CarWashBusiness;
 import com.carwash.marketplace.domain.CarWashBusinessRepository;
 import com.carwash.shared.infrastructure.InMemoryRepository;
 
+import java.util.Optional;
+
 public final class InMemoryCarWashBusinessRepository extends InMemoryRepository<CarWashBusiness, String>
         implements CarWashBusinessRepository {
 
@@ -16,6 +18,12 @@ public final class InMemoryCarWashBusinessRepository extends InMemoryRepository<
         return anyMatch(business -> business.getRegistrationNumber() != null
                 && business.getRegistrationNumber().trim().equalsIgnoreCase(normalizedRegistrationNumber)
                 && (excludedBusinessId == null || !excludedBusinessId.equals(business.getBusinessId())));
+    }
+
+    @Override
+    public Optional<CarWashBusiness> findByIdAndTenantId(String businessId, String tenantId) {
+        if (businessId == null || !businessId.equals(tenantId)) return Optional.empty();
+        return findById(businessId);
     }
 
     @Override

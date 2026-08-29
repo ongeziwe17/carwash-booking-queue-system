@@ -1,7 +1,7 @@
 info:
   name: Business owner cancels temporary closure
   type: http
-  seq: 25
+  seq: 31
   tags: [marketplace, owner, workflow]
 
 http:

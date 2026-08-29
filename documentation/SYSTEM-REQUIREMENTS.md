@@ -31,20 +31,20 @@ The current backend includes:
 - Marketplace businesses/branches with validated coordinates, scheduling, offerings, branch-scoped operations, and authenticated nearby discovery.
 - Authenticated, explainable Marketplace branch recommendations using authoritative availability eligibility and deterministic rule-based scoring.
 - Swagger/OpenAPI documentation.
-- Secure BCrypt credential storage, JWT authentication, RBAC, and ownership authorization.
+- Secure BCrypt credential storage, JWT authentication, RBAC, customer ownership authorization, and canonical Marketplace tenant isolation.
 - Standardized API errors and validated runtime/business policy configuration.
 - Docker/local development support.
 - Flyway migrations, module-owned PostgreSQL adapters, transactional workflows, cross-instance capacity/queue locking, and restart durability.
 
-The current backend does not include a frontend application, managed database provisioning/backups, payments, external notifications, multi-tenancy, or production SaaS hardening. Authentication and RBAC are implemented but are not a substitute for Marketplace tenant isolation.
+The current backend does not include a frontend application, managed database provisioning/backups, payments, external notifications, audit logging, or production SaaS hardening. Marketplace tenant identity and data isolation are implemented in both persistence profiles; database-per-tenant and federation are not.
 
 ## 2. Stakeholder Analysis Summary
 
 | Stakeholder          | Role                            | Current Concerns                                                    | Future Concerns                                          |
 |----------------------|---------------------------------|---------------------------------------------------------------------|----------------------------------------------------------|
 | Customer             | Books services and joins queues | Secure login plus accurate booking, vehicle, queue, and notification-record workflows | External notifications, payments, feedback |
-| Business Owner       | Manages services and operations | Service, booking, queue, and basic report visibility                | Tenant management, reports, payments, dashboards         |
-| Service Staff        | Performs car wash services      | RBAC-protected queue and booking status flow                         | Tenant-scoped operational workflows                     |
+| Business Owner       | Manages services and operations | Assigned-business offerings, bookings, queues, schedules, and reports | Payments and richer dashboards                         |
+| Service Staff        | Performs car wash services      | Tenant-scoped queue and booking status flow                           | Richer operational tooling                             |
 | System Administrator | Maintains system                | Local reliability and maintainable APIs                             | Security, observability, production operations           |
 | Platform Owner       | Oversees system direction       | Clear implementation status                                         | SaaS readiness and tenant isolation                      |
 
@@ -104,14 +104,20 @@ The current backend does not include a frontend application, managed database pr
 
 **Status:** Implemented. The default/test profile remains in memory; managed provisioning, backup/restore automation, and replicas are not included.
 
+### FR10: Marketplace Tenant Isolation
+
+**Description:** The system binds each staff member/business owner to exactly one canonical business, validates that assignment on every token use, and requires subject-, tenant-, or explicit administrator-scoped application/repository operations.
+
+**Status:** Implemented under in-memory and PostgreSQL profiles. Existing unassigned operational users fail closed until a platform administrator explicitly assigns a verified business. Foreign and missing tenant resources produce indistinguishable `404` responses.
+
 ## 4. Planned/Future Functional Requirements
 
 | Requirement                                        | Status                                       |
 |----------------------------------------------------|----------------------------------------------|
 | Refresh-token/logout/revocation lifecycle, if specified | Future security work                     |
 | Security and operational audit logging                 | Future security hardening                |
-| Marketplace tenant-scoped authorization                | Future SaaS hardening                    |
-| Business registration and multi-tenancy            | Future SaaS hardening                        |
+| Marketplace tenant-scoped authorization                | Implemented                              |
+| Database-per-tenant isolation or federation             | Out of current scope                     |
 | External email/SMS notification delivery           | Future product/platform work                 |
 | Payments                                           | Future product/platform work                 |
 | Ratings and feedback                               | Future product capability                    |
@@ -137,8 +143,8 @@ The current backend does not include a frontend application, managed database pr
 
 ### 5.4 Security
 
-- BCrypt credential storage, JWT authentication, RBAC, ownership authorization, and safe API errors are implemented.
-- Tenant isolation, audit logging, backup/restore operations, observability, and deployment hardening remain required before production SaaS use.
+- BCrypt credential storage, JWT authentication, RBAC, ownership authorization, tenant isolation, and safe API errors are implemented.
+- Audit logging, backup/restore operations, observability, and deployment hardening remain required before production SaaS use.
 
 ### 5.5 Persistence and Reliability
 
@@ -161,5 +167,5 @@ The current backend does not include a frontend application, managed database pr
 ### Assumptions
 
 - Current APIs are used for backend validation, local development, and automated tests.
-- Production use requires tenant isolation, backup/restore operations, observability, and deployment hardening first.
-- Branch-scoped operational filters and reports are implemented, but authorization remains global by role until SaaS tenant isolation is introduced.
+- Production use still requires auditability, backup/restore operations, observability, and deployment hardening.
+- Operational filters and reports carry a canonical tenant predicate; platform administrators use explicit concrete scopes.

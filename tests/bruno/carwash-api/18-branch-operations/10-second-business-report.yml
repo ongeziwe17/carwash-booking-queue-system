@@ -1,8 +1,8 @@
-info: { name: Second business report excludes first business, type: http, seq: 11, tags: [ops, report, business, workflow] }
+info: { name: Second business report excludes first business, type: http, seq: 12, tags: [ops, report, business, workflow] }
 http:
   method: GET
   url: "{{baseUrl}}/api/reports/daily-summary?date={{branchOpsReportDate}}&businessId={{marketplaceSecondBusinessId}}"
-  auth: { type: bearer, token: "{{ownerToken}}" }
+  auth: { type: bearer, token: "{{adminToken}}" }
 runtime:
   scripts:
     - type: tests

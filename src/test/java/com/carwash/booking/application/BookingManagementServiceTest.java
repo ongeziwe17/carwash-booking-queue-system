@@ -870,6 +870,31 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         }
 
         @Override
+        public List<Booking> findByBusinessId(String businessId) {
+            return delegate.findByBusinessId(businessId);
+        }
+
+        @Override
+        public List<Booking> findByBranchIdAndBusinessId(String branchId, String businessId) {
+            return delegate.findByBranchIdAndBusinessId(branchId, businessId);
+        }
+
+        @Override
+        public List<Booking> findByUserIdAndBusinessId(String userId, String businessId) {
+            return delegate.findByUserIdAndBusinessId(userId, businessId);
+        }
+
+        @Override
+        public Optional<Booking> findByIdAndBusinessId(String bookingId, String businessId) {
+            return delegate.findByIdAndBusinessId(bookingId, businessId);
+        }
+
+        @Override
+        public Optional<Booking> findByIdAndUserId(String bookingId, String userId) {
+            return delegate.findByIdAndUserId(bookingId, userId);
+        }
+
+        @Override
         public boolean existsByUserId(String userId) {
             return delegate.existsByUserId(userId);
         }

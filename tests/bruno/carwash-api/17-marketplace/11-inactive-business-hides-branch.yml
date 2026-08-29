@@ -1,7 +1,7 @@
 info:
   name: Inactive business hides otherwise active branch
   type: http
-  seq: 11
+  seq: 17
   tags: [marketplace, customer, workflow]
 
 http:

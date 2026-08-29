@@ -1,7 +1,7 @@
 info:
-  name: Business owner creates second offering branch
+  name: Platform admin creates second offering branch
   type: http
-  seq: 41
+  seq: 47
   tags: [marketplace, offering, owner, workflow]
 
 http:
@@ -29,7 +29,7 @@ http:
       }
   auth:
     type: bearer
-    token: "{{ownerToken}}"
+    token: "{{adminToken}}"
 
 runtime:
   scripts:

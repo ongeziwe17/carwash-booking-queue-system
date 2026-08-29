@@ -54,11 +54,32 @@ public final class AuthenticationTestClient {
     }
 
     public RequestPostProcessor roleJwt(String subject, String role, String... authorities) {
+        return roleJwt(subject, role, null, authorities);
+    }
+
+    public RequestPostProcessor tenantRoleJwt(
+            String subject,
+            String role,
+            String businessId,
+            String... authorities
+    ) {
+        return roleJwt(subject, role, businessId, authorities);
+    }
+
+    private RequestPostProcessor roleJwt(
+            String subject,
+            String role,
+            String businessId,
+            String... authorities
+    ) {
         SimpleGrantedAuthority[] granted = Arrays.stream(authorities)
                 .map(SimpleGrantedAuthority::new)
                 .toArray(SimpleGrantedAuthority[]::new);
         return jwt()
-                .jwt(token -> token.subject(subject).claim("role", role))
+                .jwt(token -> {
+                    token.subject(subject).claim("role", role);
+                    if (businessId != null) token.claim("tenant_id", businessId);
+                })
                 .authorities(granted);
     }
 }

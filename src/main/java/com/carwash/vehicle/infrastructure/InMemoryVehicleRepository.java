@@ -4,15 +4,46 @@ import com.carwash.shared.infrastructure.InMemoryRepository;
 
 import com.carwash.vehicle.domain.Vehicle;
 import com.carwash.vehicle.domain.VehicleRepository;
+import com.carwash.booking.domain.BookingRepository;
 
 import java.util.List;
 
 public class InMemoryVehicleRepository extends InMemoryRepository<Vehicle, String>
         implements VehicleRepository {
 
+    private final BookingRepository bookings;
+
+    public InMemoryVehicleRepository() {
+        this(null);
+    }
+
+    public InMemoryVehicleRepository(BookingRepository bookings) {
+        this.bookings = bookings;
+    }
+
     @Override
     public List<Vehicle> findByUserId(String userId) {
         return findMatching(vehicle -> vehicle.getUserId() != null && vehicle.getUserId().equals(userId));
+    }
+
+    @Override
+    public List<Vehicle> findByBusinessId(String businessId) {
+        if (bookings == null) return List.of();
+        java.util.Set<String> ids = bookings.findByBusinessId(businessId).stream()
+                .map(booking -> booking.getVehicle() == null ? null : booking.getVehicle().getVehicleId())
+                .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+        return findMatching(vehicle -> ids.contains(vehicle.getVehicleId()));
+    }
+
+    @Override
+    public java.util.Optional<Vehicle> findByIdAndBusinessId(String vehicleId, String businessId) {
+        return findByBusinessId(businessId).stream()
+                .filter(vehicle -> vehicleId.equals(vehicle.getVehicleId())).findFirst();
+    }
+
+    @Override
+    public java.util.Optional<Vehicle> findByIdAndUserId(String vehicleId, String userId) {
+        return findById(vehicleId).filter(vehicle -> userId.equals(vehicle.getUserId()));
     }
 
     @Override

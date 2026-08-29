@@ -1,7 +1,7 @@
 info:
   name: Staff cannot create temporary closure
   type: http
-  seq: 32
+  seq: 38
   tags: [marketplace, staff, rbac, security]
 
 http:

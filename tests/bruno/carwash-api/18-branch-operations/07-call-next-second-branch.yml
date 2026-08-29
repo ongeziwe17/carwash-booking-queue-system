@@ -1,8 +1,8 @@
-info: { name: Call next only in second branch, type: http, seq: 8, tags: [ops, queue, branch, workflow] }
+info: { name: Call next only in second branch, type: http, seq: 9, tags: [ops, queue, branch, workflow] }
 http:
   method: POST
   url: "{{baseUrl}}/api/queue-entries/call-next?branchId={{marketplaceSecondBranchId}}"
-  auth: { type: bearer, token: "{{staffToken}}" }
+  auth: { type: bearer, token: "{{adminToken}}" }
 runtime:
   scripts:
     - type: tests

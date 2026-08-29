@@ -1,8 +1,8 @@
-info: { name: Owner restores second branch after visibility workflow, type: http, seq: 22, tags: [discovery, lifecycle, owner, workflow] }
+info: { name: Admin restores second branch after visibility workflow, type: http, seq: 22, tags: [discovery, lifecycle, admin, workflow] }
 http:
   method: POST
   url: "{{baseUrl}}/api/marketplace/branches/{{marketplaceSecondBranchId}}/activate"
-  auth: { type: bearer, token: "{{ownerToken}}" }
+  auth: { type: bearer, token: "{{adminToken}}" }
 runtime:
   scripts:
     - type: tests

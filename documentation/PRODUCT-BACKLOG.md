@@ -19,13 +19,13 @@ Priority guide:
 | Area | Implemented State | Notes |
 | --- | --- | --- |
 | Users | Safe registration/profile responses, secure credentials, JWT authentication, RBAC and duplicate-email validation | Privileged role assignment is separate and platform-admin-only. |
-| Vehicles | CRUD, owner association, duplicate-plate validation, ownership authorization and deletion integrity | Marketplace tenant scoping is not implemented. |
+| Vehicles | CRUD, owner association, duplicate-plate validation, ownership authorization and deletion integrity | Customer access is subject-scoped; operational traversal is tenant-scoped. |
 | Services | Reusable global service catalogue plus branch-specific offerings with independent price, duration, capacity, lifecycle, and discovery | Global price/duration remain transitional for legacy AVAIL-001. |
 | Bookings and availability | Canonical branch/offering booking creation, retrieval/filtering, guarded same-branch offering update, rescheduling, confirm/cancel, shared complete-window/configured-capacity validation, branch-aware search, plus legacy global AVAIL-001 | Staff/bay resources and capacity reservations are not implemented. |
 | Queues | Booking-derived branch/offering scope, branch-isolated ordering/waits/call-next/rebalance, explicit call override, synchronized call/start/complete workflow, and delete | Offering concurrent capacity is not a remaining-capacity model. |
 | Notifications | In-app notification creation and bounded recent lookup with branch/offering context | Read-status lifecycle and external delivery are incomplete. |
-| Reports | In-memory daily summary with exactly one branch or business scope and branch-local dates | Tenant-authorized dashboards, revenue, and durable analytics are future work. |
-| Marketplace | Businesses/branches, location/lifecycle/discovery, schedules/closures/open status, offerings, branch-scoped operations, nearby straight-line discovery, and branch-aware availability | Tenant isolation, routing/geocoding, reservations, and resource calendars remain future work. |
+| Reports | Persistence-profile daily summary with exactly one tenant-authorized branch or business scope and branch-local dates | Rich dashboards, revenue, and analytics are future work. |
+| Marketplace | Tenant-isolated businesses/branches, membership/JWT trust, location/lifecycle/discovery, schedules/closures/open status, offerings, scoped operations, nearby straight-line discovery, and branch-aware availability | Routing/geocoding, reservations, audit logging, and resource calendars remain future work. |
 | Recommendations | Point-in-time ranked branch recommendations for five preferences over one AVAIL-002 candidate set, with normalized component scores, validated weights, stable ties, and customer-safe explanations | No reservation, ML/personalization, traffic routing, sponsored ranking, or dynamic pricing. |
 | API/Docs | Generated Swagger/OpenAPI plus human-readable API documentation and contract quality gates | DOCS-001 keeps written and generated contracts aligned. |
 | Testing | Unit/integration suites plus deterministic repeatability, real-PostgreSQL Testcontainers coverage, OpenAPI gates, and Bruno HTTP acceptance | TEST-002 persistence, migration, transaction, restart, and concurrency coverage is delivered. |
@@ -62,6 +62,7 @@ Completed issue cleanup:
 - #121 — Explainable rule-based Marketplace recommendations (REC-001).
 - #122 — PostgreSQL persistence, migrations, and transaction boundaries (DATA-002).
 - #123 — PostgreSQL integration tests with Testcontainers (TEST-002), delivered by PR #179.
+- #124 — Marketplace tenant isolation with trusted membership/JWT scope and V4 database enforcement (TENANT-001).
 
 ## 3. Phase 0 — Immediate Hardening
 
@@ -142,13 +143,13 @@ REC-001 uses raw Haversine distance, branch-scoped queue estimates when meaningf
 
 ## 7. Phase 4 — Persistence, Tenant Isolation, and Production Security Hardening
 
-SEC-002 (#13) authentication and SEC-003 (#22) RBAC/ownership authorization were completed ahead of this original phase. The remaining security boundary here is tenant isolation plus production/audit hardening.
+SEC-002 (#13) authentication and SEC-003 (#22) RBAC/ownership authorization were completed ahead of this original phase. TENANT-001 adds the business boundary; audit and production hardening remain.
 
 | ID | GitHub | Backlog Item | Priority | Depends On |
 | --- | ---: | --- | --- | --- |
 | DATA-002 | #122 | Add PostgreSQL persistence, migrations, and transaction boundaries — implemented | P1 | Stable Marketplace domain |
 | TEST-002 | #123 | Add PostgreSQL integration tests with Testcontainers — implemented by PR #179 | P1 | DATA-002 |
-| TENANT-001 | #124 | Enforce Marketplace tenant isolation | P0 before production | MKT-001, DATA-002, SEC-002, SEC-003 |
+| TENANT-001 | #124 | Enforce Marketplace tenant isolation — implemented | P0 before production | MKT-001, DATA-002, SEC-002, SEC-003 |
 | AUDIT-001 | #125 | Add security and operational audit logging | P2 | DATA-002, SEC-002, SEC-003, TENANT-001 |
 
 ## 8. Phase 5 — Product and Platform Expansion
@@ -189,4 +190,4 @@ Potential later outcomes:
 - Treat availability eligibility and recommendation ranking as separate concerns.
 - Keep all new issues as top-level issues unless the project intentionally adopts sub-issues later.
 - Use `staging` as the current integration source of truth under the CI-001 branch strategy.
-- Do not claim production readiness until persistence, tenant isolation, audit/security hardening, observability, and deployment hardening are complete.
+- Do not claim production readiness until audit/security hardening, backup/restore operations, observability, and deployment hardening are complete; persistence and tenant isolation are implemented foundations.

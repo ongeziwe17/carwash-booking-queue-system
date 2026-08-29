@@ -1,7 +1,7 @@
 info:
   name: Business owner updates branch service offering terms
   type: http
-  seq: 46
+  seq: 56
   tags: [marketplace, offering, owner, workflow]
 
 http:

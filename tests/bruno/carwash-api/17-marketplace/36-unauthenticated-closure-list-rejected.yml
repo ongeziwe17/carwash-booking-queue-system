@@ -1,7 +1,7 @@
 info:
   name: Unauthenticated closure list is rejected
   type: http
-  seq: 36
+  seq: 42
   tags: [marketplace, auth, security]
 
 http:

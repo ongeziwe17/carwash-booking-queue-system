@@ -20,9 +20,12 @@ import com.carwash.catalog.domain.ServiceOfferingStatus;
 import com.carwash.catalog.domain.ServiceRepository;
 import com.carwash.identity.application.CreateUserCommand;
 import com.carwash.identity.application.UserManagementService;
+import com.carwash.identity.application.TenantMembershipManagementService;
 import com.carwash.identity.domain.User;
 import com.carwash.identity.domain.UserRepository;
 import com.carwash.identity.domain.RoleRepository;
+import com.carwash.identity.domain.RoleName;
+import com.carwash.identity.domain.TenantMembershipRepository;
 import com.carwash.marketplace.application.BranchSchedulingService;
 import com.carwash.marketplace.application.CreateBranchCommand;
 import com.carwash.marketplace.application.MarketplaceManagementService;
@@ -104,6 +107,8 @@ class PostgresPersistenceIntegrationTest {
     @Autowired UserManagementService users;
     @Autowired UserRepository userRepository;
     @Autowired RoleRepository roleRepository;
+    @Autowired TenantMembershipManagementService tenantMemberships;
+    @Autowired TenantMembershipRepository tenantMembershipRepository;
     @Autowired VehicleManagementService vehicles;
     @Autowired VehicleRepository vehicleRepository;
     @Autowired MarketplaceManagementService marketplace;
@@ -128,9 +133,9 @@ class PostgresPersistenceIntegrationTest {
     @AfterEach void cleanMutableData(){jdbc.execute("truncate table users, businesses, service_definitions cascade");}
 
     @Test void emptyDatabaseMigratesAndValidatesToLatest(){
-        assertEquals("3",flyway.info().current().getVersion().getVersion());
+        assertEquals("4",flyway.info().current().getVersion().getVersion());
         assertTrue(flyway.validateWithResult().validationSuccessful);
-        assertEquals(3,jdbc.queryForObject("select count(*) from flyway_schema_history where success",Integer.class));
+        assertEquals(4,jdbc.queryForObject("select count(*) from flyway_schema_history where success",Integer.class));
         assertEquals(4,jdbc.queryForObject("select count(*) from roles",Integer.class));
     }
 
@@ -138,14 +143,86 @@ class PostgresPersistenceIntegrationTest {
         String schema="upgrade_"+UUID.randomUUID().toString().replace("-","");
         jdbc.execute("create schema "+schema);
         try{
-            Flyway first=Flyway.configure().dataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword()).schemas(schema).defaultSchema(schema).locations("classpath:db/migration").target("1").cleanDisabled(true).load();
-            assertEquals(1,first.migrate().migrationsExecuted);
-            try(var connection=POSTGRES.createConnection("");var statement=connection.createStatement()){statement.execute("insert into "+schema+".businesses(business_id,business_name,contact_email,contact_phone,business_status,registered_at,updated_at) values ('upgrade-business','Upgrade','upgrade@example.test','0123456789','ACTIVE',timestamp '2089-01-01',timestamp '2089-01-01')");}
+            Flyway first=Flyway.configure().dataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword()).schemas(schema).defaultSchema(schema).locations("classpath:db/migration").target("3").cleanDisabled(true).load();
+            assertEquals(3,first.migrate().migrationsExecuted);
+            try(var connection=POSTGRES.createConnection("");var statement=connection.createStatement()){
+                statement.execute("insert into "+schema+".businesses(business_id,business_name,contact_email,contact_phone,business_status,registered_at,updated_at) values ('upgrade-business','Upgrade','upgrade@example.test','0123456789','ACTIVE',timestamp '2089-01-01',timestamp '2089-01-01')");
+                statement.execute("insert into "+schema+".users(user_id,full_name,email,phone,account_status,created_at) values ('legacy-unassigned-staff','Legacy Staff','legacy-staff@example.test','0123456789','ACTIVE',timestamp '2089-01-01')");
+                statement.execute("insert into "+schema+".user_credentials(user_id,encoded_password) values ('legacy-unassigned-staff','encoded')");
+                statement.execute("insert into "+schema+".user_role_assignments(user_id,role_id) values ('legacy-unassigned-staff','builtin:STAFF')");
+            }
             Flyway latest=Flyway.configure().dataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword()).schemas(schema).defaultSchema(schema).locations("classpath:db/migration").cleanDisabled(true).load();
-            assertEquals(2,latest.migrate().migrationsExecuted);
+            assertEquals(1,latest.migrate().migrationsExecuted);
             assertTrue(latest.validateWithResult().validationSuccessful);
             assertEquals(1,jdbc.queryForObject("select count(*) from "+schema+".businesses where business_id='upgrade-business'",Integer.class));
+            assertEquals(0,jdbc.queryForObject("select count(*) from "+schema+".tenant_memberships where user_id='legacy-unassigned-staff'",Integer.class));
+            assertEquals(1,jdbc.queryForObject("select count(*) from pg_indexes where schemaname='"+schema+"' and indexname='ix_bookings_branch_status_time_tenant'",Integer.class));
         }catch(Exception failure){throw new AssertionError(failure);}finally{jdbc.execute("drop schema "+schema+" cascade");}
+    }
+
+    @Test void membershipConstraintsAndTransactionsEnforceOneOperationalTenant(){
+        Fixture fixture=fixture("membership",2);
+        marketplace.registerBusiness(new RegisterBusinessCommand(
+                "membership-other-business","Other Membership Business",
+                "membership-other@example.test","0123456789","membership-other-registration"));
+        tenantMemberships.assignRole(fixture.user.getUserId(),RoleName.STAFF,"membership-business");
+        assertEquals("membership-business",tenantMembershipRepository.findById(fixture.user.getUserId())
+                .orElseThrow().businessId());
+        assertThrows(DataIntegrityViolationException.class,()->jdbc.update(
+                "insert into tenant_memberships(user_id,business_id,assigned_at) values (?,?,current_timestamp)",
+                fixture.user.getUserId(),"membership-other-business"));
+        assertThrows(DataIntegrityViolationException.class,()->jdbc.update(
+                "update user_role_assignments set role_id='builtin:CUSTOMER' where user_id=?",
+                fixture.user.getUserId()));
+
+        User rollback=createUser("membership-rollback","membership-rollback@example.test");
+        assertThrows(IllegalStateException.class,()->transactions.write(()->{
+            tenantMemberships.assignRole(rollback.getUserId(),RoleName.BUSINESS_OWNER,"membership-business");
+            throw new IllegalStateException("injected");
+        }));
+        assertTrue(tenantMembershipRepository.findById(rollback.getUserId()).isEmpty());
+        assertEquals(RoleName.CUSTOMER,com.carwash.identity.domain.RoleCatalog.name(
+                userRepository.findById(rollback.getUserId()).orElseThrow().getRole()));
+    }
+
+    @Test void tenantPredicatesAndRelationalConstraintsRejectCrossBusinessScope(){
+        Fixture first=fixture("tenant-a",2);
+        Fixture second=fixture("tenant-b",2);
+        Booking firstBooking=bookings.confirmBooking(bookings.createBooking(
+                "tenant-a-booking",first.user.getUserId(),first.vehicle.getVehicleId(),first.branchId,
+                first.offeringId,LocalDateTime.of(2089,1,17,10,0),null).getBookingId());
+        QueueEntry firstQueue=queues.createQueueEntry(
+                "tenant-a-queue",firstBooking.getBookingId(),first.service.getServiceId());
+
+        assertEquals(List.of(firstBooking.getBookingId()),bookingRepository.findByBusinessId("tenant-a-business")
+                .stream().map(Booking::getBookingId).toList());
+        assertTrue(bookingRepository.findByIdAndBusinessId(
+                firstBooking.getBookingId(),"tenant-b-business").isEmpty());
+        assertEquals(List.of(firstQueue.getQueueEntryId()),queueRepository.findByBusinessId("tenant-a-business")
+                .stream().map(QueueEntry::getQueueEntryId).toList());
+        assertTrue(queueRepository.findByIdAndBusinessId(
+                firstQueue.getQueueEntryId(),"tenant-b-business").isEmpty());
+        assertTrue(offeringRepository.findByIdAndBusinessId(
+                first.offeringId,"tenant-b-business").isEmpty());
+        assertTrue(branchRepository.findByIdAndBusinessId(
+                first.branchId,"tenant-b-business").isEmpty());
+        assertTrue(scheduleRepository.findByBranchIdAndBusinessId(
+                first.branchId,"tenant-b-business").isEmpty());
+
+        String notificationId=notificationRepository.findByBookingId(firstBooking.getBookingId())
+                .getFirst().getNotificationId();
+        assertThrows(DataIntegrityViolationException.class,()->jdbc.update(
+                "update notifications set branch_id=?,offering_id=? where notification_id=?",
+                second.branchId,second.offeringId,notificationId));
+        assertThrows(DataIntegrityViolationException.class,()->jdbc.update(
+                "update notifications set branch_id=null where notification_id=?",notificationId));
+        assertThrows(DataIntegrityViolationException.class,()->jdbc.update(
+                "insert into bookings(booking_id,user_id,vehicle_id,branch_id,offering_id,service_id,scheduled_at,booking_status,created_at) values (?,?,?,?,?,?,timestamp '2089-01-17 11:00:00','CREATED',timestamp '2089-01-01')",
+                "tenant-mismatch-booking",first.user.getUserId(),first.vehicle.getVehicleId(),
+                first.branchId,second.offeringId,second.service.getServiceId()));
+        assertThrows(DataIntegrityViolationException.class,()->jdbc.update(
+                "update queue_entries set branch_id=?,offering_id=?,service_id=? where queue_entry_id=?",
+                second.branchId,second.offeringId,second.service.getServiceId(),firstQueue.getQueueEntryId()));
     }
 
     @Test void repositoryContractsPreserveDuplicateMissingAndCaseInsensitiveUniqueness(){

@@ -26,10 +26,12 @@ class BranchSchedulingAuthorizationIntegrationTest extends ApiIntegrationTestSup
 
     @Test
     void businessOwnerAndPlatformAdminCanManageBranchScheduling() throws Exception {
-        String branchId = createBranch();
+        BranchFixture fixture = createBranch();
+        String branchId = fixture.branchId();
         String closureId = ids.closure();
-        RequestPostProcessor owner = role(
-                "owner", "BUSINESS_OWNER", "PERM_MARKETPLACE_READ", "PERM_MARKETPLACE_MANAGE");
+        RequestPostProcessor owner = tenantRole(
+                "owner", "BUSINESS_OWNER", fixture.businessId(),
+                "PERM_MARKETPLACE_READ", "PERM_MARKETPLACE_MANAGE");
 
         replaceHours(branchId, owner).andExpect(status().isOk());
         mockMvc.perform(get("/api/marketplace/branches/{branchId}/operating-hours", branchId)
@@ -45,7 +47,7 @@ class BranchSchedulingAuthorizationIntegrationTest extends ApiIntegrationTestSup
 
     @Test
     void customerAndStaffCanReadOpenStatusButCannotManageScheduling() throws Exception {
-        String branchId = createBranch();
+        String branchId = createBranch().branchId();
         String closureId = ids.closure();
         replaceHours(branchId, authentication.platformAdminJwt()).andExpect(status().isOk());
         createClosure(branchId, closureId, authentication.platformAdminJwt()).andExpect(status().isCreated());
@@ -72,7 +74,7 @@ class BranchSchedulingAuthorizationIntegrationTest extends ApiIntegrationTestSup
 
     @Test
     void allSixSchedulingOperationsRejectUnauthenticatedRequestsWithStandard401() throws Exception {
-        String branchId = createBranch();
+        String branchId = createBranch().branchId();
         String closureId = ids.closure();
         createClosure(branchId, closureId, authentication.platformAdminJwt()).andExpect(status().isCreated());
 
@@ -91,7 +93,7 @@ class BranchSchedulingAuthorizationIntegrationTest extends ApiIntegrationTestSup
                 .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
     }
 
-    private String createBranch() throws Exception {
+    private BranchFixture createBranch() throws Exception {
         CreateBusinessRequest business = new CreateBusinessRequest(
                 ids.business(), "Authorized Wash Group", "owner@example.test", "+27 82 123 4567", "REG-AUTH");
         CreateBranchRequest branch = new CreateBranchRequest(
@@ -99,7 +101,7 @@ class BranchSchedulingAuthorizationIntegrationTest extends ApiIntegrationTestSup
                 BigDecimal.valueOf(-33.9249), BigDecimal.valueOf(18.4241), "Africa/Johannesburg", true);
         api.createBusiness(business).andExpect(status().isCreated());
         api.createBranch(business.businessId(), branch).andExpect(status().isCreated());
-        return branch.branchId();
+        return new BranchFixture(business.businessId(), branch.branchId());
     }
 
     private org.springframework.test.web.servlet.ResultActions replaceHours(
@@ -136,5 +138,20 @@ class BranchSchedulingAuthorizationIntegrationTest extends ApiIntegrationTestSup
         authorities[0] = "ROLE_" + role;
         System.arraycopy(permissions, 0, authorities, 1, permissions.length);
         return authentication.roleJwt(subject, role, authorities);
+    }
+
+    private RequestPostProcessor tenantRole(
+            String subject,
+            String role,
+            String businessId,
+            String... permissions
+    ) {
+        String[] authorities = new String[permissions.length + 1];
+        authorities[0] = "ROLE_" + role;
+        System.arraycopy(permissions, 0, authorities, 1, permissions.length);
+        return authentication.tenantRoleJwt(subject, role, businessId, authorities);
+    }
+
+    private record BranchFixture(String businessId, String branchId) {
     }
 }

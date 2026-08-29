@@ -1,7 +1,7 @@
 info:
   name: Business owner lists temporary closures
   type: http
-  seq: 24
+  seq: 30
   tags: [marketplace, owner]
 
 http:

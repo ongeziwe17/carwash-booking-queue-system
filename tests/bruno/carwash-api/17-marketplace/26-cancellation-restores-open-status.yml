@@ -1,7 +1,7 @@
 info:
   name: Cancelling closure restores weekly open status
   type: http
-  seq: 26
+  seq: 32
   tags: [marketplace, customer, workflow]
 
 http:

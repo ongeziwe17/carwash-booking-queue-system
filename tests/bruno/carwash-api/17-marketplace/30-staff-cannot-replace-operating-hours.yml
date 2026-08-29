@@ -1,7 +1,7 @@
 info:
   name: Staff cannot replace operating hours
   type: http
-  seq: 30
+  seq: 36
   tags: [marketplace, staff, rbac, security]
 
 http:

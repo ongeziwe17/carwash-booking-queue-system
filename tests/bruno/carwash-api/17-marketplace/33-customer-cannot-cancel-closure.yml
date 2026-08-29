@@ -1,7 +1,7 @@
 info:
   name: Customer cannot cancel temporary closure
   type: http
-  seq: 33
+  seq: 39
   tags: [marketplace, customer, rbac, security]
 
 http:

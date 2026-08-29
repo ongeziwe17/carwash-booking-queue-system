@@ -168,6 +168,11 @@ class BranchAvailabilitySearchServiceTest {
         QueueQuery queues = new QueueQuery() {
             public List<QueueEntrySnapshot> findQueueEntrySnapshots() { return List.of(); }
             public List<QueueEntrySnapshot> findQueueEntrySnapshotsByBranch(String branchId) { return List.of(); }
+            public List<QueueEntrySnapshot> findQueueEntrySnapshotsByBusiness(String businessId) { return List.of(); }
+            public List<QueueEntrySnapshot> findQueueEntrySnapshotsByBranchAndBusiness(
+                    String branchId,
+                    String businessId
+            ) { return List.of(); }
             public int estimateWaitMinutesForNewWork(String branchId) { return 30; }
             public Optional<String> findOwnerId(String queueEntryId) { return Optional.empty(); }
             public boolean existsByServiceId(String serviceId) { return false; }

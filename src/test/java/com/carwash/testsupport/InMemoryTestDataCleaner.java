@@ -17,6 +17,7 @@ import com.carwash.queue.domain.QueueEntryRepository;
 import com.carwash.catalog.domain.ServiceRepository;
 import com.carwash.catalog.domain.ServiceOfferingRepository;
 import com.carwash.identity.domain.UserRepository;
+import com.carwash.identity.domain.TenantMembershipRepository;
 import com.carwash.vehicle.domain.VehicleRepository;
 import com.carwash.marketplace.domain.CarWashBranchRepository;
 import com.carwash.marketplace.domain.CarWashBusinessRepository;
@@ -28,6 +29,7 @@ public final class InMemoryTestDataCleaner {
 
     private final InMemoryDataCoordinator coordinator;
     private final UserRepository users;
+    private final TenantMembershipRepository memberships;
     private final VehicleRepository vehicles;
     private final ServiceRepository services;
     private final ServiceOfferingRepository offerings;
@@ -43,6 +45,7 @@ public final class InMemoryTestDataCleaner {
     public InMemoryTestDataCleaner(
             InMemoryDataCoordinator coordinator,
             UserRepository users,
+            TenantMembershipRepository memberships,
             VehicleRepository vehicles,
             ServiceRepository services,
             ServiceOfferingRepository offerings,
@@ -57,6 +60,7 @@ public final class InMemoryTestDataCleaner {
     ) {
         this.coordinator = coordinator;
         this.users = users;
+        this.memberships = memberships;
         this.vehicles = vehicles;
         this.services = services;
         this.offerings = offerings;
@@ -91,6 +95,8 @@ public final class InMemoryTestDataCleaner {
                     .forEach(vehicles::deleteById);
             services.findAll().stream().map(Service::getServiceId)
                     .forEach(services::deleteById);
+            memberships.findAll().stream().map(com.carwash.identity.domain.TenantMembership::userId)
+                    .forEach(memberships::deleteById);
             users.findAll().stream().map(User::getUserId)
                     .forEach(users::deleteById);
             notificationIds.reset();

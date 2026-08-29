@@ -10,6 +10,7 @@ import com.carwash.marketplace.application.MarketplaceManagementService;
 import com.carwash.marketplace.application.RegisterBusinessCommand;
 import com.carwash.marketplace.application.UpdateBusinessCommand;
 import com.carwash.shared.api.error.ApiErrorResponse;
+import com.carwash.access.application.TenantAccessContextProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -56,9 +57,11 @@ import java.util.List;
 public class BusinessController {
 
     private final MarketplaceManagementService marketplace;
+    private final TenantAccessContextProvider tenantAccess;
 
-    public BusinessController(MarketplaceManagementService marketplace) {
+    public BusinessController(MarketplaceManagementService marketplace, TenantAccessContextProvider tenantAccess) {
         this.marketplace = marketplace;
+        this.tenantAccess = tenantAccess;
     }
 
     @GetMapping
@@ -67,7 +70,8 @@ public class BusinessController {
             description = "Returns bounded business records for Marketplace management.")
     @ApiResponse(responseCode = "200", description = "Businesses returned")
     public List<BusinessResponse> findAll() {
-        return marketplace.findAllBusinesses().stream().map(MarketplaceMapper::toResponse).toList();
+        return marketplace.findAccessibleBusinesses(tenantAccess.current()).stream()
+                .map(MarketplaceMapper::toResponse).toList();
     }
 
     @PostMapping
@@ -77,7 +81,7 @@ public class BusinessController {
             description = "Registers one independent car wash business with an active initial lifecycle state.")
     @ApiResponse(responseCode = "201", description = "Business registered")
     public BusinessResponse register(@Valid @RequestBody CreateBusinessRequest request) {
-        return MarketplaceMapper.toResponse(marketplace.registerBusiness(new RegisterBusinessCommand(
+        return MarketplaceMapper.toResponse(marketplace.registerBusiness(tenantAccess.current(), new RegisterBusinessCommand(
                 request.businessId(),
                 request.businessName(),
                 request.contactEmail(),
@@ -93,7 +97,7 @@ public class BusinessController {
     public BusinessResponse findById(
             @PathVariable @NotBlank @Size(max = 64) String businessId
     ) {
-        return MarketplaceMapper.toResponse(marketplace.findBusiness(businessId));
+        return MarketplaceMapper.toResponse(marketplace.findBusiness(tenantAccess.current(), businessId));
     }
 
     @PutMapping("/{businessId}")
@@ -105,7 +109,7 @@ public class BusinessController {
             @PathVariable @NotBlank @Size(max = 64) String businessId,
             @Valid @RequestBody UpdateBusinessRequest request
     ) {
-        return MarketplaceMapper.toResponse(marketplace.updateBusiness(businessId, new UpdateBusinessCommand(
+        return MarketplaceMapper.toResponse(marketplace.updateBusiness(tenantAccess.current(), businessId, new UpdateBusinessCommand(
                 request.businessName(),
                 request.contactEmail(),
                 request.contactPhone(),
@@ -121,7 +125,7 @@ public class BusinessController {
     public BusinessResponse activate(
             @PathVariable @NotBlank @Size(max = 64) String businessId
     ) {
-        return MarketplaceMapper.toResponse(marketplace.activateBusiness(businessId));
+        return MarketplaceMapper.toResponse(marketplace.activateBusiness(tenantAccess.current(), businessId));
     }
 
     @PostMapping("/{businessId}/deactivate")
@@ -132,7 +136,7 @@ public class BusinessController {
     public BusinessResponse deactivate(
             @PathVariable @NotBlank @Size(max = 64) String businessId
     ) {
-        return MarketplaceMapper.toResponse(marketplace.deactivateBusiness(businessId));
+        return MarketplaceMapper.toResponse(marketplace.deactivateBusiness(tenantAccess.current(), businessId));
     }
 
     @GetMapping("/{businessId}/branches")
@@ -143,7 +147,7 @@ public class BusinessController {
     public List<BranchResponse> findBranches(
             @PathVariable @NotBlank @Size(max = 64) String businessId
     ) {
-        return marketplace.findBranchesByBusiness(businessId).stream()
+        return marketplace.findBranchesByBusiness(tenantAccess.current(), businessId).stream()
                 .map(MarketplaceMapper::toResponse)
                 .toList();
     }
@@ -158,7 +162,7 @@ public class BusinessController {
             @PathVariable @NotBlank @Size(max = 64) String businessId,
             @Valid @RequestBody CreateBranchRequest request
     ) {
-        return MarketplaceMapper.toResponse(marketplace.createBranch(businessId, new CreateBranchCommand(
+        return MarketplaceMapper.toResponse(marketplace.createBranch(tenantAccess.current(), businessId, new CreateBranchCommand(
                 request.branchId(),
                 request.branchName(),
                 request.addressLine1(),

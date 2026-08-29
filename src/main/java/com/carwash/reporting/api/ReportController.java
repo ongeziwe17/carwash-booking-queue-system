@@ -3,6 +3,7 @@ package com.carwash.reporting.api;
 import com.carwash.shared.api.error.ApiErrorResponse;
 import com.carwash.reporting.api.dto.DailySummaryReportResponse;
 import com.carwash.reporting.application.DailySummaryReportService;
+import com.carwash.access.application.TenantAccessContextProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -28,9 +29,14 @@ import java.time.LocalDate;
 public class ReportController {
 
     private final DailySummaryReportService dailySummaryReportService;
+    private final TenantAccessContextProvider tenantAccess;
 
-    public ReportController(DailySummaryReportService dailySummaryReportService) {
+    public ReportController(
+            DailySummaryReportService dailySummaryReportService,
+            TenantAccessContextProvider tenantAccess
+    ) {
         this.dailySummaryReportService = dailySummaryReportService;
+        this.tenantAccess = tenantAccess;
     }
 
     @GetMapping("/daily-summary")
@@ -61,6 +67,7 @@ public class ReportController {
             @RequestParam(required = false) @Size(max = 64) String branchId,
             @RequestParam(required = false) @Size(max = 64) String businessId
     ) {
-        return dailySummaryReportService.generateDailySummary(date, branchId, businessId);
+        return dailySummaryReportService.generateDailySummary(
+                tenantAccess.current(), date, branchId, businessId);
     }
 }

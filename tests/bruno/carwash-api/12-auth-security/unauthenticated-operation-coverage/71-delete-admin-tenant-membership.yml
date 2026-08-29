@@ -1,0 +1,10 @@
+info: { name: 401 DELETE admin tenant membership, type: http, seq: 71, tags: [security, auth, tenant] }
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/admin/users/{{customerUserId}}/tenant-membership"
+  auth: { type: none }
+runtime:
+  scripts:
+    - type: tests
+      code: test("returns safe 401", function() { expect(res.status).to.equal(401); expect(res.body.code).to.equal("AUTHENTICATION_REQUIRED"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

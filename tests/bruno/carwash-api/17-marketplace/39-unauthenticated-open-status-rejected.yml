@@ -1,7 +1,7 @@
 info:
   name: Unauthenticated open status lookup is rejected
   type: http
-  seq: 39
+  seq: 45
   tags: [marketplace, auth, security]
 
 http:

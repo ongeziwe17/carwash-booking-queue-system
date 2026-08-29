@@ -1,8 +1,8 @@
-info: { name: Confirm second branch booking, type: http, seq: 5, tags: [ops, booking, workflow] }
+info: { name: Confirm second branch booking, type: http, seq: 6, tags: [ops, booking, workflow] }
 http:
   method: POST
   url: "{{baseUrl}}/api/bookings/{{branchOpsSecondBookingId}}/confirm"
-  auth: { type: bearer, token: "{{staffToken}}" }
+  auth: { type: bearer, token: "{{adminToken}}" }
 runtime:
   scripts:
     - type: tests

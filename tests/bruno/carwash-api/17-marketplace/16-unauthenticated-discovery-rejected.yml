@@ -1,7 +1,7 @@
 info:
   name: Unauthenticated Marketplace discovery is rejected
   type: http
-  seq: 16
+  seq: 22
   tags: [marketplace, auth, security]
 
 http:
