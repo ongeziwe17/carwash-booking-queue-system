@@ -44,7 +44,8 @@ class BookingReschedulingIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(jsonPath("$.scheduledDateTime").value(apiDateTime(target)))
                 .andExpect(jsonPath("$.status").value("CREATED"));
         mockMvc.perform(get("/api/notifications/user/{userId}", created.resources().user().userId())
-                        .with(authentication.platformAdminJwt()))
+                        .with(authentication.platformAdminJwt())
+                        .param("businessId", created.resources().business().businessId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].type").value("BOOKING_RESCHEDULED"))
                 .andExpect(jsonPath("$[0].bookingId").value(created.booking().bookingId()))

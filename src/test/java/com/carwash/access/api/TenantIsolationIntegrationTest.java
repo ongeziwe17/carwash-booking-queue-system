@@ -7,6 +7,7 @@ import com.carwash.identity.api.dto.CreateUserRequest;
 import com.carwash.marketplace.api.dto.CreateBranchRequest;
 import com.carwash.marketplace.api.dto.CreateBusinessRequest;
 import com.carwash.marketplace.api.dto.ReplaceOperatingHoursRequest;
+import com.carwash.marketplace.api.dto.UpdateBranchRequest;
 import com.carwash.marketplace.api.dto.WeeklyOperatingIntervalRequest;
 import com.carwash.queue.api.dto.CreateQueueEntryRequest;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
@@ -138,7 +139,11 @@ class TenantIsolationIntegrationTest extends ApiIntegrationTestSupport {
                         .param("businessId", fixture.tenantA().businessId()))
                 .andExpect(status().isForbidden());
         mockMvc.perform(put("/api/marketplace/branches/{id}", fixture.tenantB().branchId()).with(staffA)
-                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new UpdateBranchRequest(
+                                "Denied Branch", "1 Denied Street", null, "Cape Town", "Western Cape",
+                                "8001", "ZA", new BigDecimal("-33.9249"), new BigDecimal("18.4241"),
+                                "Africa/Johannesburg", true))))
                 .andExpect(status().isForbidden());
 
         assertTenantNotFound(get("/api/bookings/{id}", fixture.tenantA().bookingId()).with(ownerB));

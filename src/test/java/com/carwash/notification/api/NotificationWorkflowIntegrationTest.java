@@ -19,7 +19,8 @@ class NotificationWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         BookingApiFixture.CreatedBooking booking = fixture().createBooking(TestDates.futureDays(1));
         confirm(booking);
         mockMvc.perform(get("/api/notifications/user/{userId}", booking.resources().user().userId())
-                        .with(authentication.platformAdminJwt()))
+                        .with(authentication.platformAdminJwt())
+                        .param("businessId", booking.resources().business().businessId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].notificationId").value("notification-00000000000000000001"))
                 .andExpect(jsonPath("$[0].type").value("BOOKING_CONFIRMED"))
@@ -39,7 +40,8 @@ class NotificationWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         confirm(first);
         confirm(second);
         String response = mockMvc.perform(get("/api/notifications/user/{userId}", first.resources().user().userId())
-                        .with(authentication.platformAdminJwt()))
+                        .with(authentication.platformAdminJwt())
+                        .param("businessId", first.resources().business().businessId()))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         assertTrue(response.contains(first.booking().bookingId()));
@@ -49,7 +51,8 @@ class NotificationWorkflowIntegrationTest extends ApiIntegrationTestSupport {
     @Test
     void notificationApiReturnsEmptyListWhenUserHasNoNotifications() throws Exception {
         mockMvc.perform(get("/api/notifications/user/{userId}", ids.user())
-                        .with(authentication.platformAdminJwt()))
+                        .with(authentication.platformAdminJwt())
+                        .param("businessId", ids.business()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
     }

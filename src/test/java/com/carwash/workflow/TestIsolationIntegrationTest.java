@@ -53,7 +53,8 @@ class TestIsolationIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(status().isOk());
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
                         "/api/notifications/user/{userId}", booking.resources().user().userId())
-                        .with(authentication.platformAdminJwt()))
+                        .with(authentication.platformAdminJwt())
+                        .param("businessId", booking.resources().business().businessId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].notificationId").value("notification-00000000000000000001"));
     }
