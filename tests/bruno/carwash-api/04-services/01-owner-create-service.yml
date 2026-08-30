@@ -1,11 +1,11 @@
 info:
-  name: Business owner creates active service
+  name: Platform admin creates active global service
   type: http
   seq: 1
   tags:
-    - owner
+    - admin
     - workflow
-    - rbac
+    - catalogue
     - security
 
 http:
@@ -26,7 +26,7 @@ http:
       }
   auth:
     type: bearer
-    token: "{{ownerToken}}"
+    token: "{{adminToken}}"
 
 runtime:
   scripts:

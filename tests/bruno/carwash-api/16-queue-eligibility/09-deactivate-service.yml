@@ -11,7 +11,7 @@ http:
   url: "{{baseUrl}}/api/services/{{queueEligibilityInactiveServiceId}}/deactivate"
   auth:
     type: bearer
-    token: "{{ownerToken}}"
+    token: "{{adminToken}}"
 
 runtime:
   scripts:

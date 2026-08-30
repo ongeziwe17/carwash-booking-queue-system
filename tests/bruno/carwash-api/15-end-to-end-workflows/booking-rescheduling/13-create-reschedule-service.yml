@@ -17,7 +17,7 @@ http:
         "price": 120.00,
         "estimatedDurationMin": 20
       }
-  auth: { type: bearer, token: "{{ownerToken}}" }
+  auth: { type: bearer, token: "{{adminToken}}" }
 runtime:
   scripts:
     - type: tests

@@ -10,7 +10,7 @@ http:
   url: "{{baseUrl}}/api/services/{{inactiveServiceId}}"
   auth:
     type: bearer
-    token: "{{ownerToken}}"
+    token: "{{adminToken}}"
 
 runtime:
   scripts:

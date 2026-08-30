@@ -1,9 +1,9 @@
 info:
-  name: Business owner updates service
+  name: Platform admin updates global service
   type: http
   seq: 5
   tags:
-    - owner
+    - admin
 
 http:
   method: PUT
@@ -22,7 +22,7 @@ http:
       }
   auth:
     type: bearer
-    token: "{{ownerToken}}"
+    token: "{{adminToken}}"
 
 runtime:
   scripts:
