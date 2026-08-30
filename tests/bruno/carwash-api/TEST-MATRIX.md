@@ -82,6 +82,6 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 - Happy-path functional coverage: **71/71**
 - 401 coverage: **69/69 protected operations** (2 public operations are N/A)
 - RBAC/403, subject/tenant ownership, validation, integrity, and multi-step workflow applicability are covered wherever meaningful in the matrix above.
-- Bruno requests/assertions: **533 requests / 1,697 assertions**
+- Bruno requests/assertions: **533 requests / 1,696 assertions**
 
 The full authorization suite also exercises each significant role/capability allow/deny cell rather than relying only on per-operation counts.

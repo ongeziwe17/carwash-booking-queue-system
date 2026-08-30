@@ -1,5 +1,5 @@
 info:
-  name: Staff vehicle operational access
+  name: Staff cannot access an unrelated customer vehicle
   type: http
   seq: 1
   tags:
@@ -17,7 +17,7 @@ runtime:
   scripts:
     - type: tests
       code: |-
-        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("returns safe 404", function() { expect(res.status).to.equal(404); expect(res.body.code).to.equal("RESOURCE_NOT_FOUND"); expect(res.body.message).to.equal("Vehicle not found"); });
         test("returns JSON", function() { expect(String(res.getHeader("content-type") || "").toLowerCase()).to.include("application/json"); });
         const payload = JSON.stringify(res.body ?? {});
         const lower = payload.toLowerCase();

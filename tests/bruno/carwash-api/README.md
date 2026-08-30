@@ -179,7 +179,7 @@ The run-scoped legacy availability workflow uses an isolated future date and ser
 
 The run-scoped Marketplace workflow has the platform administrator register two businesses, assigns/reassigns explicit owner/staff memberships, re-authenticates after stale-token rejection, and exercises management only within canonical scope. Negative requests prove safe foreign-business/offering `404`, tenant-scoped enumeration, second-business denial, owner global-catalogue denial, and explicit administrator cross-tenant operations. A following operational workflow books and queues across both businesses while tenant operators remain confined to their assignment. GEO, AVAIL-002, and REC-001 retain authenticated customer-safe multi-business discovery. Deterministic Java integration tests cover the wider booking, queue, notification, report, JWT, repository, and PostgreSQL constraint matrix. Tenant isolation does not imply audit logging, billing, database-per-tenant isolation, federation, driving routes, reservations, personalization, dynamic pricing, or staff/bay allocation.
 
-The exact collection inventory is **533 HTTP requests and 1,697 explicit `test(...)` assertions**, covering **71/71 OpenAPI operations** and **69/69 protected-operation unauthenticated paths**.
+The exact collection inventory is **533 HTTP requests and 1,696 explicit `test(...)` assertions**, covering **71/71 OpenAPI operations** and **69/69 protected-operation unauthenticated paths**.
 
 ## Cleanup
 
