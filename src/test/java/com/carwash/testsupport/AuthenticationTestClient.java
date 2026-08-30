@@ -54,7 +54,7 @@ public final class AuthenticationTestClient {
     }
 
     public RequestPostProcessor roleJwt(String subject, String role, String... authorities) {
-        return roleJwt(subject, role, null, authorities);
+        return buildRoleJwt(subject, role, null, authorities);
     }
 
     public RequestPostProcessor tenantRoleJwt(
@@ -63,10 +63,10 @@ public final class AuthenticationTestClient {
             String businessId,
             String... authorities
     ) {
-        return roleJwt(subject, role, businessId, authorities);
+        return buildRoleJwt(subject, role, businessId, authorities);
     }
 
-    private RequestPostProcessor roleJwt(
+    private RequestPostProcessor buildRoleJwt(
             String subject,
             String role,
             String businessId,
