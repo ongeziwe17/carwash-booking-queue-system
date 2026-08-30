@@ -16,6 +16,6 @@ runtime:
     - type: tests
       code: |-
         test("returns 200", function() { expect(res.status).to.equal(200); });
-        test("contains a discovery-safe active branch", function() { const branch = res.body.find(b => b.branchId === bru.getVar("marketplaceBranchId")); expect(branch).to.not.equal(undefined); expect(branch).to.not.have.property("discoverable"); expect(branch).to.not.have.property("businessId"); });
+        test("contains a discovery-safe active branch", function() { const branch = res.body.find(b => b.branchId === bru.getVar("marketplaceBranchId")); expect(branch).to.not.equal(undefined); expect(branch.businessId).to.equal(bru.getVar("marketplaceBusinessId")); expect(branch).to.not.have.property("discoverable"); expect(branch).to.not.have.property("registrationNumber"); });
 
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
