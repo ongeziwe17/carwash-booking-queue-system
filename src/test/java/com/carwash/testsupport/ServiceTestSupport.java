@@ -108,20 +108,20 @@ public abstract class ServiceTestSupport {
         branchRepository = new InMemoryCarWashBranchRepository();
         scheduleRepository = new InMemoryBranchOperatingScheduleRepository();
         closureRepository = new InMemoryTemporaryBranchClosureRepository();
-        bookingRepository = new InMemoryBookingRepository();
-        queueRepository = new InMemoryQueueEntryRepository();
-        notificationRepository = new InMemoryNotificationRepository();
         coordinator = new InMemoryDataCoordinator();
         notificationIds = new DeterministicTestNotificationIdGenerator();
         clock = Clock.fixed(Instant.parse("2089-01-15T12:00:00Z"), ZoneOffset.UTC);
+        marketplaceService = new MarketplaceManagementService(
+                businessRepository, branchRepository, coordinator, clock);
+        bookingRepository = new InMemoryBookingRepository(marketplaceService);
+        queueRepository = new InMemoryQueueEntryRepository(marketplaceService);
+        notificationRepository = new InMemoryNotificationRepository(marketplaceService);
 
         UserCredentialService credentialService = new UserCredentialService(
                 new BCryptPasswordEncoder(4), new PasswordSecurityProperties(4, 12, 72));
         userService = new UserManagementService(userRepository, credentialService,
                 vehicleRepository, bookingRepository, notificationRepository, coordinator);
         vehicleService = new VehicleManagementService(vehicleRepository, userRepository, bookingRepository, coordinator);
-        marketplaceService = new MarketplaceManagementService(
-                businessRepository, branchRepository, coordinator, clock);
         branchSchedulingService = new BranchSchedulingService(
                 businessRepository, branchRepository, scheduleRepository, closureRepository, coordinator, clock);
         ServiceDefinitionUsageQuery serviceUsage = new ServiceDefinitionUsageQuery() {
