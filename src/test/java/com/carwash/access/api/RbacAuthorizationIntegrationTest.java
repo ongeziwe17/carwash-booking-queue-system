@@ -6,6 +6,7 @@ import com.carwash.queue.domain.QueueEntry;
 import com.carwash.catalog.domain.Service;
 import com.carwash.vehicle.domain.Vehicle;
 import com.carwash.identity.domain.RoleName;
+import com.carwash.identity.domain.TenantMembershipRepository;
 import com.carwash.booking.application.BookingManagementService;
 import com.carwash.queue.application.QueueManagementService;
 import com.carwash.catalog.application.ServiceCatalogService;
@@ -18,6 +19,7 @@ import com.carwash.marketplace.application.ReplaceOperatingScheduleCommand;
 import com.carwash.marketplace.application.WeeklyOperatingIntervalCommand;
 import com.carwash.marketplace.application.RegisterBusinessCommand;
 import com.carwash.identity.application.UserManagementService;
+import com.carwash.identity.application.TenantMembershipManagementService;
 import com.carwash.vehicle.application.VehicleManagementService;
 import com.carwash.testsupport.ApiContractAssertions;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
@@ -47,6 +49,7 @@ import java.util.Map;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -60,6 +63,8 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
     private static final String PASSWORD = UserFixtureBuilder.DEFAULT_PASSWORD;
 
     @Autowired UserManagementService users;
+    @Autowired TenantMembershipManagementService tenantMemberships;
+    @Autowired TenantMembershipRepository tenantMembershipRepository;
     @Autowired VehicleManagementService vehicles;
     @Autowired ServiceCatalogService services;
     @Autowired ServiceOfferingService offerings;
@@ -72,6 +77,7 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
     @Autowired Clock securityClock;
 
     private int slotSequence;
+    private String defaultBusinessId;
     private String defaultBranchId;
 
     @Test
@@ -94,12 +100,12 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         assertAvailabilityAllowed(customer, ownResources.serviceId());
 
         assertForbidden(mockMvc.perform(get("/api/users/{id}", other.userId()).header(HttpHeaders.AUTHORIZATION, customer.bearer())));
-        assertForbidden(mockMvc.perform(get("/api/vehicles/{id}", otherResources.primaryVehicleId()).header(HttpHeaders.AUTHORIZATION, customer.bearer())));
-        assertForbidden(mockMvc.perform(get("/api/bookings/{id}", otherResources.bookingId()).header(HttpHeaders.AUTHORIZATION, customer.bearer())));
-        assertForbidden(mockMvc.perform(post("/api/bookings/{id}/reschedule", otherResources.bookingId())
+        assertNotFound(mockMvc.perform(get("/api/vehicles/{id}", otherResources.primaryVehicleId()).header(HttpHeaders.AUTHORIZATION, customer.bearer())));
+        assertNotFound(mockMvc.perform(get("/api/bookings/{id}", otherResources.bookingId()).header(HttpHeaders.AUTHORIZATION, customer.bearer())));
+        assertNotFound(mockMvc.perform(post("/api/bookings/{id}/reschedule", otherResources.bookingId())
                 .header(HttpHeaders.AUTHORIZATION, customer.bearer()).contentType(MediaType.APPLICATION_JSON)
                 .content(rescheduleRequest(nextScheduledTime()))));
-        assertForbidden(mockMvc.perform(get("/api/queue-entries/{id}", otherResources.queueEntryId()).header(HttpHeaders.AUTHORIZATION, customer.bearer())));
+        assertNotFound(mockMvc.perform(get("/api/queue-entries/{id}", otherResources.queueEntryId()).header(HttpHeaders.AUTHORIZATION, customer.bearer())));
         assertForbidden(mockMvc.perform(post("/api/services").header(HttpHeaders.AUTHORIZATION, customer.bearer())
                 .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(serviceRequest()))));
         assertForbidden(mockMvc.perform(post("/api/queue-entries/call-next")
@@ -144,7 +150,7 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
     }
 
     @Test
-    void businessOwnerCanOperateAndManageServicesAndReportsButCannotAssignRoles() throws Exception {
+    void businessOwnerCanOperateAndReportButCannotManageGlobalServicesOrAssignRoles() throws Exception {
         LoginIdentity owner = registerAndLogin(RoleName.BUSINESS_OWNER);
         LoginIdentity customer = registerAndLogin(RoleName.CUSTOMER);
         LoginIdentity other = registerAndLogin(RoleName.CUSTOMER);
@@ -161,7 +167,7 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
                         .header(HttpHeaders.AUTHORIZATION, owner.bearer())).andExpect(status().isOk());
         mockMvc.perform(post("/api/services").header(HttpHeaders.AUTHORIZATION, owner.bearer())
                         .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(serviceRequest())))
-                .andExpect(status().isCreated());
+                .andExpect(status().isForbidden());
         mockMvc.perform(get("/api/reports/daily-summary").header(HttpHeaders.AUTHORIZATION, owner.bearer())
                         .param("date", TestDates.future().toLocalDate().toString())
                         .param("branchId", resources.branchId())).andExpect(status().isOk());
@@ -180,11 +186,15 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         mockMvc.perform(get("/api/users").header(HttpHeaders.AUTHORIZATION, administrator.bearer())).andExpect(status().isOk());
         mockMvc.perform(put("/api/admin/users/{id}/role", customer.userId())
                         .header(HttpHeaders.AUTHORIZATION, administrator.bearer()).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"roleName\":\"STAFF\"}"))
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "roleName", "STAFF", "businessId", defaultBusinessId))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.roleName").value("STAFF"));
-        mockMvc.perform(get("/api/vehicles").header(HttpHeaders.AUTHORIZATION, administrator.bearer())).andExpect(status().isOk());
-        mockMvc.perform(get("/api/bookings").header(HttpHeaders.AUTHORIZATION, administrator.bearer())).andExpect(status().isOk());
-        mockMvc.perform(get("/api/queue-entries").header(HttpHeaders.AUTHORIZATION, administrator.bearer())).andExpect(status().isOk());
+        mockMvc.perform(get("/api/vehicles").param("businessId", defaultBusinessId)
+                .header(HttpHeaders.AUTHORIZATION, administrator.bearer())).andExpect(status().isOk());
+        mockMvc.perform(get("/api/bookings").param("businessId", defaultBusinessId)
+                .header(HttpHeaders.AUTHORIZATION, administrator.bearer())).andExpect(status().isOk());
+        mockMvc.perform(get("/api/queue-entries").param("businessId", defaultBusinessId)
+                .header(HttpHeaders.AUTHORIZATION, administrator.bearer())).andExpect(status().isOk());
         assertAvailabilityAllowed(administrator, resources.serviceId());
         mockMvc.perform(post("/api/services").header(HttpHeaders.AUTHORIZATION, administrator.bearer())
                         .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(serviceRequest())))
@@ -243,10 +253,52 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
     @Test
     void roleChangesInvalidateOldTokensAndNewLoginUsesCurrentCatalogueAuthorities() throws Exception {
         LoginIdentity customer = registerAndLogin(RoleName.CUSTOMER);
-        users.assignRole(customer.userId(), RoleName.STAFF);
+        tenantMemberships.assignRole(customer.userId(), RoleName.STAFF, ensureBusinessId());
         assertUnauthorized(mockMvc.perform(get("/api/auth/me").header(HttpHeaders.AUTHORIZATION, customer.bearer())));
         String newToken = authentication.login(customer.email(), PASSWORD);
         mockMvc.perform(get("/api/vehicles").header(HttpHeaders.AUTHORIZATION, bearer(newToken))).andExpect(status().isOk());
+    }
+
+    @Test
+    void missingForgedAndReassignedTenantClaimsInvalidateOperationalTokens() throws Exception {
+        LoginIdentity staff = registerAndLogin(RoleName.STAFF);
+        String tenantA = ensureBusinessId();
+        String tenantB = ids.business();
+        marketplace.registerBusiness(new RegisterBusinessCommand(
+                tenantB, "Second RBAC Wash", ids.emailFor(tenantB), "+27821234568", null));
+
+        String missingClaim = signedToken(staff.userId(), RoleName.STAFF.name(), null, List.of());
+        assertUnauthorized(mockMvc.perform(get("/api/bookings").header(
+                HttpHeaders.AUTHORIZATION, bearer(missingClaim))));
+
+        String forgedClaim = signedToken(staff.userId(), RoleName.STAFF.name(), tenantB, List.of());
+        assertUnauthorized(mockMvc.perform(get("/api/bookings").header(
+                HttpHeaders.AUTHORIZATION, bearer(forgedClaim))));
+
+        tenantMemberships.assignOrReplace(staff.userId(), tenantB);
+        assertUnauthorized(mockMvc.perform(get("/api/bookings").header(
+                HttpHeaders.AUTHORIZATION, staff.bearer())));
+
+        String reassigned = authentication.login(staff.email(), PASSWORD);
+        mockMvc.perform(get("/api/bookings").header(HttpHeaders.AUTHORIZATION, bearer(reassigned)))
+                .andExpect(status().isOk());
+        org.junit.jupiter.api.Assertions.assertNotEquals(tenantA, tenantB);
+    }
+
+    @Test
+    void legacyOperationalUserWithoutMembershipCannotLogin() throws Exception {
+        LoginIdentity staff = registerAndLogin(RoleName.STAFF);
+        assertTrue(tenantMembershipRepository.deleteById(staff.userId()));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "email", staff.email(),
+                                "password", PASSWORD))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+        assertUnauthorized(mockMvc.perform(get("/api/auth/me")
+                .header(HttpHeaders.AUTHORIZATION, staff.bearer())));
     }
 
     @Test
@@ -310,7 +362,9 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         String email = ids.emailFor(userId);
         api.createUser(UserFixtureBuilder.valid(ids).userId(userId).email(email).build())
                 .andExpect(status().isCreated());
-        if (roleName != RoleName.CUSTOMER) {
+        if (roleName == RoleName.STAFF || roleName == RoleName.BUSINESS_OWNER) {
+            tenantMemberships.assignRole(userId, roleName, ensureBusinessId());
+        } else if (roleName != RoleName.CUSTOMER) {
             users.assignRole(userId, roleName);
         }
         return new LoginIdentity(userId, email, authentication.login(email, PASSWORD));
@@ -357,6 +411,7 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
     private String ensureBranch() {
         if (defaultBranchId != null) return defaultBranchId;
         String businessId = ids.business();
+        defaultBusinessId = businessId;
         marketplace.registerBusiness(new RegisterBusinessCommand(
                 businessId, "RBAC Wash", ids.emailFor(businessId), "+27821234567", null));
         defaultBranchId = ids.branch();
@@ -370,6 +425,11 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
                                 day, LocalTime.of(8, 0), LocalTime.of(17, 0)))
                         .toList()));
         return defaultBranchId;
+    }
+
+    private String ensureBusinessId() {
+        ensureBranch();
+        return defaultBusinessId;
     }
 
     private void assertAvailabilityAllowed(LoginIdentity identity, String serviceId) throws Exception {
@@ -409,13 +469,30 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         ApiContractAssertions.assertNoSensitiveData(action, false);
     }
 
+    private void assertNotFound(ResultActions action) throws Exception {
+        action.andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(404));
+        ApiContractAssertions.assertNoSensitiveData(action, false);
+    }
+
     private String signedTokenWithInjectedPermissions(String subject, String roleClaim, List<String> injectedPermissions) {
+        return signedToken(subject, roleClaim, null, injectedPermissions);
+    }
+
+    private String signedToken(
+            String subject,
+            String roleClaim,
+            String tenantId,
+            List<String> injectedPermissions
+    ) {
         Instant issuedAt = securityClock.instant();
-        JwtClaimsSet claims = JwtClaimsSet.builder().issuer(jwtProperties.issuer()).subject(subject)
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder().issuer(jwtProperties.issuer()).subject(subject)
                 .claim("role", roleClaim).claim("permissions", injectedPermissions).issuedAt(issuedAt)
-                .expiresAt(issuedAt.plus(jwtProperties.accessTokenTtl())).id(subject + "-test-token").build();
+                .expiresAt(issuedAt.plus(jwtProperties.accessTokenTtl())).id(subject + "-test-token");
+        if (tenantId != null) claims.claim("tenant_id", tenantId);
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).type("JWT").build();
-        return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
+        return jwtEncoder.encode(JwtEncoderParameters.from(header, claims.build())).getTokenValue();
     }
 
     private String bearer(String token) { return "Bearer " + token; }

@@ -1,7 +1,7 @@
 info:
   name: Business owner creates first branch service offering
   type: http
-  seq: 42
+  seq: 48
   tags: [marketplace, offering, owner, workflow]
 
 http:

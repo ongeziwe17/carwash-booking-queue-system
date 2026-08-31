@@ -1,7 +1,7 @@
 info:
-  name: Business owner registers second offering business
+  name: Platform admin registers second offering business
   type: http
-  seq: 40
+  seq: 46
   tags: [marketplace, offering, owner, workflow]
 
 http:
@@ -22,7 +22,7 @@ http:
       }
   auth:
     type: bearer
-    token: "{{ownerToken}}"
+    token: "{{adminToken}}"
 
 runtime:
   scripts:

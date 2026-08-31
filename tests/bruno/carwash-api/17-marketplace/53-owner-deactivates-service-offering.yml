@@ -1,7 +1,7 @@
 info:
   name: Business owner deactivates branch service offering
   type: http
-  seq: 53
+  seq: 63
   tags: [marketplace, offering, owner, workflow]
 
 http:

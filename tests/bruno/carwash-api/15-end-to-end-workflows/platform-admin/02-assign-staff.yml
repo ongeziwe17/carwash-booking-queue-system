@@ -17,7 +17,8 @@ http:
     type: json
     data: |-
       {
-        "roleName": "STAFF"
+        "roleName": "STAFF",
+        "businessId": "{{opsBusinessId}}"
       }
   auth:
     type: bearer

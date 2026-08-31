@@ -8,6 +8,8 @@ import com.carwash.vehicle.domain.VehicleRepository;
 import com.carwash.shared.application.DataTransactionOperations;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
+import com.carwash.access.application.TenantAccessContext;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.util.List;
 import java.util.Objects;
@@ -38,6 +40,25 @@ public class VehicleManagementService implements VehicleQuery {
         return createVehicle(new Vehicle(vehicleId, plateNumber, vehicleType, brand, model, color, notes), userId);
     }
 
+    public Vehicle createVehicle(
+            TenantAccessContext access,
+            String userId,
+            String vehicleId,
+            String plateNumber,
+            String vehicleType,
+            String brand,
+            String model,
+            String color,
+            String notes
+    ) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        if (access.isOperational()) {
+            throw new AccessDeniedException("Operational users cannot create customer-owned vehicles");
+        }
+        access.requireSelf(userId);
+        return createVehicle(userId, vehicleId, plateNumber, vehicleType, brand, model, color, notes);
+    }
+
     public Vehicle createVehicle(Vehicle vehicle, String userId) {
         return coordinator.write(() -> {
             validateVehicle(vehicle);
@@ -65,8 +86,31 @@ public class VehicleManagementService implements VehicleQuery {
         return coordinator.read(() -> requireVehicle(vehicleId));
     }
 
+    public Vehicle findById(TenantAccessContext access, String vehicleId) {
+        return coordinator.read(() -> requireAccessibleVehicle(access, vehicleId));
+    }
+
     public List<Vehicle> findAll() {
         return coordinator.read(vehicleRepository::findAll);
+    }
+
+    public List<Vehicle> findAll(TenantAccessContext access) {
+        return findAll(access, null);
+    }
+
+    public List<Vehicle> findAll(TenantAccessContext access, String administratorBusinessId) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        if (access.isPlatformAdministrator()) {
+            String businessId = normalizeBusinessId(administratorBusinessId);
+            return coordinator.read(() -> vehicleRepository.findByBusinessId(businessId));
+        }
+        if (access.isOperational()) {
+            if (administratorBusinessId != null) {
+                throw new BusinessRuleViolationException("Tenant identity is derived from authentication");
+            }
+            return coordinator.read(() -> vehicleRepository.findByBusinessId(access.requireBusinessId()));
+        }
+        throw new AccessDeniedException("Operational vehicle access is required");
     }
 
     public List<Vehicle> findByUserId(String userId) {
@@ -89,6 +133,20 @@ public class VehicleManagementService implements VehicleQuery {
     public Vehicle updateVehicle(String vehicleId, String plateNumber, String vehicleType,
                                  String brand, String model, String color, String notes) {
         return updateVehicle(new Vehicle(vehicleId, plateNumber, vehicleType, brand, model, color, notes));
+    }
+
+    public Vehicle updateVehicle(
+            TenantAccessContext access,
+            String vehicleId,
+            String plateNumber,
+            String vehicleType,
+            String brand,
+            String model,
+            String color,
+            String notes
+    ) {
+        requireAccessibleVehicle(access, vehicleId);
+        return updateVehicle(vehicleId, plateNumber, vehicleType, brand, model, color, notes);
     }
 
     public Vehicle updateVehicle(Vehicle vehicle) {
@@ -121,6 +179,11 @@ public class VehicleManagementService implements VehicleQuery {
         });
     }
 
+    public void deleteVehicle(TenantAccessContext access, String vehicleId) {
+        requireAccessibleVehicle(access, vehicleId);
+        deleteVehicle(vehicleId);
+    }
+
     private void validateVehicle(Vehicle vehicle) {
         if (vehicle == null) throw new BusinessRuleViolationException("Vehicle is required");
         if (isBlank(vehicle.getVehicleId())) throw new BusinessRuleViolationException("Vehicle ID must not be blank");
@@ -139,6 +202,16 @@ public class VehicleManagementService implements VehicleQuery {
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found: " + vehicleId));
     }
 
+    private Vehicle requireAccessibleVehicle(TenantAccessContext access, String vehicleId) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        Optional<Vehicle> accessible = access.isPlatformAdministrator()
+                ? vehicleRepository.findById(vehicleId)
+                : access.isOperational()
+                ? vehicleRepository.findByIdAndBusinessId(vehicleId, access.requireBusinessId())
+                : vehicleRepository.findByIdAndUserId(vehicleId, access.userId());
+        return accessible.orElseThrow(() -> new ResourceNotFoundException("Vehicle not found"));
+    }
+
     private User requireUser(String userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
@@ -152,5 +225,17 @@ public class VehicleManagementService implements VehicleQuery {
 
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
+    }
+
+    private String normalizeBusinessId(String value) {
+        String normalized = value == null ? null : value.trim();
+        if (normalized == null || normalized.isBlank()) {
+            throw new BusinessRuleViolationException(
+                    "Business ID is required for platform administrator vehicle access");
+        }
+        if (normalized.length() > 64) {
+            throw new BusinessRuleViolationException("Business ID must not exceed 64 characters");
+        }
+        return normalized;
     }
 }

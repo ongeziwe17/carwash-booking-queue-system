@@ -1,10 +1,12 @@
 package com.carwash.marketplace.api;
 
 import com.carwash.marketplace.api.dto.BranchResponse;
+import com.carwash.marketplace.api.dto.DiscoverableBranchResponse;
 import com.carwash.marketplace.api.dto.UpdateBranchRequest;
 import com.carwash.marketplace.application.MarketplaceManagementService;
 import com.carwash.marketplace.application.UpdateBranchCommand;
 import com.carwash.shared.api.error.ApiErrorResponse;
+import com.carwash.access.application.TenantAccessContextProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -49,9 +51,11 @@ import java.util.List;
 public class BranchController {
 
     private final MarketplaceManagementService marketplace;
+    private final TenantAccessContextProvider tenantAccess;
 
-    public BranchController(MarketplaceManagementService marketplace) {
+    public BranchController(MarketplaceManagementService marketplace, TenantAccessContextProvider tenantAccess) {
         this.marketplace = marketplace;
+        this.tenantAccess = tenantAccess;
     }
 
     @GetMapping("/discoverable")
@@ -59,9 +63,9 @@ public class BranchController {
     @Operation(summary = "List discoverable Marketplace branches",
             description = "Returns only public-discovery-enabled branches whose branch and owning business are both active. No distance ranking is performed.")
     @ApiResponse(responseCode = "200", description = "Discoverable branches returned")
-    public List<BranchResponse> findDiscoverable() {
+    public List<DiscoverableBranchResponse> findDiscoverable() {
         return marketplace.findDiscoverableBranches().stream()
-                .map(MarketplaceMapper::toResponse)
+                .map(MarketplaceMapper::toDiscoverableResponse)
                 .toList();
     }
 
@@ -72,7 +76,7 @@ public class BranchController {
     public BranchResponse findById(
             @PathVariable @NotBlank @Size(max = 64) String branchId
     ) {
-        return MarketplaceMapper.toResponse(marketplace.findBranch(branchId));
+        return MarketplaceMapper.toResponse(marketplace.findBranch(tenantAccess.current(), branchId));
     }
 
     @PutMapping("/{branchId}")
@@ -84,7 +88,7 @@ public class BranchController {
             @PathVariable @NotBlank @Size(max = 64) String branchId,
             @Valid @RequestBody UpdateBranchRequest request
     ) {
-        return MarketplaceMapper.toResponse(marketplace.updateBranch(branchId, new UpdateBranchCommand(
+        return MarketplaceMapper.toResponse(marketplace.updateBranch(tenantAccess.current(), branchId, new UpdateBranchCommand(
                 request.branchName(),
                 request.addressLine1(),
                 request.addressLine2(),
@@ -107,7 +111,7 @@ public class BranchController {
     public BranchResponse activate(
             @PathVariable @NotBlank @Size(max = 64) String branchId
     ) {
-        return MarketplaceMapper.toResponse(marketplace.activateBranch(branchId));
+        return MarketplaceMapper.toResponse(marketplace.activateBranch(tenantAccess.current(), branchId));
     }
 
     @PostMapping("/{branchId}/deactivate")
@@ -118,6 +122,6 @@ public class BranchController {
     public BranchResponse deactivate(
             @PathVariable @NotBlank @Size(max = 64) String branchId
     ) {
-        return MarketplaceMapper.toResponse(marketplace.deactivateBranch(branchId));
+        return MarketplaceMapper.toResponse(marketplace.deactivateBranch(tenantAccess.current(), branchId));
     }
 }

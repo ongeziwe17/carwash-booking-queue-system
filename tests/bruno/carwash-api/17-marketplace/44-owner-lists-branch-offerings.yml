@@ -1,7 +1,7 @@
 info:
   name: Business owner lists branch offerings
   type: http
-  seq: 44
+  seq: 54
   tags: [marketplace, offering, owner]
 
 http:

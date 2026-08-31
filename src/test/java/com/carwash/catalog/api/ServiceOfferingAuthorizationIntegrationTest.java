@@ -24,8 +24,9 @@ class ServiceOfferingAuthorizationIntegrationTest extends ApiIntegrationTestSupp
     @Test
     void ownerAndAdministratorCanManageOfferings() throws Exception {
         Fixture fixture = createFixture();
-        RequestPostProcessor owner = role(
-                "owner", "BUSINESS_OWNER", "PERM_MARKETPLACE_READ", "PERM_MARKETPLACE_MANAGE");
+        RequestPostProcessor owner = tenantRole(
+                "owner", "BUSINESS_OWNER", fixture.businessId(),
+                "PERM_MARKETPLACE_READ", "PERM_MARKETPLACE_MANAGE");
         CreateServiceOfferingRequest request = request(ids.offering(), fixture.serviceId());
 
         create(fixture.branchId(), request, owner).andExpect(status().isCreated());
@@ -118,7 +119,7 @@ class ServiceOfferingAuthorizationIntegrationTest extends ApiIntegrationTestSupp
         api.createService(new CreateServiceRequest(
                 serviceId, "Exterior", "Reusable definition", BigDecimal.valueOf(80), 20))
                 .andExpect(status().isCreated());
-        return new Fixture(branchId, serviceId);
+        return new Fixture(businessId, branchId, serviceId);
     }
 
     private org.springframework.test.web.servlet.ResultActions create(
@@ -143,6 +144,18 @@ class ServiceOfferingAuthorizationIntegrationTest extends ApiIntegrationTestSupp
         return authentication.roleJwt(subject, role, authorities);
     }
 
-    private record Fixture(String branchId, String serviceId) {
+    private RequestPostProcessor tenantRole(
+            String subject,
+            String role,
+            String businessId,
+            String... permissions
+    ) {
+        String[] authorities = new String[permissions.length + 1];
+        authorities[0] = "ROLE_" + role;
+        System.arraycopy(permissions, 0, authorities, 1, permissions.length);
+        return authentication.tenantRoleJwt(subject, role, businessId, authorities);
+    }
+
+    private record Fixture(String businessId, String branchId, String serviceId) {
     }
 }

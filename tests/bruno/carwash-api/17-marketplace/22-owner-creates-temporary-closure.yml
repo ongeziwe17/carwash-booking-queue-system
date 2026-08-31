@@ -1,7 +1,7 @@
 info:
   name: Business owner creates temporary branch closure
   type: http
-  seq: 22
+  seq: 28
   tags: [marketplace, owner, workflow]
 
 http:

@@ -1,7 +1,7 @@
 info:
   name: Admin journey rechecks final-administrator protection
   type: http
-  seq: 6
+  seq: 7
   tags:
     - workflow
     - admin

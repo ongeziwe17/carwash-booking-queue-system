@@ -8,7 +8,7 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/api/notifications/user/{{customerUserId}}"
+  url: "{{baseUrl}}/api/notifications/user/{{customerUserId}}?businessId={{opsBusinessId}}"
   auth:
     type: bearer
     token: "{{adminToken}}"

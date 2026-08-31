@@ -18,6 +18,9 @@ public class PostgresNotificationRepository implements NotificationRepository {
     public PostgresNotificationRepository(NotificationSpringDataRepository repository){this.repository=repository;}
     @Override public List<Notification> findByUserId(String id){return domains(repository.findByUserIdOrderByIdAsc(id));}
     @Override public List<Notification> findByBookingId(String id){return domains(repository.findByBookingIdOrderByIdAsc(id));}
+    @Override public List<Notification> findByUserIdAndBusinessId(String userId,String businessId){return domains(repository.findByUserTenant(userId,businessId));}
+    @Override public List<Notification> findByBusinessId(String businessId){return domains(repository.findByTenant(businessId));}
+    @Override public Optional<Notification> findByIdAndBusinessId(String id,String businessId){return repository.findTenantScoped(id,businessId).map(this::domain);}
     @Override public int deleteByUserId(String id){int count=repository.deleteByUserId(id);repository.flush();return count;}
     @Override public int deleteByBookingId(String id){int count=repository.deleteByBookingId(id);repository.flush();return count;}
     @Override public boolean insert(Notification v){if(repository.existsById(v.getNotificationId()))return false;repository.saveAndFlush(entity(v));return true;}

@@ -5,6 +5,7 @@ import com.carwash.marketplace.api.dto.BranchOpenStatusResponse;
 import com.carwash.marketplace.api.dto.BranchOperatingHoursResponse;
 import com.carwash.marketplace.api.dto.BusinessResponse;
 import com.carwash.marketplace.api.dto.TemporaryClosureResponse;
+import com.carwash.marketplace.api.dto.DiscoverableBranchResponse;
 import com.carwash.marketplace.api.dto.WeeklyOperatingIntervalResponse;
 import com.carwash.marketplace.application.BranchOpenStatusSnapshot;
 import com.carwash.marketplace.application.BranchOperatingScheduleSnapshot;
@@ -52,6 +53,23 @@ final class MarketplaceMapper {
                 branch.discoverable(),
                 branch.createdAt(),
                 branch.updatedAt()
+        );
+    }
+
+    static DiscoverableBranchResponse toDiscoverableResponse(BranchSnapshot branch) {
+        return new DiscoverableBranchResponse(
+                branch.branchId(),
+                branch.businessId(),
+                branch.branchName(),
+                branch.addressLine1(),
+                branch.addressLine2(),
+                branch.city(),
+                branch.province(),
+                branch.postalCode(),
+                branch.countryCode(),
+                branch.latitude(),
+                branch.longitude(),
+                branch.timezone()
         );
     }
 

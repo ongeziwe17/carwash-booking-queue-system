@@ -1,5 +1,5 @@
 info:
-  name: Owner journey removes unreferenced service
+  name: Owner journey cannot delete global service definition
   type: http
   seq: 6
   tags:
@@ -17,7 +17,7 @@ runtime:
   scripts:
     - type: tests
       code: |-
-        test("returns 204", function() { expect(res.status).to.equal(204); });
+        test("returns 403", function() { expect(res.status).to.equal(403); expect(res.body.code).to.equal("ACCESS_DENIED"); });
         const payload = JSON.stringify(res.body ?? {});
         const lower = payload.toLowerCase();
         for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password"]) {

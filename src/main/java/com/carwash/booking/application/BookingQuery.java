@@ -10,6 +10,10 @@ public interface BookingQuery {
 
     List<BookingSnapshot> findBookingSnapshotsByBranch(String branchId);
 
+    List<BookingSnapshot> findBookingSnapshotsByBusiness(String businessId);
+
+    List<BookingSnapshot> findBookingSnapshotsByBranchAndBusiness(String branchId, String businessId);
+
     Optional<String> findOwnerId(String bookingId);
 
     boolean existsByUserId(String userId);

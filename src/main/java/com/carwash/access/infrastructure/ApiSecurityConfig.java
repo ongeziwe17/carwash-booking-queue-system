@@ -5,6 +5,9 @@ import com.carwash.shared.api.error.ApiErrorResponseFactory;
 import com.carwash.identity.domain.AccountStatus;
 import com.carwash.identity.domain.RoleCatalog;
 import com.carwash.identity.application.UserQuery;
+import com.carwash.identity.application.TenantMembershipQuery;
+import com.carwash.identity.domain.RoleName;
+import com.carwash.access.application.JwtTokenService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -45,22 +48,49 @@ public class ApiSecurityConfig {
     JwtEncoder jwtEncoder(SecretKey key) { return NimbusJwtEncoder.withSecretKey(key).build(); }
 
     @Bean
-    JwtDecoder jwtDecoder(SecretKey key, JwtSecurityProperties properties, UserQuery users) {
+    JwtDecoder jwtDecoder(
+            SecretKey key,
+            JwtSecurityProperties properties,
+            UserQuery users,
+            TenantMembershipQuery memberships
+    ) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
         OAuth2TokenValidator<Jwt> standard = JwtValidators.createDefaultWithIssuer(properties.issuer());
         OAuth2TokenValidator<Jwt> activeUser = jwt -> {
             String subject = jwt.getSubject();
-            boolean valid = subject != null && !subject.isBlank() && jwt.getIssuedAt() != null && jwt.getExpiresAt() != null
-                    && users.findOptionalById(subject).filter(u -> u.getAccountStatus() == AccountStatus.ACTIVE)
-                    .filter(u -> {
-                        try { return RoleCatalog.name(u.getRole()).name().equals(jwt.getClaimAsString("role")); }
-                        catch (RuntimeException ex) { return false; }
-                    }).isPresent();
+            boolean valid = subject != null && !subject.isBlank()
+                    && jwt.getIssuedAt() != null && jwt.getExpiresAt() != null
+                    && users.findOptionalById(subject)
+                    .filter(u -> u.getAccountStatus() == AccountStatus.ACTIVE)
+                    .filter(u -> canonicalClaimsMatch(jwt, u, memberships))
+                    .isPresent();
             return valid ? OAuth2TokenValidatorResult.success()
                     : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Token subject is invalid", null));
         };
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(standard, activeUser));
         return decoder;
+    }
+
+    private boolean canonicalClaimsMatch(
+            Jwt jwt,
+            com.carwash.identity.domain.User user,
+            TenantMembershipQuery memberships
+    ) {
+        try {
+            RoleName role = RoleCatalog.name(user.getRole());
+            if (!role.name().equals(jwt.getClaimAsString("role"))) return false;
+            String tenantClaim = jwt.getClaimAsString(JwtTokenService.TENANT_ID_CLAIM);
+            if (role == RoleName.STAFF || role == RoleName.BUSINESS_OWNER) {
+                return tenantClaim != null && !tenantClaim.isBlank()
+                        && memberships.findByUserId(user.getUserId())
+                        .map(com.carwash.identity.domain.TenantMembership::businessId)
+                        .filter(tenantClaim::equals)
+                        .isPresent();
+            }
+            return tenantClaim == null;
+        } catch (RuntimeException invalidCanonicalState) {
+            return false;
+        }
     }
 
     @Bean

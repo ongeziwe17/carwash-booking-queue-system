@@ -5,6 +5,7 @@ import com.carwash.marketplace.domain.CarWashBranchRepository;
 import com.carwash.shared.infrastructure.InMemoryRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public final class InMemoryCarWashBranchRepository extends InMemoryRepository<CarWashBranch, String>
         implements CarWashBranchRepository {
@@ -17,5 +18,11 @@ public final class InMemoryCarWashBranchRepository extends InMemoryRepository<Ca
     @Override
     public List<CarWashBranch> findByBusinessId(String businessId) {
         return findMatching(branch -> businessId.equals(branch.getBusinessId()));
+    }
+
+    @Override
+    public Optional<CarWashBranch> findByIdAndBusinessId(String branchId, String businessId) {
+        return findMatching(branch -> branchId != null && branchId.equals(branch.getBranchId())
+                && businessId != null && businessId.equals(branch.getBusinessId())).stream().findFirst();
     }
 }

@@ -143,3 +143,11 @@ The branch protection rules on `master` are in place to ensure that only reviewe
 The required `check-branch` GitHub Actions workflow adds an extra safeguard by ensuring that only the `develop` branch can be used as the source branch for pull requests into `master`.
 
 This supports a safer, cleaner, and more controlled development and release process.
+
+## Application tenant protection
+
+Marketplace authorization is enforced independently of branch protection. `CarWashBusiness.businessId` is the tenant boundary; Identity owns the one-to-one operational membership, Access verifies the canonical `tenant_id` claim on every token use, and application/repository layers require tenant-scoped operations. No client-supplied tenant override or wildcard administrator tenant is supported.
+
+The safe response policy is `401` for missing/invalid/forged/stale authentication, `403` for a canonical role without the required permission, and indistinguishable `404` responses for absent and foreign-tenant resources. Business owners cannot register a second business or mutate the platform-wide reusable service catalogue. Discovery remains authenticated and uses dedicated allowlisted DTOs.
+
+The complete membership lifecycle, backfill procedure, database constraints/indexes, discovery allowlist, and #125 audit boundary are documented in [Marketplace Tenant Isolation](TENANT-ISOLATION.md).

@@ -2,7 +2,7 @@
 
 ## Product Vision
 
-A car wash booking and queue management backend with durable PostgreSQL and lightweight in-memory profiles, protected operational workflows, and an incremental path toward tenant-isolated SaaS capabilities.
+A car wash booking and queue management backend with durable PostgreSQL and lightweight in-memory profiles, protected tenant-isolated operational workflows, and an incremental path toward production SaaS capabilities.
 
 ## Stakeholders
 
@@ -31,10 +31,11 @@ Implemented in the current backend:
 - Authenticated nearby discovery over existing branch coordinates with deterministic straight-line distance and optional radius, effective-offering, and explicit-instant open filters.
 - Authenticated explainable recommendations over authoritative branch availability using five deterministic preferences and configurable normalized scoring.
 - Flyway-owned PostgreSQL persistence with module-local adapters, real transactions, optimistic versions, invariant locks, restart durability, and Compose/Testcontainers support.
+- Identity-owned operational tenant memberships, trusted `tenant_id` JWT validation, tenant-scoped application/repository operations, explicit platform-admin paths, and discovery-specific DTOs.
 
 ## Partially Implemented Foundation
 
-- JWT login and RBAC are implemented, but refresh tokens, logout/revocation, Marketplace tenant isolation, and security audit logging are not.
+- JWT login, RBAC, and Marketplace tenant isolation are implemented, but refresh tokens, logout/revocation, and security audit logging are not.
 - Notification domain objects can track statuses, but no external SMS/email provider sends messages.
 - A daily summary report endpoint exists, but richer dashboards, revenue reporting, filtering, and production analytics are not implemented.
 - The default profile is intentionally ephemeral; production-like durability requires the explicit `postgres` profile and an externally managed backup policy.
@@ -59,6 +60,7 @@ Implemented in the current backend:
 | FR-14 | Search branch-aware availability at an explicit instant using unambiguous branch-local starts, continuous-window-anchored slots, complete operating windows, closures, offering terms/capacity, active bookings, branch queues, and optional distance. | Implemented |
 | FR-15 | Rank the same booking-valid branch candidates by nearest, shortest queue, fastest total time, lowest price, or validated weighted balance and return a deterministic customer-safe explanation. | Implemented |
 | FR-16 | Persist every current aggregate through module-owned PostgreSQL adapters and Flyway while preserving in-memory parity, transaction rollback, deterministic ordering, and cross-instance capacity/queue invariants. | Implemented |
+| FR-17 | Bind every operational identity to one canonical business, validate the membership in JWTs, and enforce subject/tenant/explicit-admin repository scopes with safe foreign-resource errors. | Implemented |
 
 ## Functional Requirements: Planned/Future
 
@@ -66,8 +68,8 @@ Implemented in the current backend:
 |--------------------------------------------------------------------|---------------------------------|
 | Refresh-token/logout/revocation lifecycle, if specified.           | Future security work            |
 | Security and operational audit logging.                            | Future security hardening       |
-| Tenant-scoped authorization for Marketplace businesses/branches.  | Future SaaS hardening           |
-| Capacity reservations, staff/wash-bay allocation, and tenant isolation. | Future Marketplace/SaaS work |
+| Database-per-tenant isolation and federation.                      | Out of current scope            |
+| Capacity reservations and staff/wash-bay allocation.              | Future Marketplace/SaaS work    |
 | External email/SMS notification delivery.                          | Future product/platform work    |
 | Payments.                                                          | Future product/platform work    |
 | Ratings and feedback.                                              | Future product capability       |
@@ -84,7 +86,7 @@ Implemented in the current backend:
 | API usability   | Swagger/OpenAPI documentation should remain available for local development.                                                       |
 | Extensibility   | Storage implementations should remain replaceable behind repository interfaces.                                                    |
 | Deployment      | Docker and Docker Compose should support repeatable local execution.                                                               |
-| Security        | BCrypt credentials, JWT authentication, RBAC, ownership authorization, and safe errors are implemented; tenant isolation, audit logging, and broader production hardening are still required. |
+| Security        | BCrypt credentials, JWT authentication, RBAC, ownership authorization, canonical tenant isolation, and safe errors are implemented; audit logging and broader production hardening are still required. |
 | Persistence     | Default/test storage is in memory; `postgres` provides Flyway-owned durable storage, transactions, optimistic versions, and database-visible invariant locks. |
 
 ## Business Rules
@@ -95,7 +97,7 @@ Implemented in the current backend:
 - Queue entries inherit immutable branch/offering scope from an eligible confirmed booking; client service input is consistency-only and mismatches are rejected.
 - Queue positions, rebalancing, call-next, and offering-duration wait calculations are isolated by branch.
 - Notification records preserve bounded branch/offering context in addition to channel, message, user, booking, and delivery-status metadata; external delivery is future work.
-- Daily reports require exactly one branch or business scope and apply branch-local date boundaries; scopes do not enforce tenant authorization.
+- Daily reports require exactly one tenant-authorized branch or business scope, use repository tenant predicates, and apply branch-local date boundaries.
 - Branch open status requires active business/branch state, a matching half-open weekly interval in the branch timezone, and no active covering temporary closure; public discovery is a separate decision.
 - An offering is effectively active only when its stored state, reusable global service, branch, and owning business are active; discovery additionally requires branch public discovery. Configured concurrent capacity is not remaining capacity.
 - Nearby discovery uses raw Haversine kilometres for filtering/sorting, rounds only output to two decimals with `HALF_UP`, defaults to branch-ID order, and never treats public visibility as anonymous authorization.
@@ -103,4 +105,4 @@ Implemented in the current backend:
 
 ## Out of Current Scope
 
-The current backend implements selectable in-memory/PostgreSQL storage, Marketplace registration/scheduling/offerings, nearby straight-line discovery, branch-aware availability, recommendations, and branch-scoped operations. It does not implement managed database provisioning/backups, payments, tenant isolation, driving routes/traffic/geocoding, capacity reservations, staff/bay calendars, external notification delivery, observability, frontend applications, or production SaaS readiness.
+The current backend implements selectable in-memory/PostgreSQL storage, canonical Marketplace tenant isolation, registration/scheduling/offerings, nearby straight-line discovery, branch-aware availability, recommendations, and branch-scoped operations. It does not implement managed database provisioning/backups, payments, audit logging, database-per-tenant isolation, federation, driving routes/traffic/geocoding, capacity reservations, staff/bay calendars, external notification delivery, observability, frontend applications, or production SaaS readiness.

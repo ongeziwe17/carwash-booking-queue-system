@@ -1,15 +1,15 @@
 info:
-  name: Business owner reactivates offering parent service
+  name: Platform admin reactivates offering parent service
   type: http
-  seq: 59
-  tags: [marketplace, offering, owner, workflow]
+  seq: 69
+  tags: [marketplace, offering, admin, workflow]
 
 http:
   method: POST
   url: "{{baseUrl}}/api/services/{{serviceId}}/activate"
   auth:
     type: bearer
-    token: "{{ownerToken}}"
+    token: "{{adminToken}}"
 
 runtime:
   scripts:

@@ -1,7 +1,7 @@
 info:
   name: Unauthenticated offering update is rejected
   type: http
-  seq: 78
+  seq: 88
   tags: [marketplace, offering, auth, security]
 
 http:

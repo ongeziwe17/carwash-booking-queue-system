@@ -10,7 +10,7 @@ http:
   url: "{{baseUrl}}/api/services/{{toggleServiceId}}/deactivate"
   auth:
     type: bearer
-    token: "{{ownerToken}}"
+    token: "{{adminToken}}"
 
 runtime:
   scripts:

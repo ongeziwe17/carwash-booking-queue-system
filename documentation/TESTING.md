@@ -2,6 +2,14 @@
 
 TEST-001 separates fast unit/repository/service tests from Spring API integration tests and makes isolation, test data, execution order, and release-gate behaviour explicit.
 
+## Current TENANT-001 inventory
+
+TENANT-001 adds **3 unit tests** and **6 integration tests** to the reviewed staging SHA, for a measured total of **380 unit tests and 196 integration tests**. The integration delta comprises two RBAC/JWT tests, two end-to-end tenant-isolation tests, and two PostgreSQL tenant-constraint/migration tests; `PostgresPersistenceIntegrationTest` now executes **22 tests** in total. The public contract adds **2 operations**, for exactly **71 OpenAPI operations**.
+
+The Bruno collection adds **13 HTTP requests and 11 explicit `test(...)` assertions** relative to the reviewed SHA's source inventory, for exactly **533 requests and 1,696 assertions**. It covers all **71/71 OpenAPI operations** and unauthenticated rejection for all **69/69 protected operations**. The added Java and HTTP cases explicitly cover canonical membership onboarding/replacement/removal, trusted `tenant_id` validation and stale-token rejection, same-tenant success, cross-tenant safe `404`, permission `403`, authentication `401`, explicit platform-administrator scope, subject-scoped customer access, global-catalogue restriction, discovery-field privacy, repository tenant predicates, report/notification isolation, and PostgreSQL relational constraints.
+
+The complete suite remains randomized and repeatable under seeds `11001` and `11002`. PostgreSQL coverage uses the pinned PostgreSQL 17.6 Testcontainers image and includes clean V1–V4 migration, incremental V1–V3 to V4 migration, checksum validation, unassigned legacy operators, active-membership uniqueness, transactional rollback, SQL tenant predicates, and cross-tenant relational mismatch rejection.
+
 ## Current DATA-002 inventory
 
 DATA-002 retains the **366 unit / 170 integration / 69 OpenAPI operation / 520 Bruno request / 1,685 Bruno assertion** staging baseline. It removes the seven-test unsupported `DatabaseUserRepository` placeholder and adds 18 unit/architecture tests plus 20 real-PostgreSQL integration tests, for **377 unit tests and 190 integration tests**. The HTTP contract remains exactly **69 operations** and Bruno remains **520 requests / 1,685 assertions**.

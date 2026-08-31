@@ -11,6 +11,7 @@ import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
 import com.carwash.shared.application.DataTransactionOperations;
 import com.carwash.shared.application.MutationLock;
+import com.carwash.access.application.TenantAccessContext;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -96,10 +97,49 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
         });
     }
 
+    public ServiceOfferingSnapshot createOffering(
+            TenantAccessContext access,
+            String branchId,
+            CreateServiceOfferingCommand command
+    ) {
+        requireAccessibleBranch(access, branchId);
+        return createOffering(branchId, command);
+    }
+
     public ServiceOfferingSnapshot findOffering(String offeringId) {
         return coordinator.read(() -> {
             ServiceOffering offering = requireOffering(offeringId);
             return snapshot(offering, requireService(offering.getServiceId()), requireBranch(offering.getBranchId()));
+        });
+    }
+
+    public ServiceOfferingSnapshot findOffering(TenantAccessContext access, String offeringId) {
+        if (access.isPlatformAdministrator()) return findOffering(offeringId);
+        String tenantId = access.requireBusinessId();
+        return coordinator.read(() -> {
+            ServiceOffering offering = offeringRepository.findByIdAndBusinessId(
+                            normalizeId(offeringId, "Offering ID"), tenantId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Offering not found"));
+            return snapshot(offering, requireService(offering.getServiceId()),
+                    requireTenantBranch(offering.getBranchId(), tenantId));
+        });
+    }
+
+    public List<ServiceOfferingSnapshot> findOfferingsByBranch(
+            TenantAccessContext access,
+            String branchId
+    ) {
+        if (access.isPlatformAdministrator()) return findOfferingsByBranch(branchId);
+        String normalizedId = normalizeId(branchId, "Branch ID");
+        String tenantId = access.requireBusinessId();
+        return coordinator.read(() -> {
+            BranchSnapshot branch = requireTenantBranch(normalizedId, tenantId);
+            Map<String, Service> services = serviceRepository.findAll().stream()
+                    .collect(Collectors.toMap(Service::getServiceId, Function.identity()));
+            return offeringRepository.findByBranchIdAndBusinessId(normalizedId, tenantId).stream()
+                    .map(offering -> snapshot(offering, requireAssociated(
+                            services, offering.getServiceId(), "Service"), branch))
+                    .toList();
         });
     }
 
@@ -187,12 +227,31 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
         });
     }
 
+    public ServiceOfferingSnapshot updateOffering(
+            TenantAccessContext access,
+            String offeringId,
+            UpdateServiceOfferingCommand command
+    ) {
+        requireAccessibleOffering(access, offeringId);
+        return updateOffering(offeringId, command);
+    }
+
     public ServiceOfferingSnapshot activateOffering(String offeringId) {
         return changeStatus(offeringId, true);
     }
 
+    public ServiceOfferingSnapshot activateOffering(TenantAccessContext access, String offeringId) {
+        requireAccessibleOffering(access, offeringId);
+        return activateOffering(offeringId);
+    }
+
     public ServiceOfferingSnapshot deactivateOffering(String offeringId) {
         return changeStatus(offeringId, false);
+    }
+
+    public ServiceOfferingSnapshot deactivateOffering(TenantAccessContext access, String offeringId) {
+        requireAccessibleOffering(access, offeringId);
+        return deactivateOffering(offeringId);
     }
 
     private ServiceOfferingSnapshot changeStatus(String offeringId, boolean active) {
@@ -236,6 +295,27 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
     private BranchSnapshot requireBranch(String branchId) {
         return marketplaceQuery.findBranchOptional(branchId)
                 .orElseThrow(() -> new ResourceNotFoundException("Branch not found: " + branchId));
+    }
+
+    private BranchSnapshot requireTenantBranch(String branchId, String businessId) {
+        return marketplaceQuery.findBranchOptionalByBusiness(branchId, businessId)
+                .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
+    }
+
+    private void requireAccessibleBranch(TenantAccessContext access, String branchId) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        if (!access.isPlatformAdministrator()) {
+            requireTenantBranch(normalizeId(branchId, "Branch ID"), access.requireBusinessId());
+        }
+    }
+
+    private void requireAccessibleOffering(TenantAccessContext access, String offeringId) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        if (!access.isPlatformAdministrator()) {
+            offeringRepository.findByIdAndBusinessId(
+                            normalizeId(offeringId, "Offering ID"), access.requireBusinessId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Offering not found"));
+        }
     }
 
     private Service requireService(String serviceId) {

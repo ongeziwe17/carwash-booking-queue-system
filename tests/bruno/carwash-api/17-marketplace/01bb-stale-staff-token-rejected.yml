@@ -1,0 +1,10 @@
+info: { name: Stale staff tenant token is rejected, type: http, seq: 5, tags: [auth, tenant, security] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/auth/me"
+  auth: { type: bearer, token: "{{staleStaffToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("membership change invalidates old staff token", function() { expect(res.status).to.equal(401); expect(res.body.code).to.equal("AUTHENTICATION_REQUIRED"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

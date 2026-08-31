@@ -17,6 +17,7 @@ import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.method.ParameterErrors;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -48,6 +49,15 @@ public class ApiExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiErrorResponse> handleAccessDenied(AccessDeniedException ex, ServletWebRequest request) {
         return response(HttpStatus.FORBIDDEN, ApiErrorCode.ACCESS_DENIED, "Access denied", request);
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiErrorResponse> handleAuthentication(
+            AuthenticationException ex,
+            ServletWebRequest request
+    ) {
+        return response(HttpStatus.UNAUTHORIZED, ApiErrorCode.AUTHENTICATION_REQUIRED,
+                "Authentication is required", request);
     }
 
     @ExceptionHandler({ResourceNotFoundException.class})

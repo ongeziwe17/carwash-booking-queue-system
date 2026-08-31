@@ -9,6 +9,8 @@ import com.carwash.marketplace.domain.CarWashBusinessRepository;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
 import com.carwash.shared.application.DataTransactionOperations;
+import com.carwash.access.application.TenantAccessContext;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -71,6 +73,82 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
             }
             return BusinessSnapshot.from(business);
         });
+    }
+
+    public BusinessSnapshot registerBusiness(TenantAccessContext access, RegisterBusinessCommand command) {
+        requirePlatformAdministrator(access);
+        return registerBusiness(command);
+    }
+
+    public List<BusinessSnapshot> findAccessibleBusinesses(TenantAccessContext access) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        if (access.isPlatformAdministrator()) return findAllBusinesses();
+        String tenantId = access.requireBusinessId();
+        return coordinator.read(() -> businessRepository.findByIdAndTenantId(tenantId, tenantId)
+                .map(BusinessSnapshot::from).stream().toList());
+    }
+
+    public BusinessSnapshot findBusiness(TenantAccessContext access, String businessId) {
+        if (access.isPlatformAdministrator()) return findBusiness(businessId);
+        return BusinessSnapshot.from(requireTenantBusiness(businessId, access.requireBusinessId()));
+    }
+
+    public BusinessSnapshot updateBusiness(
+            TenantAccessContext access,
+            String businessId,
+            UpdateBusinessCommand command
+    ) {
+        requireAccessibleBusiness(access, businessId);
+        return updateBusiness(businessId, command);
+    }
+
+    public BusinessSnapshot activateBusiness(TenantAccessContext access, String businessId) {
+        requireAccessibleBusiness(access, businessId);
+        return activateBusiness(businessId);
+    }
+
+    public BusinessSnapshot deactivateBusiness(TenantAccessContext access, String businessId) {
+        requireAccessibleBusiness(access, businessId);
+        return deactivateBusiness(businessId);
+    }
+
+    public BranchSnapshot createBranch(
+            TenantAccessContext access,
+            String businessId,
+            CreateBranchCommand command
+    ) {
+        requireAccessibleBusiness(access, businessId);
+        return createBranch(businessId, command);
+    }
+
+    public List<BranchSnapshot> findBranchesByBusiness(TenantAccessContext access, String businessId) {
+        requireAccessibleBusiness(access, businessId);
+        return findBranchesByBusiness(businessId);
+    }
+
+    public BranchSnapshot findBranch(TenantAccessContext access, String branchId) {
+        if (access.isPlatformAdministrator()) return findBranch(branchId);
+        CarWashBranch branch = requireTenantBranch(branchId, access.requireBusinessId());
+        return coordinator.read(() -> snapshot(branch));
+    }
+
+    public BranchSnapshot updateBranch(
+            TenantAccessContext access,
+            String branchId,
+            UpdateBranchCommand command
+    ) {
+        requireAccessibleBranch(access, branchId);
+        return updateBranch(branchId, command);
+    }
+
+    public BranchSnapshot activateBranch(TenantAccessContext access, String branchId) {
+        requireAccessibleBranch(access, branchId);
+        return activateBranch(branchId);
+    }
+
+    public BranchSnapshot deactivateBranch(TenantAccessContext access, String branchId) {
+        requireAccessibleBranch(access, branchId);
+        return deactivateBranch(branchId);
     }
 
     @Override
@@ -178,6 +256,13 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
         return coordinator.read(() -> branchRepository.findById(normalizedId).map(this::snapshot));
     }
 
+    @Override
+    public Optional<BranchSnapshot> findBranchOptionalByBusiness(String branchId, String businessId) {
+        String normalizedId = normalizeRequiredId(branchId, "Branch ID");
+        return coordinator.read(() -> branchRepository.findByIdAndBusinessId(normalizedId, businessId)
+                .map(this::snapshot));
+    }
+
     public BranchSnapshot updateBranch(String branchId, UpdateBranchCommand command) {
         return coordinator.write(() -> {
             CarWashBranch existing = requireBranch(branchId);
@@ -248,10 +333,39 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
                 .orElseThrow(() -> new ResourceNotFoundException("Business not found: " + normalizedId));
     }
 
+    private CarWashBusiness requireTenantBusiness(String businessId, String tenantId) {
+        String normalizedId = normalizeRequiredId(businessId, "Business ID");
+        return coordinator.read(() -> businessRepository.findByIdAndTenantId(normalizedId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Business not found")));
+    }
+
     private CarWashBranch requireBranch(String branchId) {
         String normalizedId = normalizeRequiredId(branchId, "Branch ID");
         return branchRepository.findById(normalizedId)
                 .orElseThrow(() -> new ResourceNotFoundException("Branch not found: " + normalizedId));
+    }
+
+    private CarWashBranch requireTenantBranch(String branchId, String tenantId) {
+        String normalizedId = normalizeRequiredId(branchId, "Branch ID");
+        return coordinator.read(() -> branchRepository.findByIdAndBusinessId(normalizedId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Branch not found")));
+    }
+
+    private void requireAccessibleBusiness(TenantAccessContext access, String businessId) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        if (!access.isPlatformAdministrator()) requireTenantBusiness(businessId, access.requireBusinessId());
+    }
+
+    private void requireAccessibleBranch(TenantAccessContext access, String branchId) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        if (!access.isPlatformAdministrator()) requireTenantBranch(branchId, access.requireBusinessId());
+    }
+
+    private void requirePlatformAdministrator(TenantAccessContext access) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        if (!access.isPlatformAdministrator()) {
+            throw new AccessDeniedException("Platform administrator access is required");
+        }
     }
 
     private void updateBusinessRecord(CarWashBusiness business) {

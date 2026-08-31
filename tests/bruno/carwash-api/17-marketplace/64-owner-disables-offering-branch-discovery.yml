@@ -1,7 +1,7 @@
 info:
   name: Business owner disables offering branch discovery
   type: http
-  seq: 64
+  seq: 74
   tags: [marketplace, offering, owner, workflow]
 
 http:

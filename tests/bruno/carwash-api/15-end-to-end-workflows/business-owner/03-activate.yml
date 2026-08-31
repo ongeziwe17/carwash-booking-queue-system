@@ -1,5 +1,5 @@
 info:
-  name: Owner journey reactivates service
+  name: Owner journey cannot activate global service definition
   type: http
   seq: 3
   tags:
@@ -17,7 +17,7 @@ runtime:
   scripts:
     - type: tests
       code: |-
-        test("returns 200", function() { expect(res.status).to.equal(200); });
+        test("returns 403", function() { expect(res.status).to.equal(403); expect(res.body.code).to.equal("ACCESS_DENIED"); });
         test("returns JSON", function() { expect(String(res.getHeader("content-type") || "").toLowerCase()).to.include("application/json"); });
         const payload = JSON.stringify(res.body ?? {});
         const lower = payload.toLowerCase();
@@ -29,7 +29,6 @@ runtime:
         const bootstrapPassword = bru.interpolate("{{process.env.BRUNO_BOOTSTRAP_ADMIN_PASSWORD}}");
         if (bootstrapPassword && !bootstrapPassword.includes("process.env")) expect(payload).to.not.include(bootstrapPassword);
         test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
-        test("active", function() { expect(res.body.active).to.equal(true); });
 
 settings:
   encodeUrl: true

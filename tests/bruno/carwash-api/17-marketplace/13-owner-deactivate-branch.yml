@@ -1,7 +1,7 @@
 info:
   name: Business owner deactivates Marketplace branch
   type: http
-  seq: 13
+  seq: 19
   tags: [marketplace, owner, workflow]
 
 http:

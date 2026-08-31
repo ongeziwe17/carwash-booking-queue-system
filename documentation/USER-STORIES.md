@@ -13,11 +13,11 @@ Stories are grouped by delivery phase so planned capabilities are not confused w
 | US-CUR-001 | As an operator, I want to manage user records so vehicles and bookings can reference customers. | Create, retrieve, update, delete, and reject duplicate email records. | Implemented foundation; unsafe response contracts remain. |
 | US-CUR-002 | As a customer or operator, I want to manage vehicle records for a user. | Create, retrieve, update, delete, associate with an owner, and reject duplicate plates during creation. | Implemented foundation. |
 | US-CUR-003 | As an operator, I want to manage a wash-service catalogue. | Create, retrieve, update, delete, activate, deactivate, and filter services. | Implemented as a global catalogue only. |
-| US-CUR-004 | As an operator, I want to manage bookings. | Create future bookings with canonical branch/offering scope, confirm, same-branch offering update, filter, and queue-aware cancel. | Implemented foundation with branch-partitioned exact-slot capacity and lifecycle synchronization. |
-| US-CUR-005 | As staff, I want to manage queue entries. | Inherit scope from bookings; branch-filter, order, rebalance, call, start, complete, and delete entries. | Implemented with branch-isolated ordering, offering-duration waits, and synchronized booking lifecycle. |
+| US-CUR-004 | As an operator, I want to manage bookings. | Create future bookings with canonical branch/offering scope; tenant-scoped confirm/update/filter/cancel for operators; subject-scoped customer self-service. | Implemented with tenant predicates, branch-partitioned exact-slot capacity, and lifecycle synchronization. |
+| US-CUR-005 | As staff, I want to manage queue entries. | Inherit scope from bookings; tenant/branch-filter, order, rebalance, call, start, complete, and delete entries. | Implemented with tenant isolation, branch ordering, offering-duration waits, and synchronized booking lifecycle. |
 | US-CUR-006 | As a customer, I want to see recent in-app notifications. | Booking/queue events create bounded records with branch/offering context that can be listed by user. | Partially implemented; external delivery/read lifecycle remain future work. |
-| US-CUR-007 | As an operator, I want a daily operational summary. | Return booking/queue counts for exactly one branch or owning-business scope using branch-local dates. | Implemented basic in-memory summary; tenant authorization and analytics remain future work. |
-| US-CUR-008 | As a business owner, I want to register Marketplace businesses and branches. | Valid contact/location data, immutable branch ownership, lifecycle actions, offerings, and bounded discovery views. | Implemented under both persistence profiles; tenant isolation remains future work. |
+| US-CUR-007 | As an operator, I want a daily operational summary. | Return booking/queue counts for exactly one tenant-authorized branch or business scope using branch-local dates. | Implemented under both persistence profiles; richer analytics remain future work. |
+| US-CUR-008 | As a business owner, I want to manage my Marketplace business and branches. | Valid contact/location data, immutable tenant ownership, lifecycle actions, offerings, and discovery-safe views; only platform admins register businesses. | Implemented under both persistence profiles with strict tenant isolation. |
 
 ## 3. Phase 0 — API, Data, Security, Test, and Delivery Hardening
 
@@ -70,7 +70,7 @@ REC-001 is implemented as a point-in-time, non-reserving read. Future-date queue
 | US-TEST-002 | #123 | As a maintainer, I want PostgreSQL integration tests so migrations and persistence behaviour are verified. | Implemented by PR #179 with PostgreSQL 17.6 Testcontainers, production Flyway migrations, repository/constraint/rollback coverage, restart durability, precision round trips, and booking/queue concurrency tests. |
 | US-SEC-002 | #13 | As a user, I want to authenticate securely so protected functionality can identify me. | Safe login, credential verification, token/session expiry, HTTP 401 paths. |
 | US-SEC-003 | #22 | As a platform administrator, I want RBAC so customer, staff, owner, and admin actions are protected. | Explicit role matrix and 401/403 coverage. |
-| US-TENANT-001 | #124 | As a business owner, I want strict tenant isolation so no other business can access my private operational data. | Tenant-scoped APIs/repositories/reports; cross-tenant access denied and tested. |
+| US-TENANT-001 | #124 | As a business owner, I want strict tenant isolation so no other business can access my private operational data. | Implemented: one canonical membership, trusted/stale-invalidating `tenant_id`, scoped APIs/repositories/reports/notifications, safe foreign `404`, explicit admin paths, V4 constraints/indexes, and discovery DTO allowlists. |
 | US-AUDIT-001 | #125 | As a business/platform administrator, I want an audit trail for sensitive actions. | Append-only actor/action/resource/outcome records with privacy and tenant controls. |
 
 ## 8. Phase 5 — Product and Platform Expansion
@@ -100,6 +100,6 @@ REC-001 is implemented as a point-in-time, non-reserving read. Future-date queue
 
 - Eligibility and availability rules remain deterministic even when recommendation ranking evolves.
 - Stories should be implemented in dependency order rather than issue-number order.
-- Tenant isolation, backup/restore operations, security auditability, and observability are required before production Marketplace use.
+- Backup/restore operations, security auditability, observability, and deployment hardening remain required before production Marketplace use; tenant isolation is implemented.
 - The modular monolith remains the default architecture until scaling or team boundaries justify extraction.
 - No story should describe a planned capability as already implemented.

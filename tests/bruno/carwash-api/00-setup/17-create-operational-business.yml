@@ -1,7 +1,7 @@
 info:
   name: Create run-scoped operational business
   type: http
-  seq: 17
+  seq: 7
   tags: [setup, operations, marketplace]
 
 http:
@@ -18,7 +18,7 @@ http:
         "contactPhone": "+27 82 555 0100",
         "registrationNumber": "OPS-{{runId}}"
       }
-  auth: { type: bearer, token: "{{ownerToken}}" }
+  auth: { type: bearer, token: "{{adminToken}}" }
 
 runtime:
   scripts:

@@ -17,6 +17,10 @@ public interface MarketplaceQuery {
 
     Optional<BranchSnapshot> findBranchOptional(String branchId);
 
+    default Optional<BranchSnapshot> findBranchOptionalByBusiness(String branchId, String businessId) {
+        return findBranchOptional(branchId).filter(branch -> businessId.equals(branch.businessId()));
+    }
+
     List<BranchSnapshot> findBranchesByBusiness(String businessId);
 
     List<BranchSnapshot> findDiscoverableBranches();

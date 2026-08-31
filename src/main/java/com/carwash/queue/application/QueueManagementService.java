@@ -8,6 +8,7 @@ import com.carwash.catalog.application.ServiceOfferingSnapshot;
 import com.carwash.catalog.domain.Service;
 import com.carwash.identity.domain.Role;
 import com.carwash.identity.domain.User;
+import com.carwash.access.application.TenantAccessContext;
 import com.carwash.marketplace.application.BranchSnapshot;
 import com.carwash.marketplace.application.MarketplaceQuery;
 import com.carwash.notification.application.NotificationManagementService;
@@ -29,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import org.springframework.security.access.AccessDeniedException;
 
 public class QueueManagementService implements QueueQuery {
 
@@ -88,6 +90,22 @@ public class QueueManagementService implements QueueQuery {
         return createQueueEntry(new QueueEntry(queueEntryId, booking, service));
     }
 
+    public QueueEntry createQueueEntry(
+            TenantAccessContext access,
+            String queueEntryId,
+            String bookingId,
+            String serviceId
+    ) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        if (access.isCustomer()) throw new AccessDeniedException("Operational queue access is required");
+        if (access.isOperational()) {
+            bookingRepository.findByIdAndBusinessId(
+                            normalizeId(bookingId, "Booking ID"), access.requireBusinessId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+        }
+        return createQueueEntry(queueEntryId, bookingId, serviceId);
+    }
+
     public QueueEntry createQueueEntry(QueueEntry queueEntry) {
         return coordinator.write(() -> {
             lockQueueCreation(queueEntry);
@@ -125,6 +143,10 @@ public class QueueManagementService implements QueueQuery {
         return coordinator.read(() -> snapshotQueueEntry(requireQueueEntry(queueEntryId)));
     }
 
+    public QueueEntry findById(TenantAccessContext access, String queueEntryId) {
+        return coordinator.read(() -> snapshotQueueEntry(requireAccessibleQueueEntry(access, queueEntryId)));
+    }
+
     public List<QueueEntry> findAll() {
         return findAll(null);
     }
@@ -142,6 +164,47 @@ public class QueueManagementService implements QueueQuery {
         });
     }
 
+    public List<QueueEntry> findAll(TenantAccessContext access, String branchId) {
+        return findAll(access, branchId, null);
+    }
+
+    public List<QueueEntry> findAll(
+            TenantAccessContext access,
+            String branchId,
+            String administratorBusinessId
+    ) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        if (access.isPlatformAdministrator()) {
+            String businessId = normalizeId(administratorBusinessId, "Business ID");
+            return coordinator.read(() -> {
+                if (branchId == null) return snapshotQueueEntries(
+                        queueEntryRepository.findByBusinessId(businessId));
+                String normalizedBranchId = normalizeId(branchId, "Branch ID");
+                marketplaceQuery.findBranchOptionalByBusiness(normalizedBranchId, businessId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
+                return snapshotQueueEntries(queueEntryRepository
+                        .findByBranchIdAndBusinessId(normalizedBranchId, businessId));
+            });
+        }
+        if (!access.isOperational()) throw new AccessDeniedException("Operational queue access is required");
+        if (administratorBusinessId != null) {
+            throw new BusinessRuleViolationException("Tenant identity is derived from authentication");
+        }
+        String tenantId = access.requireBusinessId();
+        return coordinator.read(() -> {
+            List<QueueEntry> source;
+            if (branchId == null) {
+                source = queueEntryRepository.findByBusinessId(tenantId);
+            } else {
+                String normalizedBranchId = normalizeId(branchId, "Branch ID");
+                marketplaceQuery.findBranchOptionalByBusiness(normalizedBranchId, tenantId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
+                source = queueEntryRepository.findByBranchIdAndBusinessId(normalizedBranchId, tenantId);
+            }
+            return snapshotQueueEntries(source);
+        });
+    }
+
     @Override
     public List<QueueEntrySnapshot> findQueueEntrySnapshots() {
         return coordinator.read(() -> queueEntrySnapshots(queueEntryRepository.findAllOrdered()));
@@ -153,6 +216,20 @@ public class QueueManagementService implements QueueQuery {
             String normalizedBranchId = requireBranch(branchId).branchId();
             return queueEntrySnapshots(queueEntryRepository.findByBranchId(normalizedBranchId));
         });
+    }
+
+    @Override
+    public List<QueueEntrySnapshot> findQueueEntrySnapshotsByBusiness(String businessId) {
+        return coordinator.read(() -> queueEntrySnapshots(queueEntryRepository.findByBusinessId(businessId)));
+    }
+
+    @Override
+    public List<QueueEntrySnapshot> findQueueEntrySnapshotsByBranchAndBusiness(
+            String branchId,
+            String businessId
+    ) {
+        return coordinator.read(() -> queueEntrySnapshots(
+                queueEntryRepository.findByBranchIdAndBusinessId(branchId, businessId)));
     }
 
     @Override
@@ -210,6 +287,11 @@ public class QueueManagementService implements QueueQuery {
         });
     }
 
+    public QueueEntry updatePosition(TenantAccessContext access, String queueEntryId, int position) {
+        requireOperationalQueueEntry(access, queueEntryId);
+        return updatePosition(queueEntryId, position);
+    }
+
     public QueueEntry callNext(String branchId) {
         return coordinator.write(() -> {
             String normalizedBranchId = requireBranch(branchId).branchId();
@@ -220,12 +302,33 @@ public class QueueManagementService implements QueueQuery {
         });
     }
 
+    public QueueEntry callNext(TenantAccessContext access, String branchId) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        if (access.isCustomer()) throw new AccessDeniedException("Operational queue access is required");
+        if (access.isPlatformAdministrator()) return callNext(branchId);
+        return coordinator.write(() -> {
+            String normalizedBranchId = normalizeId(branchId, "Branch ID");
+            String tenantId = access.requireBusinessId();
+            marketplaceQuery.findBranchOptionalByBusiness(normalizedBranchId, tenantId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
+            mutationLock.acquire(MutationLock.queueBranch(normalizedBranchId));
+            return callWaitingEntry(queueEntryRepository
+                    .findNextWaitingByBranchIdAndBusinessId(normalizedBranchId, tenantId)
+                    .orElseThrow(() -> new ResourceNotFoundException("No waiting queue entry found")));
+        });
+    }
+
     public QueueEntry callQueueEntry(String queueEntryId) {
         return coordinator.write(() -> {
             QueueEntry initial = requireQueueEntry(queueEntryId);
             mutationLock.acquire(MutationLock.queueBranch(initial.getBranchId()));
             return callWaitingEntry(requireQueueEntry(queueEntryId));
         });
+    }
+
+    public QueueEntry callQueueEntry(TenantAccessContext access, String queueEntryId) {
+        requireOperationalQueueEntry(access, queueEntryId);
+        return callQueueEntry(queueEntryId);
     }
 
     public QueueEntry startService(String queueEntryId) {
@@ -262,6 +365,11 @@ public class QueueManagementService implements QueueQuery {
             notifyCustomerBestEffort(queueEntry, "SERVICE_STARTED", "Your service has started.");
             return snapshotQueueEntry(queueEntry);
         });
+    }
+
+    public QueueEntry startService(TenantAccessContext access, String queueEntryId) {
+        requireOperationalQueueEntry(access, queueEntryId);
+        return startService(queueEntryId);
     }
 
     public QueueEntry completeQueueEntry(String queueEntryId) {
@@ -304,6 +412,11 @@ public class QueueManagementService implements QueueQuery {
         });
     }
 
+    public QueueEntry completeQueueEntry(TenantAccessContext access, String queueEntryId) {
+        requireOperationalQueueEntry(access, queueEntryId);
+        return completeQueueEntry(queueEntryId);
+    }
+
     public void deleteQueueEntry(String queueEntryId) {
         coordinator.write(() -> {
             QueueEntry initial = requireQueueEntry(queueEntryId);
@@ -333,6 +446,11 @@ public class QueueManagementService implements QueueQuery {
                 throw exception;
             }
         });
+    }
+
+    public void deleteQueueEntry(TenantAccessContext access, String queueEntryId) {
+        requireOperationalQueueEntry(access, queueEntryId);
+        deleteQueueEntry(queueEntryId);
     }
 
     private void rollbackQueueCreation(
@@ -388,6 +506,22 @@ public class QueueManagementService implements QueueQuery {
     private QueueEntry requireQueueEntry(String queueEntryId) {
         return queueEntryRepository.findById(queueEntryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Queue entry not found: " + queueEntryId));
+    }
+
+    private QueueEntry requireAccessibleQueueEntry(TenantAccessContext access, String queueEntryId) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        String normalizedId = normalizeId(queueEntryId, "Queue entry ID");
+        Optional<QueueEntry> accessible = access.isPlatformAdministrator()
+                ? queueEntryRepository.findById(normalizedId)
+                : access.isOperational()
+                ? queueEntryRepository.findByIdAndBusinessId(normalizedId, access.requireBusinessId())
+                : queueEntryRepository.findByIdAndUserId(normalizedId, access.userId());
+        return accessible.orElseThrow(() -> new ResourceNotFoundException("Queue entry not found"));
+    }
+
+    private QueueEntry requireOperationalQueueEntry(TenantAccessContext access, String queueEntryId) {
+        if (access.isCustomer()) throw new AccessDeniedException("Operational queue access is required");
+        return requireAccessibleQueueEntry(access, queueEntryId);
     }
 
     private void updateQueueEntry(QueueEntry queueEntry) {

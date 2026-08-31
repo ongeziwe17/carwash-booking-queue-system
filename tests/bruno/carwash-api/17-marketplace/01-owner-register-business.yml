@@ -1,8 +1,8 @@
 info:
-  name: Business owner registers Marketplace business
+  name: Platform admin registers Marketplace business for explicit onboarding
   type: http
   seq: 1
-  tags: [marketplace, workflow, owner, rbac]
+  tags: [marketplace, workflow, admin, tenant]
 
 http:
   method: POST
@@ -22,7 +22,7 @@ http:
       }
   auth:
     type: bearer
-    token: "{{ownerToken}}"
+    token: "{{adminToken}}"
 
 runtime:
   scripts:

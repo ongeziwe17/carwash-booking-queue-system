@@ -9,7 +9,7 @@ http:
   url: "{{baseUrl}}/api/services/{{availabilityInactiveServiceId}}/deactivate"
   auth:
     type: bearer
-    token: "{{ownerToken}}"
+    token: "{{adminToken}}"
 
 runtime:
   scripts:

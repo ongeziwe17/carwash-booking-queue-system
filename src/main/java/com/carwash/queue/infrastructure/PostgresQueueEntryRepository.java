@@ -28,6 +28,11 @@ public class PostgresQueueEntryRepository implements QueueEntryRepository {
     @Override public List<QueueEntry> findByBookingId(String id){return domains(repository.findByBookingIdOrderByIdAsc(id));}
     @Override public List<QueueEntry> findByServiceId(String id){return domains(repository.byService(id));}
     @Override public List<QueueEntry> findByBranchId(String id){return domains(repository.byBranch(id));}
+    @Override public List<QueueEntry> findByBusinessId(String id){return domains(repository.byTenant(id));}
+    @Override public List<QueueEntry> findByBranchIdAndBusinessId(String branchId,String businessId){return domains(repository.byBranchTenant(branchId,businessId));}
+    @Override public Optional<QueueEntry> findByIdAndBusinessId(String id,String businessId){return repository.tenantScoped(id,businessId).map(this::domain);}
+    @Override public Optional<QueueEntry> findByIdAndUserId(String id,String userId){return repository.findByIdAndUserId(id,userId).map(this::domain);}
+    @Override public Optional<QueueEntry> findNextWaitingByBranchIdAndBusinessId(String branchId,String businessId){return repository.nextWaitingTenantScoped(branchId,businessId).map(this::domain);}
     @Override public boolean existsByBookingId(String id){return repository.existsByBookingId(id);}
     @Override public boolean existsActiveByBookingId(String id){return repository.existsByBookingIdAndStatusIn(id,ACTIVE);}
     @Override public boolean existsByServiceId(String id){return repository.existsByServiceId(id);}

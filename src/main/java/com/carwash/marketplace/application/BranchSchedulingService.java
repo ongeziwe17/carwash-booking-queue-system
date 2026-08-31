@@ -14,6 +14,7 @@ import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
 import com.carwash.shared.application.DataTransactionOperations;
 import com.carwash.shared.application.MutationLock;
+import com.carwash.access.application.TenantAccessContext;
 
 import java.time.Clock;
 import java.time.DayOfWeek;
@@ -77,6 +78,24 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
         });
     }
 
+    public BranchOperatingScheduleSnapshot getOperatingSchedule(
+            TenantAccessContext access,
+            String branchId
+    ) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        if (access.isPlatformAdministrator()) return getOperatingSchedule(branchId);
+        String normalizedId = normalizeRequiredId(branchId, "Branch ID");
+        String businessId = access.requireBusinessId();
+        return coordinator.read(() -> {
+            CarWashBranch branch = branchRepository.findByIdAndBusinessId(normalizedId, businessId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
+            return scheduleRepository.findByBranchIdAndBusinessId(branch.getBranchId(), businessId)
+                    .map(schedule -> BranchOperatingScheduleSnapshot.from(schedule, branch.getTimezone()))
+                    .orElseGet(() -> BranchOperatingScheduleSnapshot.empty(
+                            branch.getBranchId(), branch.getTimezone()));
+        });
+    }
+
     public BranchOperatingScheduleSnapshot replaceOperatingSchedule(
             String branchId,
             ReplaceOperatingScheduleCommand command
@@ -104,6 +123,15 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
         });
     }
 
+    public BranchOperatingScheduleSnapshot replaceOperatingSchedule(
+            TenantAccessContext access,
+            String branchId,
+            ReplaceOperatingScheduleCommand command
+    ) {
+        requireAccessibleBranch(access, branchId);
+        return replaceOperatingSchedule(branchId, command);
+    }
+
     public List<TemporaryBranchClosureSnapshot> listTemporaryClosures(String branchId) {
         return coordinator.read(() -> {
             CarWashBranch branch = requireBranch(branchId);
@@ -111,6 +139,17 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
                     .map(TemporaryBranchClosureSnapshot::from)
                     .toList();
         });
+    }
+
+    public List<TemporaryBranchClosureSnapshot> listTemporaryClosures(
+            TenantAccessContext access,
+            String branchId
+    ) {
+        if (access.isPlatformAdministrator()) return listTemporaryClosures(branchId);
+        CarWashBranch branch = requireTenantBranch(branchId, access.requireBusinessId());
+        return coordinator.read(() -> closureRepository
+                .findByBranchIdAndBusinessId(branch.getBranchId(), access.businessId()).stream()
+                .map(TemporaryBranchClosureSnapshot::from).toList());
     }
 
     public TemporaryBranchClosureSnapshot createTemporaryClosure(
@@ -153,6 +192,15 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
         });
     }
 
+    public TemporaryBranchClosureSnapshot createTemporaryClosure(
+            TenantAccessContext access,
+            String branchId,
+            CreateTemporaryBranchClosureCommand command
+    ) {
+        requireAccessibleBranch(access, branchId);
+        return createTemporaryClosure(branchId, command);
+    }
+
     public TemporaryBranchClosureSnapshot cancelTemporaryClosure(String closureId) {
         return coordinator.write(() -> {
             String normalizedId = normalizeRequiredId(closureId, "Closure ID");
@@ -169,6 +217,19 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
             }
             return TemporaryBranchClosureSnapshot.from(cancelled);
         });
+    }
+
+    public TemporaryBranchClosureSnapshot cancelTemporaryClosure(
+            TenantAccessContext access,
+            String closureId
+    ) {
+        if (!access.isPlatformAdministrator()) {
+            String normalizedId = normalizeRequiredId(closureId, "Closure ID");
+            coordinator.read(() -> closureRepository
+                    .findByIdAndBusinessId(normalizedId, access.requireBusinessId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Closure not found")));
+        }
+        return cancelTemporaryClosure(closureId);
     }
 
     @Override
@@ -346,6 +407,17 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
         String normalizedId = normalizeRequiredId(branchId, "Branch ID");
         return branchRepository.findById(normalizedId)
                 .orElseThrow(() -> new ResourceNotFoundException("Branch not found: " + normalizedId));
+    }
+
+    private CarWashBranch requireTenantBranch(String branchId, String businessId) {
+        String normalizedId = normalizeRequiredId(branchId, "Branch ID");
+        return coordinator.read(() -> branchRepository.findByIdAndBusinessId(normalizedId, businessId)
+                .orElseThrow(() -> new ResourceNotFoundException("Branch not found")));
+    }
+
+    private void requireAccessibleBranch(TenantAccessContext access, String branchId) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        if (!access.isPlatformAdministrator()) requireTenantBranch(branchId, access.requireBusinessId());
     }
 
     private CarWashBusiness requireBusiness(String businessId) {

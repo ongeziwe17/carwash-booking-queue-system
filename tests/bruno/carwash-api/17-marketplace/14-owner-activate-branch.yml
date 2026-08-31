@@ -1,7 +1,7 @@
 info:
   name: Business owner activates Marketplace branch
   type: http
-  seq: 14
+  seq: 20
   tags: [marketplace, owner, workflow]
 
 http:

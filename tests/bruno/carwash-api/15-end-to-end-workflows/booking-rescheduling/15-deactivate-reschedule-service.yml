@@ -6,7 +6,7 @@ info:
 http:
   method: POST
   url: "{{baseUrl}}/api/services/{{rescheduleServiceId}}/deactivate"
-  auth: { type: bearer, token: "{{ownerToken}}" }
+  auth: { type: bearer, token: "{{adminToken}}" }
 runtime:
   scripts:
     - type: tests

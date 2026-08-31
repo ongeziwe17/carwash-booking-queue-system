@@ -10,6 +10,7 @@ import com.carwash.marketplace.application.CreateTemporaryBranchClosureCommand;
 import com.carwash.marketplace.application.ReplaceOperatingScheduleCommand;
 import com.carwash.marketplace.application.WeeklyOperatingIntervalCommand;
 import com.carwash.shared.api.error.ApiErrorResponse;
+import com.carwash.access.application.TenantAccessContextProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -61,9 +62,11 @@ import java.util.List;
 public class BranchSchedulingController {
 
     private final BranchSchedulingService scheduling;
+    private final TenantAccessContextProvider tenantAccess;
 
-    public BranchSchedulingController(BranchSchedulingService scheduling) {
+    public BranchSchedulingController(BranchSchedulingService scheduling, TenantAccessContextProvider tenantAccess) {
         this.scheduling = scheduling;
+        this.tenantAccess = tenantAccess;
     }
 
     @GetMapping("/branches/{branchId}/operating-hours")
@@ -74,7 +77,7 @@ public class BranchSchedulingController {
     public BranchOperatingHoursResponse getOperatingHours(
             @PathVariable @NotBlank @Size(max = 64) String branchId
     ) {
-        return MarketplaceMapper.toResponse(scheduling.getOperatingSchedule(branchId));
+        return MarketplaceMapper.toResponse(scheduling.getOperatingSchedule(tenantAccess.current(), branchId));
     }
 
     @PutMapping("/branches/{branchId}/operating-hours")
@@ -87,6 +90,7 @@ public class BranchSchedulingController {
             @Valid @RequestBody ReplaceOperatingHoursRequest request
     ) {
         return MarketplaceMapper.toResponse(scheduling.replaceOperatingSchedule(
+                tenantAccess.current(),
                 branchId,
                 new ReplaceOperatingScheduleCommand(request.intervals().stream()
                         .map(interval -> new WeeklyOperatingIntervalCommand(
@@ -103,7 +107,7 @@ public class BranchSchedulingController {
     public List<TemporaryClosureResponse> listClosures(
             @PathVariable @NotBlank @Size(max = 64) String branchId
     ) {
-        return scheduling.listTemporaryClosures(branchId).stream()
+        return scheduling.listTemporaryClosures(tenantAccess.current(), branchId).stream()
                 .map(MarketplaceMapper::toResponse)
                 .toList();
     }
@@ -119,6 +123,7 @@ public class BranchSchedulingController {
             @Valid @RequestBody CreateTemporaryClosureRequest request
     ) {
         return MarketplaceMapper.toResponse(scheduling.createTemporaryClosure(
+                tenantAccess.current(),
                 branchId,
                 new CreateTemporaryBranchClosureCommand(
                         request.closureId(),
@@ -136,7 +141,7 @@ public class BranchSchedulingController {
     public TemporaryClosureResponse cancelClosure(
             @PathVariable @NotBlank @Size(max = 64) String closureId
     ) {
-        return MarketplaceMapper.toResponse(scheduling.cancelTemporaryClosure(closureId));
+        return MarketplaceMapper.toResponse(scheduling.cancelTemporaryClosure(tenantAccess.current(), closureId));
     }
 
     @GetMapping("/branches/{branchId}/open-status")

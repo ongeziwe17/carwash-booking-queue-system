@@ -1,7 +1,7 @@
 info:
   name: Business owner creates Marketplace branch
   type: http
-  seq: 5
+  seq: 11
   tags: [marketplace, owner, workflow]
 
 http:

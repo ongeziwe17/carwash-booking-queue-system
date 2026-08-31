@@ -15,6 +15,7 @@ public class PostgresCarWashBranchRepository implements CarWashBranchRepository 
     private final BranchSpringDataRepository repository;
     public PostgresCarWashBranchRepository(BranchSpringDataRepository repository){this.repository=repository;}
     @Override public List<CarWashBranch> findByBusinessId(String id){return repository.findByBusinessIdOrderByIdAsc(id).stream().map(this::domain).toList();}
+    @Override public Optional<CarWashBranch> findByIdAndBusinessId(String id,String businessId){return repository.findByIdAndBusinessId(id,businessId).map(this::domain);}
     @Override public boolean insert(CarWashBranch v){if(repository.existsById(v.getBranchId()))return false;repository.saveAndFlush(entity(v));return true;}
     @Override public boolean update(CarWashBranch v){Optional<BranchJpaEntity> found=repository.findById(v.getBranchId());if(found.isEmpty())return false;apply(v,found.get());repository.saveAndFlush(found.get());return true;}
     @Override public Optional<CarWashBranch> findById(String id){return repository.findById(id).map(this::domain);}

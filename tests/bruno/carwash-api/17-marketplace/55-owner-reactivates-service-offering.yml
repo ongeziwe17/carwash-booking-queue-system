@@ -1,7 +1,7 @@
 info:
   name: Business owner reactivates branch service offering
   type: http
-  seq: 55
+  seq: 65
   tags: [marketplace, offering, owner, workflow]
 
 http:

@@ -1,10 +1,10 @@
-info: { name: Queue second branch booking, type: http, seq: 7, tags: [ops, queue, branch, workflow] }
+info: { name: Queue second branch booking, type: http, seq: 8, tags: [ops, queue, branch, workflow] }
 http:
   method: POST
   url: "{{baseUrl}}/api/queue-entries"
   headers: [{ name: Content-Type, value: "application/json" }]
   body: { type: json, data: '{"queueEntryId":"{{branchOpsSecondQueueId}}","bookingId":"{{branchOpsSecondBookingId}}","serviceId":"{{serviceId}}"}' }
-  auth: { type: bearer, token: "{{staffToken}}" }
+  auth: { type: bearer, token: "{{adminToken}}" }
 runtime:
   scripts:
     - type: tests

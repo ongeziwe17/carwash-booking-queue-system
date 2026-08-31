@@ -66,3 +66,15 @@ class UserRoleAssignmentJpaEntity {
 
     protected UserRoleAssignmentJpaEntity() { }
 }
+
+@Entity
+@Table(name = "tenant_memberships")
+class TenantMembershipJpaEntity {
+    @Id @Column(name = "user_id", length = 64) String userId;
+    @Column(name = "business_id", nullable = false, length = 64) String businessId;
+    @Column(name = "assigned_at", nullable = false, columnDefinition = "timestamp(6)") LocalDateTime assignedAt;
+    @Column(name = "assigned_at_nano_remainder", nullable = false) short assignedAtNano;
+    @Version @Column(nullable = false) Long version;
+
+    protected TenantMembershipJpaEntity() { }
+}

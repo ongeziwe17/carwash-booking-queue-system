@@ -8,7 +8,7 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/api/vehicles"
+  url: "{{baseUrl}}/api/vehicles?businessId={{opsBusinessId}}"
   auth:
     type: bearer
     token: "{{adminToken}}"

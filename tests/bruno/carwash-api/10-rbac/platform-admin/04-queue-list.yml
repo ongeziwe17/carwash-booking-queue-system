@@ -8,7 +8,7 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/api/queue-entries"
+  url: "{{baseUrl}}/api/queue-entries?businessId={{opsBusinessId}}"
   auth:
     type: bearer
     token: "{{adminToken}}"

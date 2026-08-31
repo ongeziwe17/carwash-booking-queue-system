@@ -5,6 +5,7 @@ import com.carwash.shared.infrastructure.InMemoryRepository;
 import com.carwash.queue.domain.QueueEntry;
 import com.carwash.queue.domain.QueueStatus;
 import com.carwash.queue.domain.QueueEntryRepository;
+import com.carwash.marketplace.application.MarketplaceQuery;
 
 import java.util.Comparator;
 import java.util.List;
@@ -12,6 +13,16 @@ import java.util.Optional;
 
 public class InMemoryQueueEntryRepository extends InMemoryRepository<QueueEntry, String>
         implements QueueEntryRepository {
+
+    private final MarketplaceQuery marketplace;
+
+    public InMemoryQueueEntryRepository() {
+        this(null);
+    }
+
+    public InMemoryQueueEntryRepository(MarketplaceQuery marketplace) {
+        this.marketplace = marketplace;
+    }
 
     private static final Comparator<QueueEntry> QUEUE_ORDER = Comparator
             .comparing(QueueEntry::getBranchId, Comparator.nullsLast(Comparator.naturalOrder()))
@@ -80,6 +91,36 @@ public class InMemoryQueueEntryRepository extends InMemoryRepository<QueueEntry,
     }
 
     @Override
+    public List<QueueEntry> findByBusinessId(String businessId) {
+        return findMatching(entry -> branchBelongsTo(entry.getBranchId(), businessId)).stream()
+                .sorted(QUEUE_ORDER).toList();
+    }
+
+    @Override
+    public List<QueueEntry> findByBranchIdAndBusinessId(String branchId, String businessId) {
+        if (!branchBelongsTo(branchId, businessId)) return List.of();
+        return findByBranchId(branchId);
+    }
+
+    @Override
+    public Optional<QueueEntry> findByIdAndBusinessId(String queueEntryId, String businessId) {
+        return findById(queueEntryId).filter(entry -> branchBelongsTo(entry.getBranchId(), businessId));
+    }
+
+    @Override
+    public Optional<QueueEntry> findByIdAndUserId(String queueEntryId, String userId) {
+        return findById(queueEntryId).filter(entry -> entry.getBooking() != null
+                && entry.getBooking().getUser() != null
+                && userId.equals(entry.getBooking().getUser().getUserId()));
+    }
+
+    @Override
+    public Optional<QueueEntry> findNextWaitingByBranchIdAndBusinessId(String branchId, String businessId) {
+        if (!branchBelongsTo(branchId, businessId)) return Optional.empty();
+        return findNextWaitingByBranch(branchId);
+    }
+
+    @Override
     public boolean existsByBookingId(String bookingId) {
         return anyMatch(queueEntry -> queueEntry.getBooking() != null
                 && bookingId != null
@@ -115,5 +156,10 @@ public class InMemoryQueueEntryRepository extends InMemoryRepository<QueueEntry,
 
     private static boolean isActive(QueueEntry queueEntry) {
         return queueEntry.getQueueStatus() != null && queueEntry.getQueueStatus().isActive();
+    }
+
+    private boolean branchBelongsTo(String branchId, String businessId) {
+        return marketplace != null && marketplace.findBranchOptional(branchId)
+                .filter(branch -> businessId.equals(branch.businessId())).isPresent();
     }
 }

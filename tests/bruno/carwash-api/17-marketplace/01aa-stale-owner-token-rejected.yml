@@ -1,0 +1,10 @@
+info: { name: Stale owner tenant token is rejected, type: http, seq: 3, tags: [auth, tenant, security] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/auth/me"
+  auth: { type: bearer, token: "{{staleOwnerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("membership change invalidates old owner token", function() { expect(res.status).to.equal(401); expect(res.body.code).to.equal("AUTHENTICATION_REQUIRED"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

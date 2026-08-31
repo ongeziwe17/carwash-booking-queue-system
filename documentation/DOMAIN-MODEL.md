@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The application is a Spring Boot modular monolith organized by capability. Persistence-agnostic repository contracts remain in domain packages; each capability owns in-memory and PostgreSQL infrastructure adapters. Narrow immutable application queries expose cross-capability reads, while a shared transaction port selects either the fair single-JVM in-memory coordinator or real PostgreSQL transactions. Identity owns roles, permissions, and the credential contract; Access implements authentication, BCrypt/JWT infrastructure, and authorization. PostgreSQL persistence is implemented; tenant isolation, payments, capacity reservations, and external notification delivery remain future work.
+The application is a Spring Boot modular monolith organized by capability. Persistence-agnostic repository contracts remain in domain packages; each capability owns in-memory and PostgreSQL infrastructure adapters. Narrow immutable application queries expose cross-capability reads, while a shared transaction port selects either the fair single-JVM in-memory coordinator or real PostgreSQL transactions. Identity owns roles, permissions, operational tenant memberships, and the credential contract; Access implements authentication, BCrypt/JWT infrastructure, canonical tenant validation, and authorization. PostgreSQL and equivalent in-memory tenant isolation are implemented; payments, capacity reservations, audit logging, and external notification delivery remain future work.
 
 ## 2. Current Entities
 
@@ -10,6 +10,7 @@ The application is a Spring Boot modular monolith organized by capability. Persi
 |---|---|---|
 | `User` | Profile, encoded credential, account state, role, and owned aggregate collections | Vehicles, bookings, and notifications are managed through focused add/remove methods. |
 | `Role` | Built-in role identity and permission catalogue | Runtime authorization derives permissions from the server-side role catalogue. |
+| `TenantMembership` | Identity-owned assignment of one operational user to one canonical Marketplace business | Required for `STAFF`/`BUSINESS_OWNER`, forbidden for `CUSTOMER`/`PLATFORM_ADMIN`, unique by user, and changed only through platform-administrator transactions. |
 | `Vehicle` | Customer-owned vehicle details | Ownership cannot change through an ordinary update; plate uniqueness is enforced per owner on create and update. |
 | `Service` | Reusable global service/wash-type definition | Booking/queue references and branch offerings prevent physical deletion; deactivate instead. Legacy global price/duration remain transitional for AVAIL-001 and internal compatibility. |
 | `ServiceOffering` | One branch's price, estimated duration, configured concurrent capacity, and activation state for one reusable service | Offering/branch/service identity is immutable; one record per branch/service pair; inactive records are reactivated, not recreated or deleted; changed duration/capacity cannot undercut the peak overlap of active bookings. |
@@ -41,6 +42,7 @@ boolean existsById(ID id);
 - `findAll` returns an immutable, deterministic ID-sorted snapshot.
 - Queue repositories additionally expose branch retrieval and active operational ordering by branch, position, joined time, and queue-entry ID; public queue lists place active records before terminal history.
 - In-memory storage uses `ConcurrentHashMap`; callers cannot access the mutable backing map. PostgreSQL adapters map flat module-owned JPA records explicitly and preserve the same insert/update/missing semantics.
+- Tenant-owned repositories additionally require `businessId` in lookup/list/mutation predicates. Customer-private repositories use authenticated subject predicates. Explicit platform-administrator paths remain distinct from operator tenant paths.
 
 Duplicate IDs for users, vehicles, services, service offerings, bookings, queue entries, notifications, businesses, branches, and temporary closures are rejected as `BUSINESS_RULE_VIOLATION` errors without replacing the existing record. Offering queries are branch-scoped and offering-ID ordered; the application also rejects a second record for the same branch/service pair. The schedule repository is keyed by `branchId`; PUT explicitly inserts when absent and updates when present rather than silently upserting.
 

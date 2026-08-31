@@ -1,4 +1,4 @@
-info: { name: Cross-branch booking offering update is rejected, type: http, seq: 3, tags: [ops, booking, integrity] }
+info: { name: Cross-branch booking offering update is rejected, type: http, seq: 4, tags: [ops, booking, integrity] }
 http:
   method: PUT
   url: "{{baseUrl}}/api/bookings/{{branchOpsFirstBookingId}}"

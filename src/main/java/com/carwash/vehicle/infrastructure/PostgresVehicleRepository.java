@@ -23,6 +23,9 @@ public class PostgresVehicleRepository implements VehicleRepository {
     @Override public List<Vehicle> findByUserId(String userId) {
         return repository.findByUserIdOrderByIdAsc(userId).stream().map(this::domain).toList();
     }
+    @Override public List<Vehicle> findByBusinessId(String businessId) { return repository.findByTenant(businessId).stream().map(this::domain).toList(); }
+    @Override public Optional<Vehicle> findByIdAndBusinessId(String vehicleId,String businessId) { return repository.findTenantScoped(vehicleId,businessId).map(this::domain); }
+    @Override public Optional<Vehicle> findByIdAndUserId(String vehicleId,String userId) { return repository.findByIdAndUserId(vehicleId,userId).map(this::domain); }
     @Override public boolean existsByUserIdAndPlateNumberIgnoreCase(String userId, String plate, String excludedId) {
         return userId != null && plate != null && repository.duplicatePlate(userId, plate, excludedId);
     }

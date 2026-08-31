@@ -18,11 +18,11 @@ runtime:
   scripts:
     - type: tests
       code: |-
-        test("returns HTTP 403", function() { expect(res.status).to.equal(403); });
-        test("uses ACCESS_DENIED", function() { expect(res.body.code).to.equal("ACCESS_DENIED"); expect(res.body.status).to.equal(403); });
+        test("returns safe HTTP 404", function() { expect(res.status).to.equal(404); });
+        test("uses RESOURCE_NOT_FOUND", function() { expect(res.body.code).to.equal("RESOURCE_NOT_FOUND"); expect(res.body.status).to.equal(404); });
         test("reports request path", function() { expect(res.body.path).to.equal(String(req.getUrl()).replace(/^https?:\/\/[^/]+/, "").split("?")[0]); });
         test("has ISO timestamp and fieldErrors", function() { expect(Number.isNaN(Date.parse(res.body.timestamp))).to.equal(false); expect(Array.isArray(res.body.fieldErrors)).to.equal(true); });
-        test("uses safe message", function() { expect(res.body.message).to.equal("Access denied"); });
+        test("uses safe message", function() { expect(res.body.message).to.equal("Vehicle not found"); });
         const payload = JSON.stringify(res.body ?? {});
         const lower = payload.toLowerCase();
         for (const forbidden of ["encodedpassword", "passwordhash", "stacktrace", "java.lang", "authorization", "secure_jwt_secret", "bootstrap-admin-password"]) {

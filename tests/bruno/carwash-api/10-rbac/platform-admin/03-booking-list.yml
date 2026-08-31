@@ -8,7 +8,7 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/api/bookings"
+  url: "{{baseUrl}}/api/bookings?businessId={{opsBusinessId}}"
   auth:
     type: bearer
     token: "{{adminToken}}"

@@ -1,7 +1,7 @@
 info:
   name: Customer cannot deactivate offering
   type: http
-  seq: 74
+  seq: 84
   tags: [marketplace, offering, customer, rbac, security]
 
 http:

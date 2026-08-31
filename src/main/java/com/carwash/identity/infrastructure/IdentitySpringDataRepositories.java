@@ -28,3 +28,8 @@ interface UserSpringDataRepository extends JpaRepository<UserJpaEntity, String> 
 interface UserCredentialSpringDataRepository extends JpaRepository<UserCredentialJpaEntity, String> { }
 
 interface UserRoleAssignmentSpringDataRepository extends JpaRepository<UserRoleAssignmentJpaEntity, String> { }
+
+interface TenantMembershipSpringDataRepository extends JpaRepository<TenantMembershipJpaEntity, String> {
+    List<TenantMembershipJpaEntity> findAllByOrderByUserIdAsc();
+    List<TenantMembershipJpaEntity> findByBusinessIdOrderByUserIdAsc(String businessId);
+}

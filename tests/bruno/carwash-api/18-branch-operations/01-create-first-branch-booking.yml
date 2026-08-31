@@ -1,7 +1,7 @@
 info:
   name: Create booking at first Marketplace branch
   type: http
-  seq: 1
+  seq: 2
   tags: [ops, booking, branch, workflow]
 http:
   method: POST

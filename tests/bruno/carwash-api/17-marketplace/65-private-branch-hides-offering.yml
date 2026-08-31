@@ -1,7 +1,7 @@
 info:
   name: Private branch hides offering
   type: http
-  seq: 65
+  seq: 75
   tags: [marketplace, offering, customer, workflow]
 
 http:

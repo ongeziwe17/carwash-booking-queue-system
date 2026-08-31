@@ -13,6 +13,8 @@ import com.carwash.reporting.api.dto.DailySummaryReportResponse;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
 import com.carwash.shared.application.DataTransactionOperations;
+import com.carwash.access.application.TenantAccessContext;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -61,6 +63,31 @@ public class DailySummaryReportService {
                 : businessSummary(reportDate, businessId));
     }
 
+    public DailySummaryReportResponse generateDailySummary(
+            TenantAccessContext access,
+            LocalDate reportDate,
+            String branchId,
+            String businessId
+    ) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        if (access.isCustomer() || access.role() == com.carwash.identity.domain.RoleName.STAFF) {
+            throw new AccessDeniedException("Report access is required");
+        }
+        if (access.isPlatformAdministrator()) {
+            return generateDailySummary(reportDate, branchId, businessId);
+        }
+        if (reportDate == null) throw new BusinessRuleViolationException("Report date is required");
+        boolean hasBranch = branchId != null;
+        boolean hasBusiness = businessId != null;
+        if (hasBranch == hasBusiness) {
+            throw new BusinessRuleViolationException("Exactly one of branchId or businessId is required");
+        }
+        String tenantId = access.requireBusinessId();
+        return coordinator.read(() -> hasBranch
+                ? tenantBranchSummary(reportDate, branchId, tenantId)
+                : tenantBusinessSummary(reportDate, businessId, tenantId));
+    }
+
     private DailySummaryReportResponse branchSummary(LocalDate reportDate, String branchId) {
         BranchSnapshot branch = requireBranch(branchId);
         ZoneId.of(branch.timezone());
@@ -79,18 +106,58 @@ public class DailySummaryReportService {
         BusinessSnapshot business = marketplaceQuery.findBusinessOptional(normalizedBusinessId)
                 .orElseThrow(() -> new ResourceNotFoundException("Business not found: " + normalizedBusinessId));
         List<BranchSnapshot> branches = marketplaceQuery.findBranchesByBusiness(business.businessId());
-        Set<String> branchIds = branches.stream().map(BranchSnapshot::branchId).collect(Collectors.toUnmodifiableSet());
         long timezoneCount = branches.stream().map(BranchSnapshot::timezone).distinct().count();
         String timezone = timezoneCount == 0
                 ? NO_BRANCH_TIMEZONE
                 : timezoneCount == 1 ? branches.getFirst().timezone() : MULTIPLE_TIMEZONES;
-        List<BookingSnapshot> bookings = bookingQuery.findBookingSnapshots().stream()
-                .filter(booking -> branchIds.contains(booking.branchId()))
-                .toList();
-        List<QueueEntrySnapshot> queueEntries = queueQuery.findQueueEntrySnapshots().stream()
-                .filter(entry -> branchIds.contains(entry.branchId()))
-                .toList();
+        List<BookingSnapshot> bookings = bookingQuery.findBookingSnapshotsByBusiness(business.businessId());
+        List<QueueEntrySnapshot> queueEntries = queueQuery.findQueueEntrySnapshotsByBusiness(business.businessId());
         return summarize(reportDate, "BUSINESS", business.businessId(), timezone, bookings, queueEntries);
+    }
+
+    private DailySummaryReportResponse tenantBranchSummary(
+            LocalDate reportDate,
+            String branchId,
+            String businessId
+    ) {
+        String normalizedBranchId = normalizeId(branchId, "Branch ID");
+        BranchSnapshot branch = marketplaceQuery.findBranchOptionalByBusiness(normalizedBranchId, businessId)
+                .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
+        ZoneId.of(branch.timezone());
+        return summarize(
+                reportDate,
+                "BRANCH",
+                branch.branchId(),
+                branch.timezone(),
+                bookingQuery.findBookingSnapshotsByBranchAndBusiness(branch.branchId(), businessId),
+                queueQuery.findQueueEntrySnapshotsByBranchAndBusiness(branch.branchId(), businessId)
+        );
+    }
+
+    private DailySummaryReportResponse tenantBusinessSummary(
+            LocalDate reportDate,
+            String requestedBusinessId,
+            String tenantId
+    ) {
+        String normalizedBusinessId = normalizeId(requestedBusinessId, "Business ID");
+        if (!tenantId.equals(normalizedBusinessId)) {
+            throw new ResourceNotFoundException("Business not found");
+        }
+        BusinessSnapshot business = marketplaceQuery.findBusinessOptional(normalizedBusinessId)
+                .orElseThrow(() -> new ResourceNotFoundException("Business not found"));
+        List<BranchSnapshot> branches = marketplaceQuery.findBranchesByBusiness(business.businessId());
+        long timezoneCount = branches.stream().map(BranchSnapshot::timezone).distinct().count();
+        String timezone = timezoneCount == 0
+                ? NO_BRANCH_TIMEZONE
+                : timezoneCount == 1 ? branches.getFirst().timezone() : MULTIPLE_TIMEZONES;
+        return summarize(
+                reportDate,
+                "BUSINESS",
+                business.businessId(),
+                timezone,
+                bookingQuery.findBookingSnapshotsByBusiness(tenantId),
+                queueQuery.findQueueEntrySnapshotsByBusiness(tenantId)
+        );
     }
 
     private DailySummaryReportResponse summarize(

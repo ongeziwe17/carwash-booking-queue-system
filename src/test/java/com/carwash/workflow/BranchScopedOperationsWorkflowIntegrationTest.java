@@ -58,6 +58,7 @@ class BranchScopedOperationsWorkflowIntegrationTest extends ApiIntegrationTestSu
 
         mockMvc.perform(get("/api/bookings")
                         .with(authentication.platformAdminJwt())
+                        .param("businessId", resources.business().businessId())
                         .param("branchId", resources.branch().branchId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
@@ -65,6 +66,7 @@ class BranchScopedOperationsWorkflowIntegrationTest extends ApiIntegrationTestSu
                 .andExpect(jsonPath("$[0].serviceOfferingId").value(resources.offering().offeringId()));
         mockMvc.perform(get("/api/bookings")
                         .with(authentication.platformAdminJwt())
+                        .param("businessId", resources.business().businessId())
                         .param("branchId", "missing-branch"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
@@ -104,6 +106,7 @@ class BranchScopedOperationsWorkflowIntegrationTest extends ApiIntegrationTestSu
                 .andExpect(jsonPath("$.branchId").value(branchB.branchId()));
         mockMvc.perform(get("/api/queue-entries")
                         .with(authentication.platformAdminJwt())
+                        .param("businessId", resources.business().businessId())
                         .param("branchId", resources.branch().branchId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
@@ -111,7 +114,8 @@ class BranchScopedOperationsWorkflowIntegrationTest extends ApiIntegrationTestSu
                 .andExpect(jsonPath("$[0].queueStatus").value("WAITING"));
 
         mockMvc.perform(get("/api/notifications/user/{userId}", resources.user().userId())
-                        .with(authentication.platformAdminJwt()))
+                        .with(authentication.platformAdminJwt())
+                        .param("businessId", resources.business().businessId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].userId").value(resources.user().userId()))
                 .andExpect(jsonPath("$[0].branchId").isString())

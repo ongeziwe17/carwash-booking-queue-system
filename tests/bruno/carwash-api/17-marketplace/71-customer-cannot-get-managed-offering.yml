@@ -1,7 +1,7 @@
 info:
   name: Customer cannot get managed offering
   type: http
-  seq: 71
+  seq: 81
   tags: [marketplace, offering, customer, rbac, security]
 
 http:

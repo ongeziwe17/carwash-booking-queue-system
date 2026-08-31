@@ -1,7 +1,7 @@
 info:
   name: Unauthenticated closure cancellation is rejected
   type: http
-  seq: 38
+  seq: 44
   tags: [marketplace, auth, security]
 
 http:

@@ -38,6 +38,11 @@ public class PostgresBookingRepository implements BookingRepository {
     @Override public List<Booking> findByServiceOfferingId(String id){return domains(repository.findByOfferingIdOrderByIdAsc(id));}
     @Override public List<Booking> findByIds(Collection<String> ids){if(ids==null||ids.isEmpty())return List.of();return domains(repository.findAllById(ids).stream().sorted(java.util.Comparator.comparing(entity->entity.id)).toList());}
     @Override public List<Booking> findByScheduledDateTime(LocalDateTime time){return domains(repository.findByScheduledAtAndScheduledAtNanoOrderByIdAsc(PersistenceSupport.databaseTime(time),PersistenceSupport.nanoRemainder(time)));}
+    @Override public List<Booking> findByBusinessId(String id){return domains(repository.findByTenant(id));}
+    @Override public List<Booking> findByBranchIdAndBusinessId(String branchId,String businessId){return domains(repository.findByBranchTenant(branchId,businessId));}
+    @Override public List<Booking> findByUserIdAndBusinessId(String userId,String businessId){return domains(repository.findByUserTenant(userId,businessId));}
+    @Override public Optional<Booking> findByIdAndBusinessId(String id,String businessId){return repository.findTenantScoped(id,businessId).map(entity->domain(entity,loadUsers(List.of(entity.userId)),loadVehicles(List.of(entity.vehicleId)),loadServices(List.of(entity.serviceId))));}
+    @Override public Optional<Booking> findByIdAndUserId(String id,String userId){return repository.findByIdAndUserId(id,userId).map(entity->domain(entity,loadUsers(List.of(entity.userId)),loadVehicles(List.of(entity.vehicleId)),loadServices(List.of(entity.serviceId))));}
     @Override public boolean existsByUserId(String id){return repository.existsByUserId(id);}
     @Override public boolean existsByVehicleId(String id){return repository.existsByVehicleId(id);}
     @Override public boolean existsByServiceId(String id){return repository.existsByServiceId(id);}

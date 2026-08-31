@@ -1,5 +1,5 @@
 info:
-  name: Owner journey creates service
+  name: Owner journey cannot create global service definition
   type: http
   seq: 1
   tags:
@@ -30,7 +30,7 @@ runtime:
   scripts:
     - type: tests
       code: |-
-        test("returns 201", function() { expect(res.status).to.equal(201); });
+        test("returns 403", function() { expect(res.status).to.equal(403); expect(res.body.code).to.equal("ACCESS_DENIED"); });
         test("returns JSON", function() { expect(String(res.getHeader("content-type") || "").toLowerCase()).to.include("application/json"); });
         const payload = JSON.stringify(res.body ?? {});
         const lower = payload.toLowerCase();

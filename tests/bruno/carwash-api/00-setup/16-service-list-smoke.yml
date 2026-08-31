@@ -1,7 +1,7 @@
 info:
   name: Customer can list services
   type: http
-  seq: 16
+  seq: 17
   tags:
     - smoke
     - customer

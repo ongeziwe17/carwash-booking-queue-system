@@ -1,7 +1,7 @@
 info:
   name: Business owner updates Marketplace branch
   type: http
-  seq: 8
+  seq: 14
   tags: [marketplace, owner, workflow]
 
 http:

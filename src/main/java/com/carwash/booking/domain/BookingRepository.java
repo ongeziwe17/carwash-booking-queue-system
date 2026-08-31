@@ -7,6 +7,7 @@ import com.carwash.booking.domain.Booking;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface BookingRepository extends Repository<Booking, String> {
     default List<Booking> findByIds(Collection<String> ids) {
@@ -21,6 +22,11 @@ public interface BookingRepository extends Repository<Booking, String> {
     List<Booking> findByBranchId(String branchId);
     List<Booking> findByServiceOfferingId(String serviceOfferingId);
     List<Booking> findByScheduledDateTime(LocalDateTime scheduledDateTime);
+    List<Booking> findByBusinessId(String businessId);
+    List<Booking> findByBranchIdAndBusinessId(String branchId, String businessId);
+    List<Booking> findByUserIdAndBusinessId(String userId, String businessId);
+    Optional<Booking> findByIdAndBusinessId(String bookingId, String businessId);
+    Optional<Booking> findByIdAndUserId(String bookingId, String userId);
 
     boolean existsByUserId(String userId);
     boolean existsByVehicleId(String vehicleId);

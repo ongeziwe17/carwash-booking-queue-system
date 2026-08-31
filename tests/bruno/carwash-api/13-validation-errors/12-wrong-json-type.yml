@@ -17,7 +17,7 @@ http:
       {"serviceId":"wrong-type-{{runId}}","serviceName":"Wrong Type","price":"not-money","estimatedDurationMin":30}
   auth:
     type: bearer
-    token: "{{ownerToken}}"
+    token: "{{adminToken}}"
 
 runtime:
   scripts:

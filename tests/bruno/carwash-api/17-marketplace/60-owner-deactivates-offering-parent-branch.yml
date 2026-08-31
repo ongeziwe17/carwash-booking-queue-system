@@ -1,7 +1,7 @@
 info:
   name: Business owner deactivates offering parent branch
   type: http
-  seq: 60
+  seq: 70
   tags: [marketplace, offering, owner, workflow]
 
 http:

@@ -1,0 +1,20 @@
+info: { name: Owner re-authenticates after tenant reassignment, type: http, seq: 6, tags: [auth, tenant, security] }
+http:
+  method: POST
+  url: "{{baseUrl}}/api/auth/login"
+  headers: [{ name: Content-Type, value: application/json }]
+  body:
+    type: json
+    data: |-
+      {
+        "email": "{{ownerEmail}}",
+        "password": "{{process.env.BRUNO_TEST_USER_PASSWORD}}"
+      }
+  auth: { type: none }
+runtime:
+  scripts:
+    - type: after-response
+      code: if (res.status === 200 && res.body.accessToken) bru.setVar("ownerToken", res.body.accessToken);
+    - type: tests
+      code: test("issues a fresh owner token", function() { expect(res.status).to.equal(200); expect(res.body.user.roleName).to.equal("BUSINESS_OWNER"); expect(res.body.accessToken).to.be.a("string").and.not.empty; });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

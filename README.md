@@ -6,6 +6,7 @@ Spring Boot backend foundation for car wash booking, queue management, and Marke
 
 - User registration and safe profile-management APIs.
 - Stateless JWT authentication and role-based authorization.
+- Canonical server-side tenant memberships for staff/business owners, trusted `tenant_id` JWT validation, and tenant-scoped Marketplace/operational access.
 - Vehicle management with ownership and duplicate-plate validation.
 - Service catalogue management with activation workflows.
 - Branch-scoped booking management with canonical service offerings, ownership, lifecycle, time, capacity, and vehicle validation.
@@ -26,7 +27,7 @@ Spring Boot backend foundation for car wash booking, queue management, and Marke
 ## Important current limitations
 
 - The default profile is intentionally in-memory and loses data on restart; select `postgres` for durability.
-- Staff and business-owner operational access remains global until tenant isolation is implemented.
+- Existing operational users are not assigned a tenant implicitly; platform administrators must explicitly onboard them before they can authenticate as staff or business owners.
 - External SMS/email delivery is not implemented.
 - Nearby distance is straight-line only; no routing, traffic, geocoding, or external maps provider is used.
 - Payments, capacity reservations, concurrent bay/staff scheduling, production observability, backups/restore automation, and deployment hardening remain future work.
@@ -271,6 +272,7 @@ and representative 400, 401, 403, 404, and 500 responses.
 ## Product documentation
 
 - [Architecture](documentation/ARCHITECTURE.md)
+- [Marketplace Tenant Isolation](documentation/TENANT-ISOLATION.md)
 - [Product Specification](documentation/SPECIFICATION.md)
 - [Roadmap](documentation/ROADMAP.md)
 - [API Documentation](documentation/API-DOCUMENTATION.md)

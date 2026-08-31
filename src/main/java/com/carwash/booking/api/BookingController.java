@@ -6,6 +6,7 @@ import com.carwash.booking.api.dto.RescheduleBookingRequest;
 import com.carwash.booking.api.dto.UpdateBookingRequest;
 import com.carwash.booking.domain.Booking;
 import com.carwash.booking.application.BookingManagementService;
+import com.carwash.access.application.TenantAccessContextProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -38,17 +39,19 @@ import java.util.List;
 public class BookingController {
 
     private final BookingManagementService service;
+    private final TenantAccessContextProvider tenantAccess;
 
-    public BookingController(BookingManagementService service) {
+    public BookingController(BookingManagementService service, TenantAccessContextProvider tenantAccess) {
         this.service = service;
+        this.tenantAccess = tenantAccess;
     }
 
     @GetMapping
     @PreAuthorize("hasAnyRole('STAFF','BUSINESS_OWNER','PLATFORM_ADMIN')")
     @Operation(
             summary = "List bookings",
-            description = "Optionally filters by an existing branch. An omitted filter returns the existing "
-                    + "role-authorized global view until tenant isolation is introduced."
+            description = "Tenant operators receive only their authenticated business scope. Platform administrators "
+                    + "must provide an explicit businessId; branchId may narrow that business scope."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Bookings returned"),
@@ -66,13 +69,14 @@ public class BookingController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public List<Booking> getAll(
-            @RequestParam(required = false) @Size(max = 64) String branchId
+            @RequestParam(required = false) @Size(max = 64) String branchId,
+            @RequestParam(required = false) @Size(max = 64) String businessId
     ) {
-        return service.findAll(branchId);
+        return service.findAll(tenantAccess.current(), branchId, businessId);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
+    @PreAuthorize("hasAnyAuthority('PERM_BOOKING_SELF_MANAGE','PERM_BOOKING_OPERATE')")
     @Operation(summary = "Get booking by ID")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Booking returned"),
@@ -90,11 +94,11 @@ public class BookingController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public Booking getById(@PathVariable @NotBlank @Size(max = 64) String id) {
-        return service.findById(id);
+        return service.findById(tenantAccess.current(), id);
     }
 
     @PostMapping
-    @PreAuthorize("@resourceAuthorization.canCreateFor(authentication, #req.userId())")
+    @PreAuthorize("hasAnyAuthority('PERM_BOOKING_SELF_MANAGE','PERM_BOOKING_OPERATE')")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create booking")
     @ApiResponses({
@@ -116,6 +120,7 @@ public class BookingController {
     })
     public Booking create(@Valid @RequestBody CreateBookingRequest req) {
         return service.createBooking(
+                tenantAccess.current(),
                 req.bookingId(),
                 req.userId(),
                 req.vehicleId(),
@@ -127,7 +132,7 @@ public class BookingController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
+    @PreAuthorize("hasAnyAuthority('PERM_BOOKING_SELF_MANAGE','PERM_BOOKING_OPERATE')")
     @Operation(
             summary = "Update booking",
             description = "Updates non-schedule details for a CREATED booking or a CONFIRMED booking without an "
@@ -155,6 +160,7 @@ public class BookingController {
             @Valid @RequestBody UpdateBookingRequest request
     ) {
         return service.updateBooking(
+                tenantAccess.current(),
                 id,
                 request.vehicleId(),
                 request.serviceOfferingId(),
@@ -163,7 +169,7 @@ public class BookingController {
     }
 
     @PostMapping("/{id}/reschedule")
-    @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
+    @PreAuthorize("hasAnyAuthority('PERM_BOOKING_SELF_MANAGE','PERM_BOOKING_OPERATE')")
     @Operation(
             summary = "Reschedule booking",
             description = "Reschedules an eligible future CREATED or CONFIRMED booking while preserving its status, "
@@ -192,12 +198,12 @@ public class BookingController {
             @PathVariable @NotBlank @Size(max = 64) String id,
             @Valid @RequestBody RescheduleBookingRequest request
     ) {
-        return service.rescheduleBooking(id, request.scheduledDateTime());
+        return service.rescheduleBooking(tenantAccess.current(), id, request.scheduledDateTime());
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
+    @PreAuthorize("hasAnyAuthority('PERM_BOOKING_SELF_MANAGE','PERM_BOOKING_OPERATE')")
     @Operation(
             summary = "Cancel booking and return no content",
             description = "Cancels an eligible CREATED or CONFIRMED booking. An associated WAITING or CALLED "
@@ -220,7 +226,7 @@ public class BookingController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public void delete(@PathVariable @NotBlank @Size(max = 64) String id) {
-        service.cancelBooking(id);
+        service.cancelBooking(tenantAccess.current(), id);
     }
 
     @PostMapping("/{id}/confirm")
@@ -242,11 +248,11 @@ public class BookingController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public Booking confirm(@PathVariable @NotBlank @Size(max = 64) String id) {
-        return service.confirmBooking(id);
+        return service.confirmBooking(tenantAccess.current(), id);
     }
 
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("@resourceAuthorization.canAccessBooking(authentication, #id)")
+    @PreAuthorize("hasAnyAuthority('PERM_BOOKING_SELF_MANAGE','PERM_BOOKING_OPERATE')")
     @Operation(
             summary = "Cancel booking",
             description = "Cancels an eligible CREATED or CONFIRMED booking. An associated WAITING or CALLED "
@@ -269,6 +275,6 @@ public class BookingController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public Booking cancel(@PathVariable @NotBlank @Size(max = 64) String id) {
-        return service.cancelBooking(id);
+        return service.cancelBooking(tenantAccess.current(), id);
     }
 }

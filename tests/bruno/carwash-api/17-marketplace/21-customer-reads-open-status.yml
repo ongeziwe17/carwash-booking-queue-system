@@ -1,7 +1,7 @@
 info:
   name: Customer reads open branch status
   type: http
-  seq: 21
+  seq: 27
   tags: [marketplace, customer, workflow]
 
 http:

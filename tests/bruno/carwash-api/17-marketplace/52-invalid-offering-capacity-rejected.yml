@@ -1,7 +1,7 @@
 info:
   name: Invalid offering concurrent capacity is rejected
   type: http
-  seq: 52
+  seq: 62
   tags: [marketplace, offering, validation]
 
 http:

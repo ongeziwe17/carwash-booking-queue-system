@@ -47,7 +47,10 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
             "PUT /api/queue-entries/{id}/position", "GET /api/bookings/{id}",
             "PUT /api/bookings/{id}", "DELETE /api/bookings/{id}",
             "POST /api/bookings/{id}/reschedule",
-            "PUT /api/admin/users/{userId}/role", "GET /api/vehicles", "POST /api/vehicles",
+            "PUT /api/admin/users/{userId}/role",
+            "PUT /api/admin/users/{userId}/tenant-membership",
+            "DELETE /api/admin/users/{userId}/tenant-membership",
+            "GET /api/vehicles", "POST /api/vehicles",
             "GET /api/users", "POST /api/users", "GET /api/services", "POST /api/services",
             "POST /api/services/{id}/deactivate", "POST /api/services/{id}/activate",
             "GET /api/queue-entries", "POST /api/queue-entries", "POST /api/queue-entries/{id}/start",
@@ -224,6 +227,14 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
                 propertyNames(schemas.path("BranchResponse")));
         assertFalse(schemas.path("BusinessResponse").path("properties").has("branches"));
         assertFalse(schemas.path("BranchResponse").path("properties").has("business"));
+        assertEquals(Set.of("branchId", "businessId", "branchName", "addressLine1", "addressLine2", "city",
+                        "province", "postalCode", "countryCode", "latitude", "longitude", "timezone"),
+                propertyNames(schemas.path("DiscoverableBranchResponse")));
+        for (String forbidden : Set.of("contactEmail", "contactPhone", "registrationNumber", "status",
+                "publicDiscoveryEnabled", "effectiveActive", "discoverable", "createdAt", "updatedAt",
+                "version", "memberships", "staff", "notifications", "audit")) {
+            assertFalse(schemas.path("DiscoverableBranchResponse").path("properties").has(forbidden));
+        }
 
         JsonNode discovery = document.path("paths").path("/api/marketplace/branches/discoverable").path("get");
         assertTrue(discovery.path("description").asText().contains("owning business are both active"));
@@ -473,6 +484,19 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         assertTrue(findParameter(report.path("parameters"), "query", "date").path("required").asBoolean());
         assertFalse(findParameter(report.path("parameters"), "query", "branchId").path("required").asBoolean());
         assertFalse(findParameter(report.path("parameters"), "query", "businessId").path("required").asBoolean());
+
+        for (String path : Set.of("/api/bookings", "/api/queue-entries")) {
+            JsonNode list = document.path("paths").path(path).path("get");
+            assertFalse(findParameter(list.path("parameters"), "query", "businessId").isMissingNode());
+        }
+        assertFalse(findParameter(document.path("paths").path("/api/vehicles").path("get")
+                .path("parameters"), "query", "businessId").isMissingNode());
+
+        JsonNode schemas = document.path("components").path("schemas");
+        assertEquals(Set.of("roleName", "businessId"), propertyNames(schemas.path("AssignRoleRequest")));
+        assertEquals(Set.of("businessId"), propertyNames(schemas.path("AssignTenantMembershipRequest")));
+        assertEquals(Set.of("userId", "businessId", "assignedAt"),
+                propertyNames(schemas.path("TenantMembershipResponse")));
     }
 
     @Test

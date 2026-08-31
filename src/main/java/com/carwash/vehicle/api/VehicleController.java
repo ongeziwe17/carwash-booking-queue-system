@@ -5,6 +5,7 @@ import com.carwash.vehicle.api.dto.CreateVehicleRequest;
 import com.carwash.vehicle.api.dto.UpdateVehicleRequest;
 import com.carwash.vehicle.domain.Vehicle;
 import com.carwash.vehicle.application.VehicleManagementService;
+import com.carwash.access.application.TenantAccessContextProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
@@ -36,9 +38,11 @@ import java.util.List;
 public class VehicleController {
 
     private final VehicleManagementService service;
+    private final TenantAccessContextProvider tenantAccess;
 
-    public VehicleController(VehicleManagementService service) {
+    public VehicleController(VehicleManagementService service, TenantAccessContextProvider tenantAccess) {
         this.service = service;
+        this.tenantAccess = tenantAccess;
     }
 
     @GetMapping
@@ -55,12 +59,14 @@ public class VehicleController {
             @ApiResponse(responseCode = "500", description = "Internal server error",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public List<Vehicle> getAll() {
-        return service.findAll();
+    public List<Vehicle> getAll(
+            @RequestParam(required = false) @Size(max = 64) String businessId
+    ) {
+        return service.findAll(tenantAccess.current(), businessId);
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("@resourceAuthorization.canAccessVehicle(authentication, #id)")
+    @PreAuthorize("hasAnyAuthority('PERM_VEHICLE_SELF_MANAGE','PERM_VEHICLE_OPERATE')")
     @Operation(summary = "Get vehicle by ID")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Vehicle returned"),
@@ -78,12 +84,12 @@ public class VehicleController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public Vehicle getById(@PathVariable @NotBlank @Size(max = 64) String id) {
-        return service.findById(id);
+        return service.findById(tenantAccess.current(), id);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("@resourceAuthorization.canCreateFor(authentication, #req.userId())")
+    @PreAuthorize("hasAuthority('PERM_VEHICLE_SELF_MANAGE')")
     @Operation(summary = "Create vehicle")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Vehicle created"),
@@ -104,6 +110,7 @@ public class VehicleController {
     })
     public Vehicle create(@Valid @RequestBody CreateVehicleRequest req) {
         return service.createVehicle(
+                tenantAccess.current(),
                 req.userId(),
                 req.vehicleId(),
                 req.plateNumber(),
@@ -116,7 +123,7 @@ public class VehicleController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("@resourceAuthorization.canAccessVehicle(authentication, #id)")
+    @PreAuthorize("hasAnyAuthority('PERM_VEHICLE_SELF_MANAGE','PERM_VEHICLE_OPERATE')")
     @Operation(summary = "Update vehicle")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Vehicle updated"),
@@ -140,6 +147,7 @@ public class VehicleController {
             @Valid @RequestBody UpdateVehicleRequest request
     ) {
         return service.updateVehicle(
+                tenantAccess.current(),
                 id,
                 request.plateNumber(),
                 request.vehicleType(),
@@ -151,7 +159,7 @@ public class VehicleController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("@resourceAuthorization.canAccessVehicle(authentication, #id)")
+    @PreAuthorize("hasAnyAuthority('PERM_VEHICLE_SELF_MANAGE','PERM_VEHICLE_OPERATE')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Delete vehicle")
     @ApiResponses({
@@ -170,6 +178,6 @@ public class VehicleController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public void delete(@PathVariable @NotBlank @Size(max = 64) String id) {
-        service.deleteVehicle(id);
+        service.deleteVehicle(tenantAccess.current(), id);
     }
 }

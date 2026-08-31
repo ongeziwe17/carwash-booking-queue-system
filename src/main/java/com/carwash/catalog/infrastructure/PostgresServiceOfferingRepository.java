@@ -23,6 +23,8 @@ public class PostgresServiceOfferingRepository implements ServiceOfferingReposit
     @Override public List<ServiceOffering> findByBranchId(String id) { return repository.findByBranchIdOrderByIdAsc(id).stream().map(this::domain).toList(); }
     @Override public List<ServiceOffering> findByServiceId(String id) { return repository.findByServiceIdOrderByIdAsc(id).stream().map(this::domain).toList(); }
     @Override public Optional<ServiceOffering> findByBranchIdAndServiceId(String branchId, String serviceId) { return repository.findByBranchIdAndServiceId(branchId, serviceId).map(this::domain); }
+    @Override public Optional<ServiceOffering> findByIdAndBusinessId(String offeringId,String businessId) { return repository.findTenantScoped(offeringId,businessId).map(this::domain); }
+    @Override public List<ServiceOffering> findByBranchIdAndBusinessId(String branchId,String businessId) { return repository.findByBranchTenant(branchId,businessId).stream().map(this::domain).toList(); }
     @Override public boolean existsByServiceId(String serviceId) { return repository.existsByServiceId(serviceId); }
     @Override public boolean insert(ServiceOffering value) {
         if (repository.existsById(value.getOfferingId())) return false;

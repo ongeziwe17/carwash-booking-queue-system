@@ -1,15 +1,15 @@
 info:
-  name: Business owner deactivates offering parent service
+  name: Platform admin deactivates offering parent service
   type: http
-  seq: 57
-  tags: [marketplace, offering, owner, workflow]
+  seq: 67
+  tags: [marketplace, offering, admin, workflow]
 
 http:
   method: POST
   url: "{{baseUrl}}/api/services/{{serviceId}}/deactivate"
   auth:
     type: bearer
-    token: "{{ownerToken}}"
+    token: "{{adminToken}}"
 
 runtime:
   scripts:

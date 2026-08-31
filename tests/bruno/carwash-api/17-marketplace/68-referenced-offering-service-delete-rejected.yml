@@ -1,7 +1,7 @@
 info:
   name: Referenced offering service cannot be deleted
   type: http
-  seq: 68
+  seq: 78
   tags: [marketplace, offering, integrity, owner]
 
 http:
@@ -9,7 +9,7 @@ http:
   url: "{{baseUrl}}/api/services/{{serviceId}}"
   auth:
     type: bearer
-    token: "{{ownerToken}}"
+    token: "{{adminToken}}"
 
 runtime:
   scripts:
