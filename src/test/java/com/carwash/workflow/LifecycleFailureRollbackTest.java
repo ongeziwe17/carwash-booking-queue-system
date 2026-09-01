@@ -34,6 +34,7 @@ import com.carwash.catalog.infrastructure.InMemoryServiceRepository;
 import com.carwash.identity.infrastructure.InMemoryUserRepository;
 import com.carwash.vehicle.infrastructure.InMemoryVehicleRepository;
 import com.carwash.shared.exception.ResourceNotFoundException;
+import com.carwash.testsupport.TestAccess;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -61,11 +62,12 @@ class LifecycleFailureRollbackTest {
         Fixture fixture = new Fixture();
         Booking booking = fixture.confirmedBooking("start", 10, 1);
         QueueEntry queueEntry = fixture.queueEntry(booking, "start");
-        fixture.queueService.callQueueEntry(queueEntry.getQueueEntryId());
+        fixture.queueService.callQueueEntry(TestAccess.platformAdministrator(), queueEntry.getQueueEntryId());
         fixture.bookings.failNextUpdate();
 
         assertThrows(ResourceNotFoundException.class,
-                () -> fixture.queueService.startService(queueEntry.getQueueEntryId()));
+                () -> fixture.queueService.startService(
+                        TestAccess.platformAdministrator(), queueEntry.getQueueEntryId()));
 
         assertEquals(QueueStatus.CALLED, queueEntry.getQueueStatus());
         assertNull(queueEntry.getStartedAt());
@@ -78,14 +80,15 @@ class LifecycleFailureRollbackTest {
         Fixture fixture = new Fixture();
         Booking booking = fixture.confirmedBooking("complete", 10, 2);
         QueueEntry queueEntry = fixture.queueEntry(booking, "complete");
-        fixture.queueService.callQueueEntry(queueEntry.getQueueEntryId());
-        fixture.queueService.startService(queueEntry.getQueueEntryId());
+        fixture.queueService.callQueueEntry(TestAccess.platformAdministrator(), queueEntry.getQueueEntryId());
+        fixture.queueService.startService(TestAccess.platformAdministrator(), queueEntry.getQueueEntryId());
         int originalPosition = queueEntry.getPosition();
         int originalWait = queueEntry.getEstimatedWaitMin();
         fixture.bookings.failNextUpdate();
 
         assertThrows(ResourceNotFoundException.class,
-                () -> fixture.queueService.completeQueueEntry(queueEntry.getQueueEntryId()));
+                () -> fixture.queueService.completeQueueEntry(
+                        TestAccess.platformAdministrator(), queueEntry.getQueueEntryId()));
 
         assertEquals(QueueStatus.IN_PROGRESS, queueEntry.getQueueStatus());
         assertNull(queueEntry.getCompletedAt());
@@ -101,12 +104,13 @@ class LifecycleFailureRollbackTest {
         Booking secondBooking = fixture.confirmedBooking("rebalance-second", 25, 4);
         QueueEntry first = fixture.queueEntry(firstBooking, "rebalance-first");
         QueueEntry second = fixture.queueEntry(secondBooking, "rebalance-second");
-        fixture.queueService.callQueueEntry(first.getQueueEntryId());
-        fixture.queueService.startService(first.getQueueEntryId());
+        fixture.queueService.callQueueEntry(TestAccess.platformAdministrator(), first.getQueueEntryId());
+        fixture.queueService.startService(TestAccess.platformAdministrator(), first.getQueueEntryId());
         fixture.queues.failOnNthUpdate(2);
 
         assertThrows(ResourceNotFoundException.class,
-                () -> fixture.queueService.completeQueueEntry(first.getQueueEntryId()));
+                () -> fixture.queueService.completeQueueEntry(
+                        TestAccess.platformAdministrator(), first.getQueueEntryId()));
 
         assertEquals(QueueStatus.IN_PROGRESS, first.getQueueStatus());
         assertEquals(BookingStatus.IN_SERVICE, firstBooking.getStatus());
@@ -126,7 +130,7 @@ class LifecycleFailureRollbackTest {
         fixture.bookings.failNextUpdate();
 
         assertThrows(ResourceNotFoundException.class, () -> fixture.bookingService.cancelBooking(
-                firstBooking.getBookingId(), firstBooking.getUser().getUserId()));
+                TestAccess.platformAdministrator(), firstBooking.getBookingId()));
 
         assertEquals(BookingStatus.CONFIRMED, firstBooking.getStatus());
         assertTrue(fixture.queues.existsById(first.getQueueEntryId()));
@@ -165,7 +169,8 @@ class LifecycleFailureRollbackTest {
         fixture.bookings.failNextUpdate();
 
         assertThrows(ResourceNotFoundException.class,
-                () -> fixture.queueService.deleteQueueEntry(queueEntry.getQueueEntryId()));
+                () -> fixture.queueService.deleteQueueEntry(
+                        TestAccess.platformAdministrator(), queueEntry.getQueueEntryId()));
 
         assertTrue(fixture.queues.existsById(queueEntry.getQueueEntryId()));
         assertSame(queueEntry, booking.getQueueEntry());
@@ -229,7 +234,7 @@ class LifecycleFailureRollbackTest {
         }
 
         private QueueEntry queueEntry(Booking booking, String suffix) {
-            QueueEntry response = queueService.createQueueEntry(
+            QueueEntry response = queueService.createQueueEntry(TestAccess.platformAdministrator(),
                     "queue-" + suffix, booking.getBookingId(), booking.getService().getServiceId());
             return queues.findById(response.getQueueEntryId()).orElseThrow();
         }
@@ -303,11 +308,34 @@ class LifecycleFailureRollbackTest {
 
         @Override
         public boolean update(Booking booking) {
+            if (shouldFail()) return false;
+            return super.update(booking);
+        }
+
+        @Override
+        public boolean updateForAdministrator(Booking booking) {
+            if (shouldFail()) return false;
+            return super.updateForAdministrator(booking);
+        }
+
+        @Override
+        public boolean updateForBusiness(Booking booking, String businessId) {
+            if (shouldFail()) return false;
+            return super.updateForBusiness(booking, businessId);
+        }
+
+        @Override
+        public boolean updateForUser(Booking booking, String userId) {
+            if (shouldFail()) return false;
+            return super.updateForUser(booking, userId);
+        }
+
+        private boolean shouldFail() {
             if (failNextUpdate) {
                 failNextUpdate = false;
-                return false;
+                return true;
             }
-            return super.update(booking);
+            return false;
         }
     }
 
@@ -320,11 +348,34 @@ class LifecycleFailureRollbackTest {
 
         @Override
         public boolean update(QueueEntry queueEntry) {
+            if (shouldFail()) return false;
+            return super.update(queueEntry);
+        }
+
+        @Override
+        public boolean updateForAdministrator(QueueEntry queueEntry) {
+            if (shouldFail()) return false;
+            return super.updateForAdministrator(queueEntry);
+        }
+
+        @Override
+        public boolean updateForBusiness(QueueEntry queueEntry, String businessId) {
+            if (shouldFail()) return false;
+            return super.updateForBusiness(queueEntry, businessId);
+        }
+
+        @Override
+        public boolean updateForUser(QueueEntry queueEntry, String userId) {
+            if (shouldFail()) return false;
+            return super.updateForUser(queueEntry, userId);
+        }
+
+        private boolean shouldFail() {
             if (updatesUntilFailure > 0 && --updatesUntilFailure == 0) {
                 updatesUntilFailure = -1;
-                return false;
+                return true;
             }
-            return super.update(queueEntry);
+            return false;
         }
     }
 }

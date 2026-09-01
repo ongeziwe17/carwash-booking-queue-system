@@ -148,6 +148,8 @@ This supports a safer, cleaner, and more controlled development and release proc
 
 Marketplace authorization is enforced independently of branch protection. `CarWashBusiness.businessId` is the tenant boundary; Identity owns the one-to-one operational membership, Access verifies the canonical `tenant_id` claim on every token use, and application/repository layers require tenant-scoped operations. No client-supplied tenant override or wildcard administrator tenant is supported.
 
+For mutations, the authorization decision is authoritative only inside the service's single write transaction after the resource lock is acquired. Tenant and customer repository reads/writes retain the authenticated business/user predicate through persistence; administrator mutations use an explicit administrator scope. A foreign, missing, replaced, or zero-row guarded resource fails with the same safe `404` and is never retried through an unscoped lookup. PostgreSQL advisory locks remain transaction-scoped, while the in-memory profile provides equivalent atomicity under the shared write lock.
+
 The safe response policy is `401` for missing/invalid/forged/stale authentication, `403` for a canonical role without the required permission, and indistinguishable `404` responses for absent and foreign-tenant resources. Business owners cannot register a second business or mutate the platform-wide reusable service catalogue. Discovery remains authenticated and uses dedicated allowlisted DTOs.
 
 The complete membership lifecycle, backfill procedure, database constraints/indexes, discovery allowlist, and #125 audit boundary are documented in [Marketplace Tenant Isolation](TENANT-ISOLATION.md).

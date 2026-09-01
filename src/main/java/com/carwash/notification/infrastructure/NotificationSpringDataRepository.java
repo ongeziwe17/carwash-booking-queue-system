@@ -16,6 +16,15 @@ interface NotificationSpringDataRepository extends JpaRepository<NotificationJpa
     @Modifying(clearAutomatically=true,flushAutomatically=true)
     @Query("delete from NotificationJpaEntity notification where notification.bookingId=:bookingId")
     int deleteByBookingId(String bookingId);
+    @Modifying(clearAutomatically=true,flushAutomatically=true)
+    @Query("delete from NotificationJpaEntity notification where notification.bookingId=:bookingId "
+            + "and notification.userId=:userId")
+    int deleteByBookingIdAndUserId(String bookingId,String userId);
+    @Modifying(clearAutomatically=true,flushAutomatically=true)
+    @Query(value="delete from notifications n where n.booking_id=:bookingId and exists "
+            + "(select 1 from branches b where b.branch_id=n.branch_id and b.business_id=:businessId)",
+            nativeQuery=true)
+    int deleteByBookingIdAndBusinessId(String bookingId,String businessId);
     @Query(value="select n.* from notifications n join branches b on b.branch_id=n.branch_id where n.user_id=:userId and b.business_id=:businessId order by n.notification_id",nativeQuery=true)
     List<NotificationJpaEntity> findByUserTenant(String userId,String businessId);
     @Query(value="select n.* from notifications n join branches b on b.branch_id=n.branch_id where b.business_id=:businessId order by n.notification_id",nativeQuery=true)

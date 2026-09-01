@@ -26,6 +26,30 @@ public class PostgresVehicleRepository implements VehicleRepository {
     @Override public List<Vehicle> findByBusinessId(String businessId) { return repository.findByTenant(businessId).stream().map(this::domain).toList(); }
     @Override public Optional<Vehicle> findByIdAndBusinessId(String vehicleId,String businessId) { return repository.findTenantScoped(vehicleId,businessId).map(this::domain); }
     @Override public Optional<Vehicle> findByIdAndUserId(String vehicleId,String userId) { return repository.findByIdAndUserId(vehicleId,userId).map(this::domain); }
+    @Override public boolean updateForBusiness(Vehicle vehicle,String businessId) {
+        Optional<VehicleJpaEntity> found=repository.findTenantScoped(vehicle.getVehicleId(),businessId);
+        return found.isPresent()&&guardedUpdate(vehicle,found.get().version,businessId,null);
+    }
+    @Override public boolean updateForUser(Vehicle vehicle,String userId) {
+        Optional<VehicleJpaEntity> found=repository.findByIdAndUserId(vehicle.getVehicleId(),userId);
+        return found.isPresent()&&guardedUpdate(vehicle,found.get().version,null,userId);
+    }
+    @Override public boolean updateForAdministrator(Vehicle vehicle) {
+        Optional<VehicleJpaEntity> found=repository.findById(vehicle.getVehicleId());
+        return found.isPresent()&&guardedUpdate(vehicle,found.get().version,null,null);
+    }
+    @Override public boolean deleteForBusiness(String id,String businessId) {
+        Optional<VehicleJpaEntity> found=repository.findTenantScoped(id,businessId);
+        return found.isPresent()&&repository.deleteBusinessScoped(id,businessId,found.get().version)==1;
+    }
+    @Override public boolean deleteForUser(String id,String userId) {
+        Optional<VehicleJpaEntity> found=repository.findByIdAndUserId(id,userId);
+        return found.isPresent()&&repository.deleteUserScoped(id,userId,found.get().version)==1;
+    }
+    @Override public boolean deleteForAdministrator(String id) {
+        Optional<VehicleJpaEntity> found=repository.findById(id);
+        return found.isPresent()&&repository.deleteAdministratorScoped(id,found.get().version)==1;
+    }
     @Override public boolean existsByUserIdAndPlateNumberIgnoreCase(String userId, String plate, String excludedId) {
         return userId != null && plate != null && repository.duplicatePlate(userId, plate, excludedId);
     }
@@ -58,6 +82,30 @@ public class PostgresVehicleRepository implements VehicleRepository {
         repository.delete(found.get()); repository.flush(); return true;
     }
     @Override public boolean existsById(String id) { return repository.existsById(id); }
+
+    private boolean guardedUpdate(Vehicle vehicle,Long version,String businessId,String userId) {
+        try {
+            int rows;
+            if(businessId!=null){
+                rows=repository.updateBusinessScoped(
+                        vehicle.getVehicleId(),businessId,vehicle.getPlateNumber(),vehicle.getVehicleType(),
+                        vehicle.getBrand(),vehicle.getModel(),vehicle.getColor(),vehicle.getNotes(),version);
+            }else if(userId!=null){
+                rows=repository.updateUserScoped(
+                        vehicle.getVehicleId(),userId,vehicle.getPlateNumber(),vehicle.getVehicleType(),
+                        vehicle.getBrand(),vehicle.getModel(),vehicle.getColor(),vehicle.getNotes(),version);
+            }else{
+                rows=repository.updateAdministratorScoped(
+                        vehicle.getVehicleId(),vehicle.getPlateNumber(),vehicle.getVehicleType(),
+                        vehicle.getBrand(),vehicle.getModel(),vehicle.getColor(),vehicle.getNotes(),version);
+            }
+            return rows==1;
+        }
+        catch (DataIntegrityViolationException failure) {
+            if (PersistenceSupport.constraint(failure,"uq_vehicle_owner_plate_ci")) throw new BusinessRuleViolationException("Duplicate plate for owner");
+            throw failure;
+        }
+    }
 
     private Vehicle domain(VehicleJpaEntity entity) {
         Vehicle value = new Vehicle(entity.id, entity.plateNumber, entity.vehicleType, entity.brand,

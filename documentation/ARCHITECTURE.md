@@ -100,7 +100,7 @@ Operational controllers resolve the already-validated authentication once into `
 
 ## Consistency and rollback
 
-Application services depend on `shared.application.DataTransactionOperations`, never on a storage implementation. The in-memory adapter retains the fair reentrant read/write lock and invokes the existing mutable-aggregate compensation. The `postgres` adapter supplies read-only reads and REQUIRED writes through Spring transactions; nested lifecycle calls participate in the same transaction. Database rollback is authoritative, so mutable in-memory compensation is skipped. Optional notifications are registered after a successful commit and run in an isolated REQUIRES_NEW transaction; mandatory lifecycle notifications remain in the parent transaction and roll it back on failure.
+Application services depend on `shared.application.DataTransactionOperations`, never on a storage implementation. Tenant/subject authorization for a mutation is evaluated after its resource lock and inside the same authoritative write boundary as the mutation. The in-memory adapter retains the fair reentrant read/write lock and invokes the existing mutable-aggregate compensation. The `postgres` adapter supplies read-only reads and REQUIRED writes through Spring transactions; nested lifecycle calls participate in the same transaction. Database rollback is authoritative, so mutable in-memory compensation is skipped. Optional notifications are registered after a successful commit and run in an isolated REQUIRES_NEW transaction; mandatory lifecycle notifications remain in the parent transaction and roll it back on failure. Cross-module lifecycle notification creation uses `BookingNotificationPublisher`, which receives the already-authorized booking instead of reloading it globally.
 
 Every persistence adapter is owned by its capability infrastructure package. Flat JPA entities, Spring Data repositories, and mappers reconstruct bounded domain objects without annotating domain aggregates or exposing proxies/lazy collections. Database foreign keys may cross capability tables, but Java modules cannot import another module's infrastructure. Hibernate Open Session in View is disabled and `ddl-auto=validate`; only immutable Flyway migrations own schema changes.
 
@@ -139,17 +139,20 @@ Java `LocalDateTime` values are stored as PostgreSQL `timestamp(6)` plus a `0..9
 
 All PostgreSQL locks are transaction-scoped advisory locks derived with `hashtextextended`. One acquisition call sorts distinct stable keys lexicographically. Workflows use the global namespace order below and never depend on a JVM-wide lock.
 
-| Protected invariant | Transaction | Lock/guard | Acquisition order |
+| Protected invariant | Transaction | Lock/guard | Key order |
 |---|---|---|---|
-| Booking identity and lifecycle | REQUIRED write | `booking:{bookingId}` | 1 |
-| Offering overlap capacity, including term changes, reschedule, and release | REQUIRED write | every old/new `offering:{id}` | 2, sorted by ID |
-| Same-customer simultaneous booking conflict | REQUIRED write | `customer:{userId}` | 3 |
-| Same-vehicle simultaneous booking conflict | REQUIRED write | `vehicle:{vehicleId}` | 4 |
-| Queue join/position/call/start/complete/delete/rebalance | REQUIRED write | `queue-branch:{branchId}` | 5 |
-| Schedule replacement and closure-overlap decisions | REQUIRED write | `schedule-branch:{branchId}` | 6 |
-| Last active platform-admin delete/demotion | REQUIRED write | `platform-administrators` | 7 |
+| Booking and temporary-closure resources | REQUIRED write | `booking:{bookingId}` / `closure:{closureId}` | `00` |
+| Queue-entry resource | REQUIRED write | `queue-entry:{queueEntryId}` | `01` |
+| Offering overlap capacity and terms | REQUIRED write | every old/new `offering:{id}` | `02`, sorted by ID |
+| Vehicle resource | REQUIRED write | `vehicle:{vehicleId}` | `03` |
+| Customer booking/vehicle conflict | REQUIRED write | `customer:{userId}` | `04` |
+| Queue ordering aggregate | REQUIRED write | `queue-branch:{branchId}` | `05` |
+| Schedule and closure overlap | REQUIRED write | `schedule-branch:{branchId}` | `06` |
+| Branch resource and lifecycle | REQUIRED write | `branch:{branchId}` | `07` |
+| Business resource and lifecycle | REQUIRED write | `business:{businessId}` | `08` |
+| Last active platform administrator | REQUIRED write | `platform-administrators` | `09` |
 
-Rescheduling acquires both offering keys together. Catalogue term changes hold the same offering key and use Booking's detached active-overlap query to reject a duration/capacity combination below the existing peak. Queue lifecycle operations acquire booking, offering, and branch keys together after a preliminary identifier lookup, then reload canonical state. A deferred unique `(branch_id, active_position)` constraint permits collision-free intermediate rebalance statements and validates the final committed branch order. Optimistic `version` columns detect ordinary lost updates; integrity, optimistic-lock, and lock-acquisition failures are translated to the standard customer-safe business-error contract.
+Resource identifiers are normalized before lock acquisition. Each acquisition sorts distinct keys; workflows acquire subsequent dependency keys only in increasing namespace order. Queue-entry commands first discover the immutable booking ID as an unscoped lock-key scalar (never as an authorization decision), then acquire booking plus queue-entry keys and load canonical scoped state. Branch call-next treats `queue-branch` as the selected queue aggregate lock. Rescheduling acquires both offering keys together. Catalogue term changes hold the same offering key and use Booking's detached active-overlap query to reject a duration/capacity combination below the existing peak. A deferred unique `(branch_id, active_position)` constraint permits collision-free intermediate rebalance statements and validates the final committed branch order. Guarded PostgreSQL update/delete statements carry the resource ID, authenticated business/customer predicate, and optimistic version in the actual mutation SQL; zero rows never fall back to an ID-only update. Optimistic `version` columns detect ordinary lost updates; integrity, optimistic-lock, and lock-acquisition failures are translated to the standard customer-safe contract.
 
 ## Enforced rules
 

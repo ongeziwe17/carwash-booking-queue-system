@@ -21,6 +21,7 @@ import com.carwash.vehicle.application.VehicleManagementService;
 import com.carwash.identity.application.CreateUserCommand;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.TestDates;
+import com.carwash.testsupport.TestAccess;
 import com.carwash.testsupport.UserFixtureBuilder;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,25 +61,27 @@ class Sec003RemediationIntegrationTest extends ApiIntegrationTestSupport {
         String serviceId = ids.service();
         String bookingId = ids.booking();
 
-        vehicles.createVehicle(new Vehicle(ownerVehicleId, ids.plate(), "SUV", "Toyota", "Rav4", "Black", ""), ownerId);
-        vehicles.createVehicle(new Vehicle(otherVehicleId, ids.plate(), "SUV", "Honda", "CR-V", "White", ""), otherId);
+        vehicles.createVehicle(TestAccess.platformAdministrator(), ownerId, ownerVehicleId,
+                ids.plate(), "SUV", "Toyota", "Rav4", "Black", "");
+        vehicles.createVehicle(TestAccess.platformAdministrator(), otherId, otherVehicleId,
+                ids.plate(), "SUV", "Honda", "CR-V", "White", "");
         services.createService(new Service(serviceId, "Transfer Test Wash", "security regression", BigDecimal.valueOf(150), 30));
         String businessId = ids.business();
-        marketplace.registerBusiness(new RegisterBusinessCommand(
+        marketplace.registerBusiness(TestAccess.platformAdministrator(), new RegisterBusinessCommand(
                 businessId, "Security Wash", ids.emailFor(businessId), "+27821234567", null));
         String branchId = ids.branch();
-        marketplace.createBranch(businessId, new CreateBranchCommand(
+        marketplace.createBranch(TestAccess.platformAdministrator(), businessId, new CreateBranchCommand(
                 branchId, "Security Branch", "1 Test Street", null, "Cape Town", "Western Cape", "8001", "ZA",
                 new BigDecimal("-33.9249"), new BigDecimal("18.4241"), "Africa/Johannesburg", true));
-        branchScheduling.replaceOperatingSchedule(branchId, new ReplaceOperatingScheduleCommand(
+        branchScheduling.replaceOperatingSchedule(TestAccess.platformAdministrator(), branchId, new ReplaceOperatingScheduleCommand(
                 Arrays.stream(DayOfWeek.values())
                         .map(day -> new WeeklyOperatingIntervalCommand(
                                 day, LocalTime.of(8, 0), LocalTime.of(17, 0)))
                         .toList()));
         String offeringId = ids.offering();
-        offerings.createOffering(branchId, new CreateServiceOfferingCommand(
+        offerings.createOffering(TestAccess.platformAdministrator(), branchId, new CreateServiceOfferingCommand(
                 offeringId, serviceId, BigDecimal.valueOf(150), 30, 2));
-        bookings.createBooking(
+        bookings.createBooking(TestAccess.platformAdministrator(),
                 bookingId, ownerId, ownerVehicleId, branchId, offeringId,
                 TestDates.futureDays(2), "original request");
 

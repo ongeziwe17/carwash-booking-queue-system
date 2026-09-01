@@ -1,6 +1,7 @@
 package com.carwash.catalog.application;
 
 import com.carwash.testsupport.ServiceTestSupport;
+import com.carwash.testsupport.TestAccess;
 
 import com.carwash.booking.domain.Booking;
 import com.carwash.queue.domain.QueueEntry;
@@ -109,9 +110,9 @@ class ServiceCatalogServiceTest extends ServiceTestSupport {
         catalogService.updateService(firstService.getServiceId(), firstService.getServiceName(),
                 firstService.getDescription(), firstService.getPrice(), 10);
         Booking secondBooking = createConfirmedBooking(TestDates.futureDays(2));
-        QueueEntry firstResponse = queueService.createQueueEntry(
+        QueueEntry firstResponse = queueService.createQueueEntry(TestAccess.platformAdministrator(),
                 ids.queueEntry(), firstBooking.getBookingId(), firstService.getServiceId());
-        QueueEntry secondResponse = queueService.createQueueEntry(
+        QueueEntry secondResponse = queueService.createQueueEntry(TestAccess.platformAdministrator(),
                 ids.queueEntry(), secondBooking.getBookingId(), secondBooking.getService().getServiceId());
         QueueEntry first = queueRepository.findById(firstResponse.getQueueEntryId()).orElseThrow();
         QueueEntry second = queueRepository.findById(secondResponse.getQueueEntryId()).orElseThrow();

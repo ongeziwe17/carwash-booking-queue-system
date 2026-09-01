@@ -19,6 +19,16 @@ public class PostgresCarWashBusinessRepository implements CarWashBusinessReposit
     public PostgresCarWashBusinessRepository(BusinessSpringDataRepository repository) { this.repository=repository; }
     @Override public boolean existsByRegistrationNumberIgnoreCase(String registrationNumber,String excludedBusinessId) { return registrationNumber!=null&&repository.duplicateRegistrationNumber(registrationNumber,excludedBusinessId); }
     @Override public Optional<CarWashBusiness> findByIdAndTenantId(String businessId,String tenantId) { return repository.findTenantScoped(businessId,tenantId).map(this::domain); }
+    @Override public boolean updateForTenant(CarWashBusiness value,String tenantId) {
+        Optional<BusinessJpaEntity> found=repository.findTenantScoped(value.getBusinessId(),tenantId);
+        if(found.isEmpty())return false;
+        return guardedUpdate(value,found.get().version,tenantId);
+    }
+    @Override public boolean updateForAdministrator(CarWashBusiness value) {
+        Optional<BusinessJpaEntity> found=repository.findById(value.getBusinessId());
+        if(found.isEmpty())return false;
+        return guardedUpdate(value,found.get().version,null);
+    }
     @Override public boolean insert(CarWashBusiness value) { if(repository.existsById(value.getBusinessId())) return false; try { repository.saveAndFlush(entity(value)); return true; } catch(DataIntegrityViolationException failure) { if(PersistenceSupport.constraint(failure,"uq_business_registration_ci")) throw new BusinessRuleViolationException("Business registration number already exists"); throw new BusinessRuleViolationException("Business conflicts with existing data"); } }
     @Override public boolean update(CarWashBusiness value) { Optional<BusinessJpaEntity> found=repository.findById(value.getBusinessId()); if(found.isEmpty()) return false; apply(value,found.get()); try { repository.saveAndFlush(found.get()); return true; } catch(DataIntegrityViolationException failure) { if(PersistenceSupport.constraint(failure,"uq_business_registration_ci")) throw new BusinessRuleViolationException("Business registration number already exists"); throw failure; } }
     @Override public Optional<CarWashBusiness> findById(String id) { return repository.findById(id).map(this::domain); }
@@ -26,6 +36,27 @@ public class PostgresCarWashBusinessRepository implements CarWashBusinessReposit
     @Override public boolean deleteById(String id) { Optional<BusinessJpaEntity> found=repository.findById(id); if(found.isEmpty()) return false; repository.delete(found.get()); repository.flush(); return true; }
     @Override public boolean existsById(String id) { return repository.existsById(id); }
     private CarWashBusiness domain(BusinessJpaEntity e) { return new CarWashBusiness(e.id,e.name,e.email,e.phone,e.registrationNumber,BusinessStatus.valueOf(e.status),PersistenceSupport.domainTime(e.registeredAt,e.registeredAtNano),PersistenceSupport.domainTime(e.updatedAt,e.updatedAtNano)); }
+    private boolean guardedUpdate(CarWashBusiness value,Long version,String tenantId) {
+        try {
+            int rows=tenantId==null
+                    ? repository.updateAdministratorScoped(
+                            value.getBusinessId(),value.getBusinessName(),value.getContactEmail(),
+                            value.getContactPhone(),value.getRegistrationNumber(),value.getStatus().name(),
+                            PersistenceSupport.databaseTime(value.getUpdatedAt()),
+                            PersistenceSupport.nanoRemainder(value.getUpdatedAt()),version)
+                    : repository.updateTenantScoped(
+                            value.getBusinessId(),tenantId,value.getBusinessName(),value.getContactEmail(),
+                            value.getContactPhone(),value.getRegistrationNumber(),value.getStatus().name(),
+                            PersistenceSupport.databaseTime(value.getUpdatedAt()),
+                            PersistenceSupport.nanoRemainder(value.getUpdatedAt()),version);
+            return rows==1;
+        } catch(DataIntegrityViolationException failure) {
+            if(PersistenceSupport.constraint(failure,"uq_business_registration_ci")) {
+                throw new BusinessRuleViolationException("Business registration number already exists");
+            }
+            throw failure;
+        }
+    }
     private static BusinessJpaEntity entity(CarWashBusiness v) { BusinessJpaEntity e=new BusinessJpaEntity(); apply(v,e); return e; }
     private static void apply(CarWashBusiness v,BusinessJpaEntity e) { e.id=v.getBusinessId();e.name=v.getBusinessName();e.email=v.getContactEmail();e.phone=v.getContactPhone();e.registrationNumber=v.getRegistrationNumber();e.status=v.getStatus().name();e.registeredAt=PersistenceSupport.databaseTime(v.getRegisteredAt());e.registeredAtNano=PersistenceSupport.nanoRemainder(v.getRegisteredAt());e.updatedAt=PersistenceSupport.databaseTime(v.getUpdatedAt());e.updatedAtNano=PersistenceSupport.nanoRemainder(v.getUpdatedAt()); }
 }

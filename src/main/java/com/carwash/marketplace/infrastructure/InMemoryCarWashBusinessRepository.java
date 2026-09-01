@@ -27,6 +27,17 @@ public final class InMemoryCarWashBusinessRepository extends InMemoryRepository<
     }
 
     @Override
+    public boolean updateForTenant(CarWashBusiness business, String tenantId) {
+        return updateMatching(business.getBusinessId(), business,
+                current -> current.getBusinessId().equals(tenantId));
+    }
+
+    @Override
+    public boolean updateForAdministrator(CarWashBusiness business) {
+        return updateMatching(business.getBusinessId(), business, current -> true);
+    }
+
+    @Override
     protected String getId(CarWashBusiness entity) {
         return entity.getBusinessId();
     }

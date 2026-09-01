@@ -121,6 +121,41 @@ public class InMemoryQueueEntryRepository extends InMemoryRepository<QueueEntry,
     }
 
     @Override
+    public boolean updateForBusiness(QueueEntry queueEntry, String businessId) {
+        return updateMatching(queueEntry.getQueueEntryId(), queueEntry,
+                current -> branchBelongsTo(current.getBranchId(), businessId));
+    }
+
+    @Override
+    public boolean updateForUser(QueueEntry queueEntry, String userId) {
+        return updateMatching(queueEntry.getQueueEntryId(), queueEntry,
+                current -> current.getBooking() != null && current.getBooking().getUser() != null
+                        && userId.equals(current.getBooking().getUser().getUserId()));
+    }
+
+    @Override
+    public boolean updateForAdministrator(QueueEntry queueEntry) {
+        return updateMatching(queueEntry.getQueueEntryId(), queueEntry, current -> true);
+    }
+
+    @Override
+    public boolean deleteForBusiness(String queueEntryId, String businessId) {
+        return deleteMatching(queueEntryId, current -> branchBelongsTo(current.getBranchId(), businessId));
+    }
+
+    @Override
+    public boolean deleteForUser(String queueEntryId, String userId) {
+        return deleteMatching(queueEntryId,
+                current -> current.getBooking() != null && current.getBooking().getUser() != null
+                        && userId.equals(current.getBooking().getUser().getUserId()));
+    }
+
+    @Override
+    public boolean deleteForAdministrator(String queueEntryId) {
+        return deleteMatching(queueEntryId, current -> true);
+    }
+
+    @Override
     public boolean existsByBookingId(String bookingId) {
         return anyMatch(queueEntry -> queueEntry.getBooking() != null
                 && bookingId != null

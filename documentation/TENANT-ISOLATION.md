@@ -43,6 +43,25 @@ Tenant-owned repositories expose predicates such as `findByIdAndBusinessId`, `fi
 
 The boundary covers businesses, branches, schedules, closures, offerings, booking lifecycle, queue lifecycle/call-next/order, daily reports, operational notifications, vehicles reached by operational workflows, and staff/owner membership queries. Customer self-service remains subject-scoped.
 
+### Authoritative mutation boundary
+
+Every externally reachable tenant- or subject-owned mutation now enters one `DataTransactionOperations.write(...)` boundary before authorization. Inside that boundary the service normalizes the resource ID, acquires its logical mutation lock, performs the canonical scoped read, mutates that exact aggregate, and persists it through a guarded repository operation. Tenant operators use resource ID plus authenticated `businessId`; customers use resource ID plus authenticated `userId`; platform administrators use a separate explicit administrator operation. There is no wildcard tenant and a failed scoped operation never retries through `findById`.
+
+Queue-entry commands may perform an unscoped scalar lookup solely to discover the immutable booking lock key. That lookup is not an authorization decision and its value is never returned: the booking and queue-entry locks are acquired together and the queue entry is then loaded canonically with the tenant/subject predicate before mutation. A foreign resource-ID replacement between discovery and the canonical read therefore returns safe `404`.
+
+The corrected boundary applies to business details/status; branch create/details/status; operating schedules; temporary closures; offering create/terms/status; booking create/update/reschedule/confirm/cancel/delete; queue join/reposition/call-next/explicit-call/start/complete/delete/rebalance; vehicle customer/tenant update/delete; and notification create/delete reached by those workflows. `BookingNotificationPublisher` is the narrow trusted cross-module contract for notifications: it accepts the already-authorized canonical booking and must not reload it by unscoped ID.
+
+Repository mutation rules are fail-closed:
+
+- tenant writes and deletes retain the authenticated `businessId` predicate;
+- customer writes and deletes retain the authenticated `userId` predicate;
+- administrator writes and deletes use explicitly named administrator operations;
+- optimistic versions remain part of PostgreSQL entity updates after the scoped canonical load;
+- zero affected rows produce `404`, roll back the transaction, and never trigger an unscoped retry; and
+- read-only reports and notification queries retain their existing tenant predicates.
+
+The in-memory profile performs the same sequence under its shared fair write lock and evaluates guarded predicates atomically in `updateMatching`/`deleteMatching`. PostgreSQL uses one REQUIRED transaction, transaction-scoped advisory locks, scoped repository queries, optimistic versions, and database rollback. Flyway V1-V4 remain unchanged; no V5 schema change is required.
+
 ## Safe error policy
 
 | Status | Meaning |

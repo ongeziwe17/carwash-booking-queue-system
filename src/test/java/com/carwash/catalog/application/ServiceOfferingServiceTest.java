@@ -13,6 +13,7 @@ import com.carwash.marketplace.infrastructure.InMemoryCarWashBusinessRepository;
 import com.carwash.shared.application.MutationLock;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
+import com.carwash.testsupport.TestAccess;
 import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,8 +51,8 @@ class ServiceOfferingServiceTest {
                 coordinator,
                 clock);
         offeringService = new ServiceOfferingService(offerings, services, marketplace, coordinator, clock);
-        marketplace.registerBusiness(business("business-001"));
-        marketplace.createBranch("business-001", branch("branch-001", true));
+        marketplace.registerBusiness(TestAccess.platformAdministrator(), business("business-001"));
+        marketplace.createBranch(TestAccess.platformAdministrator(), "business-001", branch("branch-001", true));
         services.insert(service("service-001"));
     }
 
@@ -73,7 +74,7 @@ class ServiceOfferingServiceTest {
 
     @Test
     void twoBranchesCanOfferTheSameServiceWithIndependentTermsAndDeterministicOrdering() {
-        marketplace.createBranch("business-001", branch("branch-002", true));
+        marketplace.createBranch(TestAccess.platformAdministrator(), "business-001", branch("branch-002", true));
         offeringService.createOffering(
                 "branch-001", command("offering-b", "service-001", "100.00", 30, 2));
         ServiceOfferingSnapshot second = offeringService.createOffering(
@@ -126,11 +127,17 @@ class ServiceOfferingServiceTest {
         acquiredKeys.clear();
         offeringService.updateOffering(
                 " offering-001 ", new UpdateServiceOfferingCommand(new BigDecimal("120.00"), 40, 3));
-        assertEquals(List.of(MutationLock.offering("offering-001")), acquiredKeys);
+        assertEquals(List.of(
+                MutationLock.offering("offering-001"),
+                MutationLock.branch("branch-001"),
+                MutationLock.business("business-001")), acquiredKeys);
 
         acquiredKeys.clear();
         offeringService.deactivateOffering(" offering-001 ");
-        assertEquals(List.of(MutationLock.offering("offering-001")), acquiredKeys);
+        assertEquals(List.of(
+                MutationLock.offering("offering-001"),
+                MutationLock.branch("branch-001"),
+                MutationLock.business("business-001")), acquiredKeys);
     }
 
     @Test
@@ -143,22 +150,22 @@ class ServiceOfferingServiceTest {
         services.findById("service-001").orElseThrow().activate();
         assertTrue(offeringService.findOffering("offering-001").discoverable());
 
-        marketplace.deactivateBranch("branch-001");
+        marketplace.deactivateBranch(TestAccess.platformAdministrator(), "branch-001");
         assertIneffectiveButStoredActive();
-        marketplace.activateBranch("branch-001");
+        marketplace.activateBranch(TestAccess.platformAdministrator(), "branch-001");
         assertTrue(offeringService.findOffering("offering-001").discoverable());
 
-        marketplace.deactivateBusiness("business-001");
+        marketplace.deactivateBusiness(TestAccess.platformAdministrator(), "business-001");
         assertIneffectiveButStoredActive();
-        marketplace.activateBusiness("business-001");
+        marketplace.activateBusiness(TestAccess.platformAdministrator(), "business-001");
         assertTrue(offeringService.findOffering("offering-001").discoverable());
 
-        marketplace.updateBranch("branch-001", updateBranch(false));
+        marketplace.updateBranch(TestAccess.platformAdministrator(), "branch-001", updateBranch(false));
         ServiceOfferingSnapshot privateBranch = offeringService.findOffering("offering-001");
         assertTrue(privateBranch.effectiveActive());
         assertFalse(privateBranch.discoverable());
         assertEquals(ServiceOfferingStatus.ACTIVE, privateBranch.status());
-        marketplace.updateBranch("branch-001", updateBranch(true));
+        marketplace.updateBranch(TestAccess.platformAdministrator(), "branch-001", updateBranch(true));
         assertTrue(offeringService.findOffering("offering-001").discoverable());
     }
 
@@ -166,7 +173,7 @@ class ServiceOfferingServiceTest {
     void duplicateIdentifiersRelationshipsAndUnknownReferencesAreRejected() {
         offeringService.createOffering(
                 "branch-001", command("offering-001", "service-001", "100.00", 30, 2));
-        marketplace.createBranch("business-001", branch("branch-002", true));
+        marketplace.createBranch(TestAccess.platformAdministrator(), "business-001", branch("branch-002", true));
 
         assertThrows(BusinessRuleViolationException.class, () -> offeringService.createOffering(
                 "branch-002", command("offering-001", "service-001", "90.00", 20, 1)));

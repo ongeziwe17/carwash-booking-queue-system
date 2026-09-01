@@ -96,31 +96,11 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
         });
     }
 
-    public BranchOperatingScheduleSnapshot replaceOperatingSchedule(
+    BranchOperatingScheduleSnapshot replaceOperatingSchedule(
             String branchId,
             ReplaceOperatingScheduleCommand command
     ) {
-        return coordinator.write(() -> {
-            CarWashBranch branch = requireBranch(branchId);
-            mutationLock.acquire(MutationLock.scheduleBranch(branch.getBranchId()));
-            if (command == null || command.intervals() == null) {
-                throw new BusinessRuleViolationException("Operating intervals are required");
-            }
-            List<WeeklyOperatingInterval> intervals = command.intervals().stream()
-                    .map(this::toDomainInterval)
-                    .toList();
-            LocalDateTime now = LocalDateTime.now(clock);
-            BranchOperatingSchedule schedule = scheduleRepository.findById(branch.getBranchId())
-                    .map(existing -> existing.replace(intervals, now))
-                    .orElseGet(() -> new BranchOperatingSchedule(branch.getBranchId(), intervals, now, now));
-
-            boolean existed = scheduleRepository.existsById(branch.getBranchId());
-            boolean persisted = existed ? scheduleRepository.update(schedule) : scheduleRepository.insert(schedule);
-            if (!persisted) {
-                throw new IllegalStateException("Operating schedule persistence state changed unexpectedly");
-            }
-            return BranchOperatingScheduleSnapshot.from(schedule, branch.getTimezone());
-        });
+        return coordinator.write(() -> replaceOperatingScheduleInside(null, branchId, command));
     }
 
     public BranchOperatingScheduleSnapshot replaceOperatingSchedule(
@@ -128,8 +108,7 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
             String branchId,
             ReplaceOperatingScheduleCommand command
     ) {
-        requireAccessibleBranch(access, branchId);
-        return replaceOperatingSchedule(branchId, command);
+        return coordinator.write(() -> replaceOperatingScheduleInside(access, branchId, command));
     }
 
     public List<TemporaryBranchClosureSnapshot> listTemporaryClosures(String branchId) {
@@ -152,44 +131,11 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
                 .map(TemporaryBranchClosureSnapshot::from).toList());
     }
 
-    public TemporaryBranchClosureSnapshot createTemporaryClosure(
+    TemporaryBranchClosureSnapshot createTemporaryClosure(
             String branchId,
             CreateTemporaryBranchClosureCommand command
     ) {
-        return coordinator.write(() -> {
-            CarWashBranch branch = requireBranch(branchId);
-            mutationLock.acquire(MutationLock.scheduleBranch(branch.getBranchId()));
-            if (command == null) {
-                throw new BusinessRuleViolationException("Temporary closure request is required");
-            }
-            validateRequired(command.startAt(), "Closure start");
-            validateRequired(command.endAt(), "Closure end");
-            String closureId = normalizeRequiredId(command.closureId(), "Closure ID");
-            if (closureRepository.existsById(closureId)) {
-                throw new BusinessRuleViolationException("Closure ID already exists");
-            }
-
-            LocalDateTime now = LocalDateTime.now(clock);
-            TemporaryBranchClosure closure = new TemporaryBranchClosure(
-                    closureId,
-                    branch.getBranchId(),
-                    command.startAt(),
-                    command.endAt(),
-                    command.reason(),
-                    ClosureStatus.ACTIVE,
-                    now,
-                    now
-            );
-            boolean overlaps = closureRepository.findByBranchId(branch.getBranchId()).stream()
-                    .anyMatch(existing -> existing.overlaps(closure.getStartAt(), closure.getEndAt()));
-            if (overlaps) {
-                throw new BusinessRuleViolationException("Active temporary closures must not overlap");
-            }
-            if (!closureRepository.insert(closure)) {
-                throw new BusinessRuleViolationException("Closure ID already exists");
-            }
-            return TemporaryBranchClosureSnapshot.from(closure);
-        });
+        return coordinator.write(() -> createTemporaryClosureInside(null, branchId, command));
     }
 
     public TemporaryBranchClosureSnapshot createTemporaryClosure(
@@ -197,39 +143,98 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
             String branchId,
             CreateTemporaryBranchClosureCommand command
     ) {
-        requireAccessibleBranch(access, branchId);
-        return createTemporaryClosure(branchId, command);
+        return coordinator.write(() -> createTemporaryClosureInside(access, branchId, command));
     }
 
-    public TemporaryBranchClosureSnapshot cancelTemporaryClosure(String closureId) {
-        return coordinator.write(() -> {
-            String normalizedId = normalizeRequiredId(closureId, "Closure ID");
-            TemporaryBranchClosure existing = closureRepository.findById(normalizedId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Closure not found: " + normalizedId));
-            requireBranch(existing.getBranchId());
-            mutationLock.acquire(MutationLock.scheduleBranch(existing.getBranchId()));
-            if (!existing.isActive()) {
-                return TemporaryBranchClosureSnapshot.from(existing);
-            }
-            TemporaryBranchClosure cancelled = existing.cancel(LocalDateTime.now(clock));
-            if (!closureRepository.update(cancelled)) {
-                throw new ResourceNotFoundException("Closure not found: " + normalizedId);
-            }
-            return TemporaryBranchClosureSnapshot.from(cancelled);
-        });
+    TemporaryBranchClosureSnapshot cancelTemporaryClosure(String closureId) {
+        return coordinator.write(() -> cancelTemporaryClosureInside(null, closureId));
     }
 
     public TemporaryBranchClosureSnapshot cancelTemporaryClosure(
             TenantAccessContext access,
             String closureId
     ) {
-        if (!access.isPlatformAdministrator()) {
-            String normalizedId = normalizeRequiredId(closureId, "Closure ID");
-            coordinator.read(() -> closureRepository
-                    .findByIdAndBusinessId(normalizedId, access.requireBusinessId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Closure not found")));
+        return coordinator.write(() -> cancelTemporaryClosureInside(access, closureId));
+    }
+
+    private BranchOperatingScheduleSnapshot replaceOperatingScheduleInside(
+            TenantAccessContext access, String branchId, ReplaceOperatingScheduleCommand command) {
+        String normalizedId = normalizeRequiredId(branchId, "Branch ID");
+        mutationLock.acquire(List.of(
+                MutationLock.scheduleBranch(normalizedId), MutationLock.branch(normalizedId)));
+        CarWashBranch branch = requireBranchForMutation(access, normalizedId);
+        mutationLock.acquire(MutationLock.business(branch.getBusinessId()));
+        if (command == null || command.intervals() == null) {
+            throw new BusinessRuleViolationException("Operating intervals are required");
         }
-        return cancelTemporaryClosure(closureId);
+        List<WeeklyOperatingInterval> intervals = command.intervals().stream()
+                .map(this::toDomainInterval).toList();
+        LocalDateTime now = LocalDateTime.now(clock);
+        java.util.Optional<BranchOperatingSchedule> existing = access == null || access.isPlatformAdministrator()
+                ? scheduleRepository.findById(normalizedId)
+                : scheduleRepository.findByBranchIdAndBusinessId(normalizedId, access.requireBusinessId());
+        BranchOperatingSchedule schedule = existing
+                .map(value -> value.replace(intervals, now))
+                .orElseGet(() -> new BranchOperatingSchedule(normalizedId, intervals, now, now));
+        boolean persisted = existing.isEmpty()
+                ? scheduleRepository.insert(schedule)
+                : access == null || access.isPlatformAdministrator()
+                ? scheduleRepository.updateForAdministrator(schedule)
+                : scheduleRepository.updateForBusiness(schedule, access.requireBusinessId());
+        if (!persisted) {
+            throw new ResourceNotFoundException("Operating schedule or branch not found");
+        }
+        return BranchOperatingScheduleSnapshot.from(schedule, branch.getTimezone());
+    }
+
+    private TemporaryBranchClosureSnapshot createTemporaryClosureInside(
+            TenantAccessContext access, String branchId, CreateTemporaryBranchClosureCommand command) {
+        if (command == null) throw new BusinessRuleViolationException("Temporary closure request is required");
+        validateRequired(command.startAt(), "Closure start");
+        validateRequired(command.endAt(), "Closure end");
+        String normalizedBranchId = normalizeRequiredId(branchId, "Branch ID");
+        String closureId = normalizeRequiredId(command.closureId(), "Closure ID");
+        mutationLock.acquire(List.of(
+                MutationLock.closure(closureId), MutationLock.scheduleBranch(normalizedBranchId),
+                MutationLock.branch(normalizedBranchId)));
+        CarWashBranch branch = requireBranchForMutation(access, normalizedBranchId);
+        mutationLock.acquire(MutationLock.business(branch.getBusinessId()));
+        if (closureRepository.existsById(closureId)) {
+            throw new BusinessRuleViolationException("Closure ID already exists");
+        }
+        LocalDateTime now = LocalDateTime.now(clock);
+        TemporaryBranchClosure closure = new TemporaryBranchClosure(
+                closureId, branch.getBranchId(), command.startAt(), command.endAt(), command.reason(),
+                ClosureStatus.ACTIVE, now, now);
+        List<TemporaryBranchClosure> current = access == null || access.isPlatformAdministrator()
+                ? closureRepository.findByBranchId(normalizedBranchId)
+                : closureRepository.findByBranchIdAndBusinessId(normalizedBranchId, access.requireBusinessId());
+        if (current.stream().anyMatch(existing -> existing.overlaps(closure.getStartAt(), closure.getEndAt()))) {
+            throw new BusinessRuleViolationException("Active temporary closures must not overlap");
+        }
+        if (!closureRepository.insert(closure)) {
+            throw new BusinessRuleViolationException("Closure ID already exists");
+        }
+        return TemporaryBranchClosureSnapshot.from(closure);
+    }
+
+    private TemporaryBranchClosureSnapshot cancelTemporaryClosureInside(
+            TenantAccessContext access, String closureId) {
+        String normalizedId = normalizeRequiredId(closureId, "Closure ID");
+        mutationLock.acquire(MutationLock.closure(normalizedId));
+        TemporaryBranchClosure existing = requireClosureForMutation(access, normalizedId);
+        mutationLock.acquire(List.of(
+                MutationLock.scheduleBranch(existing.getBranchId()),
+                MutationLock.branch(existing.getBranchId())));
+        CarWashBranch branch = requireBranchForMutation(access, existing.getBranchId());
+        mutationLock.acquire(MutationLock.business(branch.getBusinessId()));
+        if (!existing.isActive()) return TemporaryBranchClosureSnapshot.from(existing);
+        TemporaryBranchClosure cancelled = existing.cancel(LocalDateTime.now(clock));
+        boolean updated = access == null || access.isPlatformAdministrator()
+                ? closureRepository.updateForAdministrator(cancelled)
+                : closureRepository.updateForBusiness(cancelled, access.requireBusinessId());
+        if (!updated) throw new ResourceNotFoundException("Closure not found");
+        return TemporaryBranchClosureSnapshot.from(cancelled);
     }
 
     @Override
@@ -418,6 +423,21 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
     private void requireAccessibleBranch(TenantAccessContext access, String branchId) {
         Objects.requireNonNull(access, "Tenant access context is required");
         if (!access.isPlatformAdministrator()) requireTenantBranch(branchId, access.requireBusinessId());
+    }
+
+    private CarWashBranch requireBranchForMutation(TenantAccessContext access, String branchId) {
+        java.util.Optional<CarWashBranch> branch = access == null || access.isPlatformAdministrator()
+                ? branchRepository.findById(branchId)
+                : branchRepository.findByIdAndBusinessId(branchId, access.requireBusinessId());
+        return branch.orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
+    }
+
+    private TemporaryBranchClosure requireClosureForMutation(
+            TenantAccessContext access, String closureId) {
+        java.util.Optional<TemporaryBranchClosure> closure = access == null || access.isPlatformAdministrator()
+                ? closureRepository.findById(closureId)
+                : closureRepository.findByIdAndBusinessId(closureId, access.requireBusinessId());
+        return closure.orElseThrow(() -> new ResourceNotFoundException("Closure not found"));
     }
 
     private CarWashBusiness requireBusiness(String businessId) {

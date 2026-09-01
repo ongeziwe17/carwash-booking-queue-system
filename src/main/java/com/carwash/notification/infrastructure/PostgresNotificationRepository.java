@@ -23,6 +23,9 @@ public class PostgresNotificationRepository implements NotificationRepository {
     @Override public Optional<Notification> findByIdAndBusinessId(String id,String businessId){return repository.findTenantScoped(id,businessId).map(this::domain);}
     @Override public int deleteByUserId(String id){int count=repository.deleteByUserId(id);repository.flush();return count;}
     @Override public int deleteByBookingId(String id){int count=repository.deleteByBookingId(id);repository.flush();return count;}
+    @Override public int deleteByBookingIdAndBusinessId(String id,String businessId){int count=repository.deleteByBookingIdAndBusinessId(id,businessId);repository.flush();return count;}
+    @Override public int deleteByBookingIdAndUserId(String id,String userId){int count=repository.deleteByBookingIdAndUserId(id,userId);repository.flush();return count;}
+    @Override public int deleteByBookingIdForAdministrator(String id){return deleteByBookingId(id);}
     @Override public boolean insert(Notification v){if(repository.existsById(v.getNotificationId()))return false;repository.saveAndFlush(entity(v));return true;}
     @Override public boolean update(Notification v){Optional<NotificationJpaEntity> found=repository.findById(v.getNotificationId());if(found.isEmpty())return false;apply(v,found.get());repository.saveAndFlush(found.get());return true;}
     @Override public Optional<Notification> findById(String id){return repository.findById(id).map(this::domain);}

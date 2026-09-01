@@ -33,4 +33,16 @@ public final class InMemoryBranchOperatingScheduleRepository
         }
         return findById(branchId);
     }
+
+    @Override
+    public boolean updateForBusiness(BranchOperatingSchedule schedule, String businessId) {
+        return updateMatching(schedule.getBranchId(), schedule,
+                current -> branches != null
+                        && branches.findByIdAndBusinessId(current.getBranchId(), businessId).isPresent());
+    }
+
+    @Override
+    public boolean updateForAdministrator(BranchOperatingSchedule schedule) {
+        return updateMatching(schedule.getBranchId(), schedule, current -> true);
+    }
 }

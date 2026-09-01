@@ -16,4 +16,7 @@ public interface NotificationRepository extends Repository<Notification, String>
 
     int deleteByUserId(String userId);
     int deleteByBookingId(String bookingId);
+    int deleteByBookingIdAndBusinessId(String bookingId, String businessId);
+    int deleteByBookingIdAndUserId(String bookingId, String userId);
+    int deleteByBookingIdForAdministrator(String bookingId);
 }

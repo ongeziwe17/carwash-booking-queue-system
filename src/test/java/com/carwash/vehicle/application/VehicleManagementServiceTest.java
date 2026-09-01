@@ -1,5 +1,7 @@
 package com.carwash.vehicle.application;
 
+import com.carwash.access.application.TenantAccessContext;
+import com.carwash.identity.domain.RoleName;
 import com.carwash.testsupport.ServiceTestSupport;
 
 import com.carwash.identity.domain.User;
@@ -72,5 +74,41 @@ class VehicleManagementServiceTest extends ServiceTestSupport {
     void vehicleUpdateFailsWhenMissing() {
         Vehicle vehicle = new Vehicle(ids.vehicle(), ids.plate(), "Sedan", "Toyota", "Corolla", "Blue", "");
         assertThrows(ResourceNotFoundException.class, () -> vehicleService.updateVehicle(vehicle));
+    }
+
+    @Test
+    void customerMutationRemainsSubjectScopedInsideTheWriteBoundary() {
+        User first = registerUser();
+        User second = registerUser();
+        Vehicle own = createVehicle(first);
+        Vehicle foreign = createVehicle(second);
+        TenantAccessContext firstCustomer =
+                new TenantAccessContext(first.getUserId(), RoleName.CUSTOMER, null);
+
+        Vehicle updated = vehicleService.updateVehicle(
+                firstCustomer, own.getVehicleId(), "OWN-UPDATED", "Sedan",
+                "Toyota", "Corolla", "Blue", "subject scoped");
+        assertEquals("OWN-UPDATED", updated.getPlateNumber());
+
+        assertThrows(ResourceNotFoundException.class, () -> vehicleService.updateVehicle(
+                firstCustomer, foreign.getVehicleId(), "FOREIGN", "Sedan",
+                "Toyota", "Corolla", "Red", "denied"));
+        assertThrows(ResourceNotFoundException.class,
+                () -> vehicleService.deleteVehicle(firstCustomer, foreign.getVehicleId()));
+        assertEquals(foreign.getPlateNumber(), vehicleService.findById(foreign.getVehicleId()).getPlateNumber());
+    }
+
+    @Test
+    void platformAdministratorMutationUsesExplicitAdministratorScope() {
+        User owner = registerUser();
+        Vehicle vehicle = createVehicle(owner);
+        TenantAccessContext administrator =
+                new TenantAccessContext("platform-admin", RoleName.PLATFORM_ADMIN, null);
+
+        Vehicle updated = vehicleService.updateVehicle(
+                administrator, vehicle.getVehicleId(), "ADMIN-UPDATED", "SUV",
+                "Toyota", "RAV4", "Black", "explicit administrator scope");
+
+        assertEquals("ADMIN-UPDATED", updated.getPlateNumber());
     }
 }

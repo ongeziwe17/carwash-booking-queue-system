@@ -1,6 +1,7 @@
 package com.carwash.notification.application;
 
 import com.carwash.testsupport.ServiceTestSupport;
+import com.carwash.testsupport.TestAccess;
 
 import com.carwash.booking.application.BookingManagementService;
 import com.carwash.notification.application.NotificationManagementService;
@@ -28,7 +29,7 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
     @Test
     void bookingConfirmationCreatesNotification() {
         Booking booking = createSavedBooking();
-        bookingService.confirmBooking(booking.getBookingId());
+        bookingService.confirmBooking(TestAccess.platformAdministrator(), booking.getBookingId());
         List<Notification> notifications = notificationService.findByUserId(booking.getUser().getUserId());
         assertEquals(1, notifications.size());
         assertEquals("BOOKING_CONFIRMED", notifications.getFirst().getType());
@@ -38,7 +39,7 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
     @Test
     void bookingCancellationCreatesNotification() {
         Booking booking = createSavedBooking();
-        bookingService.cancelBooking(booking.getBookingId(), booking.getUser().getUserId());
+        bookingService.cancelBooking(TestAccess.platformAdministrator(), booking.getBookingId());
         List<Notification> notifications = notificationService.findByUserId(booking.getUser().getUserId());
         assertEquals(1, notifications.size());
         assertEquals("BOOKING_CANCELLED", notifications.getFirst().getType());
@@ -48,7 +49,7 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
     @Test
     void queueCallCreatesNotification() {
         QueueEntry queueEntry = createSavedQueueEntry();
-        queueService.callQueueEntry(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(TestAccess.platformAdministrator(), queueEntry.getQueueEntryId());
         List<Notification> notifications = notificationService.findByUserId(queueEntry.getBooking().getUser().getUserId());
         assertEquals(List.of("BOOKING_CONFIRMED", "QUEUE_CALLED"),
                 notifications.stream().map(Notification::getType).toList());
@@ -60,8 +61,8 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
     @Test
     void queueServiceStartCreatesNotification() {
         QueueEntry queueEntry = createSavedQueueEntry();
-        queueService.callQueueEntry(queueEntry.getQueueEntryId());
-        queueService.startService(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(TestAccess.platformAdministrator(), queueEntry.getQueueEntryId());
+        queueService.startService(TestAccess.platformAdministrator(), queueEntry.getQueueEntryId());
         List<Notification> notifications = notificationService.findByUserId(queueEntry.getBooking().getUser().getUserId());
         assertEquals(List.of("BOOKING_CONFIRMED", "QUEUE_CALLED", "SERVICE_STARTED"),
                 notifications.stream().map(Notification::getType).toList());
@@ -72,9 +73,9 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
     @Test
     void queueServiceCompletionCreatesNotification() {
         QueueEntry queueEntry = createSavedQueueEntry();
-        queueService.callQueueEntry(queueEntry.getQueueEntryId());
-        queueService.startService(queueEntry.getQueueEntryId());
-        queueService.completeQueueEntry(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(TestAccess.platformAdministrator(), queueEntry.getQueueEntryId());
+        queueService.startService(TestAccess.platformAdministrator(), queueEntry.getQueueEntryId());
+        queueService.completeQueueEntry(TestAccess.platformAdministrator(), queueEntry.getQueueEntryId());
         List<Notification> notifications = notificationService.findByUserId(queueEntry.getBooking().getUser().getUserId());
         assertEquals(List.of("BOOKING_CONFIRMED", "QUEUE_CALLED", "SERVICE_STARTED", "SERVICE_COMPLETED"),
                 notifications.stream().map(Notification::getType).toList());
@@ -85,12 +86,12 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
     @Test
     void cancellationRemainsSuccessfulWhenLifecycleNotificationFails() {
         Booking booking = createConfirmedBooking();
-        QueueEntry queueEntry = queueService.createQueueEntry(
-                new QueueEntry(ids.queueEntry(), booking, booking.getService()));
+        QueueEntry queueEntry = queueService.createQueueEntry(TestAccess.platformAdministrator(),
+                ids.queueEntry(), booking.getBookingId(), booking.getService().getServiceId());
         BookingManagementService serviceWithFailingNotifications = bookingServiceWith(failingNotificationService());
 
         Booking cancelled = assertDoesNotThrow(() -> serviceWithFailingNotifications.cancelBooking(
-                booking.getBookingId(), booking.getUser().getUserId()));
+                TestAccess.platformAdministrator(), booking.getBookingId()));
 
         assertEquals(BookingStatus.CANCELLED, cancelled.getStatus());
         assertTrue(queueRepository.findById(queueEntry.getQueueEntryId()).isEmpty());
@@ -100,11 +101,12 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
     @Test
     void serviceStartRemainsSuccessfulWhenLifecycleNotificationFails() {
         QueueEntry queueEntry = createSavedQueueEntry();
-        queueService.callQueueEntry(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(TestAccess.platformAdministrator(), queueEntry.getQueueEntryId());
         QueueManagementService serviceWithFailingNotifications = queueServiceWith(failingNotificationService());
 
         QueueEntry started = assertDoesNotThrow(
-                () -> serviceWithFailingNotifications.startService(queueEntry.getQueueEntryId()));
+                () -> serviceWithFailingNotifications.startService(
+                        TestAccess.platformAdministrator(), queueEntry.getQueueEntryId()));
 
         assertEquals(QueueStatus.IN_PROGRESS, started.getQueueStatus());
         assertEquals(BookingStatus.IN_SERVICE, started.getBooking().getStatus());
@@ -114,12 +116,13 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
     @Test
     void serviceCompletionRemainsSuccessfulWhenLifecycleNotificationFails() {
         QueueEntry queueEntry = createSavedQueueEntry();
-        queueService.callQueueEntry(queueEntry.getQueueEntryId());
-        queueService.startService(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(TestAccess.platformAdministrator(), queueEntry.getQueueEntryId());
+        queueService.startService(TestAccess.platformAdministrator(), queueEntry.getQueueEntryId());
         QueueManagementService serviceWithFailingNotifications = queueServiceWith(failingNotificationService());
 
         QueueEntry completed = assertDoesNotThrow(
-                () -> serviceWithFailingNotifications.completeQueueEntry(queueEntry.getQueueEntryId()));
+                () -> serviceWithFailingNotifications.completeQueueEntry(
+                        TestAccess.platformAdministrator(), queueEntry.getQueueEntryId()));
 
         assertEquals(QueueStatus.COMPLETED, completed.getQueueStatus());
         assertEquals(BookingStatus.COMPLETED, completed.getBooking().getStatus());
@@ -129,8 +132,8 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
     @Test
     void recentNotificationsCanBeRetrievedByUserId() {
         Booking booking = createSavedBooking();
-        bookingService.confirmBooking(booking.getBookingId());
-        bookingService.cancelBooking(booking.getBookingId(), booking.getUser().getUserId());
+        bookingService.confirmBooking(TestAccess.platformAdministrator(), booking.getBookingId());
+        bookingService.cancelBooking(TestAccess.platformAdministrator(), booking.getBookingId());
         List<Notification> notifications = notificationService.findRecentByUserId(booking.getUser().getUserId());
         assertEquals(2, notifications.size());
         assertEquals("BOOKING_CANCELLED", notifications.getFirst().getType());
@@ -165,7 +168,7 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
     @Test
     void deterministicNotificationIdsStartFromKnownStateForEveryTest() {
         Booking booking = createSavedBooking();
-        bookingService.confirmBooking(booking.getBookingId());
+        bookingService.confirmBooking(TestAccess.platformAdministrator(), booking.getBookingId());
         Notification notification = notificationService.findByUserId(booking.getUser().getUserId()).getFirst();
         assertEquals("notification-00000000000000000001", notification.getNotificationId());
     }
@@ -175,7 +178,7 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
                 notificationRepository, userRepository, bookingRepository, coordinator, notificationIds,
                 new NotificationPolicyProperties(10), clock) {
             @Override
-            public Notification createNotification(User user, Booking booking, String type, String message) {
+            public Notification publishForAuthorizedBooking(Booking booking, String type, String message) {
                 throw new ResourceNotFoundException("Injected notification persistence failure");
             }
         };

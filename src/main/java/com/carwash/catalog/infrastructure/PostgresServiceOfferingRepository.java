@@ -25,6 +25,14 @@ public class PostgresServiceOfferingRepository implements ServiceOfferingReposit
     @Override public Optional<ServiceOffering> findByBranchIdAndServiceId(String branchId, String serviceId) { return repository.findByBranchIdAndServiceId(branchId, serviceId).map(this::domain); }
     @Override public Optional<ServiceOffering> findByIdAndBusinessId(String offeringId,String businessId) { return repository.findTenantScoped(offeringId,businessId).map(this::domain); }
     @Override public List<ServiceOffering> findByBranchIdAndBusinessId(String branchId,String businessId) { return repository.findByBranchTenant(branchId,businessId).stream().map(this::domain).toList(); }
+    @Override public boolean updateForBusiness(ServiceOffering value,String businessId) {
+        Optional<ServiceOfferingJpaEntity> found=repository.findTenantScoped(value.getOfferingId(),businessId);
+        return found.isPresent()&&guardedUpdate(value,found.get().version,businessId);
+    }
+    @Override public boolean updateForAdministrator(ServiceOffering value) {
+        Optional<ServiceOfferingJpaEntity> found=repository.findById(value.getOfferingId());
+        return found.isPresent()&&guardedUpdate(value,found.get().version,null);
+    }
     @Override public boolean existsByServiceId(String serviceId) { return repository.existsByServiceId(serviceId); }
     @Override public boolean insert(ServiceOffering value) {
         if (repository.existsById(value.getOfferingId())) return false;
@@ -39,6 +47,21 @@ public class PostgresServiceOfferingRepository implements ServiceOfferingReposit
     @Override public List<ServiceOffering> findAll() { return repository.findAllByOrderByIdAsc().stream().map(this::domain).toList(); }
     @Override public boolean deleteById(String id) { Optional<ServiceOfferingJpaEntity> found = repository.findById(id); if (found.isEmpty()) return false; repository.delete(found.get()); repository.flush(); return true; }
     @Override public boolean existsById(String id) { return repository.existsById(id); }
+
+    private boolean guardedUpdate(ServiceOffering value,Long version,String businessId) {
+        int rows=businessId==null
+                ? repository.updateAdministratorScoped(
+                        value.getOfferingId(),value.getPrice(),value.getEstimatedDurationMin(),
+                        value.getConcurrentCapacity(),value.getStatus().name(),
+                        PersistenceSupport.databaseTime(value.getUpdatedAt()),
+                        PersistenceSupport.nanoRemainder(value.getUpdatedAt()),version)
+                : repository.updateBusinessScoped(
+                        value.getOfferingId(),businessId,value.getPrice(),value.getEstimatedDurationMin(),
+                        value.getConcurrentCapacity(),value.getStatus().name(),
+                        PersistenceSupport.databaseTime(value.getUpdatedAt()),
+                        PersistenceSupport.nanoRemainder(value.getUpdatedAt()),version);
+        return rows==1;
+    }
 
     private ServiceOffering domain(ServiceOfferingJpaEntity e) { return new ServiceOffering(e.id, e.branchId, e.serviceId, e.price, e.duration, e.capacity, ServiceOfferingStatus.valueOf(e.status), PersistenceSupport.domainTime(e.createdAt, e.createdAtNano), PersistenceSupport.domainTime(e.updatedAt, e.updatedAtNano)); }
     private static ServiceOfferingJpaEntity entity(ServiceOffering value) { ServiceOfferingJpaEntity entity = new ServiceOfferingJpaEntity(); apply(value, entity); return entity; }

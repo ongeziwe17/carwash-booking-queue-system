@@ -25,4 +25,15 @@ public final class InMemoryCarWashBranchRepository extends InMemoryRepository<Ca
         return findMatching(branch -> branchId != null && branchId.equals(branch.getBranchId())
                 && businessId != null && businessId.equals(branch.getBusinessId())).stream().findFirst();
     }
+
+    @Override
+    public boolean updateForBusiness(CarWashBranch branch, String businessId) {
+        return updateMatching(branch.getBranchId(), branch,
+                current -> businessId != null && businessId.equals(current.getBusinessId()));
+    }
+
+    @Override
+    public boolean updateForAdministrator(CarWashBranch branch) {
+        return updateMatching(branch.getBranchId(), branch, current -> true);
+    }
 }

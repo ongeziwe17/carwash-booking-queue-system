@@ -20,6 +20,7 @@ import com.carwash.booking.domain.BookingRepository;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
 import com.carwash.testsupport.TestDates;
+import com.carwash.testsupport.TestAccess;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -132,7 +133,8 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         LocalDateTime scheduled = TestDates.futureDays(7);
 
         Booking first = newBookingWithFixture(scheduled);
-        serviceOfferingService.updateOffering(first.getServiceOfferingId(), new UpdateServiceOfferingCommand(
+        serviceOfferingService.updateOffering(TestAccess.platformAdministrator(),
+                first.getServiceOfferingId(), new UpdateServiceOfferingCommand(
                 first.getService().getPrice(), first.getService().getEstimatedDurationMin(), 2));
         Booking second = newBookingForScope(first, scheduled);
         Booking third = newBookingForScope(first, scheduled);
@@ -229,12 +231,12 @@ class BookingManagementServiceTest extends ServiceTestSupport {
     @Test
     void cancellationRemovesWaitingQueueEntryAndRebalancesRemainingQueue() {
         Booking firstBooking = createConfirmedBooking(TestDates.futureDays(20));
-        serviceOfferingService.updateOffering(firstBooking.getServiceOfferingId(),
+        serviceOfferingService.updateOffering(TestAccess.platformAdministrator(), firstBooking.getServiceOfferingId(),
                 new UpdateServiceOfferingCommand(firstBooking.getService().getPrice(), 10, 2));
         Booking secondBooking = createConfirmedBooking(TestDates.futureDays(21));
-        QueueEntry first = canonicalQueue(queueService.createQueueEntry(
+        QueueEntry first = canonicalQueue(queueService.createQueueEntry(TestAccess.platformAdministrator(),
                 ids.queueEntry(), firstBooking.getBookingId(), firstBooking.getService().getServiceId()));
-        QueueEntry second = canonicalQueue(queueService.createQueueEntry(
+        QueueEntry second = canonicalQueue(queueService.createQueueEntry(TestAccess.platformAdministrator(),
                 ids.queueEntry(), secondBooking.getBookingId(), secondBooking.getService().getServiceId()));
         assertEquals(2, second.getPosition());
         assertEquals(10, second.getEstimatedWaitMin());
@@ -256,12 +258,13 @@ class BookingManagementServiceTest extends ServiceTestSupport {
     @Test
     void cancellationRemovesCalledQueueEntryWithoutChangingPublicDeleteRule() {
         Booking booking = createConfirmedBooking(TestDates.futureDays(22));
-        QueueEntry queueEntry = canonicalQueue(queueService.createQueueEntry(
+        QueueEntry queueEntry = canonicalQueue(queueService.createQueueEntry(TestAccess.platformAdministrator(),
                 ids.queueEntry(), booking.getBookingId(), booking.getService().getServiceId()));
-        queueService.callQueueEntry(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(TestAccess.platformAdministrator(), queueEntry.getQueueEntryId());
 
         assertThrows(BusinessRuleViolationException.class,
-                () -> queueService.deleteQueueEntry(queueEntry.getQueueEntryId()));
+                () -> queueService.deleteQueueEntry(
+                        TestAccess.platformAdministrator(), queueEntry.getQueueEntryId()));
         Booking cancelled = bookingService.cancelBooking(booking.getBookingId(), booking.getUser().getUserId());
 
         assertEquals(BookingStatus.CANCELLED, cancelled.getStatus());
@@ -272,10 +275,10 @@ class BookingManagementServiceTest extends ServiceTestSupport {
     @Test
     void inServiceBookingCancellationIsExplicitlyRejectedWithoutNotificationOrMutation() {
         Booking booking = createConfirmedBooking(TestDates.futureDays(23));
-        QueueEntry queueEntry = canonicalQueue(queueService.createQueueEntry(
+        QueueEntry queueEntry = canonicalQueue(queueService.createQueueEntry(TestAccess.platformAdministrator(),
                 ids.queueEntry(), booking.getBookingId(), booking.getService().getServiceId()));
-        queueService.callQueueEntry(queueEntry.getQueueEntryId());
-        queueService.startService(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(TestAccess.platformAdministrator(), queueEntry.getQueueEntryId());
+        queueService.startService(TestAccess.platformAdministrator(), queueEntry.getQueueEntryId());
         int notificationsBefore = notificationRepository.findByBookingId(booking.getBookingId()).size();
 
         BusinessRuleViolationException exception = assertThrows(BusinessRuleViolationException.class,
@@ -291,7 +294,7 @@ class BookingManagementServiceTest extends ServiceTestSupport {
     @Test
     void activeQueuedBookingCannotBeUpdated() {
         Booking booking = createConfirmedBooking(TestDates.futureDays(24));
-        QueueEntry queueEntry = canonicalQueue(queueService.createQueueEntry(
+        QueueEntry queueEntry = canonicalQueue(queueService.createQueueEntry(TestAccess.platformAdministrator(),
                 ids.queueEntry(), booking.getBookingId(), booking.getService().getServiceId()));
         Vehicle originalVehicle = booking.getVehicle();
         Service originalService = booking.getService();
@@ -466,7 +469,7 @@ class BookingManagementServiceTest extends ServiceTestSupport {
     @Test
     void rescheduleRejectsWaitingQueueWithoutChangingQueueMetrics() {
         Booking booking = createConfirmedBooking(TestDates.futureDays(56));
-        QueueEntry queue = canonicalQueue(queueService.createQueueEntry(
+        QueueEntry queue = canonicalQueue(queueService.createQueueEntry(TestAccess.platformAdministrator(),
                 ids.queueEntry(), booking.getBookingId(), booking.getService().getServiceId()));
         LocalDateTime original = booking.getScheduledDateTime();
         int position = queue.getPosition();
@@ -484,9 +487,9 @@ class BookingManagementServiceTest extends ServiceTestSupport {
     @Test
     void rescheduleRejectsCalledQueueAndPreservesConfirmedBooking() {
         Booking booking = createConfirmedBooking(TestDates.futureDays(58));
-        QueueEntry queue = canonicalQueue(queueService.createQueueEntry(
+        QueueEntry queue = canonicalQueue(queueService.createQueueEntry(TestAccess.platformAdministrator(),
                 ids.queueEntry(), booking.getBookingId(), booking.getService().getServiceId()));
-        queueService.callQueueEntry(queue.getQueueEntryId());
+        queueService.callQueueEntry(TestAccess.platformAdministrator(), queue.getQueueEntryId());
         LocalDateTime original = booking.getScheduledDateTime();
 
         assertThrows(BusinessRuleViolationException.class,
@@ -500,10 +503,10 @@ class BookingManagementServiceTest extends ServiceTestSupport {
     @Test
     void rescheduleRejectsInServiceBookingAndInProgressQueue() {
         Booking booking = createConfirmedBooking(TestDates.futureDays(60));
-        QueueEntry queue = canonicalQueue(queueService.createQueueEntry(
+        QueueEntry queue = canonicalQueue(queueService.createQueueEntry(TestAccess.platformAdministrator(),
                 ids.queueEntry(), booking.getBookingId(), booking.getService().getServiceId()));
-        queueService.callQueueEntry(queue.getQueueEntryId());
-        queueService.startService(queue.getQueueEntryId());
+        queueService.callQueueEntry(TestAccess.platformAdministrator(), queue.getQueueEntryId());
+        queueService.startService(TestAccess.platformAdministrator(), queue.getQueueEntryId());
         LocalDateTime original = booking.getScheduledDateTime();
 
         assertThrows(BusinessRuleViolationException.class,
@@ -557,7 +560,8 @@ class BookingManagementServiceTest extends ServiceTestSupport {
                 notificationRepository, userRepository, bookingRepository, coordinator, notificationIds,
                 new NotificationPolicyProperties(10), clock) {
             @Override
-            public Notification createNotification(User user, Booking notificationBooking, String type, String message) {
+            public Notification publishForAuthorizedBooking(
+                    Booking notificationBooking, String type, String message) {
                 throw new IllegalStateException("notification unavailable");
             }
         };
@@ -623,7 +627,7 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         Booking booking = createSavedBooking(TestDates.futureDays(74), BookingStatus.CREATED);
         LocalDateTime original = booking.getScheduledDateTime();
         LocalDate targetDate = TestDates.futureDays(75).toLocalDate();
-        serviceOfferingService.updateOffering(booking.getServiceOfferingId(),
+        serviceOfferingService.updateOffering(TestAccess.platformAdministrator(), booking.getServiceOfferingId(),
                 new UpdateServiceOfferingCommand(booking.getService().getPrice(), 60, 2));
 
         for (LocalDateTime invalid : List.of(
@@ -647,7 +651,7 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         Service longService = catalogService.createService(new Service(
                 ids.service(), "Long wash", "test", BigDecimal.TEN, 60));
         String longOfferingId = createOffering(longService);
-        serviceOfferingService.updateOffering(longOfferingId,
+        serviceOfferingService.updateOffering(TestAccess.platformAdministrator(), longOfferingId,
                 new UpdateServiceOfferingCommand(BigDecimal.TEN, 60, 2));
 
         assertThrows(BusinessRuleViolationException.class, () -> bookingService.updateBooking(
@@ -812,11 +816,15 @@ class BookingManagementServiceTest extends ServiceTestSupport {
 
         @Override
         public boolean update(Booking entity) {
+            failIfRequested();
+            return delegate.update(entity);
+        }
+
+        private void failIfRequested() {
             if (failNextUpdate) {
                 failNextUpdate = false;
                 throw new IllegalStateException("booking update unavailable");
             }
-            return delegate.update(entity);
         }
 
         @Override
@@ -892,6 +900,39 @@ class BookingManagementServiceTest extends ServiceTestSupport {
         @Override
         public Optional<Booking> findByIdAndUserId(String bookingId, String userId) {
             return delegate.findByIdAndUserId(bookingId, userId);
+        }
+
+        @Override
+        public boolean updateForBusiness(Booking booking, String businessId) {
+            failIfRequested();
+            return delegate.updateForBusiness(booking, businessId);
+        }
+
+        @Override
+        public boolean updateForUser(Booking booking, String userId) {
+            failIfRequested();
+            return delegate.updateForUser(booking, userId);
+        }
+
+        @Override
+        public boolean updateForAdministrator(Booking booking) {
+            failIfRequested();
+            return delegate.updateForAdministrator(booking);
+        }
+
+        @Override
+        public boolean deleteForBusiness(String bookingId, String businessId) {
+            return delegate.deleteForBusiness(bookingId, businessId);
+        }
+
+        @Override
+        public boolean deleteForUser(String bookingId, String userId) {
+            return delegate.deleteForUser(bookingId, userId);
+        }
+
+        @Override
+        public boolean deleteForAdministrator(String bookingId) {
+            return delegate.deleteForAdministrator(bookingId);
         }
 
         @Override
