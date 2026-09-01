@@ -86,7 +86,11 @@ public final class QueueOrderingService {
         coordinator.write(() -> {
             mutationLock.acquire(MutationLock.queueBranch(normalizedBranchId));
             applyQueueMetrics(
-                    queueEntryRepository.findByBranchIdAndBusinessId(normalizedBranchId, normalizedBusinessId),
+                    queueEntryRepository.findByBranchIdAndBusinessId(
+                                    normalizedBranchId, normalizedBusinessId).stream()
+                            .filter(entry -> entry.getQueueStatus() != null
+                                    && entry.getQueueStatus().isActive())
+                            .toList(),
                     normalizedBusinessId);
         });
     }

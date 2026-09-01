@@ -324,9 +324,11 @@ public class QueueManagementService implements QueueQuery {
                     ? queueEntryRepository.findNextWaitingByBranch(normalizedBranchId)
                     : queueEntryRepository.findNextWaitingByBranchIdAndBusinessId(
                             normalizedBranchId, access.requireBusinessId());
+            String emptyQueueMessage = access != null && access.isOperational()
+                    ? "No waiting queue entry found"
+                    : "No waiting queue entry available for branch: " + normalizedBranchId;
             return callWaitingEntry(access, waiting.orElseThrow(
-                    () -> new ResourceNotFoundException(
-                            "No waiting queue entry available for branch: " + normalizedBranchId)));
+                    () -> new ResourceNotFoundException(emptyQueueMessage)));
     }
 
     QueueEntry callQueueEntry(String queueEntryId) {
