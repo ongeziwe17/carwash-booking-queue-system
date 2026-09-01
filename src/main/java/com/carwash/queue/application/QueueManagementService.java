@@ -121,7 +121,7 @@ public class QueueManagementService implements QueueQuery {
                 throw new BusinessRuleViolationException("Booking already has a queue entry");
             }
             String branchId = queueEntry.getBranchId();
-            List<QueueEntry> activeQueue = queueEntryRepository.findActiveOrderedByBranch(branchId);
+            List<QueueEntry> activeQueue = findActiveQueueForMutation(access, branchId);
             List<LifecycleStateSnapshot.QueueEntryState> queueStates =
                     LifecycleStateSnapshot.queueEntries(activeQueue);
             LifecycleStateSnapshot.BookingState bookingState = LifecycleStateSnapshot.booking(booking);
@@ -134,7 +134,9 @@ public class QueueManagementService implements QueueQuery {
                 if (!updateBookingRecord(access, booking)) {
                     throw new ResourceNotFoundException("Booking not found");
                 }
-                rebalanceQueue(access, branchId);
+                List<QueueEntry> queueWithNewEntry = new ArrayList<>(activeQueue);
+                queueWithNewEntry.add(queueEntry);
+                rebalanceQueue(access, branchId, queueWithNewEntry);
             } catch (RuntimeException exception) {
                 coordinator.compensate(exception,
                         () -> rollbackQueueCreation(access, exception, queueEntry, bookingState, queueStates));
@@ -592,6 +594,18 @@ public class QueueManagementService implements QueueQuery {
                 ? marketplaceQuery.findBranchOptional(branchId)
                 : marketplaceQuery.findBranchOptionalByBusiness(branchId, access.requireBusinessId());
         return branch.orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
+    }
+
+    private List<QueueEntry> findActiveQueueForMutation(
+            TenantAccessContext access, String branchId) {
+        if (access != null && access.isOperational()) {
+            return queueEntryRepository.findByBranchIdAndBusinessId(
+                            branchId, access.requireBusinessId()).stream()
+                    .filter(entry -> entry.getQueueStatus() != null
+                            && entry.getQueueStatus().isActive())
+                    .toList();
+        }
+        return queueEntryRepository.findActiveOrderedByBranch(branchId);
     }
 
     private boolean updateQueueEntryRecord(TenantAccessContext access, QueueEntry queueEntry) {
