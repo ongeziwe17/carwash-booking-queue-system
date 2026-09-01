@@ -45,6 +45,7 @@ import com.carwash.booking.application.BookingCapacityQuery;
 import com.carwash.booking.application.BookingSlotPolicyService;
 import com.carwash.reporting.application.DailySummaryReportService;
 import com.carwash.notification.application.NotificationIdGenerator;
+import com.carwash.notification.application.BookingNotificationPublisher;
 import com.carwash.notification.application.NotificationManagementService;
 import com.carwash.marketplace.application.MarketplaceManagementService;
 import com.carwash.marketplace.application.BranchSchedulingService;
@@ -186,9 +187,11 @@ public class ApplicationCompositionConfig {
             CarWashBusinessRepository businessRepository,
             CarWashBranchRepository branchRepository,
             DataTransactionOperations coordinator,
+            MutationLock mutationLock,
             Clock clock
     ) {
-        return new MarketplaceManagementService(businessRepository, branchRepository, coordinator, clock);
+        return new MarketplaceManagementService(
+                businessRepository, branchRepository, coordinator, mutationLock, clock);
     }
 
     @Bean
@@ -420,13 +423,15 @@ public class ApplicationCompositionConfig {
             VehicleRepository vehicleRepository,
             UserRepository userRepository,
             BookingRepository bookingRepository,
-            DataTransactionOperations coordinator
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock
     ) {
         return new VehicleManagementService(
                 vehicleRepository,
                 userRepository,
                 bookingRepository,
-                coordinator
+                coordinator,
+                mutationLock
         );
     }
 
@@ -502,7 +507,7 @@ public class ApplicationCompositionConfig {
             MarketplaceQuery marketplaceQuery,
             QueueEntryRepository queueEntryRepository,
             NotificationRepository notificationRepository,
-            NotificationManagementService notificationManagementService,
+            BookingNotificationPublisher notificationPublisher,
             QueueOrderingService queueOrderingService,
             DataTransactionOperations coordinator,
             MutationLock mutationLock,
@@ -520,7 +525,7 @@ public class ApplicationCompositionConfig {
                 marketplaceQuery,
                 queueEntryRepository,
                 notificationRepository,
-                notificationManagementService,
+                notificationPublisher,
                 queueOrderingService,
                 coordinator,
                 mutationLock,
@@ -537,7 +542,7 @@ public class ApplicationCompositionConfig {
             BookingRepository bookingRepository,
             ServiceOfferingQuery serviceOfferingQuery,
             MarketplaceQuery marketplaceQuery,
-            NotificationManagementService notificationManagementService,
+            BookingNotificationPublisher notificationPublisher,
             DataTransactionOperations coordinator,
             MutationLock mutationLock,
             QueueOrderingService queueOrderingService,
@@ -548,7 +553,7 @@ public class ApplicationCompositionConfig {
                 bookingRepository,
                 serviceOfferingQuery,
                 marketplaceQuery,
-                notificationManagementService,
+                notificationPublisher,
                 coordinator,
                 mutationLock,
                 queueOrderingService,

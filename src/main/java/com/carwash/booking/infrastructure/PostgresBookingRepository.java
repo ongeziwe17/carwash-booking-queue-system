@@ -43,6 +43,30 @@ public class PostgresBookingRepository implements BookingRepository {
     @Override public List<Booking> findByUserIdAndBusinessId(String userId,String businessId){return domains(repository.findByUserTenant(userId,businessId));}
     @Override public Optional<Booking> findByIdAndBusinessId(String id,String businessId){return repository.findTenantScoped(id,businessId).map(entity->domain(entity,loadUsers(List.of(entity.userId)),loadVehicles(List.of(entity.vehicleId)),loadServices(List.of(entity.serviceId))));}
     @Override public Optional<Booking> findByIdAndUserId(String id,String userId){return repository.findByIdAndUserId(id,userId).map(entity->domain(entity,loadUsers(List.of(entity.userId)),loadVehicles(List.of(entity.vehicleId)),loadServices(List.of(entity.serviceId))));}
+    @Override public boolean updateForBusiness(Booking value,String businessId){
+        Optional<BookingJpaEntity> found=repository.findTenantScoped(value.getBookingId(),businessId);
+        return found.isPresent()&&guardedUpdate(value,found.get().version,businessId,null);
+    }
+    @Override public boolean updateForUser(Booking value,String userId){
+        Optional<BookingJpaEntity> found=repository.findByIdAndUserId(value.getBookingId(),userId);
+        return found.isPresent()&&guardedUpdate(value,found.get().version,null,userId);
+    }
+    @Override public boolean updateForAdministrator(Booking value){
+        Optional<BookingJpaEntity> found=repository.findById(value.getBookingId());
+        return found.isPresent()&&guardedUpdate(value,found.get().version,null,null);
+    }
+    @Override public boolean deleteForBusiness(String id,String businessId){
+        Optional<BookingJpaEntity> found=repository.findTenantScoped(id,businessId);
+        return found.isPresent()&&repository.deleteBusinessScoped(id,businessId,found.get().version)==1;
+    }
+    @Override public boolean deleteForUser(String id,String userId){
+        Optional<BookingJpaEntity> found=repository.findByIdAndUserId(id,userId);
+        return found.isPresent()&&repository.deleteUserScoped(id,userId,found.get().version)==1;
+    }
+    @Override public boolean deleteForAdministrator(String id){
+        Optional<BookingJpaEntity> found=repository.findById(id);
+        return found.isPresent()&&repository.deleteAdministratorScoped(id,found.get().version)==1;
+    }
     @Override public boolean existsByUserId(String id){return repository.existsByUserId(id);}
     @Override public boolean existsByVehicleId(String id){return repository.existsByVehicleId(id);}
     @Override public boolean existsByServiceId(String id){return repository.existsByServiceId(id);}
@@ -53,6 +77,28 @@ public class PostgresBookingRepository implements BookingRepository {
     @Override public List<Booking> findAll(){return domains(repository.findAllByOrderByIdAsc());}
     @Override public boolean deleteById(String id){Optional<BookingJpaEntity> found=repository.findById(id);if(found.isEmpty())return false;repository.delete(found.get());repository.flush();return true;}
     @Override public boolean existsById(String id){return repository.existsById(id);}
+
+    private boolean guardedUpdate(Booking value,Long version,String businessId,String userId){
+        String queueEntryId=value.getQueueEntry()==null?null:value.getQueueEntry().getQueueEntryId();
+        LocalDateTime scheduledAt=PersistenceSupport.databaseTime(value.getScheduledDateTime());
+        short scheduledAtNano=PersistenceSupport.nanoRemainder(value.getScheduledDateTime());
+        if(businessId!=null){
+            return repository.updateBusinessScoped(
+                    value.getBookingId(),businessId,value.getVehicle().getVehicleId(),
+                    value.getServiceOfferingId(),value.getService().getServiceId(),scheduledAt,scheduledAtNano,
+                    value.getStatus().name(),value.getSpecialRequest(),queueEntryId,version)==1;
+        }
+        if(userId!=null){
+            return repository.updateUserScoped(
+                    value.getBookingId(),userId,value.getVehicle().getVehicleId(),
+                    value.getServiceOfferingId(),value.getService().getServiceId(),scheduledAt,scheduledAtNano,
+                    value.getStatus().name(),value.getSpecialRequest(),queueEntryId,version)==1;
+        }
+        return repository.updateAdministratorScoped(
+                value.getBookingId(),value.getVehicle().getVehicleId(),value.getServiceOfferingId(),
+                value.getService().getServiceId(),scheduledAt,scheduledAtNano,value.getStatus().name(),
+                value.getSpecialRequest(),queueEntryId,version)==1;
+    }
 
     private List<Booking> domains(List<BookingJpaEntity> entities){if(entities.isEmpty())return List.of();Map<String,User> users=loadUsers(entities.stream().map(e->e.userId).distinct().toList());Map<String,Vehicle> vehicles=loadVehicles(entities.stream().map(e->e.vehicleId).distinct().toList());Map<String,Service> services=loadServices(entities.stream().map(e->e.serviceId).distinct().toList());return entities.stream().map(e->domain(e,users,vehicles,services)).toList();}
     private Booking domain(BookingJpaEntity e,Map<String,User> users,Map<String,Vehicle> vehicles,Map<String,Service> services){Booking value=new Booking(e.id,users.get(e.userId),vehicles.get(e.vehicleId),e.branchId,e.offeringId,services.get(e.serviceId),PersistenceSupport.domainTime(e.scheduledAt,e.scheduledAtNano),e.specialRequest);value.setStatus(BookingStatus.valueOf(e.status));value.setCreatedAt(PersistenceSupport.domainTime(e.createdAt,e.createdAtNano));if(e.queueEntryId!=null){QueueEntry queue=new QueueEntry();queue.setQueueEntryId(e.queueEntryId);value.attachQueueEntry(queue);}return value;}

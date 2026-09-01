@@ -93,6 +93,31 @@ public abstract class InMemoryRepository<T, ID extends Comparable<? super ID>> i
         }
     }
 
+    /** Atomically replaces an identified value only while its authorization predicate still holds. */
+    protected final boolean updateMatching(ID id, T entity, Predicate<T> predicate) {
+        requireId(id);
+        if (entity == null) throw new IllegalArgumentException("Entity is required");
+        if (!id.equals(requireEntityId(entity))) {
+            throw new IllegalArgumentException("Entity ID does not match guarded mutation ID");
+        }
+        synchronized (repositoryMonitor) {
+            T current = storage.get(id);
+            if (current == null || !predicate.test(current)) return false;
+            storage.put(id, entity);
+            return true;
+        }
+    }
+
+    /** Atomically removes an identified value only while its authorization predicate still holds. */
+    protected final boolean deleteMatching(ID id, Predicate<T> predicate) {
+        requireId(id);
+        synchronized (repositoryMonitor) {
+            T current = storage.get(id);
+            if (current == null || !predicate.test(current)) return false;
+            return storage.remove(id, current);
+        }
+    }
+
     /**
      * Performs one repository-local bulk mutation. Callers coordinating this
      * with other repositories must still use {@link InMemoryDataCoordinator}.

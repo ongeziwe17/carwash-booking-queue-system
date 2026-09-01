@@ -13,6 +13,13 @@ public interface VehicleRepository extends Repository<Vehicle, String> {
     Optional<Vehicle> findByIdAndBusinessId(String vehicleId, String businessId);
     Optional<Vehicle> findByIdAndUserId(String vehicleId, String userId);
 
+    boolean updateForBusiness(Vehicle vehicle, String businessId);
+    boolean updateForUser(Vehicle vehicle, String userId);
+    boolean updateForAdministrator(Vehicle vehicle);
+    boolean deleteForBusiness(String vehicleId, String businessId);
+    boolean deleteForUser(String vehicleId, String userId);
+    boolean deleteForAdministrator(String vehicleId);
+
     boolean existsByUserIdAndPlateNumberIgnoreCase(
             String userId,
             String plateNumber,

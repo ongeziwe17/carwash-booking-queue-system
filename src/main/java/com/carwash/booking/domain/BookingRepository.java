@@ -28,6 +28,13 @@ public interface BookingRepository extends Repository<Booking, String> {
     Optional<Booking> findByIdAndBusinessId(String bookingId, String businessId);
     Optional<Booking> findByIdAndUserId(String bookingId, String userId);
 
+    boolean updateForBusiness(Booking booking, String businessId);
+    boolean updateForUser(Booking booking, String userId);
+    boolean updateForAdministrator(Booking booking);
+    boolean deleteForBusiness(String bookingId, String businessId);
+    boolean deleteForUser(String bookingId, String userId);
+    boolean deleteForAdministrator(String bookingId);
+
     boolean existsByUserId(String userId);
     boolean existsByVehicleId(String vehicleId);
     boolean existsByServiceId(String serviceId);

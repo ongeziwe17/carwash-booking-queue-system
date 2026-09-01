@@ -17,5 +17,9 @@ public interface ServiceOfferingRepository extends Repository<ServiceOffering, S
 
     List<ServiceOffering> findByBranchIdAndBusinessId(String branchId, String businessId);
 
+    boolean updateForBusiness(ServiceOffering offering, String businessId);
+
+    boolean updateForAdministrator(ServiceOffering offering);
+
     boolean existsByServiceId(String serviceId);
 }

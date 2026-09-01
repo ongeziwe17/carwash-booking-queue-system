@@ -61,40 +61,8 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
         this.clock = Objects.requireNonNull(clock, "Application clock is required");
     }
 
-    public ServiceOfferingSnapshot createOffering(String branchId, CreateServiceOfferingCommand command) {
-        return coordinator.write(() -> {
-            String normalizedBranchId = normalizeId(branchId, "Branch ID");
-            if (command == null) {
-                throw new BusinessRuleViolationException("Offering request is required");
-            }
-            BranchSnapshot branch = requireBranch(normalizedBranchId);
-            Service service = requireService(command.serviceId());
-            String offeringId = normalizeId(command.offeringId(), "Offering ID");
-            mutationLock.acquire(MutationLock.offering(offeringId));
-            if (offeringRepository.existsById(offeringId)) {
-                throw new BusinessRuleViolationException("Offering ID already exists");
-            }
-            if (offeringRepository.findByBranchIdAndServiceId(normalizedBranchId, service.getServiceId()).isPresent()) {
-                throw new BusinessRuleViolationException(
-                        "Branch already has an offering for this service; reactivate or update it instead");
-            }
-            LocalDateTime now = LocalDateTime.now(clock);
-            ServiceOffering offering = new ServiceOffering(
-                    offeringId,
-                    normalizedBranchId,
-                    service.getServiceId(),
-                    command.price(),
-                    command.estimatedDurationMin(),
-                    command.concurrentCapacity(),
-                    ServiceOfferingStatus.ACTIVE,
-                    now,
-                    now
-            );
-            if (!offeringRepository.insert(offering)) {
-                throw new BusinessRuleViolationException("Offering ID already exists");
-            }
-            return snapshot(offering, service, branch);
-        });
+    ServiceOfferingSnapshot createOffering(String branchId, CreateServiceOfferingCommand command) {
+        return coordinator.write(() -> createOfferingInside(null, branchId, command));
     }
 
     public ServiceOfferingSnapshot createOffering(
@@ -102,8 +70,7 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
             String branchId,
             CreateServiceOfferingCommand command
     ) {
-        requireAccessibleBranch(access, branchId);
-        return createOffering(branchId, command);
+        return coordinator.write(() -> createOfferingInside(access, branchId, command));
     }
 
     public ServiceOfferingSnapshot findOffering(String offeringId) {
@@ -200,31 +167,8 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
         });
     }
 
-    public ServiceOfferingSnapshot updateOffering(String offeringId, UpdateServiceOfferingCommand command) {
-        return coordinator.write(() -> {
-            String normalizedOfferingId = normalizeId(offeringId, "Offering ID");
-            mutationLock.acquire(MutationLock.offering(normalizedOfferingId));
-            if (command == null) {
-                throw new BusinessRuleViolationException("Offering request is required");
-            }
-            ServiceOffering existing = requireOffering(normalizedOfferingId);
-            Service service = requireService(existing.getServiceId());
-            BranchSnapshot branch = requireBranch(existing.getBranchId());
-            ServiceOffering updated = existing.updateTerms(
-                    command.price(),
-                    command.estimatedDurationMin(),
-                    command.concurrentCapacity(),
-                    LocalDateTime.now(clock)
-            );
-            int requiredCapacity = capacityQuery.maximumConcurrentActiveBookings(
-                    updated.getOfferingId(), updated.getEstimatedDurationMin());
-            if (updated.getConcurrentCapacity() < requiredCapacity) {
-                throw new BusinessRuleViolationException(
-                        "Offering capacity cannot be lower than its active booking overlap");
-            }
-            updateRecord(updated);
-            return snapshot(updated, service, branch);
-        });
+    ServiceOfferingSnapshot updateOffering(String offeringId, UpdateServiceOfferingCommand command) {
+        return coordinator.write(() -> updateOfferingInside(null, offeringId, command));
     }
 
     public ServiceOfferingSnapshot updateOffering(
@@ -232,41 +176,94 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
             String offeringId,
             UpdateServiceOfferingCommand command
     ) {
-        requireAccessibleOffering(access, offeringId);
-        return updateOffering(offeringId, command);
+        return coordinator.write(() -> updateOfferingInside(access, offeringId, command));
     }
 
-    public ServiceOfferingSnapshot activateOffering(String offeringId) {
+    ServiceOfferingSnapshot activateOffering(String offeringId) {
         return changeStatus(offeringId, true);
     }
 
     public ServiceOfferingSnapshot activateOffering(TenantAccessContext access, String offeringId) {
-        requireAccessibleOffering(access, offeringId);
-        return activateOffering(offeringId);
+        return coordinator.write(() -> changeStatusInside(access, offeringId, true));
     }
 
-    public ServiceOfferingSnapshot deactivateOffering(String offeringId) {
+    ServiceOfferingSnapshot deactivateOffering(String offeringId) {
         return changeStatus(offeringId, false);
     }
 
     public ServiceOfferingSnapshot deactivateOffering(TenantAccessContext access, String offeringId) {
-        requireAccessibleOffering(access, offeringId);
-        return deactivateOffering(offeringId);
+        return coordinator.write(() -> changeStatusInside(access, offeringId, false));
     }
 
     private ServiceOfferingSnapshot changeStatus(String offeringId, boolean active) {
-        return coordinator.write(() -> {
-            String normalizedOfferingId = normalizeId(offeringId, "Offering ID");
-            mutationLock.acquire(MutationLock.offering(normalizedOfferingId));
-            ServiceOffering existing = requireOffering(normalizedOfferingId);
-            Service service = requireService(existing.getServiceId());
-            BranchSnapshot branch = requireBranch(existing.getBranchId());
-            ServiceOffering updated = active
-                    ? existing.activate(LocalDateTime.now(clock))
-                    : existing.deactivate(LocalDateTime.now(clock));
-            updateRecord(updated);
-            return snapshot(updated, service, branch);
-        });
+        return coordinator.write(() -> changeStatusInside(null, offeringId, active));
+    }
+
+    private ServiceOfferingSnapshot createOfferingInside(
+            TenantAccessContext access, String branchId, CreateServiceOfferingCommand command) {
+        if (command == null) throw new BusinessRuleViolationException("Offering request is required");
+        String normalizedBranchId = normalizeId(branchId, "Branch ID");
+        String offeringId = normalizeId(command.offeringId(), "Offering ID");
+        mutationLock.acquire(List.of(
+                MutationLock.offering(offeringId), MutationLock.branch(normalizedBranchId)));
+        BranchSnapshot branch = requireBranchForMutation(access, normalizedBranchId);
+        mutationLock.acquire(MutationLock.business(branch.businessId()));
+        Service service = requireService(command.serviceId());
+        if (offeringRepository.existsById(offeringId)) {
+            throw new BusinessRuleViolationException("Offering ID already exists");
+        }
+        if (offeringRepository.findByBranchIdAndServiceId(normalizedBranchId, service.getServiceId()).isPresent()) {
+            throw new BusinessRuleViolationException(
+                    "Branch already has an offering for this service; reactivate or update it instead");
+        }
+        LocalDateTime now = LocalDateTime.now(clock);
+        ServiceOffering offering = new ServiceOffering(
+                offeringId, normalizedBranchId, service.getServiceId(), command.price(),
+                command.estimatedDurationMin(), command.concurrentCapacity(),
+                ServiceOfferingStatus.ACTIVE, now, now);
+        if (!offeringRepository.insert(offering)) {
+            throw new BusinessRuleViolationException("Offering ID already exists");
+        }
+        return snapshot(offering, service, branch);
+    }
+
+    private ServiceOfferingSnapshot updateOfferingInside(
+            TenantAccessContext access, String offeringId, UpdateServiceOfferingCommand command) {
+        String normalizedOfferingId = normalizeId(offeringId, "Offering ID");
+        mutationLock.acquire(MutationLock.offering(normalizedOfferingId));
+        if (command == null) throw new BusinessRuleViolationException("Offering request is required");
+        ServiceOffering existing = requireOfferingForMutation(access, normalizedOfferingId);
+        mutationLock.acquire(MutationLock.branch(existing.getBranchId()));
+        Service service = requireService(existing.getServiceId());
+        BranchSnapshot branch = requireBranchForMutation(access, existing.getBranchId());
+        mutationLock.acquire(MutationLock.business(branch.businessId()));
+        ServiceOffering updated = existing.updateTerms(
+                command.price(), command.estimatedDurationMin(), command.concurrentCapacity(),
+                LocalDateTime.now(clock));
+        int requiredCapacity = capacityQuery.maximumConcurrentActiveBookings(
+                updated.getOfferingId(), updated.getEstimatedDurationMin());
+        if (updated.getConcurrentCapacity() < requiredCapacity) {
+            throw new BusinessRuleViolationException(
+                    "Offering capacity cannot be lower than its active booking overlap");
+        }
+        updateRecord(access, updated);
+        return snapshot(updated, service, branch);
+    }
+
+    private ServiceOfferingSnapshot changeStatusInside(
+            TenantAccessContext access, String offeringId, boolean active) {
+        String normalizedOfferingId = normalizeId(offeringId, "Offering ID");
+        mutationLock.acquire(MutationLock.offering(normalizedOfferingId));
+        ServiceOffering existing = requireOfferingForMutation(access, normalizedOfferingId);
+        mutationLock.acquire(MutationLock.branch(existing.getBranchId()));
+        Service service = requireService(existing.getServiceId());
+        BranchSnapshot branch = requireBranchForMutation(access, existing.getBranchId());
+        mutationLock.acquire(MutationLock.business(branch.businessId()));
+        ServiceOffering updated = active
+                ? existing.activate(LocalDateTime.now(clock))
+                : existing.deactivate(LocalDateTime.now(clock));
+        updateRecord(access, updated);
+        return snapshot(updated, service, branch);
     }
 
     private ServiceOfferingSnapshot snapshot(
@@ -318,6 +315,20 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
         }
     }
 
+    private BranchSnapshot requireBranchForMutation(TenantAccessContext access, String branchId) {
+        Objects.requireNonNull(branchId, "Branch ID is required");
+        return access == null || access.isPlatformAdministrator()
+                ? requireBranch(branchId)
+                : requireTenantBranch(branchId, access.requireBusinessId());
+    }
+
+    private ServiceOffering requireOfferingForMutation(TenantAccessContext access, String offeringId) {
+        Optional<ServiceOffering> offering = access == null || access.isPlatformAdministrator()
+                ? offeringRepository.findById(offeringId)
+                : offeringRepository.findByIdAndBusinessId(offeringId, access.requireBusinessId());
+        return offering.orElseThrow(() -> new ResourceNotFoundException("Offering not found"));
+    }
+
     private Service requireService(String serviceId) {
         String normalizedId = normalizeId(serviceId, "Service ID");
         return serviceRepository.findById(normalizedId)
@@ -330,9 +341,12 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
                 .orElseThrow(() -> new ResourceNotFoundException("Offering not found: " + normalizedId));
     }
 
-    private void updateRecord(ServiceOffering offering) {
-        if (!offeringRepository.update(offering)) {
-            throw new ResourceNotFoundException("Offering not found: " + offering.getOfferingId());
+    private void updateRecord(TenantAccessContext access, ServiceOffering offering) {
+        boolean updated = access == null || access.isPlatformAdministrator()
+                ? offeringRepository.updateForAdministrator(offering)
+                : offeringRepository.updateForBusiness(offering, access.requireBusinessId());
+        if (!updated) {
+            throw new ResourceNotFoundException("Offering not found");
         }
     }
 

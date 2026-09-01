@@ -64,6 +64,25 @@ public class InMemoryNotificationRepository extends InMemoryRepository<Notificat
     }
 
     @Override
+    public int deleteByBookingIdAndBusinessId(String bookingId, String businessId) {
+        return deleteMatching(notification -> notification.getBooking() != null
+                && bookingId.equals(notification.getBooking().getBookingId())
+                && branchBelongsTo(notification.getBranchId(), businessId));
+    }
+
+    @Override
+    public int deleteByBookingIdAndUserId(String bookingId, String userId) {
+        return deleteMatching(notification -> notification.getBooking() != null
+                && bookingId.equals(notification.getBooking().getBookingId())
+                && notification.getUser() != null && userId.equals(notification.getUser().getUserId()));
+    }
+
+    @Override
+    public int deleteByBookingIdForAdministrator(String bookingId) {
+        return deleteByBookingId(bookingId);
+    }
+
+    @Override
     protected String getId(Notification entity) {
         return entity.getNotificationId();
     }

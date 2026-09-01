@@ -22,7 +22,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class NotificationManagementService {
+public class NotificationManagementService implements BookingNotificationPublisher {
 
     private static final String DEFAULT_CHANNEL = "IN_APP";
 
@@ -52,31 +52,47 @@ public class NotificationManagementService {
         this.clock = Objects.requireNonNull(clock, "Application clock is required");
     }
 
-    public Notification createNotification(User user, Booking booking, String type, String message) {
+    Notification createNotification(User user, Booking booking, String type, String message) {
         return coordinator.write(() -> {
             User canonicalUser = resolveUser(user);
             Booking canonicalBooking = resolveBooking(booking);
-            if (message == null || message.isBlank()) {
-                throw new BusinessRuleViolationException("Notification message is required");
-            }
-            Notification notification = new Notification(notificationIdGenerator.nextId(), canonicalUser,
-                    canonicalBooking, type, message, DEFAULT_CHANNEL);
-            notification.send(LocalDateTime.now(clock));
-            if (!notificationRepository.insert(notification)) {
-                throw new BusinessRuleViolationException("Notification ID already exists");
-            }
-            canonicalUser.addNotification(notification);
-            if (userRepository != null && !userRepository.update(canonicalUser)) {
-                ResourceNotFoundException failure =
-                        new ResourceNotFoundException("User not found: " + canonicalUser.getUserId());
-                coordinator.compensate(failure, () -> {
-                    canonicalUser.removeNotification(notification.getNotificationId());
-                    notificationRepository.deleteById(notification.getNotificationId());
-                });
-                throw failure;
-            }
-            return notification;
+            return createInside(canonicalUser, canonicalBooking, type, message);
         });
+    }
+
+    @Override
+    public Notification publishForAuthorizedBooking(
+            Booking authorizedBooking, String type, String message) {
+        return coordinator.write(() -> {
+            if (authorizedBooking == null) {
+                throw new BusinessRuleViolationException("Authorized notification booking is required");
+            }
+            User canonicalUser = resolveUser(authorizedBooking.getUser());
+            return createInside(canonicalUser, authorizedBooking, type, message);
+        });
+    }
+
+    private Notification createInside(User canonicalUser, Booking canonicalBooking, String type, String message) {
+        if (message == null || message.isBlank()) {
+            throw new BusinessRuleViolationException("Notification message is required");
+        }
+        Notification notification = new Notification(notificationIdGenerator.nextId(), canonicalUser,
+                canonicalBooking, type, message, DEFAULT_CHANNEL);
+        notification.send(LocalDateTime.now(clock));
+        if (!notificationRepository.insert(notification)) {
+            throw new BusinessRuleViolationException("Notification ID already exists");
+        }
+        canonicalUser.addNotification(notification);
+        if (userRepository != null && !userRepository.update(canonicalUser)) {
+            ResourceNotFoundException failure =
+                    new ResourceNotFoundException("User not found: " + canonicalUser.getUserId());
+            coordinator.compensate(failure, () -> {
+                canonicalUser.removeNotification(notification.getNotificationId());
+                notificationRepository.deleteById(notification.getNotificationId());
+            });
+            throw failure;
+        }
+        return notification;
     }
 
     public List<Notification> findByUserId(String userId) {

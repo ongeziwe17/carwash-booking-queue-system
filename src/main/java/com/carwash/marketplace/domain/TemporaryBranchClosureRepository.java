@@ -10,4 +10,6 @@ public interface TemporaryBranchClosureRepository extends Repository<TemporaryBr
     List<TemporaryBranchClosure> findByBranchId(String branchId);
     List<TemporaryBranchClosure> findByBranchIdAndBusinessId(String branchId, String businessId);
     Optional<TemporaryBranchClosure> findByIdAndBusinessId(String closureId, String businessId);
+    boolean updateForBusiness(TemporaryBranchClosure closure, String businessId);
+    boolean updateForAdministrator(TemporaryBranchClosure closure);
 }

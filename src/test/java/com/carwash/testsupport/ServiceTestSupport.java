@@ -178,8 +178,9 @@ public abstract class ServiceTestSupport {
     }
 
     protected Vehicle createVehicle(User owner) {
-        return vehicleService.createVehicle(new Vehicle(
-                ids.vehicle(), ids.plate(), "SUV", "Toyota", "Rav4", "Black", ""), owner.getUserId());
+        return vehicleService.createVehicle(
+                TestAccess.platformAdministrator(), owner.getUserId(), ids.vehicle(), ids.plate(),
+                "SUV", "Toyota", "Rav4", "Black", "");
     }
 
     protected com.carwash.catalog.domain.Service createService() {
@@ -189,7 +190,8 @@ public abstract class ServiceTestSupport {
 
     protected String createOffering(com.carwash.catalog.domain.Service service) {
         String offeringId = ids.offering();
-        serviceOfferingService.createOffering(ensureDefaultBranch(), new CreateServiceOfferingCommand(
+        serviceOfferingService.createOffering(
+                TestAccess.platformAdministrator(), ensureDefaultBranch(), new CreateServiceOfferingCommand(
                 offeringId, service.getServiceId(), service.getPrice(), service.getEstimatedDurationMin(),
                 bookingPolicy.maxActiveBookingsPerSlot()));
         return offeringId;
@@ -208,10 +210,10 @@ public abstract class ServiceTestSupport {
     protected String ensureDefaultBranch() {
         if (defaultBranchId != null) return defaultBranchId;
         defaultBusinessId = ids.business();
-        marketplaceService.registerBusiness(new RegisterBusinessCommand(
+        marketplaceService.registerBusiness(TestAccess.platformAdministrator(), new RegisterBusinessCommand(
                 defaultBusinessId, "Test Car Wash", ids.emailFor(defaultBusinessId), "+27821234567", null));
         defaultBranchId = ids.branch();
-        marketplaceService.createBranch(defaultBusinessId, new CreateBranchCommand(
+        marketplaceService.createBranch(TestAccess.platformAdministrator(), defaultBusinessId, new CreateBranchCommand(
                 defaultBranchId, "Test Branch", "1 Test Street", null, "Cape Town", "Western Cape",
                 "8001", "ZA", new BigDecimal("-33.9249"), new BigDecimal("18.4241"),
                 "Africa/Johannesburg", true));
@@ -220,28 +222,29 @@ public abstract class ServiceTestSupport {
     }
 
     protected void replaceFullWeekOperatingHours(String branchId, LocalTime opensAt, LocalTime closesAt) {
-        branchSchedulingService.replaceOperatingSchedule(branchId, new ReplaceOperatingScheduleCommand(
+        branchSchedulingService.replaceOperatingSchedule(
+                TestAccess.platformAdministrator(), branchId, new ReplaceOperatingScheduleCommand(
                 Arrays.stream(DayOfWeek.values())
                         .map(day -> new WeeklyOperatingIntervalCommand(day, opensAt, closesAt))
                         .toList()));
     }
 
     protected Booking createSavedBooking() {
-        return bookingService.createBooking(newBookingWithFixture(TestDates.future()));
+        return createBooking(newBookingWithFixture(TestDates.future()));
     }
 
     protected Booking createConfirmedBooking() {
         Booking booking = createSavedBooking();
-        return bookingService.confirmBooking(booking.getBookingId());
+        return bookingService.confirmBooking(TestAccess.platformAdministrator(), booking.getBookingId());
     }
 
     protected Booking createConfirmedBooking(LocalDateTime scheduledDateTime) {
-        Booking booking = bookingService.createBooking(newBookingWithFixture(scheduledDateTime));
-        return bookingService.confirmBooking(booking.getBookingId());
+        Booking booking = createBooking(newBookingWithFixture(scheduledDateTime));
+        return bookingService.confirmBooking(TestAccess.platformAdministrator(), booking.getBookingId());
     }
 
     protected Booking createSavedBooking(LocalDateTime scheduledDateTime, BookingStatus status) {
-        Booking booking = bookingService.createBooking(newBookingWithFixture(scheduledDateTime));
+        Booking booking = createBooking(newBookingWithFixture(scheduledDateTime));
         booking.setStatus(status);
         return booking;
     }
@@ -249,18 +252,27 @@ public abstract class ServiceTestSupport {
     protected QueueEntry createSavedQueueEntry() {
         Booking booking = createConfirmedBooking();
         QueueEntry created = queueService.createQueueEntry(
-                new QueueEntry(ids.queueEntry(), booking, booking.getService()));
+                TestAccess.platformAdministrator(), ids.queueEntry(), booking.getBookingId(),
+                booking.getService().getServiceId());
         return queueRepository.findById(created.getQueueEntryId()).orElseThrow();
     }
 
     protected QueueEntry createSavedQueueEntry(LocalDateTime scheduledDateTime, QueueStatus status) {
         Booking booking = createConfirmedBooking(scheduledDateTime);
         QueueEntry created = queueService.createQueueEntry(
-                new QueueEntry(ids.queueEntry(), booking, booking.getService()));
+                TestAccess.platformAdministrator(), ids.queueEntry(), booking.getBookingId(),
+                booking.getService().getServiceId());
         QueueEntry queueEntry = queueRepository.findById(created.getQueueEntryId()).orElseThrow();
         queueEntry.setQueueStatus(status);
         if (!status.isActive()) queueEntry.updateQueueMetrics(queueEntry.getPosition(), 0);
         queueRepository.update(queueEntry);
         return queueEntry;
+    }
+
+    private Booking createBooking(Booking booking) {
+        return bookingService.createBooking(
+                TestAccess.platformAdministrator(), booking.getBookingId(), booking.getUser().getUserId(),
+                booking.getVehicle().getVehicleId(), booking.getBranchId(), booking.getServiceOfferingId(),
+                booking.getScheduledDateTime(), booking.getSpecialRequest());
     }
 }

@@ -42,6 +42,7 @@ import com.carwash.identity.infrastructure.InMemoryUserRepository;
 import com.carwash.vehicle.infrastructure.InMemoryVehicleRepository;
 import com.carwash.access.application.UserCredentialService;
 import com.carwash.shared.exception.BusinessRuleViolationException;
+import com.carwash.testsupport.TestAccess;
 import com.carwash.testsupport.TestDates;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -103,9 +104,9 @@ class AggregateIntegrityServiceTest {
                 businesses, branches, new InMemoryBranchOperatingScheduleRepository(),
                 new InMemoryTemporaryBranchClosureRepository(), coordinator, clock);
         String businessId = "aggregate-business";
-        marketplace.registerBusiness(new RegisterBusinessCommand(
+        marketplace.registerBusiness(TestAccess.platformAdministrator(), new RegisterBusinessCommand(
                 businessId, "Aggregate Wash", "aggregate-wash@example.test", "+27821234567", null));
-        marketplace.createBranch(businessId, new CreateBranchCommand(
+        marketplace.createBranch(TestAccess.platformAdministrator(), businessId, new CreateBranchCommand(
                 "aggregate-branch", "Aggregate Branch", "1 Test Street", null, "Cape Town", "Western Cape",
                 "8001", "ZA", new BigDecimal("-33.9249"), new BigDecimal("18.4241"),
                 "Africa/Johannesburg", true));
@@ -144,29 +145,34 @@ class AggregateIntegrityServiceTest {
         assertTrue(users.insert(user));
         Service service = service("aggregate-service", "Exterior");
         assertTrue(services.insert(service));
-        offeringService.createOffering("aggregate-branch", new CreateServiceOfferingCommand(
+        offeringService.createOffering(TestAccess.platformAdministrator(), "aggregate-branch", new CreateServiceOfferingCommand(
                 "aggregate-offering", service.getServiceId(), BigDecimal.TEN, 30, 2));
-        Vehicle vehicle = vehicleManagement.createVehicle("aggregate-user", "aggregate-vehicle", "ABC123", "SEDAN",
+        Vehicle vehicle = vehicleManagement.createVehicle(TestAccess.platformAdministrator(), "aggregate-user",
+                "aggregate-vehicle", "ABC123", "SEDAN",
                 "Toyota", "Corolla", "White", "");
         assertSame(vehicle, vehicles.findById("aggregate-vehicle").orElseThrow());
         assertEquals(1, user.getVehicles().size());
-        Booking booking = bookingManagement.createBooking("aggregate-booking", "aggregate-user", "aggregate-vehicle",
+        Booking booking = bookingManagement.createBooking(TestAccess.platformAdministrator(),
+                "aggregate-booking", "aggregate-user", "aggregate-vehicle",
                 "aggregate-branch", "aggregate-offering", TestDates.futureDays(1), "");
         assertSame(booking, bookings.findById("aggregate-booking").orElseThrow());
         assertEquals(1, user.getBookings().size());
-        bookingManagement.confirmBooking("aggregate-booking");
-        var queueEntry = queueManagement.createQueueEntry("aggregate-queue", "aggregate-booking", "aggregate-service");
+        bookingManagement.confirmBooking(TestAccess.platformAdministrator(), "aggregate-booking");
+        var queueEntry = queueManagement.createQueueEntry(TestAccess.platformAdministrator(),
+                "aggregate-queue", "aggregate-booking", "aggregate-service");
         assertEquals(queueEntry.getQueueEntryId(), booking.getQueueEntry().getQueueEntryId());
         assertSame(queues.findById(queueEntry.getQueueEntryId()).orElseThrow(), booking.getQueueEntry());
-        assertThrows(BusinessRuleViolationException.class, () -> vehicleManagement.deleteVehicle("aggregate-vehicle"));
+        assertThrows(BusinessRuleViolationException.class,
+                () -> vehicleManagement.deleteVehicle(TestAccess.platformAdministrator(), "aggregate-vehicle"));
         assertThrows(BusinessRuleViolationException.class, () -> serviceCatalog.deleteService("aggregate-service"));
-        assertThrows(BusinessRuleViolationException.class, () -> bookingManagement.deleteBooking("aggregate-booking"));
-        queueManagement.deleteQueueEntry("aggregate-queue");
+        assertThrows(BusinessRuleViolationException.class,
+                () -> bookingManagement.deleteBooking(TestAccess.platformAdministrator(), "aggregate-booking"));
+        queueManagement.deleteQueueEntry(TestAccess.platformAdministrator(), "aggregate-queue");
         assertNull(booking.getQueueEntry());
-        bookingManagement.cancelBooking("aggregate-booking", "aggregate-user");
+        bookingManagement.cancelBooking(TestAccess.platformAdministrator(), "aggregate-booking");
         assertFalse(notifications.findByBookingId("aggregate-booking").isEmpty());
-        bookingManagement.deleteBooking("aggregate-booking");
-        vehicleManagement.deleteVehicle("aggregate-vehicle");
+        bookingManagement.deleteBooking(TestAccess.platformAdministrator(), "aggregate-booking");
+        vehicleManagement.deleteVehicle(TestAccess.platformAdministrator(), "aggregate-vehicle");
         serviceCatalog.deactivateService("aggregate-service");
         userManagement.deleteUser("aggregate-user");
         assertTrue(users.findById("aggregate-user").isEmpty());
@@ -186,7 +192,8 @@ class AggregateIntegrityServiceTest {
                     .mapToObj(index -> executor.submit(() -> {
                         ready.countDown();
                         assertTrue(start.await(5, TimeUnit.SECONDS));
-                        return vehicleManagement.createVehicle(user.getUserId(), "concurrent-vehicle-" + index,
+                        return vehicleManagement.createVehicle(TestAccess.platformAdministrator(), user.getUserId(),
+                                "concurrent-vehicle-" + index,
                                 "CONC" + index, "SEDAN", "Brand", "Model", "White", "");
                     })).toList();
             assertTrue(ready.await(5, TimeUnit.SECONDS));
@@ -205,13 +212,17 @@ class AggregateIntegrityServiceTest {
     void vehicleUpdateRechecksOwnerPlateUniquenessWithoutMutationOnFailure() {
         User user = activeUser("plate-user", "plate@example.test");
         assertTrue(users.insert(user));
-        vehicleManagement.createVehicle(user.getUserId(), "plate-vehicle-one", "ABC123", "SEDAN", "Brand", "One", "White", "");
-        vehicleManagement.createVehicle(user.getUserId(), "plate-vehicle-two", "XYZ999", "SUV", "Brand", "Two", "Black", "");
+        vehicleManagement.createVehicle(TestAccess.platformAdministrator(), user.getUserId(),
+                "plate-vehicle-one", "ABC123", "SEDAN", "Brand", "One", "White", "");
+        vehicleManagement.createVehicle(TestAccess.platformAdministrator(), user.getUserId(),
+                "plate-vehicle-two", "XYZ999", "SUV", "Brand", "Two", "Black", "");
         assertThrows(BusinessRuleViolationException.class,
-                () -> vehicleManagement.updateVehicle("plate-vehicle-one", " xyz999 ", "SEDAN", "Changed", "Changed", "Blue", ""));
+                () -> vehicleManagement.updateVehicle(TestAccess.platformAdministrator(), "plate-vehicle-one",
+                        " xyz999 ", "SEDAN", "Changed", "Changed", "Blue", ""));
         Vehicle unchanged = vehicles.findById("plate-vehicle-one").orElseThrow();
         assertEquals("ABC123", unchanged.getPlateNumber());
-        Vehicle retained = vehicleManagement.updateVehicle("plate-vehicle-one", " abc123 ", "SEDAN", "Updated", "One", "Silver", "");
+        Vehicle retained = vehicleManagement.updateVehicle(TestAccess.platformAdministrator(), "plate-vehicle-one",
+                " abc123 ", "SEDAN", "Updated", "One", "Silver", "");
         assertEquals("abc123", retained.getPlateNumber());
     }
 
@@ -221,34 +232,43 @@ class AggregateIntegrityServiceTest {
         assertTrue(users.insert(user));
         Service stateService = service("state-service", "State");
         assertTrue(services.insert(stateService));
-        offeringService.createOffering("aggregate-branch", new CreateServiceOfferingCommand(
+        offeringService.createOffering(TestAccess.platformAdministrator(), "aggregate-branch", new CreateServiceOfferingCommand(
                 "state-offering", stateService.getServiceId(), BigDecimal.TEN, 30, 2));
-        vehicleManagement.createVehicle(user.getUserId(), "state-vehicle", "STATE1", "SEDAN", "Brand", "Model", "White", "");
-        Booking booking = bookingManagement.createBooking(
+        vehicleManagement.createVehicle(TestAccess.platformAdministrator(), user.getUserId(),
+                "state-vehicle", "STATE1", "SEDAN", "Brand", "Model", "White", "");
+        Booking booking = bookingManagement.createBooking(TestAccess.platformAdministrator(),
                 "state-booking", user.getUserId(), "state-vehicle", "aggregate-branch", "state-offering",
                 TestDates.futureDays(2), "");
-        bookingManagement.confirmBooking("state-booking");
+        bookingManagement.confirmBooking(TestAccess.platformAdministrator(), "state-booking");
         assertTrue(booking.startService());
         assertTrue(bookings.update(booking));
         assertThrows(BusinessRuleViolationException.class,
-                () -> bookingManagement.updateBooking("state-booking", "state-vehicle", "state-offering", ""));
-        Booking waiting = bookingManagement.createBooking(
+                () -> bookingManagement.updateBooking(TestAccess.platformAdministrator(),
+                        "state-booking", "state-vehicle", "state-offering", ""));
+        Booking waiting = bookingManagement.createBooking(TestAccess.platformAdministrator(),
                 "state-queue-booking", user.getUserId(), "state-vehicle", "aggregate-branch", "state-offering",
                 TestDates.futureDays(4), "");
-        bookingManagement.confirmBooking(waiting.getBookingId());
-        var queueEntry = queueManagement.createQueueEntry("state-queue", waiting.getBookingId(), "state-service");
-        queueManagement.callQueueEntry(queueEntry.getQueueEntryId());
-        assertThrows(BusinessRuleViolationException.class, () -> queueManagement.updatePosition(queueEntry.getQueueEntryId(), 2));
-        assertThrows(BusinessRuleViolationException.class, () -> queueManagement.deleteQueueEntry(queueEntry.getQueueEntryId()));
+        bookingManagement.confirmBooking(TestAccess.platformAdministrator(), waiting.getBookingId());
+        var queueEntry = queueManagement.createQueueEntry(TestAccess.platformAdministrator(),
+                "state-queue", waiting.getBookingId(), "state-service");
+        queueManagement.callQueueEntry(TestAccess.platformAdministrator(), queueEntry.getQueueEntryId());
+        assertThrows(BusinessRuleViolationException.class,
+                () -> queueManagement.updatePosition(
+                        TestAccess.platformAdministrator(), queueEntry.getQueueEntryId(), 2));
+        assertThrows(BusinessRuleViolationException.class,
+                () -> queueManagement.deleteQueueEntry(
+                        TestAccess.platformAdministrator(), queueEntry.getQueueEntryId()));
     }
 
     @Test
     void duplicateCreationFailsBeforeAggregateCollectionsChange() {
         User user = activeUser("duplicate-user", "duplicate@example.test");
         assertTrue(users.insert(user));
-        vehicleManagement.createVehicle(user.getUserId(), "duplicate-vehicle", "DUP1", "SEDAN", "Brand", "Model", "White", "");
+        vehicleManagement.createVehicle(TestAccess.platformAdministrator(), user.getUserId(),
+                "duplicate-vehicle", "DUP1", "SEDAN", "Brand", "Model", "White", "");
         assertThrows(BusinessRuleViolationException.class,
-                () -> vehicleManagement.createVehicle(user.getUserId(), "duplicate-vehicle", "DUP2", "SUV", "Other", "Other", "Black", ""));
+                () -> vehicleManagement.createVehicle(TestAccess.platformAdministrator(), user.getUserId(),
+                        "duplicate-vehicle", "DUP2", "SUV", "Other", "Other", "Black", ""));
         assertEquals(1, vehicles.findAll().size());
         assertEquals(1, user.getVehicles().size());
         assertEquals("DUP1", vehicles.findById("duplicate-vehicle").orElseThrow().getPlateNumber());

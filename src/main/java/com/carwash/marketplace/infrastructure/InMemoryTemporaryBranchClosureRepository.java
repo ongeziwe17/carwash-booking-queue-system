@@ -43,6 +43,17 @@ public final class InMemoryTemporaryBranchClosureRepository
         return findById(closureId).filter(closure -> branchBelongsTo(closure.getBranchId(), businessId));
     }
 
+    @Override
+    public boolean updateForBusiness(TemporaryBranchClosure closure, String businessId) {
+        return updateMatching(closure.getClosureId(), closure,
+                current -> branchBelongsTo(current.getBranchId(), businessId));
+    }
+
+    @Override
+    public boolean updateForAdministrator(TemporaryBranchClosure closure) {
+        return updateMatching(closure.getClosureId(), closure, current -> true);
+    }
+
     private boolean branchBelongsTo(String branchId, String businessId) {
         return branches != null && branches.findByIdAndBusinessId(branchId, businessId).isPresent();
     }

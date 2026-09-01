@@ -1,6 +1,7 @@
 package com.carwash.reporting.application;
 
 import com.carwash.testsupport.ServiceTestSupport;
+import com.carwash.testsupport.TestAccess;
 
 import com.carwash.reporting.api.dto.DailySummaryReportResponse;
 import com.carwash.booking.domain.Booking;
@@ -93,7 +94,7 @@ class DailySummaryReportServiceTest extends ServiceTestSupport {
     void dailySummaryReflectsSynchronizedOperationalLifecycle() {
         LocalDateTime scheduled = TestDates.futureDays(15);
         Booking booking = createConfirmedBooking(scheduled);
-        QueueEntry queueEntry = queueRepository.findById(queueService.createQueueEntry(
+        QueueEntry queueEntry = queueRepository.findById(queueService.createQueueEntry(TestAccess.platformAdministrator(),
                 ids.queueEntry(), booking.getBookingId(), booking.getService().getServiceId())
                 .getQueueEntryId()).orElseThrow();
 
@@ -102,18 +103,18 @@ class DailySummaryReportServiceTest extends ServiceTestSupport {
         assertEquals(1, before.waitingQueueEntries());
         assertEquals(1, before.pendingWorkload());
 
-        queueService.callQueueEntry(queueEntry.getQueueEntryId());
+        queueService.callQueueEntry(TestAccess.platformAdministrator(), queueEntry.getQueueEntryId());
         DailySummaryReportResponse called = reportService.generateDailySummary(scheduled.toLocalDate(), ensureDefaultBranch(), null);
         assertEquals(1, called.confirmedBookings());
         assertEquals(1, called.calledQueueEntries());
 
-        queueService.startService(queueEntry.getQueueEntryId());
+        queueService.startService(TestAccess.platformAdministrator(), queueEntry.getQueueEntryId());
         DailySummaryReportResponse during = reportService.generateDailySummary(scheduled.toLocalDate(), ensureDefaultBranch(), null);
         assertEquals(BookingStatus.IN_SERVICE, booking.getStatus());
         assertEquals(1, during.inProgressQueueEntries());
         assertEquals(1, during.pendingWorkload());
 
-        queueService.completeQueueEntry(queueEntry.getQueueEntryId());
+        queueService.completeQueueEntry(TestAccess.platformAdministrator(), queueEntry.getQueueEntryId());
         DailySummaryReportResponse completed = reportService.generateDailySummary(scheduled.toLocalDate(), ensureDefaultBranch(), null);
         assertEquals(1, completed.completedBookings());
         assertEquals(1, completed.completedQueueEntries());

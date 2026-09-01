@@ -47,6 +47,39 @@ public class InMemoryVehicleRepository extends InMemoryRepository<Vehicle, Strin
     }
 
     @Override
+    public boolean updateForBusiness(Vehicle vehicle, String businessId) {
+        return updateMatching(vehicle.getVehicleId(), vehicle,
+                current -> findByIdAndBusinessId(current.getVehicleId(), businessId).isPresent());
+    }
+
+    @Override
+    public boolean updateForUser(Vehicle vehicle, String userId) {
+        return updateMatching(vehicle.getVehicleId(), vehicle,
+                current -> userId.equals(current.getUserId()));
+    }
+
+    @Override
+    public boolean updateForAdministrator(Vehicle vehicle) {
+        return updateMatching(vehicle.getVehicleId(), vehicle, current -> true);
+    }
+
+    @Override
+    public boolean deleteForBusiness(String vehicleId, String businessId) {
+        return deleteMatching(vehicleId,
+                current -> findByIdAndBusinessId(current.getVehicleId(), businessId).isPresent());
+    }
+
+    @Override
+    public boolean deleteForUser(String vehicleId, String userId) {
+        return deleteMatching(vehicleId, current -> userId.equals(current.getUserId()));
+    }
+
+    @Override
+    public boolean deleteForAdministrator(String vehicleId) {
+        return deleteMatching(vehicleId, current -> true);
+    }
+
+    @Override
     public boolean existsByUserIdAndPlateNumberIgnoreCase(
             String userId,
             String plateNumber,

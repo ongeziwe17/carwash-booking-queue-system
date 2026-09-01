@@ -9,6 +9,7 @@ import com.carwash.marketplace.domain.CarWashBusinessRepository;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
 import com.carwash.shared.application.DataTransactionOperations;
+import com.carwash.shared.application.MutationLock;
 import com.carwash.access.application.TenantAccessContext;
 import org.springframework.security.access.AccessDeniedException;
 
@@ -35,6 +36,7 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
     private final CarWashBusinessRepository businessRepository;
     private final CarWashBranchRepository branchRepository;
     private final DataTransactionOperations coordinator;
+    private final MutationLock mutationLock;
     private final Clock clock;
 
     public MarketplaceManagementService(
@@ -43,41 +45,32 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
             DataTransactionOperations coordinator,
             Clock clock
     ) {
+        this(businessRepository, branchRepository, coordinator, MutationLock.noOp(), clock);
+    }
+
+    public MarketplaceManagementService(
+            CarWashBusinessRepository businessRepository,
+            CarWashBranchRepository branchRepository,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock,
+            Clock clock
+    ) {
         this.businessRepository = Objects.requireNonNull(businessRepository, "Business repository is required");
         this.branchRepository = Objects.requireNonNull(branchRepository, "Branch repository is required");
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
+        this.mutationLock = Objects.requireNonNull(mutationLock, "Mutation lock is required");
         this.clock = Objects.requireNonNull(clock, "Application clock is required");
     }
 
-    public BusinessSnapshot registerBusiness(RegisterBusinessCommand command) {
-        return coordinator.write(() -> {
-            validateBusiness(command);
-            String businessId = normalizeRequiredId(command.businessId(), "Business ID");
-            if (businessRepository.findById(businessId).isPresent()) {
-                throw new BusinessRuleViolationException("Business ID already exists");
-            }
-            rejectDuplicateRegistrationNumber(command.registrationNumber(), null);
-            LocalDateTime now = LocalDateTime.now(clock);
-            CarWashBusiness business = new CarWashBusiness(
-                    command.businessId(),
-                    command.businessName(),
-                    command.contactEmail(),
-                    command.contactPhone(),
-                    command.registrationNumber(),
-                    BusinessStatus.ACTIVE,
-                    now,
-                    now
-            );
-            if (!businessRepository.insert(business)) {
-                throw new BusinessRuleViolationException("Business ID already exists");
-            }
-            return BusinessSnapshot.from(business);
-        });
+    BusinessSnapshot registerBusiness(RegisterBusinessCommand command) {
+        return coordinator.write(() -> registerBusinessInside(command));
     }
 
     public BusinessSnapshot registerBusiness(TenantAccessContext access, RegisterBusinessCommand command) {
-        requirePlatformAdministrator(access);
-        return registerBusiness(command);
+        return coordinator.write(() -> {
+            requirePlatformAdministrator(access);
+            return registerBusinessInside(command);
+        });
     }
 
     public List<BusinessSnapshot> findAccessibleBusinesses(TenantAccessContext access) {
@@ -98,18 +91,15 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
             String businessId,
             UpdateBusinessCommand command
     ) {
-        requireAccessibleBusiness(access, businessId);
-        return updateBusiness(businessId, command);
+        return coordinator.write(() -> updateBusinessInside(access, businessId, command));
     }
 
     public BusinessSnapshot activateBusiness(TenantAccessContext access, String businessId) {
-        requireAccessibleBusiness(access, businessId);
-        return activateBusiness(businessId);
+        return coordinator.write(() -> changeBusinessStatusInside(access, businessId, true));
     }
 
     public BusinessSnapshot deactivateBusiness(TenantAccessContext access, String businessId) {
-        requireAccessibleBusiness(access, businessId);
-        return deactivateBusiness(businessId);
+        return coordinator.write(() -> changeBusinessStatusInside(access, businessId, false));
     }
 
     public BranchSnapshot createBranch(
@@ -117,8 +107,7 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
             String businessId,
             CreateBranchCommand command
     ) {
-        requireAccessibleBusiness(access, businessId);
-        return createBranch(businessId, command);
+        return coordinator.write(() -> createBranchInside(access, businessId, command));
     }
 
     public List<BranchSnapshot> findBranchesByBusiness(TenantAccessContext access, String businessId) {
@@ -137,18 +126,15 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
             String branchId,
             UpdateBranchCommand command
     ) {
-        requireAccessibleBranch(access, branchId);
-        return updateBranch(branchId, command);
+        return coordinator.write(() -> updateBranchInside(access, branchId, command));
     }
 
     public BranchSnapshot activateBranch(TenantAccessContext access, String branchId) {
-        requireAccessibleBranch(access, branchId);
-        return activateBranch(branchId);
+        return coordinator.write(() -> changeBranchStatusInside(access, branchId, true));
     }
 
     public BranchSnapshot deactivateBranch(TenantAccessContext access, String branchId) {
-        requireAccessibleBranch(access, branchId);
-        return deactivateBranch(branchId);
+        return coordinator.write(() -> changeBranchStatusInside(access, branchId, false));
     }
 
     @Override
@@ -181,59 +167,20 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
         return coordinator.read(() -> businessRepository.findById(normalizedId).map(BusinessSnapshot::from));
     }
 
-    public BusinessSnapshot updateBusiness(String businessId, UpdateBusinessCommand command) {
-        return coordinator.write(() -> {
-            CarWashBusiness existing = requireBusiness(businessId);
-            validateBusiness(command);
-            rejectDuplicateRegistrationNumber(command.registrationNumber(), existing.getBusinessId());
-            CarWashBusiness updated = existing.updateDetails(
-                    command.businessName(),
-                    command.contactEmail(),
-                    command.contactPhone(),
-                    command.registrationNumber(),
-                    LocalDateTime.now(clock)
-            );
-            updateBusinessRecord(updated);
-            return BusinessSnapshot.from(updated);
-        });
+    BusinessSnapshot updateBusiness(String businessId, UpdateBusinessCommand command) {
+        return coordinator.write(() -> updateBusinessInside(null, businessId, command));
     }
 
-    public BusinessSnapshot activateBusiness(String businessId) {
+    BusinessSnapshot activateBusiness(String businessId) {
         return changeBusinessStatus(businessId, true);
     }
 
-    public BusinessSnapshot deactivateBusiness(String businessId) {
+    BusinessSnapshot deactivateBusiness(String businessId) {
         return changeBusinessStatus(businessId, false);
     }
 
-    public BranchSnapshot createBranch(String businessId, CreateBranchCommand command) {
-        return coordinator.write(() -> {
-            CarWashBusiness business = requireBusiness(businessId);
-            validateBranch(command);
-            LocalDateTime now = LocalDateTime.now(clock);
-            CarWashBranch branch = new CarWashBranch(
-                    command.branchId(),
-                    business.getBusinessId(),
-                    command.branchName(),
-                    command.addressLine1(),
-                    command.addressLine2(),
-                    command.city(),
-                    command.province(),
-                    command.postalCode(),
-                    command.countryCode(),
-                    command.latitude(),
-                    command.longitude(),
-                    canonicalTimezone(command.timezone()),
-                    BranchStatus.ACTIVE,
-                    command.publicDiscoveryEnabled(),
-                    now,
-                    now
-            );
-            if (!branchRepository.insert(branch)) {
-                throw new BusinessRuleViolationException("Branch ID already exists");
-            }
-            return BranchSnapshot.from(branch, business);
-        });
+    BranchSnapshot createBranch(String businessId, CreateBranchCommand command) {
+        return coordinator.write(() -> createBranchInside(null, businessId, command));
     }
 
     @Override
@@ -263,34 +210,15 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
                 .map(this::snapshot));
     }
 
-    public BranchSnapshot updateBranch(String branchId, UpdateBranchCommand command) {
-        return coordinator.write(() -> {
-            CarWashBranch existing = requireBranch(branchId);
-            validateBranch(command);
-            CarWashBranch updated = existing.updateDetails(
-                    command.branchName(),
-                    command.addressLine1(),
-                    command.addressLine2(),
-                    command.city(),
-                    command.province(),
-                    command.postalCode(),
-                    command.countryCode(),
-                    command.latitude(),
-                    command.longitude(),
-                    canonicalTimezone(command.timezone()),
-                    command.publicDiscoveryEnabled(),
-                    LocalDateTime.now(clock)
-            );
-            updateBranchRecord(updated);
-            return snapshot(updated);
-        });
+    BranchSnapshot updateBranch(String branchId, UpdateBranchCommand command) {
+        return coordinator.write(() -> updateBranchInside(null, branchId, command));
     }
 
-    public BranchSnapshot activateBranch(String branchId) {
+    BranchSnapshot activateBranch(String branchId) {
         return changeBranchStatus(branchId, true);
     }
 
-    public BranchSnapshot deactivateBranch(String branchId) {
+    BranchSnapshot deactivateBranch(String branchId) {
         return changeBranchStatus(branchId, false);
     }
 
@@ -302,25 +230,104 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
     }
 
     private BusinessSnapshot changeBusinessStatus(String businessId, boolean active) {
-        return coordinator.write(() -> {
-            CarWashBusiness existing = requireBusiness(businessId);
-            CarWashBusiness updated = active
-                    ? existing.activate(LocalDateTime.now(clock))
-                    : existing.deactivate(LocalDateTime.now(clock));
-            updateBusinessRecord(updated);
-            return BusinessSnapshot.from(updated);
-        });
+        return coordinator.write(() -> changeBusinessStatusInside(null, businessId, active));
     }
 
     private BranchSnapshot changeBranchStatus(String branchId, boolean active) {
-        return coordinator.write(() -> {
-            CarWashBranch existing = requireBranch(branchId);
-            CarWashBranch updated = active
-                    ? existing.activate(LocalDateTime.now(clock))
-                    : existing.deactivate(LocalDateTime.now(clock));
-            updateBranchRecord(updated);
-            return snapshot(updated);
-        });
+        return coordinator.write(() -> changeBranchStatusInside(null, branchId, active));
+    }
+
+    private BusinessSnapshot registerBusinessInside(RegisterBusinessCommand command) {
+        validateBusiness(command);
+        String businessId = normalizeRequiredId(command.businessId(), "Business ID");
+        mutationLock.acquire(MutationLock.business(businessId));
+        if (businessRepository.findById(businessId).isPresent()) {
+            throw new BusinessRuleViolationException("Business ID already exists");
+        }
+        rejectDuplicateRegistrationNumber(command.registrationNumber(), null);
+        LocalDateTime now = LocalDateTime.now(clock);
+        CarWashBusiness business = new CarWashBusiness(
+                businessId, command.businessName(), command.contactEmail(), command.contactPhone(),
+                command.registrationNumber(), BusinessStatus.ACTIVE, now, now);
+        if (!businessRepository.insert(business)) {
+            throw new BusinessRuleViolationException("Business ID already exists");
+        }
+        return BusinessSnapshot.from(business);
+    }
+
+    private BusinessSnapshot updateBusinessInside(
+            TenantAccessContext access, String businessId, UpdateBusinessCommand command) {
+        String normalizedId = normalizeRequiredId(businessId, "Business ID");
+        mutationLock.acquire(MutationLock.business(normalizedId));
+        CarWashBusiness existing = requireBusinessForMutation(access, normalizedId);
+        validateBusiness(command);
+        rejectDuplicateRegistrationNumber(command.registrationNumber(), existing.getBusinessId());
+        CarWashBusiness updated = existing.updateDetails(
+                command.businessName(), command.contactEmail(), command.contactPhone(),
+                command.registrationNumber(), LocalDateTime.now(clock));
+        updateBusinessRecord(access, updated);
+        return BusinessSnapshot.from(updated);
+    }
+
+    private BusinessSnapshot changeBusinessStatusInside(
+            TenantAccessContext access, String businessId, boolean active) {
+        String normalizedId = normalizeRequiredId(businessId, "Business ID");
+        mutationLock.acquire(MutationLock.business(normalizedId));
+        CarWashBusiness existing = requireBusinessForMutation(access, normalizedId);
+        CarWashBusiness updated = active
+                ? existing.activate(LocalDateTime.now(clock))
+                : existing.deactivate(LocalDateTime.now(clock));
+        updateBusinessRecord(access, updated);
+        return BusinessSnapshot.from(updated);
+    }
+
+    private BranchSnapshot createBranchInside(
+            TenantAccessContext access, String businessId, CreateBranchCommand command) {
+        validateBranch(command);
+        String normalizedBusinessId = normalizeRequiredId(businessId, "Business ID");
+        String branchId = normalizeRequiredId(command.branchId(), "Branch ID");
+        mutationLock.acquire(List.of(
+                MutationLock.branch(branchId), MutationLock.business(normalizedBusinessId)));
+        CarWashBusiness business = requireBusinessForMutation(access, normalizedBusinessId);
+        LocalDateTime now = LocalDateTime.now(clock);
+        CarWashBranch branch = new CarWashBranch(
+                branchId, business.getBusinessId(), command.branchName(), command.addressLine1(),
+                command.addressLine2(), command.city(), command.province(), command.postalCode(),
+                command.countryCode(), command.latitude(), command.longitude(), canonicalTimezone(command.timezone()),
+                BranchStatus.ACTIVE, command.publicDiscoveryEnabled(), now, now);
+        if (!branchRepository.insert(branch)) {
+            throw new BusinessRuleViolationException("Branch ID already exists");
+        }
+        return BranchSnapshot.from(branch, business);
+    }
+
+    private BranchSnapshot updateBranchInside(
+            TenantAccessContext access, String branchId, UpdateBranchCommand command) {
+        String normalizedId = normalizeRequiredId(branchId, "Branch ID");
+        mutationLock.acquire(MutationLock.branch(normalizedId));
+        CarWashBranch existing = requireBranchForMutation(access, normalizedId);
+        mutationLock.acquire(MutationLock.business(existing.getBusinessId()));
+        validateBranch(command);
+        CarWashBranch updated = existing.updateDetails(
+                command.branchName(), command.addressLine1(), command.addressLine2(), command.city(),
+                command.province(), command.postalCode(), command.countryCode(), command.latitude(),
+                command.longitude(), canonicalTimezone(command.timezone()), command.publicDiscoveryEnabled(),
+                LocalDateTime.now(clock));
+        updateBranchRecord(access, updated);
+        return BranchSnapshot.from(updated, requireBusinessForMutation(access, updated.getBusinessId()));
+    }
+
+    private BranchSnapshot changeBranchStatusInside(
+            TenantAccessContext access, String branchId, boolean active) {
+        String normalizedId = normalizeRequiredId(branchId, "Branch ID");
+        mutationLock.acquire(MutationLock.branch(normalizedId));
+        CarWashBranch existing = requireBranchForMutation(access, normalizedId);
+        mutationLock.acquire(MutationLock.business(existing.getBusinessId()));
+        CarWashBranch updated = active
+                ? existing.activate(LocalDateTime.now(clock))
+                : existing.deactivate(LocalDateTime.now(clock));
+        updateBranchRecord(access, updated);
+        return BranchSnapshot.from(updated, requireBusinessForMutation(access, updated.getBusinessId()));
     }
 
     private BranchSnapshot snapshot(CarWashBranch branch) {
@@ -368,15 +375,35 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
         }
     }
 
-    private void updateBusinessRecord(CarWashBusiness business) {
-        if (!businessRepository.update(business)) {
-            throw new ResourceNotFoundException("Business not found: " + business.getBusinessId());
+    private CarWashBusiness requireBusinessForMutation(TenantAccessContext access, String businessId) {
+        Optional<CarWashBusiness> business = access == null || access.isPlatformAdministrator()
+                ? businessRepository.findById(businessId)
+                : businessRepository.findByIdAndTenantId(businessId, access.requireBusinessId());
+        return business.orElseThrow(() -> new ResourceNotFoundException("Business not found"));
+    }
+
+    private CarWashBranch requireBranchForMutation(TenantAccessContext access, String branchId) {
+        Optional<CarWashBranch> branch = access == null || access.isPlatformAdministrator()
+                ? branchRepository.findById(branchId)
+                : branchRepository.findByIdAndBusinessId(branchId, access.requireBusinessId());
+        return branch.orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
+    }
+
+    private void updateBusinessRecord(TenantAccessContext access, CarWashBusiness business) {
+        boolean updated = access == null || access.isPlatformAdministrator()
+                ? businessRepository.updateForAdministrator(business)
+                : businessRepository.updateForTenant(business, access.requireBusinessId());
+        if (!updated) {
+            throw new ResourceNotFoundException("Business not found");
         }
     }
 
-    private void updateBranchRecord(CarWashBranch branch) {
-        if (!branchRepository.update(branch)) {
-            throw new ResourceNotFoundException("Branch not found: " + branch.getBranchId());
+    private void updateBranchRecord(TenantAccessContext access, CarWashBranch branch) {
+        boolean updated = access == null || access.isPlatformAdministrator()
+                ? branchRepository.updateForAdministrator(branch)
+                : branchRepository.updateForBusiness(branch, access.requireBusinessId());
+        if (!updated) {
+            throw new ResourceNotFoundException("Branch not found");
         }
     }
 

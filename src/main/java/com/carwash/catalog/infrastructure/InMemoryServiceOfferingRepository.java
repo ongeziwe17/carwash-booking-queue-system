@@ -57,6 +57,17 @@ public final class InMemoryServiceOfferingRepository
     }
 
     @Override
+    public boolean updateForBusiness(ServiceOffering offering, String businessId) {
+        return updateMatching(offering.getOfferingId(), offering,
+                current -> branchBelongsTo(current.getBranchId(), businessId));
+    }
+
+    @Override
+    public boolean updateForAdministrator(ServiceOffering offering) {
+        return updateMatching(offering.getOfferingId(), offering, current -> true);
+    }
+
+    @Override
     public boolean existsByServiceId(String serviceId) {
         return anyMatch(offering -> serviceId.equals(offering.getServiceId()));
     }

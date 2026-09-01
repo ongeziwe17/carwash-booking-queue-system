@@ -2,6 +2,7 @@ package com.carwash.persistence;
 
 import com.carwash.CarwashBookingQueueSystemApplication;
 import com.carwash.access.application.UserAuthenticationService;
+import com.carwash.access.application.TenantAccessContext;
 import com.carwash.booking.application.BookingManagementService;
 import com.carwash.booking.application.BranchAvailabilitySearchCriteria;
 import com.carwash.booking.application.BranchAvailabilitySearchService;
@@ -31,6 +32,7 @@ import com.carwash.marketplace.application.CreateBranchCommand;
 import com.carwash.marketplace.application.MarketplaceManagementService;
 import com.carwash.marketplace.application.RegisterBusinessCommand;
 import com.carwash.marketplace.application.ReplaceOperatingScheduleCommand;
+import com.carwash.marketplace.application.UpdateBranchCommand;
 import com.carwash.marketplace.application.WeeklyOperatingIntervalCommand;
 import com.carwash.marketplace.domain.BranchOperatingScheduleRepository;
 import com.carwash.marketplace.domain.CarWashBranchRepository;
@@ -77,9 +79,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -93,6 +98,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Testcontainers
 class PostgresPersistenceIntegrationTest {
     private static final String PASSWORD="StrongPassword!123";
+    private static final TenantAccessContext ADMIN =
+            new TenantAccessContext("test-platform-admin", RoleName.PLATFORM_ADMIN, null);
     @Container static final PostgreSQLContainer POSTGRES=new PostgreSQLContainer("postgres:17.6-alpine3.22");
 
     @DynamicPropertySource static void postgres(DynamicPropertyRegistry properties){
@@ -162,7 +169,7 @@ class PostgresPersistenceIntegrationTest {
 
     @Test void membershipConstraintsAndTransactionsEnforceOneOperationalTenant(){
         Fixture fixture=fixture("membership",2);
-        marketplace.registerBusiness(new RegisterBusinessCommand(
+        marketplace.registerBusiness(ADMIN,new RegisterBusinessCommand(
                 "membership-other-business","Other Membership Business",
                 "membership-other@example.test","0123456789","membership-other-registration"));
         tenantMemberships.assignRole(fixture.user.getUserId(),RoleName.STAFF,"membership-business");
@@ -188,10 +195,10 @@ class PostgresPersistenceIntegrationTest {
     @Test void tenantPredicatesAndRelationalConstraintsRejectCrossBusinessScope(){
         Fixture first=fixture("tenant-a",2);
         Fixture second=fixture("tenant-b",2);
-        Booking firstBooking=bookings.confirmBooking(bookings.createBooking(
+        Booking firstBooking=bookings.confirmBooking(ADMIN,bookings.createBooking(ADMIN,
                 "tenant-a-booking",first.user.getUserId(),first.vehicle.getVehicleId(),first.branchId,
                 first.offeringId,LocalDateTime.of(2089,1,17,10,0),null).getBookingId());
-        QueueEntry firstQueue=queues.createQueueEntry(
+        QueueEntry firstQueue=queues.createQueueEntry(ADMIN,
                 "tenant-a-queue",firstBooking.getBookingId(),first.service.getServiceId());
 
         assertEquals(List.of(firstBooking.getBookingId()),bookingRepository.findByBusinessId("tenant-a-business")
@@ -225,6 +232,55 @@ class PostgresPersistenceIntegrationTest {
                 second.branchId,second.offeringId,second.service.getServiceId(),firstQueue.getQueueEntryId()));
     }
 
+    @Test void tenantMutationWaitsForResourceLockAndRejectsARecreatedForeignBranch() throws Exception {
+        marketplace.registerBusiness(ADMIN,new RegisterBusinessCommand(
+                "atomic-business-a","Atomic A","atomic-a@example.test","0123456789","atomic-reg-a"));
+        marketplace.registerBusiness(ADMIN,new RegisterBusinessCommand(
+                "atomic-business-b","Atomic B","atomic-b@example.test","0123456789","atomic-reg-b"));
+        marketplace.createBranch(ADMIN,"atomic-business-a",new CreateBranchCommand(
+                "atomic-branch","Original A","1 Main",null,"Cape Town","Western Cape","8001","ZA",
+                BigDecimal.ZERO,BigDecimal.ZERO,"UTC",true));
+        TenantAccessContext tenantA=new TenantAccessContext(
+                "atomic-owner-a",RoleName.BUSINESS_OWNER,"atomic-business-a");
+        CountDownLatch replacementHoldingLock=new CountDownLatch(1);
+        CountDownLatch allowReplacementCommit=new CountDownLatch(1);
+
+        try(var executor=Executors.newFixedThreadPool(2)){
+            Future<?> replacement=executor.submit(()->{
+                try(var connection=POSTGRES.createConnection("");var statement=connection.createStatement()){
+                    connection.setAutoCommit(false);
+                    statement.execute("select pg_advisory_xact_lock(hashtextextended('07:branch:atomic-branch',0))");
+                    statement.executeUpdate("delete from branches where branch_id='atomic-branch'");
+                    statement.executeUpdate("insert into branches(branch_id,business_id,branch_name,address_line1,city,province,postal_code,country_code,latitude,longitude,timezone,branch_status,public_discovery_enabled,created_at,updated_at) values ('atomic-branch','atomic-business-b','Canonical B','2 Main','Cape Town','Western Cape','8001','ZA',0,0,'UTC','ACTIVE',true,current_timestamp,current_timestamp)");
+                    replacementHoldingLock.countDown();
+                    assertTrue(allowReplacementCommit.await(5,TimeUnit.SECONDS));
+                    connection.commit();
+                }
+                return null;
+            });
+            assertTrue(replacementHoldingLock.await(5,TimeUnit.SECONDS));
+            Future<?> mutation=executor.submit(()->marketplace.updateBranch(
+                    tenantA,"atomic-branch",new UpdateBranchCommand(
+                            "Tenant A overwrite","3 Main",null,"Cape Town","Western Cape","8001","ZA",
+                            BigDecimal.ZERO,BigDecimal.ZERO,"UTC",true)));
+
+            try{
+                awaitAdvisoryLockWaiter();
+            }finally{
+                allowReplacementCommit.countDown();
+            }
+            replacement.get(5,TimeUnit.SECONDS);
+            ExecutionException failure=assertThrows(ExecutionException.class,
+                    ()->mutation.get(5,TimeUnit.SECONDS));
+            assertTrue(failure.getCause() instanceof ResourceNotFoundException);
+        }
+
+        assertEquals("atomic-business-b",jdbc.queryForObject(
+                "select business_id from branches where branch_id='atomic-branch'",String.class));
+        assertEquals("Canonical B",jdbc.queryForObject(
+                "select branch_name from branches where branch_id='atomic-branch'",String.class));
+    }
+
     @Test void repositoryContractsPreserveDuplicateMissingAndCaseInsensitiveUniqueness(){
         User first=createUser("contract-user","Contract@Example.test");
         assertFalse(userRepository.insert(first));
@@ -232,21 +288,22 @@ class PostgresPersistenceIntegrationTest {
         assertFalse(userRepository.update(missing));
         BusinessRuleViolationException duplicate=assertThrows(BusinessRuleViolationException.class,()->createUser("other-user","contract@example.TEST"));
         assertEquals("User email already exists",duplicate.getMessage());
-        vehicles.createVehicle("contract-user","vehicle-one"," CA 123 ","SUV","A","B","C",null);
-        assertThrows(BusinessRuleViolationException.class,()->vehicles.createVehicle("contract-user","vehicle-two","ca 123","SUV","A","B","C",null));
+        vehicles.createVehicle(ADMIN,"contract-user","vehicle-one"," CA 123 ","SUV","A","B","C",null);
+        assertThrows(BusinessRuleViolationException.class,()->vehicles.createVehicle(
+                ADMIN,"contract-user","vehicle-two","ca 123","SUV","A","B","C",null));
         String maximumPhone="+"+"1".repeat(39);
         users.createUser(new CreateUserCommand("phone-user","Phone User","phone@example.test",maximumPhone,PASSWORD));
         assertEquals(maximumPhone,userRepository.findById("phone-user").orElseThrow().getPhone());
-        marketplace.registerBusiness(new RegisterBusinessCommand("registration-one","First","first-business@example.test","0123456789","REGISTRATION-001"));
-        BusinessRuleViolationException registrationDuplicate=assertThrows(BusinessRuleViolationException.class,()->marketplace.registerBusiness(new RegisterBusinessCommand("registration-two","Second","second-business@example.test","0123456789","registration-001")));
+        marketplace.registerBusiness(ADMIN,new RegisterBusinessCommand("registration-one","First","first-business@example.test","0123456789","REGISTRATION-001"));
+        BusinessRuleViolationException registrationDuplicate=assertThrows(BusinessRuleViolationException.class,()->marketplace.registerBusiness(ADMIN,new RegisterBusinessCommand("registration-two","Second","second-business@example.test","0123456789","registration-001")));
         assertEquals("Business registration number already exists",registrationDuplicate.getMessage());
     }
 
     @Test void everyPostgresAdapterHonorsDuplicateInsertAndDeterministicReadContracts(){
         Fixture fixture=fixture("contracts",2);
-        Booking booking=bookings.confirmBooking(bookings.createBooking("contracts-booking",fixture.user.getUserId(),fixture.vehicle.getVehicleId(),fixture.branchId,fixture.offeringId,LocalDateTime.of(2089,1,17,10,0),null).getBookingId());
-        QueueEntry queue=queues.createQueueEntry("contracts-queue",booking.getBookingId(),fixture.service.getServiceId());
-        scheduling.createTemporaryClosure(fixture.branchId,new com.carwash.marketplace.application.CreateTemporaryBranchClosureCommand("contracts-closure",Instant.parse("2089-01-18T10:00:00Z"),Instant.parse("2089-01-18T11:00:00Z"),"contract"));
+        Booking booking=bookings.confirmBooking(ADMIN,bookings.createBooking(ADMIN,"contracts-booking",fixture.user.getUserId(),fixture.vehicle.getVehicleId(),fixture.branchId,fixture.offeringId,LocalDateTime.of(2089,1,17,10,0),null).getBookingId());
+        QueueEntry queue=queues.createQueueEntry(ADMIN,"contracts-queue",booking.getBookingId(),fixture.service.getServiceId());
+        scheduling.createTemporaryClosure(ADMIN,fixture.branchId,new com.carwash.marketplace.application.CreateTemporaryBranchClosureCommand("contracts-closure",Instant.parse("2089-01-18T10:00:00Z"),Instant.parse("2089-01-18T11:00:00Z"),"contract"));
 
         assertFalse(roleRepository.insert(roleRepository.findById("builtin:CUSTOMER").orElseThrow()));
         assertFalse(userRepository.insert(fixture.user));
@@ -284,11 +341,11 @@ class PostgresPersistenceIntegrationTest {
     @Test void nanosecondPrecisionRoundTripsForSchedulesClosuresAndBookings(){
         Fixture fixture=fixture("nanos",2);
         LocalTime opens=LocalTime.of(8,0,0,123456789);LocalTime closes=LocalTime.of(18,0,0,987654321);
-        scheduling.replaceOperatingSchedule(fixture.branchId,new ReplaceOperatingScheduleCommand(List.of(new WeeklyOperatingIntervalCommand(DayOfWeek.MONDAY,opens,closes))));
+        scheduling.replaceOperatingSchedule(ADMIN,fixture.branchId,new ReplaceOperatingScheduleCommand(List.of(new WeeklyOperatingIntervalCommand(DayOfWeek.MONDAY,opens,closes))));
         var schedule=scheduling.getOperatingSchedule(fixture.branchId);
         assertEquals(opens,schedule.intervals().getFirst().opensAt());assertEquals(closes,schedule.intervals().getFirst().closesAt());
         Instant start=Instant.ofEpochSecond(4_000_000_000L,123456789);Instant end=start.plusSeconds(10).plusNanos(111);
-        scheduling.createTemporaryClosure(fixture.branchId,new com.carwash.marketplace.application.CreateTemporaryBranchClosureCommand("nano-closure",start,end,"precision"));
+        scheduling.createTemporaryClosure(ADMIN,fixture.branchId,new com.carwash.marketplace.application.CreateTemporaryBranchClosureCommand("nano-closure",start,end,"precision"));
         assertEquals(start,scheduling.listTemporaryClosures(fixture.branchId).getFirst().startAt());
         LocalDateTime at=LocalDateTime.of(2089,1,17,10,0,0,123456789);
         Booking value=new Booking("nano-booking",fixture.user,fixture.vehicle,fixture.branchId,fixture.offeringId,fixture.service,at,"precision");
@@ -298,17 +355,17 @@ class PostgresPersistenceIntegrationTest {
     }
 
     @Test void concurrentCapacityOneBookingAttemptsAllowExactlyOneWinner() throws Exception {
-        Fixture fixture=fixture("capacity",1);User second=createUser("capacity-user-2","capacity-2@example.test");Vehicle secondVehicle=vehicles.createVehicle(second.getUserId(),"capacity-vehicle-2","CAP-2","SUV","A","B","C",null);LocalDateTime at=LocalDateTime.of(2089,1,17,10,0);
-        List<Callable<Booking>> work=List.of(()->bookings.createBooking("capacity-booking-1",fixture.user.getUserId(),fixture.vehicle.getVehicleId(),fixture.branchId,fixture.offeringId,at,null),()->bookings.createBooking("capacity-booking-2",second.getUserId(),secondVehicle.getVehicleId(),fixture.branchId,fixture.offeringId,at,null));
+        Fixture fixture=fixture("capacity",1);User second=createUser("capacity-user-2","capacity-2@example.test");Vehicle secondVehicle=vehicles.createVehicle(ADMIN,second.getUserId(),"capacity-vehicle-2","CAP-2","SUV","A","B","C",null);LocalDateTime at=LocalDateTime.of(2089,1,17,10,0);
+        List<Callable<Booking>> work=List.of(()->bookings.createBooking(ADMIN,"capacity-booking-1",fixture.user.getUserId(),fixture.vehicle.getVehicleId(),fixture.branchId,fixture.offeringId,at,null),()->bookings.createBooking(ADMIN,"capacity-booking-2",second.getUserId(),secondVehicle.getVehicleId(),fixture.branchId,fixture.offeringId,at,null));
         try(var executor=Executors.newFixedThreadPool(2)){List<Future<Booking>> results=executor.invokeAll(work);int success=0;int failure=0;for(Future<Booking> result:results){try{result.get();success++;}catch(Exception ignored){failure++;}}assertEquals(1,success);assertEquals(1,failure);}
         assertEquals(1,bookingRepository.findByServiceOfferingId(fixture.offeringId).size());
     }
 
     @Test void concurrentCancellationAndCapacityDecisionRemainSerialized() throws Exception {
-        Fixture fixture=fixture("cancel-capacity",1);LocalDateTime at=LocalDateTime.of(2089,1,17,10,0);Booking existing=bookings.createBooking("cancel-existing",fixture.user.getUserId(),fixture.vehicle.getVehicleId(),fixture.branchId,fixture.offeringId,at,null);User other=createUser("cancel-other","cancel-other@example.test");Vehicle otherVehicle=vehicles.createVehicle(other.getUserId(),"cancel-other-vehicle","CANCEL-2","SUV","A","B","C",null);CyclicBarrier barrier=new CyclicBarrier(2);
-        Callable<Booking> cancel=()->{barrier.await();return bookings.cancelBooking(existing.getBookingId(),fixture.user.getUserId());};Callable<Booking> create=()->{barrier.await();return bookings.createBooking("cancel-replacement",other.getUserId(),otherVehicle.getVehicleId(),fixture.branchId,fixture.offeringId,at,null);};boolean created;
+        Fixture fixture=fixture("cancel-capacity",1);LocalDateTime at=LocalDateTime.of(2089,1,17,10,0);Booking existing=bookings.createBooking(ADMIN,"cancel-existing",fixture.user.getUserId(),fixture.vehicle.getVehicleId(),fixture.branchId,fixture.offeringId,at,null);User other=createUser("cancel-other","cancel-other@example.test");Vehicle otherVehicle=vehicles.createVehicle(ADMIN,other.getUserId(),"cancel-other-vehicle","CANCEL-2","SUV","A","B","C",null);CyclicBarrier barrier=new CyclicBarrier(2);
+        Callable<Booking> cancel=()->{barrier.await();return bookings.cancelBooking(ADMIN,existing.getBookingId());};Callable<Booking> create=()->{barrier.await();return bookings.createBooking(ADMIN,"cancel-replacement",other.getUserId(),otherVehicle.getVehicleId(),fixture.branchId,fixture.offeringId,at,null);};boolean created;
         try(var executor=Executors.newFixedThreadPool(2)){Future<Booking> cancelled=executor.submit(cancel);Future<Booking> replacement=executor.submit(create);assertEquals(BookingStatus.CANCELLED,cancelled.get().getStatus());try{replacement.get();created=true;}catch(Exception failure){created=false;}}
-        if(!created)bookings.createBooking("cancel-replacement",other.getUserId(),otherVehicle.getVehicleId(),fixture.branchId,fixture.offeringId,at,null);
+        if(!created)bookings.createBooking(ADMIN,"cancel-replacement",other.getUserId(),otherVehicle.getVehicleId(),fixture.branchId,fixture.offeringId,at,null);
         assertEquals(1,bookingRepository.findByServiceOfferingId(fixture.offeringId).stream().filter(value->value.getStatus()!=BookingStatus.CANCELLED&&value.getStatus()!=BookingStatus.COMPLETED).count());
     }
 
@@ -318,22 +375,22 @@ class PostgresPersistenceIntegrationTest {
         createConfirmed(fixture,"offering-capacity-booking-2","offering-capacity-user-2","offering-capacity-vehicle-2","OC-2",LocalDateTime.of(2089,1,17,10,30));
 
         assertThrows(BusinessRuleViolationException.class,()->offerings.updateOffering(
-                fixture.offeringId,new UpdateServiceOfferingCommand(new BigDecimal("100.00"),60,1)));
+                ADMIN,fixture.offeringId,new UpdateServiceOfferingCommand(new BigDecimal("100.00"),60,1)));
         assertEquals(30,offerings.findOffering(fixture.offeringId).estimatedDurationMin());
         assertEquals(2,offerings.findOffering(fixture.offeringId).concurrentCapacity());
     }
 
     @Test void concurrentOfferingReductionAndBookingCreationCannotOverbook() throws Exception {
         Fixture fixture=fixture("offering-race",2);
-        bookings.createBooking("offering-race-existing",fixture.user.getUserId(),fixture.vehicle.getVehicleId(),
+        bookings.createBooking(ADMIN,"offering-race-existing",fixture.user.getUserId(),fixture.vehicle.getVehicleId(),
                 fixture.branchId,fixture.offeringId,LocalDateTime.of(2089,1,17,10,0),null);
         User other=createUser("offering-race-other","offering-race-other@example.test");
-        Vehicle otherVehicle=vehicles.createVehicle(other.getUserId(),"offering-race-other-vehicle",
+        Vehicle otherVehicle=vehicles.createVehicle(ADMIN,other.getUserId(),"offering-race-other-vehicle",
                 "OR-2","SUV","A","B","C",null);
         CyclicBarrier barrier=new CyclicBarrier(2);
-        Callable<Object> reduce=()->{barrier.await();return offerings.updateOffering(fixture.offeringId,
+        Callable<Object> reduce=()->{barrier.await();return offerings.updateOffering(ADMIN,fixture.offeringId,
                 new UpdateServiceOfferingCommand(new BigDecimal("100.00"),30,1));};
-        Callable<Object> create=()->{barrier.await();return bookings.createBooking("offering-race-new",
+        Callable<Object> create=()->{barrier.await();return bookings.createBooking(ADMIN,"offering-race-new",
                 other.getUserId(),otherVehicle.getVehicleId(),fixture.branchId,fixture.offeringId,
                 LocalDateTime.of(2089,1,17,10,0),null);};
 
@@ -347,16 +404,16 @@ class PostgresPersistenceIntegrationTest {
 
     @Test void concurrentReschedulingAndBookingCreationCannotOverbook() throws Exception {
         Fixture fixture=fixture("reschedule-capacity",1);
-        Booking existing=bookings.createBooking("reschedule-existing",fixture.user.getUserId(),
+        Booking existing=bookings.createBooking(ADMIN,"reschedule-existing",fixture.user.getUserId(),
                 fixture.vehicle.getVehicleId(),fixture.branchId,fixture.offeringId,
                 LocalDateTime.of(2089,1,17,10,0),null);
         User other=createUser("reschedule-other","reschedule-other@example.test");
-        Vehicle otherVehicle=vehicles.createVehicle(other.getUserId(),"reschedule-other-vehicle",
+        Vehicle otherVehicle=vehicles.createVehicle(ADMIN,other.getUserId(),"reschedule-other-vehicle",
                 "RESCHEDULE-2","SUV","A","B","C",null);
         CyclicBarrier barrier=new CyclicBarrier(2);
         Callable<Booking> reschedule=()->{barrier.await();return bookings.rescheduleBooking(
-                existing.getBookingId(),LocalDateTime.of(2089,1,17,10,30));};
-        Callable<Booking> create=()->{barrier.await();return bookings.createBooking(
+                ADMIN,existing.getBookingId(),LocalDateTime.of(2089,1,17,10,30));};
+        Callable<Booking> create=()->{barrier.await();return bookings.createBooking(ADMIN,
                 "reschedule-new",other.getUserId(),otherVehicle.getVehicleId(),fixture.branchId,
                 fixture.offeringId,LocalDateTime.of(2089,1,17,10,0),null);};
 
@@ -371,43 +428,43 @@ class PostgresPersistenceIntegrationTest {
 
     @Test void concurrentQueueJoinsProduceUniqueContiguousBranchPositions() throws Exception {
         Fixture fixture=fixture("queue-join",2);Booking one=createConfirmed(fixture,"queue-booking-1","queue-user-1","queue-vehicle-1","QJ-1",LocalDateTime.of(2089,1,17,10,0));Booking two=createConfirmed(fixture,"queue-booking-2","queue-user-2","queue-vehicle-2","QJ-2",LocalDateTime.of(2089,1,17,10,0));
-        try(var executor=Executors.newFixedThreadPool(2)){List<Future<QueueEntry>> results=executor.invokeAll(List.of(()->queues.createQueueEntry("queue-entry-1",one.getBookingId(),fixture.service.getServiceId()),()->queues.createQueueEntry("queue-entry-2",two.getBookingId(),fixture.service.getServiceId())));for(Future<QueueEntry> result:results)assertNotNull(result.get());}
+        try(var executor=Executors.newFixedThreadPool(2)){List<Future<QueueEntry>> results=executor.invokeAll(List.of(()->queues.createQueueEntry(ADMIN,"queue-entry-1",one.getBookingId(),fixture.service.getServiceId()),()->queues.createQueueEntry(ADMIN,"queue-entry-2",two.getBookingId(),fixture.service.getServiceId())));for(Future<QueueEntry> result:results)assertNotNull(result.get());}
         assertEquals(List.of(1,2),queues.findAll(fixture.branchId).stream().map(QueueEntry::getPosition).toList());
     }
 
     @Test void queueDeletionAndBookingCancellationDetachQueueReferencesAtomically(){
         Fixture fixture=fixture("queue-detach",2);
         Booking removable=createConfirmed(fixture,"queue-delete-booking","queue-delete-user","queue-delete-vehicle","QD-1",LocalDateTime.of(2089,1,17,10,0));
-        QueueEntry first=queues.createQueueEntry("queue-delete-entry",removable.getBookingId(),fixture.service.getServiceId());
+        QueueEntry first=queues.createQueueEntry(ADMIN,"queue-delete-entry",removable.getBookingId(),fixture.service.getServiceId());
         Booking cancellable=createConfirmed(fixture,"queue-cancel-booking","queue-cancel-user","queue-cancel-vehicle","QD-2",LocalDateTime.of(2089,1,17,11,0));
-        QueueEntry second=queues.createQueueEntry("queue-cancel-entry",cancellable.getBookingId(),fixture.service.getServiceId());
+        QueueEntry second=queues.createQueueEntry(ADMIN,"queue-cancel-entry",cancellable.getBookingId(),fixture.service.getServiceId());
         assertTrue(second.getEstimatedWaitMin()>first.getEstimatedWaitMin());
 
-        queues.deleteQueueEntry("queue-delete-entry");
+        queues.deleteQueueEntry(ADMIN,"queue-delete-entry");
         assertTrue(queueRepository.findById("queue-delete-entry").isEmpty());
         assertNull(bookingRepository.findById(removable.getBookingId()).orElseThrow().getQueueEntry());
         assertEquals(first.getEstimatedWaitMin(),queues.findById("queue-cancel-entry").getEstimatedWaitMin());
 
-        assertEquals(BookingStatus.CANCELLED,bookings.cancelBooking(cancellable.getBookingId(),"queue-cancel-user").getStatus());
+        assertEquals(BookingStatus.CANCELLED,bookings.cancelBooking(ADMIN,cancellable.getBookingId()).getStatus());
         assertTrue(queueRepository.findById("queue-cancel-entry").isEmpty());
         assertNull(bookingRepository.findById(cancellable.getBookingId()).orElseThrow().getQueueEntry());
     }
 
     @Test void queueRollbackPreservesOriginalOrdering(){
-        Fixture fixture=fixture("queue-rollback",2);Booking one=createConfirmed(fixture,"rollback-booking-1","rollback-user-1","rollback-vehicle-1","QR-1",LocalDateTime.of(2089,1,17,10,0));Booking two=createConfirmed(fixture,"rollback-booking-2","rollback-user-2","rollback-vehicle-2","QR-2",LocalDateTime.of(2089,1,17,10,0));queues.createQueueEntry("rollback-entry-1",one.getBookingId(),fixture.service.getServiceId());queues.createQueueEntry("rollback-entry-2",two.getBookingId(),fixture.service.getServiceId());List<String> original=queues.findAll(fixture.branchId).stream().map(QueueEntry::getQueueEntryId).toList();
-        assertThrows(IllegalStateException.class,()->transactions.write(()->{queues.updatePosition("rollback-entry-2",1);throw new IllegalStateException("injected");}));
+        Fixture fixture=fixture("queue-rollback",2);Booking one=createConfirmed(fixture,"rollback-booking-1","rollback-user-1","rollback-vehicle-1","QR-1",LocalDateTime.of(2089,1,17,10,0));Booking two=createConfirmed(fixture,"rollback-booking-2","rollback-user-2","rollback-vehicle-2","QR-2",LocalDateTime.of(2089,1,17,10,0));queues.createQueueEntry(ADMIN,"rollback-entry-1",one.getBookingId(),fixture.service.getServiceId());queues.createQueueEntry(ADMIN,"rollback-entry-2",two.getBookingId(),fixture.service.getServiceId());List<String> original=queues.findAll(fixture.branchId).stream().map(QueueEntry::getQueueEntryId).toList();
+        assertThrows(IllegalStateException.class,()->transactions.write(()->{queues.updatePosition(ADMIN,"rollback-entry-2",1);throw new IllegalStateException("injected");}));
         assertEquals(original,queues.findAll(fixture.branchId).stream().map(QueueEntry::getQueueEntryId).toList());
     }
 
     @Test void concurrentQueueMutationsRemainIsolatedByBranch() throws Exception {
         Fixture first=fixture("branch-one",1);Fixture second=fixture("branch-two",1);Booking one=createConfirmed(first,"branch-one-booking","branch-one-user-2","branch-one-vehicle-2","BI-1",LocalDateTime.of(2089,1,17,10,0));Booking two=createConfirmed(second,"branch-two-booking","branch-two-user-2","branch-two-vehicle-2","BI-2",LocalDateTime.of(2089,1,17,10,0));
-        try(var executor=Executors.newFixedThreadPool(2)){List<Future<QueueEntry>> results=executor.invokeAll(List.of(()->queues.createQueueEntry("branch-one-entry",one.getBookingId(),first.service.getServiceId()),()->queues.createQueueEntry("branch-two-entry",two.getBookingId(),second.service.getServiceId())));for(Future<QueueEntry> result:results)assertEquals(1,result.get().getPosition());}
+        try(var executor=Executors.newFixedThreadPool(2)){List<Future<QueueEntry>> results=executor.invokeAll(List.of(()->queues.createQueueEntry(ADMIN,"branch-one-entry",one.getBookingId(),first.service.getServiceId()),()->queues.createQueueEntry(ADMIN,"branch-two-entry",two.getBookingId(),second.service.getServiceId())));for(Future<QueueEntry> result:results)assertEquals(1,result.get().getPosition());}
         assertEquals(1,queues.findAll(first.branchId).size());assertEquals(1,queues.findAll(second.branchId).size());
     }
 
     @Test void concurrentCallNextSelectsTheSingleWaitingEntryOnlyOnce() throws Exception {
-        Fixture fixture=fixture("call-next",1);Booking booking=createConfirmed(fixture,"call-booking","call-user","call-vehicle","CALL-1",LocalDateTime.of(2089,1,17,10,0));queues.createQueueEntry("call-entry",booking.getBookingId(),fixture.service.getServiceId());
-        try(var executor=Executors.newFixedThreadPool(2)){List<Future<QueueEntry>> results=executor.invokeAll(List.of(()->queues.callNext(fixture.branchId),()->queues.callNext(fixture.branchId)));int success=0;int absent=0;for(Future<QueueEntry> result:results){try{result.get();success++;}catch(Exception failure){if(failure.getCause() instanceof ResourceNotFoundException)absent++;}}assertEquals(1,success);assertEquals(1,absent);}
+        Fixture fixture=fixture("call-next",1);Booking booking=createConfirmed(fixture,"call-booking","call-user","call-vehicle","CALL-1",LocalDateTime.of(2089,1,17,10,0));queues.createQueueEntry(ADMIN,"call-entry",booking.getBookingId(),fixture.service.getServiceId());
+        try(var executor=Executors.newFixedThreadPool(2)){List<Future<QueueEntry>> results=executor.invokeAll(List.of(()->queues.callNext(ADMIN,fixture.branchId),()->queues.callNext(ADMIN,fixture.branchId)));int success=0;int absent=0;for(Future<QueueEntry> result:results){try{result.get();success++;}catch(Exception failure){if(failure.getCause() instanceof ResourceNotFoundException)absent++;}}assertEquals(1,success);assertEquals(1,absent);}
     }
 
     @Test void optimisticVersionsRejectLostUpdatesAcrossIndependentTransactions() throws Exception {
@@ -417,18 +474,18 @@ class PostgresPersistenceIntegrationTest {
     }
 
     @Test void timezoneAndDstOverlapDecisionsSurvivePostgresRoundTrips(){
-        User user=createUser("dst-user","dst-user@example.test");Vehicle vehicle=vehicles.createVehicle(user.getUserId(),"dst-vehicle","DST-1","SUV","A","B","C",null);marketplace.registerBusiness(new RegisterBusinessCommand("dst-business","DST Business","dst-business@example.test","0123456789","dst-registration"));marketplace.createBranch("dst-business",new CreateBranchCommand("dst-branch","New York","1 Main",null,"New York","New York","10001","US",new BigDecimal("40.7128"),new BigDecimal("-74.0060"),"America/New_York",true));scheduling.replaceOperatingSchedule("dst-branch",new ReplaceOperatingScheduleCommand(List.of(new WeeklyOperatingIntervalCommand(DayOfWeek.SUNDAY,LocalTime.MIDNIGHT,LocalTime.of(4,0)))));Service service=catalog.createService("dst-service","DST Wash","test",new BigDecimal("100.00"),30);offerings.createOffering("dst-branch",new CreateServiceOfferingCommand("dst-offering",service.getServiceId(),new BigDecimal("100.00"),30,2));
+        User user=createUser("dst-user","dst-user@example.test");Vehicle vehicle=vehicles.createVehicle(ADMIN,user.getUserId(),"dst-vehicle","DST-1","SUV","A","B","C",null);marketplace.registerBusiness(ADMIN,new RegisterBusinessCommand("dst-business","DST Business","dst-business@example.test","0123456789","dst-registration"));marketplace.createBranch(ADMIN,"dst-business",new CreateBranchCommand("dst-branch","New York","1 Main",null,"New York","New York","10001","US",new BigDecimal("40.7128"),new BigDecimal("-74.0060"),"America/New_York",true));scheduling.replaceOperatingSchedule(ADMIN,"dst-branch",new ReplaceOperatingScheduleCommand(List.of(new WeeklyOperatingIntervalCommand(DayOfWeek.SUNDAY,LocalTime.MIDNIGHT,LocalTime.of(4,0)))));Service service=catalog.createService("dst-service","DST Wash","test",new BigDecimal("100.00"),30);offerings.createOffering(ADMIN,"dst-branch",new CreateServiceOfferingCommand("dst-offering",service.getServiceId(),new BigDecimal("100.00"),30,2));
         assertEquals("America/New_York",marketplace.findBranch("dst-branch").timezone());BranchAvailabilitySearchService availability=applicationContext().getBean(BranchAvailabilitySearchService.class);
         assertTrue(availability.findAvailableBranches(new BranchAvailabilitySearchCriteria(service.getServiceId(),OffsetDateTime.parse("2090-11-05T01:30:00-04:00").toInstant(),null,null,null)).isEmpty());
         assertTrue(availability.findAvailableBranches(new BranchAvailabilitySearchCriteria(service.getServiceId(),OffsetDateTime.parse("2090-11-05T01:30:00-05:00").toInstant(),null,null,null)).isEmpty());
         assertFalse(availability.findAvailableBranches(new BranchAvailabilitySearchCriteria(service.getServiceId(),OffsetDateTime.parse("2090-11-05T00:30:00-04:00").toInstant(),null,null,null)).isEmpty());
-        assertThrows(BusinessRuleViolationException.class,()->bookings.createBooking("dst-ambiguous",user.getUserId(),vehicle.getVehicleId(),"dst-branch","dst-offering",LocalDateTime.of(2090,11,5,1,30),null));
+        assertThrows(BusinessRuleViolationException.class,()->bookings.createBooking(ADMIN,"dst-ambiguous",user.getUserId(),vehicle.getVehicleId(),"dst-branch","dst-offering",LocalDateTime.of(2090,11,5,1,30),null));
     }
 
     @Test void dataAuthenticationAndOperationalReadsSurviveApplicationRestart(){
         String prefix="restart";
         try(ConfigurableApplicationContext first=startContext()){
-            Fixture fixture=fixture(first,prefix,2);Booking booking=createConfirmed(first,fixture,"restart-booking","restart-user",fixture.vehicle,"restart-vehicle",LocalDateTime.of(2089,1,17,10,0));first.getBean(QueueManagementService.class).createQueueEntry("restart-queue",booking.getBookingId(),fixture.service.getServiceId());
+            Fixture fixture=fixture(first,prefix,2);Booking booking=createConfirmed(first,fixture,"restart-booking","restart-user",fixture.vehicle,"restart-vehicle",LocalDateTime.of(2089,1,17,10,0));first.getBean(QueueManagementService.class).createQueueEntry(ADMIN,"restart-queue",booking.getBookingId(),fixture.service.getServiceId());
         }
         try(ConfigurableApplicationContext second=startContext()){
             var authentication=second.getBean(UserAuthenticationService.class).authenticate("restart@example.test",PASSWORD);
@@ -445,10 +502,20 @@ class PostgresPersistenceIntegrationTest {
 
     private Fixture fixture(String prefix,int capacity){return fixture(users,vehicles,marketplace,scheduling,catalog,offerings,prefix,capacity);}
     private static Fixture fixture(ConfigurableApplicationContext context,String prefix,int capacity){return fixture(context.getBean(UserManagementService.class),context.getBean(VehicleManagementService.class),context.getBean(MarketplaceManagementService.class),context.getBean(BranchSchedulingService.class),context.getBean(ServiceCatalogService.class),context.getBean(ServiceOfferingService.class),prefix,capacity);}
-    private static Fixture fixture(UserManagementService users,VehicleManagementService vehicles,MarketplaceManagementService marketplace,BranchSchedulingService scheduling,ServiceCatalogService catalog,ServiceOfferingService offerings,String prefix,int capacity){User user=users.createUser(new CreateUserCommand(prefix+"-user",prefix+" User",prefix+"@example.test","0123456789",PASSWORD));Vehicle vehicle=vehicles.createVehicle(user.getUserId(),prefix+"-vehicle",prefix.toUpperCase()+"-1","SUV","A","B","C",null);marketplace.registerBusiness(new RegisterBusinessCommand(prefix+"-business",prefix+" Business",prefix+"-business@example.test","0123456789",prefix+"-registration"));String branch=prefix+"-branch";marketplace.createBranch(prefix+"-business",new CreateBranchCommand(branch,prefix+" Branch","1 Main",null,"Cape Town","Western Cape","8001","ZA",BigDecimal.ZERO,BigDecimal.ZERO,"UTC",true));scheduling.replaceOperatingSchedule(branch,new ReplaceOperatingScheduleCommand(Arrays.stream(DayOfWeek.values()).map(day->new WeeklyOperatingIntervalCommand(day,LocalTime.MIDNIGHT,LocalTime.of(23,59,59,999999999))).toList()));Service service=catalog.createService(prefix+"-service",prefix+" Wash","test",new BigDecimal("100.00"),30);String offering=prefix+"-offering";offerings.createOffering(branch,new CreateServiceOfferingCommand(offering,service.getServiceId(),new BigDecimal("100.00"),30,capacity));return new Fixture(user,vehicle,service,branch,offering);}
-    private Booking createConfirmed(Fixture fixture,String bookingId,String userId,String vehicleId,String plate,LocalDateTime at){User user=createUser(userId,userId+"@example.test");Vehicle vehicle=vehicles.createVehicle(userId,vehicleId,plate,"SUV","A","B","C",null);return bookings.confirmBooking(bookings.createBooking(bookingId,userId,vehicle.getVehicleId(),fixture.branchId,fixture.offeringId,at,null).getBookingId());}
-    private static Booking createConfirmed(ConfigurableApplicationContext context,Fixture fixture,String bookingId,String userId,Vehicle vehicle,String vehicleId,LocalDateTime at){BookingManagementService bookings=context.getBean(BookingManagementService.class);return bookings.confirmBooking(bookings.createBooking(bookingId,userId,vehicleId,fixture.branchId,fixture.offeringId,at,null).getBookingId());}
+    private static Fixture fixture(UserManagementService users,VehicleManagementService vehicles,MarketplaceManagementService marketplace,BranchSchedulingService scheduling,ServiceCatalogService catalog,ServiceOfferingService offerings,String prefix,int capacity){User user=users.createUser(new CreateUserCommand(prefix+"-user",prefix+" User",prefix+"@example.test","0123456789",PASSWORD));Vehicle vehicle=vehicles.createVehicle(ADMIN,user.getUserId(),prefix+"-vehicle",prefix.toUpperCase()+"-1","SUV","A","B","C",null);marketplace.registerBusiness(ADMIN,new RegisterBusinessCommand(prefix+"-business",prefix+" Business",prefix+"-business@example.test","0123456789",prefix+"-registration"));String branch=prefix+"-branch";marketplace.createBranch(ADMIN,prefix+"-business",new CreateBranchCommand(branch,prefix+" Branch","1 Main",null,"Cape Town","Western Cape","8001","ZA",BigDecimal.ZERO,BigDecimal.ZERO,"UTC",true));scheduling.replaceOperatingSchedule(ADMIN,branch,new ReplaceOperatingScheduleCommand(Arrays.stream(DayOfWeek.values()).map(day->new WeeklyOperatingIntervalCommand(day,LocalTime.MIDNIGHT,LocalTime.of(23,59,59,999999999))).toList()));Service service=catalog.createService(prefix+"-service",prefix+" Wash","test",new BigDecimal("100.00"),30);String offering=prefix+"-offering";offerings.createOffering(ADMIN,branch,new CreateServiceOfferingCommand(offering,service.getServiceId(),new BigDecimal("100.00"),30,capacity));return new Fixture(user,vehicle,service,branch,offering);}
+    private Booking createConfirmed(Fixture fixture,String bookingId,String userId,String vehicleId,String plate,LocalDateTime at){User user=createUser(userId,userId+"@example.test");Vehicle vehicle=vehicles.createVehicle(ADMIN,userId,vehicleId,plate,"SUV","A","B","C",null);return bookings.confirmBooking(ADMIN,bookings.createBooking(ADMIN,bookingId,userId,vehicle.getVehicleId(),fixture.branchId,fixture.offeringId,at,null).getBookingId());}
+    private static Booking createConfirmed(ConfigurableApplicationContext context,Fixture fixture,String bookingId,String userId,Vehicle vehicle,String vehicleId,LocalDateTime at){BookingManagementService bookings=context.getBean(BookingManagementService.class);return bookings.confirmBooking(ADMIN,bookings.createBooking(ADMIN,bookingId,userId,vehicleId,fixture.branchId,fixture.offeringId,at,null).getBookingId());}
     private User createUser(String id,String email){return users.createUser(new CreateUserCommand(id,id+" Name",email,"0123456789",PASSWORD));}
+    private void awaitAdvisoryLockWaiter(){
+        long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
+        while(System.nanoTime()<deadline){
+            Integer waiting=jdbc.queryForObject(
+                    "select count(*) from pg_locks where locktype='advisory' and not granted",Integer.class);
+            if(waiting!=null&&waiting>0)return;
+            Thread.onSpinWait();
+        }
+        throw new AssertionError("Timed out waiting for the tenant mutation to block on its advisory lock");
+    }
     private User createUserValue(String id,String email){return com.carwash.identity.domain.User.withEncodedPassword(id,id+" Name",email,"0123456789","encoded",com.carwash.identity.domain.RoleCatalog.role(com.carwash.identity.domain.RoleName.CUSTOMER));}
     private static Service service(String id){Service value=new Service();value.setServiceId(id);value.setServiceName("Missing");value.setDescription("missing");value.setPrice(BigDecimal.ONE);value.setEstimatedDurationMin(1);value.setActive(true);value.setCreatedAt(LocalDateTime.of(2089,1,1,0,0));return value;}
     @Autowired ConfigurableApplicationContext springContext;

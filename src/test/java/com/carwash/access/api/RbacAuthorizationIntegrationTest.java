@@ -24,6 +24,7 @@ import com.carwash.vehicle.application.VehicleManagementService;
 import com.carwash.testsupport.ApiContractAssertions;
 import com.carwash.testsupport.ApiIntegrationTestSupport;
 import com.carwash.testsupport.TestDates;
+import com.carwash.testsupport.TestAccess;
 import com.carwash.testsupport.UserFixtureBuilder;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -264,7 +265,7 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         LoginIdentity staff = registerAndLogin(RoleName.STAFF);
         String tenantA = ensureBusinessId();
         String tenantB = ids.business();
-        marketplace.registerBusiness(new RegisterBusinessCommand(
+        marketplace.registerBusiness(TestAccess.platformAdministrator(), new RegisterBusinessCommand(
                 tenantB, "Second RBAC Wash", ids.emailFor(tenantB), "+27821234568", null));
 
         String missingClaim = signedToken(staff.userId(), RoleName.STAFF.name(), null, List.of());
@@ -382,17 +383,18 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         String serviceId = ids.service();
         String bookingId = ids.booking();
         String queueEntryId = ids.queueEntry();
-        Vehicle primary = vehicles.createVehicle(new Vehicle(primaryVehicleId, ids.plate(), "SUV", "Toyota", "Rav4", "Black", ""), ownerId);
-        vehicles.createVehicle(new Vehicle(alternateVehicleId, ids.plate(), "Sedan", "Honda", "Civic", "White", ""), ownerId);
+        Vehicle primary = vehicles.createVehicle(TestAccess.platformAdministrator(), ownerId, primaryVehicleId,
+                ids.plate(), "SUV", "Toyota", "Rav4", "Black", "");
+        vehicles.createVehicle(TestAccess.platformAdministrator(), ownerId, alternateVehicleId,
+                ids.plate(), "Sedan", "Honda", "Civic", "White", "");
         Service service = services.createService(new Service(serviceId, "RBAC Wash", "authorization fixture", BigDecimal.valueOf(200), 30));
         String branchId = ensureBranch();
         String offeringId = ids.offering();
-        offerings.createOffering(branchId, new CreateServiceOfferingCommand(
+        offerings.createOffering(TestAccess.platformAdministrator(), branchId, new CreateServiceOfferingCommand(
                 offeringId, serviceId, BigDecimal.valueOf(200), 30, 2));
-        Booking booking = bookings.createBooking(new Booking(
-                bookingId, users.findById(ownerId), primary, branchId, offeringId, service,
-                nextScheduledTime(), "authorization fixture"));
-        bookings.confirmBooking(bookingId);
+        Booking booking = bookings.createBooking(TestAccess.platformAdministrator(), bookingId, ownerId,
+                primaryVehicleId, branchId, offeringId, nextScheduledTime(), "authorization fixture");
+        bookings.confirmBooking(TestAccess.platformAdministrator(), bookingId);
         return new ResourceSet(
                 ownerId, primaryVehicleId, alternateVehicleId, serviceId, branchId, offeringId,
                 bookingId, queueEntryId);
@@ -400,7 +402,8 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
 
     private void enqueue(ResourceSet resources) {
         Booking booking = bookings.findById(resources.bookingId());
-        queues.createQueueEntry(new QueueEntry(resources.queueEntryId(), booking, booking.getService()));
+        queues.createQueueEntry(TestAccess.platformAdministrator(), resources.queueEntryId(),
+                booking.getBookingId(), booking.getService().getServiceId());
     }
 
     private Map<String, Object> updateBookingRequest(String vehicleId, String serviceOfferingId) {
@@ -412,14 +415,14 @@ class RbacAuthorizationIntegrationTest extends ApiIntegrationTestSupport {
         if (defaultBranchId != null) return defaultBranchId;
         String businessId = ids.business();
         defaultBusinessId = businessId;
-        marketplace.registerBusiness(new RegisterBusinessCommand(
+        marketplace.registerBusiness(TestAccess.platformAdministrator(), new RegisterBusinessCommand(
                 businessId, "RBAC Wash", ids.emailFor(businessId), "+27821234567", null));
         defaultBranchId = ids.branch();
-        marketplace.createBranch(businessId, new CreateBranchCommand(
+        marketplace.createBranch(TestAccess.platformAdministrator(), businessId, new CreateBranchCommand(
                 defaultBranchId, "RBAC Branch", "1 Test Street", null, "Cape Town", "Western Cape",
                 "8001", "ZA", new BigDecimal("-33.9249"), new BigDecimal("18.4241"),
                 "Africa/Johannesburg", true));
-        branchScheduling.replaceOperatingSchedule(defaultBranchId, new ReplaceOperatingScheduleCommand(
+        branchScheduling.replaceOperatingSchedule(TestAccess.platformAdministrator(), defaultBranchId, new ReplaceOperatingScheduleCommand(
                 java.util.Arrays.stream(DayOfWeek.values())
                         .map(day -> new WeeklyOperatingIntervalCommand(
                                 day, LocalTime.of(8, 0), LocalTime.of(17, 0)))

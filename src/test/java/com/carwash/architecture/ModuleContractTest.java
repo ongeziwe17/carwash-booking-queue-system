@@ -15,6 +15,7 @@ import com.carwash.queue.domain.QueueEntry;
 import com.carwash.marketplace.application.BranchScheduleQuery;
 import com.carwash.marketplace.application.MarketplaceQuery;
 import com.carwash.testsupport.ServiceTestSupport;
+import com.carwash.testsupport.TestAccess;
 import com.carwash.vehicle.application.VehicleQuery;
 import com.carwash.vehicle.domain.Vehicle;
 import com.carwash.recommendation.application.RecommendationMetricProvider;
@@ -35,11 +36,11 @@ class ModuleContractTest extends ServiceTestSupport {
         Vehicle vehicle = createVehicle(user);
         Service service = createService();
         String offeringId = createOffering(service);
-        Booking booking = bookingService.createBooking(
+        Booking booking = bookingService.createBooking(TestAccess.platformAdministrator(),
                 ids.booking(), user.getUserId(), vehicle.getVehicleId(), ensureDefaultBranch(), offeringId,
                 com.carwash.testsupport.TestDates.future(), "none");
-        bookingService.confirmBooking(booking.getBookingId());
-        QueueEntry queueEntry = queueService.createQueueEntry(
+        bookingService.confirmBooking(TestAccess.platformAdministrator(), booking.getBookingId());
+        QueueEntry queueEntry = queueService.createQueueEntry(TestAccess.platformAdministrator(),
                 ids.queueEntry(), booking.getBookingId(), service.getServiceId());
 
         UserQuery users = userService;
@@ -60,7 +61,7 @@ class ModuleContractTest extends ServiceTestSupport {
     @Test
     void reporting_queries_publish_the_existing_booking_and_detached_queue_views() {
         Booking booking = createConfirmedBooking();
-        QueueEntry queueEntry = queueService.createQueueEntry(
+        QueueEntry queueEntry = queueService.createQueueEntry(TestAccess.platformAdministrator(),
                 ids.queueEntry(), booking.getBookingId(), booking.getService().getServiceId());
 
         assertTrue(((BookingQuery) bookingService).findBookingSnapshots().stream()

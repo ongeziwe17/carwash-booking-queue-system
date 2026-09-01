@@ -9,4 +9,6 @@ public interface CarWashBranchRepository extends Repository<CarWashBranch, Strin
 
     List<CarWashBranch> findByBusinessId(String businessId);
     Optional<CarWashBranch> findByIdAndBusinessId(String branchId, String businessId);
+    boolean updateForBusiness(CarWashBranch branch, String businessId);
+    boolean updateForAdministrator(CarWashBranch branch);
 }

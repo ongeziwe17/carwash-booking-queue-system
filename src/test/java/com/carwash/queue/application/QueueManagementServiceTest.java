@@ -1,6 +1,7 @@
 package com.carwash.queue.application;
 
 import com.carwash.testsupport.ServiceTestSupport;
+import com.carwash.testsupport.TestAccess;
 import com.carwash.catalog.application.UpdateServiceOfferingCommand;
 
 import com.carwash.notification.application.NotificationManagementService;
@@ -222,11 +223,11 @@ class QueueManagementServiceTest extends ServiceTestSupport {
                 notificationRepository, userRepository, bookingRepository, coordinator, notificationIds,
                 new NotificationPolicyProperties(10), clock) {
             @Override
-            public Notification createNotification(User user, Booking booking, String type, String message) {
+            public Notification publishForAuthorizedBooking(Booking booking, String type, String message) {
                 if ("QUEUE_CALLED".equals(type)) {
                     throw new IllegalStateException("notification persistence failed");
                 }
-                return super.createNotification(user, booking, type, message);
+                return super.publishForAuthorizedBooking(booking, type, message);
             }
         };
         queueService = new QueueManagementService(
@@ -317,7 +318,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
     void completionRejectsQueueEntryWithCrossBranchScope() {
         Booking booking = createConfirmedBooking(TestDates.futureDays(66));
         String otherBranch = ids.branch();
-        marketplaceService.createBranch(defaultBusinessId, new com.carwash.marketplace.application.CreateBranchCommand(
+        marketplaceService.createBranch(TestAccess.platformAdministrator(), defaultBusinessId, new com.carwash.marketplace.application.CreateBranchCommand(
                 otherBranch, "Other Branch", "2 Test Street", null, "Cape Town", "Western Cape", "8001", "ZA",
                 new BigDecimal("-33.9250"), new BigDecimal("18.4250"), "Africa/Johannesburg", true));
         QueueEntry queueEntry = insertInProgressEntry(
@@ -788,7 +789,7 @@ class QueueManagementServiceTest extends ServiceTestSupport {
         Booking booking = createConfirmedBooking(TestDates.futureDays(futureDay));
         booking.getService().setEstimatedDurationMin(duration);
         assertTrue(serviceRepository.update(booking.getService()));
-        serviceOfferingService.updateOffering(
+        serviceOfferingService.updateOffering(TestAccess.platformAdministrator(),
                 booking.getServiceOfferingId(),
                 new UpdateServiceOfferingCommand(booking.getService().getPrice(), duration, 2));
         return booking;

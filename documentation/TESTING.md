@@ -2,6 +2,14 @@
 
 TEST-001 separates fast unit/repository/service tests from Spring API integration tests and makes isolation, test data, execution order, and release-gate behaviour explicit.
 
+## Atomic tenant-write authorization follow-up
+
+The follow-up to #124 and PR #181 adds **7 unit tests** and **1 PostgreSQL integration test** without removing, skipping, or weakening an existing test. The final inventory is **387 unit tests and 197 integration tests**. `PostgresPersistenceIntegrationTest` executes **23 tests** against the pinned PostgreSQL 17.6 container. The HTTP contract is unchanged at exactly **71 OpenAPI operations**, **533 Bruno requests**, and **1,696 explicit Bruno assertions**.
+
+The focused regressions prove one write boundary, lock-before-authoritative-read ordering, no unscoped fallback, guarded tenant predicates during persistence, zero-row rollback, same-tenant success, indistinguishable foreign/missing `404`, customer subject isolation, explicit administrator scope, and deterministic delete/recreate replacement safety. The PostgreSQL case uses independent executor threads, transactions, and connections: one transaction holds the exact branch advisory lock while it deletes/recreates the ID under another tenant; the tenant mutation is observed waiting in `pg_locks`, then resumes and returns `404` without changing the replacement. No arbitrary sleeps are used. Existing booking-capacity, offering-capacity, queue ordering/call-next, lifecycle rollback, notification, restart, and deterministic-seed suites remain unchanged and provide the related invariant evidence.
+
+Flyway V1-V4 remain byte-for-byte unchanged and no V5 migration is introduced. Issue #125 audit logging is not implemented.
+
 ## Current TENANT-001 inventory
 
 TENANT-001 adds **3 unit tests** and **6 integration tests** to the reviewed staging SHA, for a measured total of **380 unit tests and 196 integration tests**. The integration delta comprises two RBAC/JWT tests, two end-to-end tenant-isolation tests, and two PostgreSQL tenant-constraint/migration tests; `PostgresPersistenceIntegrationTest` now executes **22 tests** in total. The public contract adds **2 operations**, for exactly **71 OpenAPI operations**.

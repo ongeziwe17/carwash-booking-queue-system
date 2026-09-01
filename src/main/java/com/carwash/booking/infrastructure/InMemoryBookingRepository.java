@@ -87,6 +87,39 @@ public class InMemoryBookingRepository extends InMemoryRepository<Booking, Strin
     }
 
     @Override
+    public boolean updateForBusiness(Booking booking, String businessId) {
+        return updateMatching(booking.getBookingId(), booking,
+                current -> branchBelongsTo(current.getBranchId(), businessId));
+    }
+
+    @Override
+    public boolean updateForUser(Booking booking, String userId) {
+        return updateMatching(booking.getBookingId(), booking,
+                current -> current.getUser() != null && userId.equals(current.getUser().getUserId()));
+    }
+
+    @Override
+    public boolean updateForAdministrator(Booking booking) {
+        return updateMatching(booking.getBookingId(), booking, current -> true);
+    }
+
+    @Override
+    public boolean deleteForBusiness(String bookingId, String businessId) {
+        return deleteMatching(bookingId, current -> branchBelongsTo(current.getBranchId(), businessId));
+    }
+
+    @Override
+    public boolean deleteForUser(String bookingId, String userId) {
+        return deleteMatching(bookingId,
+                current -> current.getUser() != null && userId.equals(current.getUser().getUserId()));
+    }
+
+    @Override
+    public boolean deleteForAdministrator(String bookingId) {
+        return deleteMatching(bookingId, current -> true);
+    }
+
+    @Override
     public boolean existsByUserId(String userId) {
         return anyMatch(booking -> booking.getUser() != null
                 && userId.equals(booking.getUser().getUserId()));

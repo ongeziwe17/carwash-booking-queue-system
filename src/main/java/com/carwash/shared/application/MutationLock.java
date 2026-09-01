@@ -19,16 +19,24 @@ public interface MutationLock {
         return "02:offering:" + offeringId;
     }
 
+    static String queueEntry(String queueEntryId) {
+        return "01:queue-entry:" + queueEntryId;
+    }
+
+    static String closure(String closureId) {
+        return "00:closure:" + closureId;
+    }
+
     static String booking(String bookingId) {
-        return "01:booking:" + bookingId;
+        return "00:booking:" + bookingId;
     }
 
     static String customer(String userId) {
-        return "03:customer:" + userId;
+        return "04:customer:" + userId;
     }
 
     static String vehicle(String vehicleId) {
-        return "04:vehicle:" + vehicleId;
+        return "03:vehicle:" + vehicleId;
     }
 
     static String queueBranch(String branchId) {
@@ -39,7 +47,15 @@ public interface MutationLock {
         return "06:schedule-branch:" + branchId;
     }
 
+    static String branch(String branchId) {
+        return "07:branch:" + branchId;
+    }
+
+    static String business(String businessId) {
+        return "08:business:" + businessId;
+    }
+
     static String platformAdministrators() {
-        return "07:platform-administrators";
+        return "09:platform-administrators";
     }
 }
