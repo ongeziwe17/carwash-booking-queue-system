@@ -323,7 +323,8 @@ public class QueueManagementService implements QueueQuery {
                     : queueEntryRepository.findNextWaitingByBranchIdAndBusinessId(
                             normalizedBranchId, access.requireBusinessId());
             return callWaitingEntry(access, waiting.orElseThrow(
-                    () -> new ResourceNotFoundException("No waiting queue entry found")));
+                    () -> new ResourceNotFoundException(
+                            "No waiting queue entry available for branch: " + normalizedBranchId)));
     }
 
     QueueEntry callQueueEntry(String queueEntryId) {
@@ -618,18 +619,21 @@ public class QueueManagementService implements QueueQuery {
     }
 
     private void rebalanceQueue(TenantAccessContext access, String branchId) {
-        String businessId = access != null && access.isOperational()
-                ? access.requireBusinessId()
-                : requireBranchForMutation(access, branchId).businessId();
-        queueOrdering.rebalanceActiveQueueForBusiness(branchId, businessId);
+        if (access != null && access.isOperational()) {
+            queueOrdering.rebalanceActiveQueueForBusiness(branchId, access.requireBusinessId());
+            return;
+        }
+        queueOrdering.rebalanceActiveQueueForAdministrator(branchId);
     }
 
     private void rebalanceQueue(
             TenantAccessContext access, String branchId, List<QueueEntry> orderedActiveQueue) {
-        String businessId = access != null && access.isOperational()
-                ? access.requireBusinessId()
-                : requireBranchForMutation(access, branchId).businessId();
-        queueOrdering.rebalanceActiveQueueForBusiness(orderedActiveQueue, businessId);
+        if (access != null && access.isOperational()) {
+            queueOrdering.rebalanceActiveQueueForBusiness(
+                    orderedActiveQueue, access.requireBusinessId());
+            return;
+        }
+        queueOrdering.rebalanceActiveQueueForAdministrator(orderedActiveQueue);
     }
 
     private void requireOperationalAccess(TenantAccessContext access) {

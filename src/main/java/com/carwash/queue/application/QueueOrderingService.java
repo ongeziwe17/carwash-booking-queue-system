@@ -46,7 +46,7 @@ public final class QueueOrderingService {
     }
 
     /** Rebalances each branch independently; retained for internal maintenance compatibility. */
-    public void rebalanceActiveQueue() {
+    void rebalanceActiveQueue() {
         coordinator.write(() -> {
             List<QueueEntry> activeEntries = queueEntryRepository.findActiveOrdered();
             LinkedHashSet<String> branchIds = activeEntries.stream()
@@ -63,12 +63,20 @@ public final class QueueOrderingService {
         });
     }
 
-    public void rebalanceActiveQueue(String branchId) {
+    void rebalanceActiveQueue(String branchId) {
         String normalizedBranchId = requireBranchId(branchId);
         coordinator.write(() -> {
             mutationLock.acquire(MutationLock.queueBranch(normalizedBranchId));
             applyQueueMetrics(queueEntryRepository.findActiveOrderedByBranch(normalizedBranchId));
         });
+    }
+
+    /**
+     * Trusted cross-module contract for a branch that was authorized through explicit platform-
+     * administrator scope in the enclosing write transaction.
+     */
+    public void rebalanceActiveQueueForAdministrator(String branchId) {
+        rebalanceActiveQueue(branchId);
     }
 
     /** Rebalances one authorized tenant branch with the tenant predicate retained on every write. */
@@ -83,7 +91,7 @@ public final class QueueOrderingService {
         });
     }
 
-    public void rebalanceActiveQueue(List<QueueEntry> orderedActiveQueue) {
+    void rebalanceActiveQueue(List<QueueEntry> orderedActiveQueue) {
         coordinator.write(() -> {
             String branchId = orderedActiveQueue.isEmpty() ? null : orderedActiveQueue.getFirst().getBranchId();
             boolean mixedBranches = orderedActiveQueue.stream()
@@ -94,6 +102,13 @@ public final class QueueOrderingService {
             if (branchId != null) mutationLock.acquire(MutationLock.queueBranch(branchId));
             applyQueueMetrics(orderedActiveQueue);
         });
+    }
+
+    /**
+     * Trusted application contract for an already authorized administrator queue snapshot.
+     */
+    public void rebalanceActiveQueueForAdministrator(List<QueueEntry> orderedActiveQueue) {
+        rebalanceActiveQueue(orderedActiveQueue);
     }
 
     /** Rebalances an already ordered tenant queue without dropping its write predicate. */

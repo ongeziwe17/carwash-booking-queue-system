@@ -652,12 +652,11 @@ public class BookingManagementService implements BookingQuery {
     }
 
     private void rebalanceQueue(TenantAccessContext access, String branchId) {
-        String businessId = access != null && access.isOperational()
-                ? access.requireBusinessId()
-                : marketplaceQuery.findBranchOptional(branchId)
-                .orElseThrow(() -> new ResourceNotFoundException("Branch not found"))
-                .businessId();
-        queueOrdering.rebalanceActiveQueueForBusiness(branchId, businessId);
+        if (access != null && access.isOperational()) {
+            queueOrdering.rebalanceActiveQueueForBusiness(branchId, access.requireBusinessId());
+            return;
+        }
+        queueOrdering.rebalanceActiveQueueForAdministrator(branchId);
     }
 
     private void validateAndResolveNewBooking(Booking booking) {
