@@ -110,7 +110,8 @@ class AggregateIntegrityServiceTest {
                 "aggregate-branch", "Aggregate Branch", "1 Test Street", null, "Cape Town", "Western Cape",
                 "8001", "ZA", new BigDecimal("-33.9249"), new BigDecimal("18.4241"),
                 "Africa/Johannesburg", true));
-        schedules.replaceOperatingSchedule("aggregate-branch", new ReplaceOperatingScheduleCommand(
+        schedules.replaceOperatingSchedule(TestAccess.platformAdministrator(), "aggregate-branch",
+                new ReplaceOperatingScheduleCommand(
                 java.util.Arrays.stream(DayOfWeek.values())
                         .map(day -> new WeeklyOperatingIntervalCommand(
                                 day, LocalTime.of(8, 0), LocalTime.of(17, 0)))
