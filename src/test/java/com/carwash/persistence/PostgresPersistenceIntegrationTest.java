@@ -236,7 +236,8 @@ class PostgresPersistenceIntegrationTest {
         int count=20;
         CountDownLatch start=new CountDownLatch(1);
         try(var executor=Executors.newFixedThreadPool(5)){
-            List<Future<Void>> futures=java.util.stream.IntStream.range(0,count).mapToObj(index->executor.submit(()->{
+            List<Future<Void>> futures=java.util.stream.IntStream.range(0,count)
+                    .mapToObj(index->executor.<Void>submit(()->{
                 start.await();
                 AuditRequestContext.open("postgres-audit-"+index);
                 try{
