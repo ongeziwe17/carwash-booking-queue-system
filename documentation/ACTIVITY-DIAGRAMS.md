@@ -100,7 +100,7 @@ flowchart LR
 
 - Key flow: customer credentials are validated, optionally followed by MFA, before a session is created.
 - Major decisions: credential validity, failed-attempt threshold, and MFA verification branch the path.
-- Parallel action intent: successful login triggers both session creation and audit logging as independent system outcomes.
+- Transaction intent: successful login state and its mandatory audit record commit together; denied login audit is appended after rollback in an isolated write.
 - Stakeholder concerns: security (lockout and MFA), traceability (login event logging), and customer access continuity.
 - Traceability: maps directly to **FR-01** and the product use cases **Authenticate User**; reinforces the product backlog delivery cycle scope around secure authentication.
 
@@ -315,7 +315,7 @@ flowchart LR
 
 - Key flow: authorized administrative actors maintain service definitions used by booking and catalog flows.
 - Major decisions: authorization and data validation decide save or correction loop.
-- Parallel actions: after persistence, catalog publication and audit logging can run independently.
+- Transaction intent: catalogue persistence and its mandatory success audit record commit atomically; audit insertion failure prevents publication.
 - Stakeholder concerns: operational control, pricing accuracy, and governance through audit trails.
 - Traceability: maps to **FR-02 Service Catalog** and **FR-06 Administrative Dashboard**, with direct relation to the product use cases **Manage Services** use case.
 

@@ -1,0 +1,12 @@
+info: { name: Platform admin uses explicit platform audit scope, type: http, seq: 7, tags: [audit, admin] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/audit-records?scope=PLATFORM&limit=10"
+  auth: { type: bearer, token: "{{adminToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("admin platform audit query returns 200", function() { expect(res.status).to.equal(200); });
+        test("platform response is bounded", function() { expect(res.body.records.length).to.be.at.most(10); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -35,7 +35,7 @@ Implemented in the current backend:
 
 ## Partially Implemented Foundation
 
-- JWT login, RBAC, and Marketplace tenant isolation are implemented, but refresh tokens, logout/revocation, and security audit logging are not.
+- JWT login, RBAC, Marketplace tenant isolation, and immutable security/operational audit logging are implemented; refresh tokens and logout/revocation are not.
 - Notification domain objects can track statuses, but no external SMS/email provider sends messages.
 - A daily summary report endpoint exists, but richer dashboards, revenue reporting, filtering, and production analytics are not implemented.
 - The default profile is intentionally ephemeral; production-like durability requires the explicit `postgres` profile and an externally managed backup policy.
@@ -67,7 +67,7 @@ Implemented in the current backend:
 | Capability                                                         | Target Status                   |
 |--------------------------------------------------------------------|---------------------------------|
 | Refresh-token/logout/revocation lifecycle, if specified.           | Future security work            |
-| Security and operational audit logging.                            | Future security hardening       |
+| SIEM export, audit archives, automated retention, and certification. | Future security hardening       |
 | Database-per-tenant isolation and federation.                      | Out of current scope            |
 | Capacity reservations and staff/wash-bay allocation.              | Future Marketplace/SaaS work    |
 | External email/SMS notification delivery.                          | Future product/platform work    |
@@ -86,7 +86,7 @@ Implemented in the current backend:
 | API usability   | Swagger/OpenAPI documentation should remain available for local development.                                                       |
 | Extensibility   | Storage implementations should remain replaceable behind repository interfaces.                                                    |
 | Deployment      | Docker and Docker Compose should support repeatable local execution.                                                               |
-| Security        | BCrypt credentials, JWT authentication, RBAC, ownership authorization, canonical tenant isolation, and safe errors are implemented; audit logging and broader production hardening are still required. |
+| Security        | BCrypt credentials, JWT authentication, RBAC, ownership authorization, canonical tenant isolation, safe errors, and transactional append-only audit history are implemented; broader production hardening is still required. |
 | Persistence     | Default/test storage is in memory; `postgres` provides Flyway-owned durable storage, transactions, optimistic versions, and database-visible invariant locks. |
 
 ## Business Rules
@@ -105,4 +105,4 @@ Implemented in the current backend:
 
 ## Out of Current Scope
 
-The current backend implements selectable in-memory/PostgreSQL storage, canonical Marketplace tenant isolation, registration/scheduling/offerings, nearby straight-line discovery, branch-aware availability, recommendations, and branch-scoped operations. It does not implement managed database provisioning/backups, payments, audit logging, database-per-tenant isolation, federation, driving routes/traffic/geocoding, capacity reservations, staff/bay calendars, external notification delivery, observability, frontend applications, or production SaaS readiness.
+The current backend implements selectable in-memory/PostgreSQL storage, canonical Marketplace tenant isolation, transactional audit history, registration/scheduling/offerings, nearby straight-line discovery, branch-aware availability, recommendations, and branch-scoped operations. It does not implement managed database provisioning/backups, payments, SIEM/archive/automated audit retention, database-per-tenant isolation, federation, driving routes/traffic/geocoding, capacity reservations, staff/bay calendars, external notification delivery, observability, frontend applications, or production SaaS readiness.

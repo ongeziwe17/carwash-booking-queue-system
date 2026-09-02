@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.carwash.access.application.TenantAccessContextProvider;
 
 @RestController
 @Validated
@@ -33,13 +34,16 @@ public class AdminUserController {
 
     private final UserMapper mapper;
     private final TenantMembershipManagementService memberships;
+    private final TenantAccessContextProvider tenantAccess;
 
     public AdminUserController(
             UserMapper mapper,
-            TenantMembershipManagementService memberships
+            TenantMembershipManagementService memberships,
+            TenantAccessContextProvider tenantAccess
     ) {
         this.mapper = mapper;
         this.memberships = memberships;
+        this.tenantAccess = tenantAccess;
     }
 
     @PutMapping("/{userId}/role")
@@ -67,7 +71,8 @@ public class AdminUserController {
             @PathVariable @NotBlank @Size(max = 64) String userId,
             @Valid @RequestBody AssignRoleRequest request
     ) {
-        return mapper.toResponse(memberships.assignRole(userId, request.roleName(), request.businessId()));
+        return mapper.toResponse(memberships.assignRole(
+                tenantAccess.current(), userId, request.roleName(), request.businessId()));
     }
 
     @PutMapping("/{userId}/tenant-membership")
@@ -89,7 +94,7 @@ public class AdminUserController {
             @PathVariable @NotBlank @Size(max = 64) String userId,
             @Valid @RequestBody AssignTenantMembershipRequest request
     ) {
-        var membership = memberships.assignOrReplace(userId, request.businessId());
+        var membership = memberships.assignOrReplace(tenantAccess.current(), userId, request.businessId());
         return new TenantMembershipResponse(
                 membership.userId(), membership.businessId(), membership.assignedAt());
     }
@@ -110,6 +115,6 @@ public class AdminUserController {
     public void removeTenantMembership(
             @PathVariable @NotBlank @Size(max = 64) String userId
     ) {
-        memberships.removeAndDemote(userId);
+        memberships.removeAndDemote(tenantAccess.current(), userId);
     }
 }

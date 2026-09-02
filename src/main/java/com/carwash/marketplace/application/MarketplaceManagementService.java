@@ -11,6 +11,11 @@ import com.carwash.shared.exception.ResourceNotFoundException;
 import com.carwash.shared.application.DataTransactionOperations;
 import com.carwash.shared.application.MutationLock;
 import com.carwash.access.application.TenantAccessContext;
+import com.carwash.audit.application.AuditActor;
+import com.carwash.audit.application.AuditCommand;
+import com.carwash.audit.application.AuditOperations;
+import com.carwash.audit.domain.AuditAction;
+import com.carwash.audit.domain.AuditSource;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
@@ -38,6 +43,7 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
     private final DataTransactionOperations coordinator;
     private final MutationLock mutationLock;
     private final Clock clock;
+    private final AuditOperations audit;
 
     public MarketplaceManagementService(
             CarWashBusinessRepository businessRepository,
@@ -45,7 +51,7 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
             DataTransactionOperations coordinator,
             Clock clock
     ) {
-        this(businessRepository, branchRepository, coordinator, MutationLock.noOp(), clock);
+        this(businessRepository, branchRepository, coordinator, MutationLock.noOp(), clock, AuditOperations.noOp());
     }
 
     public MarketplaceManagementService(
@@ -55,11 +61,23 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
             MutationLock mutationLock,
             Clock clock
     ) {
+        this(businessRepository, branchRepository, coordinator, mutationLock, clock, AuditOperations.noOp());
+    }
+
+    public MarketplaceManagementService(
+            CarWashBusinessRepository businessRepository,
+            CarWashBranchRepository branchRepository,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock,
+            Clock clock,
+            AuditOperations audit
+    ) {
         this.businessRepository = Objects.requireNonNull(businessRepository, "Business repository is required");
         this.branchRepository = Objects.requireNonNull(branchRepository, "Branch repository is required");
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
         this.mutationLock = Objects.requireNonNull(mutationLock, "Mutation lock is required");
         this.clock = Objects.requireNonNull(clock, "Application clock is required");
+        this.audit = Objects.requireNonNull(audit, "Audit operations are required");
     }
 
     BusinessSnapshot registerBusiness(RegisterBusinessCommand command) {
@@ -67,10 +85,12 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
     }
 
     public BusinessSnapshot registerBusiness(TenantAccessContext access, RegisterBusinessCommand command) {
-        return coordinator.write(() -> {
+        return audit.execute(eventForBusiness(access, AuditAction.BUSINESS_REGISTERED,
+                command == null ? null : command.businessId(), "BUSINESS",
+                command == null ? null : command.businessId()), () -> coordinator.write(() -> {
             requirePlatformAdministrator(access);
             return registerBusinessInside(command);
-        });
+        }));
     }
 
     public List<BusinessSnapshot> findAccessibleBusinesses(TenantAccessContext access) {
@@ -91,15 +111,18 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
             String businessId,
             UpdateBusinessCommand command
     ) {
-        return coordinator.write(() -> updateBusinessInside(access, businessId, command));
+        return audit.execute(event(access, AuditAction.BUSINESS_UPDATED, "BUSINESS", businessId),
+                () -> coordinator.write(() -> updateBusinessInside(access, businessId, command)));
     }
 
     public BusinessSnapshot activateBusiness(TenantAccessContext access, String businessId) {
-        return coordinator.write(() -> changeBusinessStatusInside(access, businessId, true));
+        return audit.execute(event(access, AuditAction.BUSINESS_ACTIVATED, "BUSINESS", businessId),
+                () -> coordinator.write(() -> changeBusinessStatusInside(access, businessId, true)));
     }
 
     public BusinessSnapshot deactivateBusiness(TenantAccessContext access, String businessId) {
-        return coordinator.write(() -> changeBusinessStatusInside(access, businessId, false));
+        return audit.execute(event(access, AuditAction.BUSINESS_DEACTIVATED, "BUSINESS", businessId),
+                () -> coordinator.write(() -> changeBusinessStatusInside(access, businessId, false)));
     }
 
     public BranchSnapshot createBranch(
@@ -107,7 +130,9 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
             String businessId,
             CreateBranchCommand command
     ) {
-        return coordinator.write(() -> createBranchInside(access, businessId, command));
+        return audit.execute(eventForBusiness(access, AuditAction.BRANCH_CREATED, businessId, "BRANCH",
+                        command == null ? null : command.branchId()),
+                () -> coordinator.write(() -> createBranchInside(access, businessId, command)));
     }
 
     public List<BranchSnapshot> findBranchesByBusiness(TenantAccessContext access, String businessId) {
@@ -126,15 +151,37 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
             String branchId,
             UpdateBranchCommand command
     ) {
-        return coordinator.write(() -> updateBranchInside(access, branchId, command));
+        return audit.execute(event(access, AuditAction.BRANCH_UPDATED, "BRANCH", branchId),
+                () -> coordinator.write(() -> updateBranchInside(access, branchId, command)));
     }
 
     public BranchSnapshot activateBranch(TenantAccessContext access, String branchId) {
-        return coordinator.write(() -> changeBranchStatusInside(access, branchId, true));
+        return audit.execute(event(access, AuditAction.BRANCH_ACTIVATED, "BRANCH", branchId),
+                () -> coordinator.write(() -> changeBranchStatusInside(access, branchId, true)));
     }
 
     public BranchSnapshot deactivateBranch(TenantAccessContext access, String branchId) {
-        return coordinator.write(() -> changeBranchStatusInside(access, branchId, false));
+        return audit.execute(event(access, AuditAction.BRANCH_DEACTIVATED, "BRANCH", branchId),
+                () -> coordinator.write(() -> changeBranchStatusInside(access, branchId, false)));
+    }
+
+    private AuditCommand event(TenantAccessContext access, AuditAction action, String targetType, String targetId) {
+        String businessId = access != null && access.isPlatformAdministrator() ? null : access.businessId();
+        return eventForBusiness(access, action, businessId, targetType, targetId);
+    }
+
+    private AuditCommand eventForBusiness(TenantAccessContext access, AuditAction action, String businessId,
+                                          String targetType, String targetId) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        AuditActor actor = AuditActor.user(access.userId(), access.canonicalRoleName(), access.businessId());
+        String eventBusiness = access.isPlatformAdministrator() ? safeId(businessId) : access.businessId();
+        return AuditCommand.actionForBusiness(action, actor, eventBusiness, targetType, safeId(targetId), AuditSource.API);
+    }
+
+    private static String safeId(String value) {
+        if (value == null) return null;
+        String normalized = value.trim();
+        return normalized.isEmpty() || normalized.length() > 64 ? null : normalized;
     }
 
     @Override

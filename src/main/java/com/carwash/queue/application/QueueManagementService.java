@@ -31,6 +31,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.security.access.AccessDeniedException;
+import com.carwash.audit.application.*;
+import com.carwash.audit.domain.AuditAction;
+import com.carwash.audit.domain.AuditSource;
 
 public class QueueManagementService implements QueueQuery {
 
@@ -45,6 +48,7 @@ public class QueueManagementService implements QueueQuery {
     private final MutationLock mutationLock;
     private final QueueOrderingService queueOrdering;
     private final Clock clock;
+    private final AuditOperations audit;
 
     public QueueManagementService(
             QueueEntryRepository queueEntryRepository,
@@ -57,7 +61,8 @@ public class QueueManagementService implements QueueQuery {
             Clock clock
     ) {
         this(queueEntryRepository, bookingRepository, serviceOfferingQuery, marketplaceQuery,
-                notificationPublisher, coordinator, MutationLock.noOp(), queueOrdering, clock);
+                notificationPublisher, coordinator, MutationLock.noOp(), queueOrdering, clock,
+                AuditOperations.noOp());
     }
 
     public QueueManagementService(
@@ -71,6 +76,22 @@ public class QueueManagementService implements QueueQuery {
             QueueOrderingService queueOrdering,
             Clock clock
     ) {
+        this(queueEntryRepository, bookingRepository, serviceOfferingQuery, marketplaceQuery,
+                notificationPublisher, coordinator, mutationLock, queueOrdering, clock, AuditOperations.noOp());
+    }
+
+    public QueueManagementService(
+            QueueEntryRepository queueEntryRepository,
+            BookingRepository bookingRepository,
+            ServiceOfferingQuery serviceOfferingQuery,
+            MarketplaceQuery marketplaceQuery,
+            BookingNotificationPublisher notificationPublisher,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock,
+            QueueOrderingService queueOrdering,
+            Clock clock,
+            AuditOperations audit
+    ) {
         this.queueEntryRepository = Objects.requireNonNull(queueEntryRepository, "Queue repository is required");
         this.bookingRepository = Objects.requireNonNull(bookingRepository, "Booking repository is required");
         this.serviceOfferingQuery = Objects.requireNonNull(serviceOfferingQuery, "Service offering query is required");
@@ -80,6 +101,7 @@ public class QueueManagementService implements QueueQuery {
         this.mutationLock = Objects.requireNonNull(mutationLock, "Mutation lock is required");
         this.queueOrdering = Objects.requireNonNull(queueOrdering, "Queue ordering service is required");
         this.clock = Objects.requireNonNull(clock, "Application clock is required");
+        this.audit = Objects.requireNonNull(audit, "Audit operations are required");
     }
 
     QueueEntry createQueueEntry(String queueEntryId, String bookingId, String serviceId) {
@@ -101,7 +123,8 @@ public class QueueManagementService implements QueueQuery {
         Service service = new Service();
         service.setServiceId(serviceId);
         QueueEntry queueEntry = new QueueEntry(queueEntryId, booking, service);
-        return coordinator.write(() -> createQueueEntryInside(access, queueEntry));
+        return audit.execute(event(access, AuditAction.QUEUE_CREATED, "QUEUE_ENTRY", queueEntryId),
+                () -> coordinator.write(() -> createQueueEntryInside(access, queueEntry)));
     }
 
     QueueEntry createQueueEntry(QueueEntry queueEntry) {
@@ -297,10 +320,11 @@ public class QueueManagementService implements QueueQuery {
     }
 
     public QueueEntry updatePosition(TenantAccessContext access, String queueEntryId, int position) {
-        return coordinator.write(() -> {
+        return audit.execute(event(access, AuditAction.QUEUE_POSITION_OVERRIDDEN, "QUEUE_ENTRY", queueEntryId),
+                () -> coordinator.write(() -> {
             requireOperationalAccess(access);
             return updatePositionInside(access, queueEntryId, position);
-        });
+        }));
     }
 
     QueueEntry callNext(String branchId) {
@@ -308,10 +332,11 @@ public class QueueManagementService implements QueueQuery {
     }
 
     public QueueEntry callNext(TenantAccessContext access, String branchId) {
-        return coordinator.write(() -> {
+        return audit.execute(event(access, AuditAction.QUEUE_CALLED_NEXT, "BRANCH_QUEUE", branchId),
+                () -> coordinator.write(() -> {
             requireOperationalAccess(access);
             return callNextInside(access, branchId);
-        });
+        }));
     }
 
     private QueueEntry callNextInside(TenantAccessContext access, String branchId) {
@@ -336,10 +361,11 @@ public class QueueManagementService implements QueueQuery {
     }
 
     public QueueEntry callQueueEntry(TenantAccessContext access, String queueEntryId) {
-        return coordinator.write(() -> {
+        return audit.execute(event(access, AuditAction.QUEUE_CALLED, "QUEUE_ENTRY", queueEntryId),
+                () -> coordinator.write(() -> {
             requireOperationalAccess(access);
             return callQueueEntryInside(access, queueEntryId);
-        });
+        }));
     }
 
     private QueueEntry callQueueEntryInside(TenantAccessContext access, String queueEntryId) {
@@ -388,10 +414,11 @@ public class QueueManagementService implements QueueQuery {
     }
 
     public QueueEntry startService(TenantAccessContext access, String queueEntryId) {
-        return coordinator.write(() -> {
+        return audit.execute(event(access, AuditAction.QUEUE_SERVICE_STARTED, "QUEUE_ENTRY", queueEntryId),
+                () -> coordinator.write(() -> {
             requireOperationalAccess(access);
             return startServiceInside(access, queueEntryId);
-        });
+        }));
     }
 
     QueueEntry completeQueueEntry(String queueEntryId) {
@@ -437,10 +464,11 @@ public class QueueManagementService implements QueueQuery {
     }
 
     public QueueEntry completeQueueEntry(TenantAccessContext access, String queueEntryId) {
-        return coordinator.write(() -> {
+        return audit.execute(event(access, AuditAction.QUEUE_SERVICE_COMPLETED, "QUEUE_ENTRY", queueEntryId),
+                () -> coordinator.write(() -> {
             requireOperationalAccess(access);
             return completeQueueEntryInside(access, queueEntryId);
-        });
+        }));
     }
 
     void deleteQueueEntry(String queueEntryId) {
@@ -477,10 +505,24 @@ public class QueueManagementService implements QueueQuery {
     }
 
     public void deleteQueueEntry(TenantAccessContext access, String queueEntryId) {
-        coordinator.write(() -> {
+        audit.execute(event(access, AuditAction.QUEUE_REMOVED, "QUEUE_ENTRY", queueEntryId),
+                () -> coordinator.write(() -> {
             requireOperationalAccess(access);
             deleteQueueEntryInside(access, queueEntryId);
-        });
+        }));
+    }
+
+    private AuditCommand event(TenantAccessContext access, AuditAction action, String targetType, String targetId) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        AuditActor actor = AuditActor.user(access.userId(), access.canonicalRoleName(), access.businessId());
+        return AuditCommand.actionForBusiness(action, actor, access.businessId(), targetType,
+                safeAuditId(targetId), AuditSource.API);
+    }
+
+    private static String safeAuditId(String value) {
+        if (value == null) return null;
+        String normalized = value.trim();
+        return normalized.isEmpty() || normalized.length() > 64 ? null : normalized;
     }
 
     private void rollbackQueueCreation(

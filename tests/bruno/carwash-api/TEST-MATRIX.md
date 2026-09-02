@@ -7,6 +7,7 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 | `PUT` | `/api/admin/users/{userId}/role` | ✅ | ✅ | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
 | `PUT` | `/api/admin/users/{userId}/tenant-membership` | ✅ | ✅ | ✅ | ✅ | ✅ — explicit administrator assignment | ✅ — stale token and role/member consistency | ✅ |
 | `DELETE` | `/api/admin/users/{userId}/tenant-membership` | ✅ | N/A — no request body | ✅ | ✅ | ✅ — explicit administrator removal | ✅ — atomic demotion | ✅ |
+| `GET` | `/api/audit-records` | ✅ | ✅ — scope/filter bounds | ✅ | ✅ — owner/admin only | ✅ — canonical tenant or explicit admin scope | ✅ — append-only; no write route | ✅ |
 | `POST` | `/api/auth/login` | ✅ | ✅ | N/A — public endpoint | N/A — public or no wrong-role case | N/A — not user-owned | N/A — no state/dependency mutation | ✅ |
 | `GET` | `/api/auth/me` | ✅ | N/A — no request body/typed input case | ✅ | N/A — public or no wrong-role case | N/A — not user-owned | N/A — no state/dependency mutation | ✅ |
 | `GET` | `/api/availability` | ✅ | ✅ | ✅ | N/A — all current roles have SERVICE_READ | N/A — service/date capacity view | ✅ | ✅ |
@@ -78,10 +79,10 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 
 ## Totals
 
-- API operations: **71**
-- Happy-path functional coverage: **71/71**
+- API operations: **72**
+- Happy-path functional coverage: **72/72**
 - 401 coverage: **69/69 protected operations** (2 public operations are N/A)
 - RBAC/403, subject/tenant ownership, validation, integrity, and multi-step workflow applicability are covered wherever meaningful in the matrix above.
-- Bruno requests/assertions: **533 requests / 1,696 assertions**
+- Bruno requests/assertions: **542 requests / 1,714 assertions**
 
 The full authorization suite also exercises each significant role/capability allow/deny cell rather than relying only on per-operation counts.

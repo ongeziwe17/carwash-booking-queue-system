@@ -18,6 +18,9 @@ class RoleCatalogTest {
         assertThat(RoleCatalog.permissions(RoleName.BUSINESS_OWNER)).containsAll(RoleCatalog.permissions(RoleName.STAFF));
         assertThat(RoleCatalog.permissions(RoleName.PLATFORM_ADMIN)).containsAll(RoleCatalog.permissions(RoleName.BUSINESS_OWNER));
         assertThat(RoleCatalog.permissions(RoleName.BUSINESS_OWNER)).contains(Permission.MARKETPLACE_MANAGE);
+        assertThat(RoleCatalog.permissions(RoleName.BUSINESS_OWNER)).contains(Permission.AUDIT_READ);
+        assertThat(RoleCatalog.permissions(RoleName.STAFF)).doesNotContain(Permission.AUDIT_READ);
+        assertThat(RoleCatalog.permissions(RoleName.CUSTOMER)).doesNotContain(Permission.AUDIT_READ);
         assertThat(RoleCatalog.permissions(RoleName.BUSINESS_OWNER)).doesNotContain(Permission.SERVICE_MANAGE);
         assertThat(RoleCatalog.permissions(RoleName.STAFF))
                 .doesNotContain(Permission.MARKETPLACE_MANAGE, Permission.SERVICE_MANAGE);

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- Implemented AUDIT-001 (#125) as a dedicated append-only `audit` capability. Sensitive success events commit in the authoritative business transaction, denied/failed events persist through an isolated write after rollback, and both in-memory and PostgreSQL adapters preserve equivalent semantics.
+- Added Flyway `V5__security_and_operational_audit.sql`, immutable historical identifiers, JSONB metadata constraints, tenant/actor/action/resource date indexes, and `AUDIT_READ` for business owners and platform administrators.
+- Added `GET /api/audit-records` with bounded newest-first cursor filtering, authenticated-tenant enforcement for owners, explicit tenant/platform scopes for administrators, and no write/delete audit API.
+- Added authentication/authorization failure capture, safe correlation identifiers, metadata allowlisting/redaction, structured categorical audit logging, validated retention/query/metadata configuration, Java/PostgreSQL regressions, and Bruno acceptance coverage.
+
 ### Changed
 
 - Enforced Marketplace tenant isolation with one Identity-owned membership per operational user, server-validated `tenant_id` JWT claims, bounded tenant access context, tenant-scoped application/repository operations across Marketplace and operational resources, customer subject scope, explicit platform-admin paths, global-catalogue restrictions, safe foreign-resource `404` responses, discovery-specific DTOs, additive Flyway V4 constraints/indexes, and in-memory/PostgreSQL/API/Bruno coverage.

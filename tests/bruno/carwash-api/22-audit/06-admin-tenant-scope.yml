@@ -1,0 +1,12 @@
+info: { name: Platform admin uses explicit tenant audit scope, type: http, seq: 6, tags: [audit, admin, tenant] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/audit-records?scope=TENANT&businessId={{marketplaceBusinessId}}&limit=25"
+  auth: { type: bearer, token: "{{adminToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("admin tenant audit query returns 200", function() { expect(res.status).to.equal(200); });
+        test("all returned records use requested tenant", function() { expect(res.body.records.every(item => item.businessId === bru.getVar("marketplaceBusinessId"))).to.equal(true); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

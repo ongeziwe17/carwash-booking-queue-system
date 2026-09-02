@@ -38,6 +38,17 @@ public final class PostgresTransactionOperations implements DataTransactionOpera
     }
 
     @Override
+    public <T> T isolatedWrite(Supplier<T> action) {
+        return requiresNew.execute(status -> action.get());
+    }
+
+    @Override
+    public void onRollback(Runnable action) {
+        Objects.requireNonNull(action, "Rollback action is required");
+        // PostgreSQL rollback is authoritative; no application compensation is registered.
+    }
+
+    @Override
     public void compensate(RuntimeException failure, Runnable compensation) {
         // Database rollback is authoritative.
     }

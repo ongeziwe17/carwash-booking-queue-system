@@ -73,6 +73,7 @@ import com.carwash.recommendation.application.QueueWaitRecommendationMetricProvi
 import com.carwash.recommendation.application.RecommendationProperties;
 import com.carwash.recommendation.application.RecommendationService;
 import com.carwash.recommendation.application.TotalTimeRecommendationMetricProvider;
+import com.carwash.audit.application.AuditOperations;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -188,10 +189,11 @@ public class ApplicationCompositionConfig {
             CarWashBranchRepository branchRepository,
             DataTransactionOperations coordinator,
             MutationLock mutationLock,
-            Clock clock
+            Clock clock,
+            AuditOperations audit
     ) {
         return new MarketplaceManagementService(
-                businessRepository, branchRepository, coordinator, mutationLock, clock);
+                businessRepository, branchRepository, coordinator, mutationLock, clock, audit);
     }
 
     @Bean
@@ -202,7 +204,8 @@ public class ApplicationCompositionConfig {
             TemporaryBranchClosureRepository closureRepository,
             DataTransactionOperations coordinator,
             MutationLock mutationLock,
-            Clock clock
+            Clock clock,
+            AuditOperations audit
     ) {
         return new BranchSchedulingService(
                 businessRepository,
@@ -211,7 +214,8 @@ public class ApplicationCompositionConfig {
                 closureRepository,
                 coordinator,
                 mutationLock,
-                clock
+                clock,
+                audit
         );
     }
 
@@ -406,7 +410,8 @@ public class ApplicationCompositionConfig {
             TenantBusinessQuery tenantBusinessQuery,
             DataTransactionOperations coordinator,
             MutationLock mutationLock,
-            Clock clock
+            Clock clock,
+            AuditOperations audit
     ) {
         return new TenantMembershipManagementService(
                 userRepository,
@@ -414,7 +419,8 @@ public class ApplicationCompositionConfig {
                 tenantBusinessQuery,
                 coordinator,
                 mutationLock,
-                clock
+                clock,
+                audit
         );
     }
 
@@ -424,14 +430,16 @@ public class ApplicationCompositionConfig {
             UserRepository userRepository,
             BookingRepository bookingRepository,
             DataTransactionOperations coordinator,
-            MutationLock mutationLock
+            MutationLock mutationLock,
+            AuditOperations audit
     ) {
         return new VehicleManagementService(
                 vehicleRepository,
                 userRepository,
                 bookingRepository,
                 coordinator,
-                mutationLock
+                mutationLock,
+                audit
         );
     }
 
@@ -440,13 +448,15 @@ public class ApplicationCompositionConfig {
             ServiceRepository serviceRepository,
             ServiceOfferingRepository serviceOfferingRepository,
             DataTransactionOperations coordinator,
-            ServiceDefinitionUsageQuery serviceDefinitionUsageQuery
+            ServiceDefinitionUsageQuery serviceDefinitionUsageQuery,
+            AuditOperations audit
     ) {
         return new ServiceCatalogService(
                 serviceRepository,
                 serviceOfferingRepository,
                 serviceDefinitionUsageQuery,
-                coordinator
+                coordinator,
+                audit
         );
     }
 
@@ -458,7 +468,8 @@ public class ApplicationCompositionConfig {
             DataTransactionOperations coordinator,
             MutationLock mutationLock,
             ServiceOfferingCapacityQuery capacityQuery,
-            Clock clock
+            Clock clock,
+            AuditOperations audit
     ) {
         return new ServiceOfferingService(
                 serviceOfferingRepository,
@@ -467,7 +478,8 @@ public class ApplicationCompositionConfig {
                 coordinator,
                 mutationLock,
                 capacityQuery,
-                clock
+                clock,
+                audit
         );
     }
 
@@ -514,7 +526,8 @@ public class ApplicationCompositionConfig {
             BookingPolicyProperties bookingPolicy,
             BookingSlotPolicyService bookingSlotPolicyService,
             BranchAvailabilityDecisionService branchAvailabilityDecisionService,
-            Clock clock
+            Clock clock,
+            AuditOperations audit
     ) {
         return new BookingManagementService(
                 bookingRepository,
@@ -532,7 +545,8 @@ public class ApplicationCompositionConfig {
                 bookingPolicy,
                 bookingSlotPolicyService,
                 branchAvailabilityDecisionService,
-                clock
+                clock,
+                audit
         );
     }
 
@@ -546,7 +560,8 @@ public class ApplicationCompositionConfig {
             DataTransactionOperations coordinator,
             MutationLock mutationLock,
             QueueOrderingService queueOrderingService,
-            Clock clock
+            Clock clock,
+            AuditOperations audit
     ) {
         return new QueueManagementService(
                 queueEntryRepository,
@@ -557,7 +572,8 @@ public class ApplicationCompositionConfig {
                 coordinator,
                 mutationLock,
                 queueOrderingService,
-                clock
+                clock,
+                audit
         );
     }
 

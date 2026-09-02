@@ -1,0 +1,12 @@
+info: { name: Business owner reads canonical tenant audit, type: http, seq: 1, tags: [audit, tenant, security] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/audit-records?limit=25"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("owner audit query returns 200", function() { expect(res.status).to.equal(200); });
+        test("audit response is cursor paged", function() { expect(res.body.records).to.be.an("array"); expect(res.body).to.have.property("nextCursor"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

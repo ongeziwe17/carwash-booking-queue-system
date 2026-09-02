@@ -12,6 +12,9 @@ import com.carwash.shared.exception.ResourceNotFoundException;
 import com.carwash.shared.application.DataTransactionOperations;
 import com.carwash.shared.application.MutationLock;
 import com.carwash.access.application.TenantAccessContext;
+import com.carwash.audit.application.*;
+import com.carwash.audit.domain.AuditAction;
+import com.carwash.audit.domain.AuditSource;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -31,6 +34,7 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
     private final MutationLock mutationLock;
     private final ServiceOfferingCapacityQuery capacityQuery;
     private final Clock clock;
+    private final AuditOperations audit;
 
     public ServiceOfferingService(
             ServiceOfferingRepository offeringRepository,
@@ -40,7 +44,7 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
             Clock clock
     ) {
         this(offeringRepository, serviceRepository, marketplaceQuery, coordinator,
-                MutationLock.noOp(), ServiceOfferingCapacityQuery.empty(), clock);
+                MutationLock.noOp(), ServiceOfferingCapacityQuery.empty(), clock, AuditOperations.noOp());
     }
 
     public ServiceOfferingService(
@@ -52,6 +56,20 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
             ServiceOfferingCapacityQuery capacityQuery,
             Clock clock
     ) {
+        this(offeringRepository, serviceRepository, marketplaceQuery, coordinator, mutationLock,
+                capacityQuery, clock, AuditOperations.noOp());
+    }
+
+    public ServiceOfferingService(
+            ServiceOfferingRepository offeringRepository,
+            ServiceRepository serviceRepository,
+            MarketplaceQuery marketplaceQuery,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock,
+            ServiceOfferingCapacityQuery capacityQuery,
+            Clock clock,
+            AuditOperations audit
+    ) {
         this.offeringRepository = Objects.requireNonNull(offeringRepository, "Offering repository is required");
         this.serviceRepository = Objects.requireNonNull(serviceRepository, "Service repository is required");
         this.marketplaceQuery = Objects.requireNonNull(marketplaceQuery, "Marketplace query is required");
@@ -59,6 +77,7 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
         this.mutationLock = Objects.requireNonNull(mutationLock, "Mutation lock is required");
         this.capacityQuery = Objects.requireNonNull(capacityQuery, "Offering capacity query is required");
         this.clock = Objects.requireNonNull(clock, "Application clock is required");
+        this.audit = Objects.requireNonNull(audit, "Audit operations are required");
     }
 
     ServiceOfferingSnapshot createOffering(String branchId, CreateServiceOfferingCommand command) {
@@ -70,7 +89,9 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
             String branchId,
             CreateServiceOfferingCommand command
     ) {
-        return coordinator.write(() -> createOfferingInside(access, branchId, command));
+        return audit.execute(event(access, AuditAction.SERVICE_OFFERING_CREATED, "SERVICE_OFFERING",
+                        command == null ? null : command.offeringId()),
+                () -> coordinator.write(() -> createOfferingInside(access, branchId, command)));
     }
 
     public ServiceOfferingSnapshot findOffering(String offeringId) {
@@ -176,7 +197,8 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
             String offeringId,
             UpdateServiceOfferingCommand command
     ) {
-        return coordinator.write(() -> updateOfferingInside(access, offeringId, command));
+        return audit.execute(event(access, AuditAction.SERVICE_OFFERING_UPDATED, "SERVICE_OFFERING", offeringId),
+                () -> coordinator.write(() -> updateOfferingInside(access, offeringId, command)));
     }
 
     ServiceOfferingSnapshot activateOffering(String offeringId) {
@@ -184,7 +206,8 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
     }
 
     public ServiceOfferingSnapshot activateOffering(TenantAccessContext access, String offeringId) {
-        return coordinator.write(() -> changeStatusInside(access, offeringId, true));
+        return audit.execute(event(access, AuditAction.SERVICE_OFFERING_ACTIVATED, "SERVICE_OFFERING", offeringId),
+                () -> coordinator.write(() -> changeStatusInside(access, offeringId, true)));
     }
 
     ServiceOfferingSnapshot deactivateOffering(String offeringId) {
@@ -192,7 +215,21 @@ public final class ServiceOfferingService implements ServiceOfferingQuery {
     }
 
     public ServiceOfferingSnapshot deactivateOffering(TenantAccessContext access, String offeringId) {
-        return coordinator.write(() -> changeStatusInside(access, offeringId, false));
+        return audit.execute(event(access, AuditAction.SERVICE_OFFERING_DEACTIVATED, "SERVICE_OFFERING", offeringId),
+                () -> coordinator.write(() -> changeStatusInside(access, offeringId, false)));
+    }
+
+    private AuditCommand event(TenantAccessContext access, AuditAction action, String targetType, String targetId) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        AuditActor actor = AuditActor.user(access.userId(), access.canonicalRoleName(), access.businessId());
+        return AuditCommand.actionForBusiness(action, actor, access.businessId(), targetType,
+                safeId(targetId), AuditSource.API);
+    }
+
+    private static String safeId(String value) {
+        if (value == null) return null;
+        String normalized = value.trim();
+        return normalized.isEmpty() || normalized.length() > 64 ? null : normalized;
     }
 
     private ServiceOfferingSnapshot changeStatus(String offeringId, boolean active) {

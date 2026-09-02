@@ -45,6 +45,14 @@ Compose activates `postgres` automatically and requires `POSTGRES_PASSWORD` in t
 | `carwash.recommendation.weights.price` | `CARWASH_RECOMMENDATION_WEIGHT_PRICE` | decimal | `0.25` | finite; `0..1`; all four weights sum exactly to `1` | BEST_OVERALL branch-offering price weight. |
 | `carwash.recommendation.max-radius-km` | `CARWASH_RECOMMENDATION_MAX_RADIUS_KM` | decimal kilometres | `50.00` | `(0, 20000]` | Default and server maximum radius for recommendation requests. |
 | `carwash.runtime.time-zone` | `CARWASH_TIME_ZONE` | `ZoneId` | `UTC` | valid Java/IANA zone ID | Zone used by the application `Clock` for local date/time policy decisions plus queue and notification lifecycle timestamps. |
+| `carwash.audit.retention-period` | `CARWASH_AUDIT_RETENTION_PERIOD` | `Duration` | `P365D` | positive | Operational retention guidance; the application does not purge history. |
+| `carwash.audit.default-page-size` | `CARWASH_AUDIT_DEFAULT_PAGE_SIZE` | integer | `50` | `>= 1` and not above maximum | Default audit query page size. |
+| `carwash.audit.maximum-page-size` | `CARWASH_AUDIT_MAXIMUM_PAGE_SIZE` | integer | `200` | `>= 1` | Hard audit query page bound. |
+| `carwash.audit.maximum-query-range` | `CARWASH_AUDIT_MAXIMUM_QUERY_RANGE` | `Duration` | `P90D` | positive | Maximum inclusive UTC query interval. |
+| `carwash.audit.metadata-maximum-keys` | `CARWASH_AUDIT_METADATA_MAXIMUM_KEYS` | integer | `10` | `1..32` | Maximum allowlisted metadata entries. |
+| `carwash.audit.metadata-maximum-key-length` | `CARWASH_AUDIT_METADATA_MAXIMUM_KEY_LENGTH` | integer | `32` | `1..128` | Maximum metadata key length. |
+| `carwash.audit.metadata-maximum-value-length` | `CARWASH_AUDIT_METADATA_MAXIMUM_VALUE_LENGTH` | integer | `256` | `1..1024` | Maximum metadata value length. |
+| `carwash.audit.metadata-maximum-total-size` | `CARWASH_AUDIT_METADATA_MAXIMUM_TOTAL_SIZE` | integer | `2048` | `64..16384` | Maximum deterministic serialized metadata size. |
 
 `UTC` is the explicit runtime default because the current product documentation does not establish one business operating geography. It avoids inheriting a developer machine or container timezone. An environment with a defined local business zone can override it, for example `Africa/Johannesburg`. Booking request DTOs validate required branch-local date/time syntax, while the shared availability decision resolves future-time validity against the selected branch timezone; a timezone-less Bean Validation `@Future` check is deliberately avoided. A booking start must map to exactly one valid branch offset: DST gaps and ambiguous fall-back local times are rejected. AVAIL-002 also excludes an offset-aware instant when its resolved branch-local start is ambiguous, because the current booking request cannot carry the selected overlap occurrence.
 
@@ -55,6 +63,10 @@ Spring accepts ISO-8601 duration syntax. Common examples are:
 - `PT0S` — zero seconds
 - `PT30M` — 30 minutes
 - `PT2H` — two hours
+
+## Audit retention procedure
+
+`P365D` is guidance, not an automatic deletion job. Audit records are immutable through application and HTTP contracts. A privileged database operator may apply an approved, backed-up retention procedure outside the application after legal/security review, using an explicit UTC cutoff and recording the operational change separately. There is no normal purge endpoint, archive implementation, SIEM integration, or compliance-certification claim. PostgreSQL backups and restore testing remain deployment responsibilities.
 
 Negative booking cancellation windows, zero/negative/sub-minute booking intervals, invalid operating-window ordering, and zero or negative retained queue default durations are rejected at startup.
 

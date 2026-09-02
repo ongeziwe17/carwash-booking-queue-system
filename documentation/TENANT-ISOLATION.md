@@ -60,7 +60,7 @@ Repository mutation rules are fail-closed:
 - zero affected rows produce `404`, roll back the transaction, and never trigger an unscoped retry; and
 - read-only reports and notification queries retain their existing tenant predicates.
 
-The in-memory profile performs the same sequence under its shared fair write lock and evaluates guarded predicates atomically in `updateMatching`/`deleteMatching`. PostgreSQL uses one REQUIRED transaction, transaction-scoped advisory locks, scoped repository queries, optimistic versions, and database rollback. Flyway V1-V4 remain unchanged; no V5 schema change is required.
+The in-memory profile performs the same sequence under its shared fair write lock and evaluates guarded predicates atomically in `updateMatching`/`deleteMatching`. PostgreSQL uses one REQUIRED transaction, transaction-scoped advisory locks, scoped repository queries, optimistic versions, and database rollback. Flyway V1–V4 remain unchanged; additive V5 introduces audit history only and does not alter the PR #182 tenant-locking/guarded-write schema.
 
 ## Safe error policy
 
@@ -100,4 +100,10 @@ PostgreSQL 17.6 Testcontainers covers clean V4 migration, incremental V1-V3 upgr
 
 ## Audit boundary
 
-Issue #125 remains out of scope: this change introduces no audit-record aggregate, table, repository, or query. A later audit implementation must store `businessId` on every tenant-owned audit record and require a tenant predicate on every operator-facing audit query. Billing, database-per-tenant isolation, and federation are also out of scope.
+## Audit trust boundary
+
+Issue #125 is implemented by the dedicated Audit capability. Other capabilities publish scalar commands only; they never pass mutable aggregates, JWT objects, requests, or persistence entities. A tenant-owned action snapshots the authenticated actor tenant. A cross-tenant safe-`404` attempt stores that actor tenant plus the requested target ID and never performs an unscoped lookup to discover the victim tenant. Platform-admin operations may snapshot a concrete explicitly selected target tenant, or remain platform-scoped with a null business ID.
+
+The mandatory SUCCESS insert and protected mutation share the authoritative write transaction. The resource lock and canonical scoped read still occur inside the protected service exactly as delivered by PR #182. DENIED/FAILURE writes run only after rollback through an isolated transaction. Tenant audit reads call `queryByBusinessId`, whose PostgreSQL statement always contains the tenant predicate; the separate platform query is reachable only after explicit `scope=PLATFORM` authorization. Foreign and missing targets remain indistinguishable.
+
+Billing, database-per-tenant isolation, federation, SIEM, archives, compliance certification, and payment/refund implementation remain out of scope.

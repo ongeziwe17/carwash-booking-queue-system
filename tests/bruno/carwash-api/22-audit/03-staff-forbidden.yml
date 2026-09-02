@@ -1,0 +1,12 @@
+info: { name: Staff cannot read audit history, type: http, seq: 3, tags: [audit, rbac, security] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/audit-records"
+  auth: { type: bearer, token: "{{staffToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("staff audit query returns 403", function() { expect(res.status).to.equal(403); });
+        test("staff denial uses safe error", function() { expect(res.body.code).to.equal("ACCESS_DENIED"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

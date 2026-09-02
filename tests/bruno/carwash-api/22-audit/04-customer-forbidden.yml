@@ -1,0 +1,12 @@
+info: { name: Customer cannot read audit history, type: http, seq: 4, tags: [audit, rbac, security] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/audit-records"
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("customer audit query returns 403", function() { expect(res.status).to.equal(403); });
+        test("customer denial uses safe error", function() { expect(res.body.code).to.equal("ACCESS_DENIED"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -1,12 +1,13 @@
 # Car Wash Booking Queue System
 
-Spring Boot backend foundation for car wash booking, queue management, and Marketplace onboarding/scheduling. The code is organized as a capability-based modular monolith with explicit `bootstrap`, `shared`, `identity`, `access`, `vehicle`, `catalog`, `booking`, `queue`, `notification`, `reporting`, `marketplace`, `discovery`, and `recommendation` boundaries enforced by ArchUnit. The current codebase exposes APIs for users, vehicles, reusable global services, branch-specific offerings, bookings, queues, notifications, daily reporting, Marketplace businesses, physical branches, weekly branch hours, temporary closures, timezone-aware open-status decisions, authenticated nearby branch discovery, branch-aware availability, and explainable rule-based recommendations. Storage is selectable: the lightweight default/test profile uses in-memory adapters, while the `postgres` profile uses durable module-owned JPA adapters and Flyway migrations.
+Spring Boot backend foundation for car wash booking, queue management, Marketplace onboarding/scheduling, and immutable security/operational auditing. The code is organized as a capability-based modular monolith with explicit `bootstrap`, `shared`, `identity`, `access`, `audit`, `vehicle`, `catalog`, `booking`, `queue`, `notification`, `reporting`, `marketplace`, `discovery`, and `recommendation` boundaries enforced by ArchUnit. The current codebase exposes APIs for users, vehicles, reusable global services, branch-specific offerings, bookings, queues, notifications, daily reporting, Marketplace businesses, physical branches, weekly branch hours, temporary closures, timezone-aware open-status decisions, authenticated nearby branch discovery, branch-aware availability, explainable rule-based recommendations, and scoped audit reads. Storage is selectable: the lightweight default/test profile uses in-memory adapters, while the `postgres` profile uses durable module-owned JPA/JDBC adapters and Flyway migrations.
 
 ## Current backend foundation
 
 - User registration and safe profile-management APIs.
 - Stateless JWT authentication and role-based authorization.
 - Canonical server-side tenant memberships for staff/business owners, trusted `tenant_id` JWT validation, and tenant-scoped Marketplace/operational access.
+- Append-only audit records for security and sensitive operational actions, with atomic success writes, isolated failure writes, redacted metadata, explicit tenant/platform scope, and no HTTP mutation surface.
 - Vehicle management with ownership and duplicate-plate validation.
 - Service catalogue management with activation workflows.
 - Branch-scoped booking management with canonical service offerings, ownership, lifecycle, time, capacity, and vehicle validation.
