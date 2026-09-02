@@ -4,6 +4,12 @@
 
 ### Added
 
+- Completed NOTIFY-001 (#126) with a keyset-paginated in-app inbox, total unread counts, unread filtering,
+  idempotent recipient-only mark-one and atomic mark-all-read operations, while preserving the legacy recent list.
+- Added Flyway `V6__notification_lifecycle.sql` with read-state consistency validation, exact-nanosecond cursor indexes,
+  a partial unread index, tenant-query support, clean/incremental migration coverage, and PostgreSQL concurrency tests.
+- Added scalar notification projections, scope-bound opaque cursors, SQL subject/tenant predicates, validated page
+  limits, 75-operation OpenAPI coverage, and expanded Bruno notification lifecycle/security acceptance.
 - Implemented AUDIT-001 (#125) as a dedicated append-only `audit` capability. Sensitive success events commit in the authoritative business transaction, denied/failed events persist through an isolated write after rollback, and both in-memory and PostgreSQL adapters preserve equivalent semantics.
 - Added Flyway `V5__security_and_operational_audit.sql`, immutable historical identifiers, JSONB metadata constraints, tenant/actor/action/resource date indexes, and `AUDIT_READ` for business owners and platform administrators.
 - Added `GET /api/audit-records` with bounded newest-first cursor filtering, authenticated-tenant enforcement for owners, explicit tenant/platform scopes for administrators, and no write/delete audit API.

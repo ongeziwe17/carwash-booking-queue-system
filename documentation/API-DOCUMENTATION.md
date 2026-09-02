@@ -275,20 +275,46 @@ Queue API responses are detached snapshots built while the coordinator lock is h
 
 | Method | Path | Auth / access | Success | Expected errors | Purpose |
 |---|---|---|---|---|---|
-| GET | `/api/notifications/user/{userId}` | Bearer; self or `PLATFORM_ADMIN` | `200 NotificationResponse[]` | 400, 401, 403, 405, 500 | List recent bounded in-app notifications. |
+| GET | `/api/notifications/user/{userId}` | Bearer; recipient, tenant operator, or explicitly scoped `PLATFORM_ADMIN` | `200 NotificationResponse[]` | 400, 401, 403, 405, 500 | Backward-compatible recent bounded list. |
+| GET | `/api/notifications/user/{userId}/inbox` | Bearer; recipient, tenant operator, or explicitly scoped `PLATFORM_ADMIN` | `200 NotificationInboxResponse` | 400, 401, 403, 500 | Keyset page with total authorized unread count. |
+| PUT | `/api/notifications/{notificationId}/read` | Bearer; authenticated recipient only | `200 NotificationResponse` | 400, 401, 404, 500 | Idempotently mark one own `SENT` record read. |
+| PUT | `/api/notifications/user/{userId}/read-all` | Bearer; exact authenticated recipient only | `200 MarkAllNotificationsReadResponse` | 400, 401, 403, 500 | Atomically mark all own unread records read. |
 
-Results are sorted newest first by `sentAt`, with `notificationId` as the deterministic tie-breaker, and are limited by the deployment-configured recent-item default. The endpoint does not require the requested user ID to exist before an authorized admin lookup; no records therefore produce an empty list rather than a user `404`.
+Both list forms sort by exact Java `sentAt DESC, notificationId DESC`. The legacy operation applies the configured
+recent limit. Inbox uses a bounded opaque keyset cursor, never an offset; the cursor is bound to the authenticated
+actor, requested recipient, tenant scope, and `unreadOnly` value. Reuse in another scope, malformed/blank/oversized
+cursors, and limits outside `1..configured maximum` return `400`. `unreadCount` is the complete count of `SENT`
+records in the authorized recipient/tenant inbox, independent of the current page. PostgreSQL comparisons use the
+microsecond timestamp, nanosecond remainder, and ID so equal instants have no duplicates or omissions.
+
+Customers may list only their own inbox and cannot submit `businessId`. Staff/business owners may retain existing
+reads of recipient records only through their authenticated tenant; a client tenant override is rejected. Platform
+administrators must supply one exact `businessId` to read another inbox. There is no wildcard. Tenant queries carry
+both user and business predicates into SQL, so an empty or foreign scope reveals neither user nor notification
+existence. Administrators and operators still cannot mutate another recipient's read state.
+
+Mark-one resolves with `notificationId + authenticated userId`. A missing and another recipient's ID return the same
+safe `404`. `SENT -> READ` uses the injected application `Clock`; `READ -> READ` is a no-op returning the original
+`readAt`. Concurrent duplicates converge on the first committed timestamp without surfacing an optimistic-lock
+failure. Mark-all updates all and only current `SENT` rows for the exact authenticated recipient in one write
+transaction, uses one timestamp for every affected row, never rewrites existing `readAt`, and returns zero on repeat.
+
 Each response contains scalar `userId`, `bookingId`, `branchId`, and `serviceOfferingId` context plus notification lifecycle fields. It never serializes User, Booking, Queue, Branch, or ServiceOffering aggregate graphs.
 
 Notifications are currently `IN_APP` only. The synchronized `BOOKING_CANCELLED`, `BOOKING_RESCHEDULED`, `SERVICE_STARTED`, and
 `SERVICE_COMPLETED` notifications are attempted only after the canonical booking/queue state is committed. For this
 phase they are best-effort: a notification persistence failure is logged and does not turn an otherwise successful
-lifecycle operation into a failed API response. Durable notification delivery remains later NOTIFY work; SMS/email
-delivery and a broader public notification lifecycle are not implemented.
+lifecycle operation into a failed API response. `BookingNotificationPublisher` remains the sole narrow cross-module
+creation contract. There is no public notification POST, DELETE, or purge endpoint. SMS, email, push delivery and
+marketing campaigns remain out of scope.
 
 `QUEUE_CALLED` keeps stricter operational semantics: the call transition and notification must both succeed. If
 notification persistence fails, the queue entry's status, call timestamp, position, and ETA are restored so a retry
 selects the same still-waiting entry rather than advancing the queue.
+
+Current retention is dependency-driven rather than time-driven: notifications remain until existing authorized user
+or eligible cancelled-booking cleanup removes them. No scheduler silently expires records, and unread records are not
+purged. Automated age-based expiry is a separate future capability.
 
 ## Reports
 
@@ -604,7 +630,7 @@ Externally visible policy values are deployment-configurable rather than hard-co
 - global single-location operating start and end;
 - booking slot interval;
 - application timezone used for booking time validation/policy decisions and queue/notification lifecycle timestamps;
-- recent-notification result limit;
+- legacy recent-notification limit plus default/maximum inbox page sizes;
 - defensive queue fallback service duration.
 
 See [Runtime Policy Configuration](CONFIGURATION.md) for defaults, validation, cutoff semantics, and environment overrides. Configuration is internal; there is no public configuration endpoint.
@@ -617,7 +643,8 @@ See [Runtime Policy Configuration](CONFIGURATION.md) for defaults, validation, c
 - Reusable service definitions remain global; new bookings and queue waits use branch offerings, while AVAIL-001 still uses legacy global service/capacity inputs.
 - General list pagination remains future work; tenant predicates are mandatory even when a bounded list has no pagination.
 - Queue/booking lifecycle synchronization is not yet complete beyond the transitions currently implemented.
-- Notifications are in-app only; there is no SMS/email provider delivery.
+- Notifications are in-app only; there is no SMS/email/push provider delivery, marketing campaign API, public
+  notification creation/deletion, or automated time-based expiry.
 - Payments/refunds are not implemented.
 - List APIs do not provide general pagination or sorting; the services list has only its current `active` filter.
 - Production observability/health-platform work is not complete.

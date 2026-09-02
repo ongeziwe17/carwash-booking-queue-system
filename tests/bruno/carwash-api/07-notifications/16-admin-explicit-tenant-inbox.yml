@@ -1,0 +1,23 @@
+info:
+  name: Administrator reads explicit tenant inbox
+  type: http
+  seq: 16
+  tags: [admin, notification, security]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/notifications/user/{{customerUserId}}/inbox?businessId={{opsBusinessId}}"
+  auth:
+    type: bearer
+    token: "{{adminToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns explicitly scoped inbox", function() { expect(res.status).to.equal(200); expect(res.body.notifications).to.be.an("array").and.not.empty; });
+        test("returns only the requested tenant branch", function() { expect(res.body.notifications.every(n => n.branchId === bru.getVar("opsBranchId"))).to.equal(true); });
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

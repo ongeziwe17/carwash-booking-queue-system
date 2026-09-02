@@ -1,0 +1,25 @@
+info:
+  name: Arbitrary notification creation is absent
+  type: http
+  seq: 21
+  tags: [notification, security]
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/notifications"
+  auth:
+    type: bearer
+    token: "{{adminToken}}"
+  body:
+    type: json
+    data: '{"userId":"{{customerUserId}}","type":"ARBITRARY","message":"not allowed"}'
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("has no public create operation", function() { expect([404, 405]).to.include(res.status); });
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

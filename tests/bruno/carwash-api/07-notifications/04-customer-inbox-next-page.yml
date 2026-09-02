@@ -1,0 +1,23 @@
+info:
+  name: Customer follows inbox keyset cursor
+  type: http
+  seq: 4
+  tags: [customer, notification, lifecycle]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/notifications/user/{{customerUserId}}/inbox?limit=1&cursor={{notificationInboxCursor}}"
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns the next page", function() { expect(res.status).to.equal(200); expect(res.body.notifications).to.be.an("array").with.length(1); });
+        test("does not repeat the prior key", function() { expect(res.body.notifications[0].notificationId).to.not.equal(bru.getVar("notificationReadId")); });
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

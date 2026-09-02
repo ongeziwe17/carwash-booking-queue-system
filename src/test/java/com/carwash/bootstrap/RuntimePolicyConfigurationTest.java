@@ -43,6 +43,8 @@ class RuntimePolicyConfigurationTest {
                     "carwash.policy.booking.operating-end=17:00",
                     "carwash.policy.booking.slot-interval=PT30M",
                     "carwash.policy.notification.recent-limit=10",
+                    "carwash.policy.notification.inbox-default-page-size=20",
+                    "carwash.policy.notification.inbox-maximum-page-size=100",
                     "carwash.policy.queue.default-service-duration=PT10M",
                     "carwash.recommendation.weights.distance=0.25",
                     "carwash.recommendation.weights.queue-wait=0.25",
@@ -61,6 +63,8 @@ class RuntimePolicyConfigurationTest {
                 "carwash.policy.booking.operating-end=18:30",
                 "carwash.policy.booking.slot-interval=PT15M",
                 "carwash.policy.notification.recent-limit=3",
+                "carwash.policy.notification.inbox-default-page-size=15",
+                "carwash.policy.notification.inbox-maximum-page-size=75",
                 "carwash.policy.queue.default-service-duration=PT15M",
                 "carwash.runtime.time-zone=Africa/Johannesburg"
         ).run(context -> {
@@ -71,6 +75,8 @@ class RuntimePolicyConfigurationTest {
             assertEquals(LocalTime.of(18, 30), context.getBean(BookingPolicyProperties.class).operatingEnd());
             assertEquals(Duration.ofMinutes(15), context.getBean(BookingPolicyProperties.class).slotInterval());
             assertEquals(3, context.getBean(NotificationPolicyProperties.class).recentLimit());
+            assertEquals(15, context.getBean(NotificationPolicyProperties.class).inboxDefaultPageSize());
+            assertEquals(75, context.getBean(NotificationPolicyProperties.class).inboxMaximumPageSize());
             assertEquals(Duration.ofMinutes(15), context.getBean(QueuePolicyProperties.class).defaultServiceDuration());
             assertEquals(ZoneId.of("Africa/Johannesburg"), context.getBean(RuntimeProperties.class).timeZone());
             assertEquals(ZoneId.of("Africa/Johannesburg"), context.getBean(Clock.class).getZone());
@@ -189,6 +195,17 @@ class RuntimePolicyConfigurationTest {
     @Test
     void zeroNotificationRecentLimitFailsStartupValidation() {
         assertInvalid("carwash.policy.notification.recent-limit=0", "recentLimit");
+    }
+
+    @Test
+    void zeroNotificationInboxDefaultFailsStartupValidation() {
+        assertInvalid("carwash.policy.notification.inbox-default-page-size=0", "inboxDefaultPageSize");
+    }
+
+    @Test
+    void notificationInboxDefaultCannotExceedMaximum() {
+        assertInvalid("carwash.policy.notification.inbox-default-page-size=101",
+                "default inbox page size");
     }
 
     @Test

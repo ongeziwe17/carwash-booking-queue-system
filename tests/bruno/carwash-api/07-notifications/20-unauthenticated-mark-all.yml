@@ -1,0 +1,21 @@
+info:
+  name: Mark all read requires authentication
+  type: http
+  seq: 20
+  tags: [notification, security]
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/notifications/user/{{customerUserId}}/read-all"
+  auth:
+    type: none
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 401", function() { expect(res.status).to.equal(401); expect(res.body.code).to.equal("AUTHENTICATION_REQUIRED"); });
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

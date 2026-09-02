@@ -1,0 +1,23 @@
+info:
+  name: Notification deletion is absent
+  type: http
+  seq: 22
+  tags: [notification, security]
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/notifications/{{notificationReadId}}"
+  auth:
+    type: bearer
+    token: "{{adminToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("has no public delete operation", function() { expect([404, 405]).to.include(res.status); });
+        test("does not report deletion success", function() { expect(res.status).to.not.equal(204); });
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

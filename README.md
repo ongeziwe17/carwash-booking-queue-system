@@ -14,7 +14,8 @@ Spring Boot backend foundation for car wash booking, queue management, Marketpla
 - Read-only single-location service availability with configured operating hours, interval slots, service duration, and remaining global capacity.
 - Branch-aware exact-instant availability using effective public branches, operating-window-anchored slot grids, unambiguous branch-local starts, full service-window hours/closures, offering price/duration/capacity, overlapping active bookings, same-day branch queue estimates, and optional raw-distance radius filtering.
 - Branch-partitioned queue lifecycle, ordering, call-next, and offering-duration wait estimation.
-- In-app notification lookup with bounded branch/offering context.
+- Complete in-app notification inbox lifecycle with bounded scalar records, exact keyset pagination, unread counts,
+  idempotent recipient-only read state, and tenant-scoped operator/platform-administrator reads.
 - Explicit branch- or business-scoped daily summary reporting.
 - Marketplace business/branch registration, bounded lifecycle management, coordinates, timezones, and basic active/public branch discovery.
 - Marketplace branch scheduling with atomic weekly intervals, overnight/week-boundary support, temporary closure history, and explicit-instant open-status decisions.
@@ -29,7 +30,8 @@ Spring Boot backend foundation for car wash booking, queue management, Marketpla
 
 - The default profile is intentionally in-memory and loses data on restart; select `postgres` for durability.
 - Existing operational users are not assigned a tenant implicitly; platform administrators must explicitly onboard them before they can authenticate as staff or business owners.
-- External SMS/email delivery is not implemented.
+- External SMS, email, push delivery, and marketing campaigns are not implemented; notification creation remains
+  internal to booking and queue workflows.
 - Nearby distance is straight-line only; no routing, traffic, geocoding, or external maps provider is used.
 - Payments, capacity reservations, concurrent bay/staff scheduling, production observability, backups/restore automation, and deployment hardening remain future work.
 - Recommendations are point-in-time rules only; personalization, machine learning, sponsored ranking, dynamic pricing, traffic-aware routing, and holds are not implemented.
@@ -145,6 +147,10 @@ That last command is destructive and cannot recover the removed local volume.
 Booking, availability, notification, queue, recommendation, and application-time policies use validated typed Spring configuration with safe defaults and environment-variable overrides. See [Runtime Policy Configuration](documentation/CONFIGURATION.md) for the supported properties, scheduling-window rules, recommendation weights/radius, validation, cancellation cutoff semantics, duration syntax, and override examples.
 
 ## Testing
+
+The NOTIFY-001 source inventory is 423 unit/architecture tests, 213 integration tests (including 28 PostgreSQL 17.6
+Testcontainers tests), exactly 75 OpenAPI operations, and 562 Bruno requests with 1,746 explicit assertions. No prior
+test is removed, skipped, disabled, or weakened; Flyway V1-V5 remain byte-for-byte unchanged and V6 is additive.
 
 The test suite has two Maven responsibilities:
 

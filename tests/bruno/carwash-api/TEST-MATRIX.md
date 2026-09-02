@@ -21,6 +21,9 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 | `POST` | `/api/bookings/{id}/cancel` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `POST` | `/api/bookings/{id}/confirm` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
 | `GET` | `/api/notifications/user/{userId}` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | ✅ | N/A — no state/dependency mutation | ✅ |
+| `GET` | `/api/notifications/user/{userId}/inbox` | ✅ | ✅ — cursor and limit | ✅ | ✅ | ✅ — subject, tenant and explicit admin scope | N/A — no state/dependency mutation | ✅ |
+| `PUT` | `/api/notifications/{notificationId}/read` | ✅ | N/A — no request body | ✅ | ✅ | ✅ — recipient predicate and safe foreign 404 | ✅ — timestamp-preserving repeat | ✅ |
+| `PUT` | `/api/notifications/user/{userId}/read-all` | ✅ | N/A — no request body | ✅ | ✅ | ✅ — exact recipient only | ✅ — repeat affects zero | ✅ |
 | `GET` | `/api/queue-entries` | ✅ | ✅ — blank/unknown branch filter | ✅ | ✅ | ✅ — tenant enumeration and foreign branch 404 | ✅ — no cross-tenant leakage | ✅ |
 | `POST` | `/api/queue-entries` | ✅ | ✅ | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
 | `DELETE` | `/api/queue-entries/{id}` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | N/A — not needed in multi-step journey |
@@ -79,10 +82,10 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 
 ## Totals
 
-- API operations: **72**
-- Happy-path functional coverage: **72/72**
-- 401 coverage: **69/69 protected operations** (2 public operations are N/A)
+- API operations: **75**
+- Happy-path functional coverage: **75/75**
+- 401 coverage: **73/73 protected operations** (2 public operations are N/A)
 - RBAC/403, subject/tenant ownership, validation, integrity, and multi-step workflow applicability are covered wherever meaningful in the matrix above.
-- Bruno requests/assertions: **542 requests / 1,714 assertions**
+- Bruno requests/assertions: **562 requests / 1,746 assertions**
 
 The full authorization suite also exercises each significant role/capability allow/deny cell rather than relying only on per-operation counts.

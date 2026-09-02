@@ -154,6 +154,27 @@ The safe response policy is `401` for missing/invalid/forged/stale authenticatio
 
 The complete membership lifecycle, backfill procedure, database constraints/indexes, discovery allowlist, and #125 audit boundary are documented in [Marketplace Tenant Isolation](TENANT-ISOLATION.md).
 
+## Notification inbox protection
+
+Notification creation remains internal to canonical booking/queue workflows through `BookingNotificationPublisher`;
+there is no client-selected recipient, tenant, type, message, POST, DELETE, or purge operation. Public representations
+allow only `notificationId`, `userId`, `bookingId`, `branchId`, `serviceOfferingId`, `type`, bounded `message`,
+`channel`, `sentAt`, `readAt`, and `deliveryStatus`. They never include aggregate graphs, credentials, contact/address
+data, roles/membership, booking special requests, versions, persistence details, headers, tokens, cookies, exception
+messages, or stack traces.
+
+Customers list only their subject. Staff and owners may read a recipient only through the authenticated business;
+platform administrators must provide one exact business scope and have no wildcard. The repository SQL includes the
+recipient and business predicates, so a foreign tenant produces an empty inbox without a user/resource discovery
+read. Customer/operator tenant overrides are rejected. A cursor is bounded, opaque, and bound to the complete
+authenticated query scope, but repository predicates remain authoritative even if a cursor is malformed or forged.
+
+Read-state mutation is stricter than list access: every role, including operators and platform administrators, may
+modify only records whose `user_id` is its own authenticated subject. Mark-one resolves and updates through
+`notification_id + user_id`, returning the same safe `404` for missing and foreign records. Mark-all requires the path
+subject to equal authentication. Both execute in the shared authoritative write boundary. Repeats never advance an
+existing `readAt`; PostgreSQL guarded updates and the in-memory write lock converge concurrent attempts on one state.
+
 ## Application audit protection
 
 AUDIT-001 makes the database record authoritative and append-only. A sensitive SUCCESS record is inserted inside the same transaction as the authorized mutation; failure of that insert prevents or rolls back the protected work. A denied/failed operation first rolls back business state, then appends its safe event through an isolated write. Audit persistence failure never replaces the original safe API error and emits only a categorical operational log.

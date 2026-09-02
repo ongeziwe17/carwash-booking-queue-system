@@ -164,6 +164,16 @@ class TenantIsolationIntegrationTest extends ApiIntegrationTestSupport {
         mockMvc.perform(get("/api/notifications/user/{id}", fixture.customerId()).with(ownerA))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[*].branchId", everyItem(is(fixture.tenantA().branchId()))));
+        mockMvc.perform(get("/api/notifications/user/{id}/inbox", fixture.customerId()).with(ownerA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.notifications[*].branchId",
+                        everyItem(is(fixture.tenantA().branchId()))))
+                .andExpect(jsonPath("$.unreadCount").value(1));
+        mockMvc.perform(get("/api/notifications/user/{id}/inbox", fixture.customerId()).with(ownerB))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.notifications[*].branchId",
+                        everyItem(is(fixture.tenantB().branchId()))))
+                .andExpect(jsonPath("$.unreadCount").value(1));
 
         assertIndistinguishableNotFound(
                 get("/api/bookings/{id}", fixture.tenantB().bookingId()).with(ownerA),

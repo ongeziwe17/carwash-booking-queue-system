@@ -38,6 +38,8 @@ Compose activates `postgres` automatically and requires `POSTGRES_PASSWORD` in t
 | `carwash.policy.booking.operating-end` | `CARWASH_BOOKING_OPERATING_END` | `LocalTime` | `17:00` | required; after operating start | Global single-location closing time; overnight windows are not supported. |
 | `carwash.policy.booking.slot-interval` | `CARWASH_BOOKING_SLOT_INTERVAL` | `Duration` | `PT30M` | positive whole minutes; at least one minute | Interval between appointment starts, measured from the applicable operating-window start. |
 | `carwash.policy.notification.recent-limit` | `CARWASH_NOTIFICATION_RECENT_LIMIT` | integer | `10` | `>= 1` | Default maximum returned by the recent-notification lookup. Explicit internal caller limits still take precedence. |
+| `carwash.policy.notification.inbox-default-page-size` | `CARWASH_NOTIFICATION_INBOX_DEFAULT_PAGE_SIZE` | integer | `20` | `1..500`, not above maximum | Default keyset inbox page size. |
+| `carwash.policy.notification.inbox-maximum-page-size` | `CARWASH_NOTIFICATION_INBOX_MAXIMUM_PAGE_SIZE` | integer | `100` | `1..500` | Hard upper bound for inbox pages. |
 | `carwash.policy.queue.default-service-duration` | `CARWASH_QUEUE_DEFAULT_SERVICE_DURATION` | `Duration` | `PT10M` | greater than zero | Retained validated CONFIG-001 compatibility setting. OPS-001 queue entries always resolve their offering duration and never fall back to this value. |
 | `carwash.recommendation.weights.distance` | `CARWASH_RECOMMENDATION_WEIGHT_DISTANCE` | decimal | `0.25` | finite; `0..1`; all four weights sum exactly to `1` | BEST_OVERALL distance weight. |
 | `carwash.recommendation.weights.queue-wait` | `CARWASH_RECOMMENDATION_WEIGHT_QUEUE_WAIT` | decimal | `0.25` | finite; `0..1`; all four weights sum exactly to `1` | BEST_OVERALL queue-wait weight. |
@@ -108,7 +110,7 @@ Tests set all supported policy values and the timezone explicitly in `applicatio
 
 ## Runtime policy versus domain invariant
 
-Runtime policies are operational values that may legitimately vary between environments without changing the workflow model, such as slot capacity, cancellation lead time, global operating hours, slot interval, recent-notification count, queue fallback duration, and timezone.
+Runtime policies are operational values that may legitimately vary between environments without changing the workflow model, such as slot capacity, cancellation lead time, global operating hours, slot interval, recent-notification count, notification inbox page bounds, queue fallback duration, and timezone.
 
 Domain invariants remain code. CONFIG-001 does not externalize booking or queue status transitions, the requirement for positive queue positions, ownership rules, terminal-state restrictions, or the initial `WAITING` queue state. The `IN_APP` notification channel is also retained as an implementation constant because external delivery/channel selection is not configurable functionality in the current system.
 
