@@ -3,6 +3,7 @@ package com.carwash.notification.application;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Max;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 import org.springframework.validation.annotation.Validated;
 
 @Validated
@@ -12,6 +13,7 @@ public record NotificationPolicyProperties(
         @Min(1) @Max(500) int inboxDefaultPageSize,
         @Min(1) @Max(500) int inboxMaximumPageSize
 ) {
+    @ConstructorBinding
     public NotificationPolicyProperties {
         if (inboxDefaultPageSize > inboxMaximumPageSize) {
             throw new IllegalArgumentException(
