@@ -11,6 +11,7 @@
 
 ### Changed
 
+- Corrected customer and platform-administrator booking audit scope so successful create, update, reschedule, confirmation, cancellation, and deletion events derive `business_id` from the canonically locked branch/booking inside the authoritative write transaction. Actor snapshots remain membership-accurate, while missing/foreign failures remain unscoped and actor-safe.
 - Enforced Marketplace tenant isolation with one Identity-owned membership per operational user, server-validated `tenant_id` JWT claims, bounded tenant access context, tenant-scoped application/repository operations across Marketplace and operational resources, customer subject scope, explicit platform-admin paths, global-catalogue restrictions, safe foreign-resource `404` responses, discovery-specific DTOs, additive Flyway V4 constraints/indexes, and in-memory/PostgreSQL/API/Bruno coverage.
 - Added an explicit PostgreSQL persistence profile with Flyway-owned schema, module-local JPA adapters for every repository port, transaction/after-commit abstraction, optimistic versions, cross-instance advisory locks for booking capacity and queue ordering, lossless nanosecond mappings, persistent Docker Compose storage, Testcontainers concurrency/restart tests, and CI acceptance coverage.
 - Corrected BEST_OVERALL response formatting to round the unrounded internal score once, keep scores bounded, and deterministically reconcile six-decimal component contributions without changing ranking.

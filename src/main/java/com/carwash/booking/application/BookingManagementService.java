@@ -35,6 +35,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 import org.springframework.security.access.AccessDeniedException;
 import com.carwash.audit.application.*;
 import com.carwash.audit.domain.AuditAction;
@@ -183,7 +184,9 @@ public class BookingManagementService implements BookingQuery {
         Booking booking = new Booking(
                 bookingId, user, vehicle, branchId, serviceOfferingId, null,
                 scheduledDateTime, specialRequest);
-        return audit.execute(event(access, AuditAction.BOOKING_CREATED, "BOOKING", bookingId),
+        return audit.executeDeferred(
+                () -> canonicalNewBookingEvent(access, AuditAction.BOOKING_CREATED, booking),
+                actorSafeBookingEvent(access, AuditAction.BOOKING_CREATED, bookingId),
                 () -> coordinator.write(() -> createBookingInside(access, booking)));
     }
 
@@ -192,25 +195,7 @@ public class BookingManagementService implements BookingQuery {
     }
 
     private Booking createBookingInside(TenantAccessContext access, Booking booking) {
-        if (booking == null) throw new BusinessRuleViolationException("Booking is required");
-        if (access != null) {
-            Objects.requireNonNull(access, "Tenant access context is required");
-            String requestedUserId = booking.getUser() == null ? null : booking.getUser().getUserId();
-            if (access.isCustomer() && !access.userId().equals(requestedUserId)) {
-                throw new AccessDeniedException("Customer self-service access is required");
-            }
-        }
-        lockNewBooking(access, booking);
-        String normalizedBranchId = normalizeId(booking.getBranchId(), "Branch ID");
-        BranchSnapshot branch;
-        if (access != null && access.isOperational()) {
-            branch = marketplaceQuery.findBranchOptionalByBusiness(normalizedBranchId, access.requireBusinessId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
-        } else {
-            branch = marketplaceQuery.findBranchOptional(normalizedBranchId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
-        }
-        mutationLock.acquire(MutationLock.business(branch.businessId()));
+        resolveNewBookingBranchForMutation(access, booking);
         validateAndResolveNewBooking(booking);
         if (!bookingRepository.insert(booking)) {
             throw new BusinessRuleViolationException("Booking ID already exists");
@@ -361,13 +346,7 @@ public class BookingManagementService implements BookingQuery {
             String normalizedBookingId = normalizeId(bookingId, "Booking ID");
             mutationLock.acquire(MutationLock.booking(normalizedBookingId));
             Booking existing = requireBookingForMutation(access, normalizedBookingId);
-            mutationLock.acquire(java.util.List.of(
-                    MutationLock.offering(existing.getServiceOfferingId()),
-                    MutationLock.offering(serviceOfferingId),
-                    MutationLock.customer(existing.getUser().getUserId()),
-                    MutationLock.vehicle(vehicleId),
-                    MutationLock.branch(existing.getBranchId())
-            ));
+            lockBookingUpdateDecision(existing, vehicleId, serviceOfferingId);
             lockBookingBusiness(access, existing);
             requireModifiableBooking(existing);
             if (queueEntryRepository.existsActiveByBookingId(normalizedBookingId)) {
@@ -412,7 +391,11 @@ public class BookingManagementService implements BookingQuery {
             String serviceOfferingId,
             String specialRequest
     ) {
-        return audit.execute(event(access, AuditAction.BOOKING_UPDATED, "BOOKING", bookingId),
+        return audit.executeDeferred(
+                () -> canonicalExistingBookingEvent(
+                        access, AuditAction.BOOKING_UPDATED, bookingId,
+                        booking -> lockBookingUpdateDecision(booking, vehicleId, serviceOfferingId)),
+                actorSafeBookingEvent(access, AuditAction.BOOKING_UPDATED, bookingId),
                 () -> coordinator.write(() -> updateBookingInside(
                         access, bookingId, vehicleId, serviceOfferingId, specialRequest)));
     }
@@ -471,7 +454,11 @@ public class BookingManagementService implements BookingQuery {
             String bookingId,
             LocalDateTime scheduledDateTime
     ) {
-        return audit.execute(event(access, AuditAction.BOOKING_RESCHEDULED, "BOOKING", bookingId),
+        return audit.executeDeferred(
+                () -> canonicalExistingBookingEvent(
+                        access, AuditAction.BOOKING_RESCHEDULED, bookingId,
+                        booking -> lockExistingBookingDecision(booking, false)),
+                actorSafeBookingEvent(access, AuditAction.BOOKING_RESCHEDULED, bookingId),
                 () -> coordinator.write(() -> rescheduleBookingInside(access, bookingId, scheduledDateTime)));
     }
 
@@ -538,7 +525,11 @@ public class BookingManagementService implements BookingQuery {
     }
 
     public Booking cancelBooking(TenantAccessContext access, String bookingId) {
-        return audit.execute(event(access, AuditAction.BOOKING_CANCELLED, "BOOKING", bookingId),
+        return audit.executeDeferred(
+                () -> canonicalExistingBookingEvent(
+                        access, AuditAction.BOOKING_CANCELLED, bookingId,
+                        booking -> lockExistingBookingDecision(booking, true)),
+                actorSafeBookingEvent(access, AuditAction.BOOKING_CANCELLED, bookingId),
                 () -> coordinator.write(() -> cancelBookingInside(access, bookingId, null)));
     }
 
@@ -550,9 +541,7 @@ public class BookingManagementService implements BookingQuery {
             String normalizedBookingId = normalizeId(bookingId, "Booking ID");
             mutationLock.acquire(MutationLock.booking(normalizedBookingId));
             Booking booking = requireBookingForMutation(access, normalizedBookingId);
-            mutationLock.acquire(List.of(
-                    MutationLock.offering(booking.getServiceOfferingId()),
-                    MutationLock.branch(booking.getBranchId())));
+            lockBookingConfirmationDecision(booking);
             lockBookingBusiness(access, booking);
             resolveOperationalOffering(booking.getBranchId(), booking.getServiceOfferingId());
             if (booking.getStatus() == BookingStatus.CANCELLED) {
@@ -569,7 +558,16 @@ public class BookingManagementService implements BookingQuery {
     }
 
     public Booking confirmBooking(TenantAccessContext access, String bookingId) {
-        return audit.execute(event(access, AuditAction.BOOKING_CONFIRMED, "BOOKING", bookingId),
+        return audit.executeDeferred(
+                () -> {
+                    if (access.isCustomer()) {
+                        throw new AccessDeniedException("Operational booking access is required");
+                    }
+                    return canonicalExistingBookingEvent(
+                            access, AuditAction.BOOKING_CONFIRMED, bookingId,
+                            this::lockBookingConfirmationDecision);
+                },
+                actorSafeBookingEvent(access, AuditAction.BOOKING_CONFIRMED, bookingId),
                 () -> coordinator.write(() -> {
             if (access.isCustomer()) throw new AccessDeniedException("Operational booking access is required");
             return confirmBookingInside(access, bookingId);
@@ -584,13 +582,7 @@ public class BookingManagementService implements BookingQuery {
             String normalizedBookingId = normalizeId(bookingId, "Booking ID");
             mutationLock.acquire(MutationLock.booking(normalizedBookingId));
             Booking booking = requireBookingForMutation(access, normalizedBookingId);
-            mutationLock.acquire(java.util.List.of(
-                    MutationLock.offering(booking.getServiceOfferingId()),
-                    MutationLock.vehicle(booking.getVehicle().getVehicleId()),
-                    MutationLock.customer(booking.getUser().getUserId()),
-                    MutationLock.queueBranch(booking.getBranchId()),
-                    MutationLock.branch(booking.getBranchId())
-            ));
+            lockBookingDeletionDecision(booking);
             lockBookingBusiness(access, booking);
             if (booking.getStatus() != BookingStatus.CANCELLED) {
                 throw new BusinessRuleViolationException("Only cancelled bookings can be deleted");
@@ -616,14 +608,54 @@ public class BookingManagementService implements BookingQuery {
     }
 
     public void deleteBooking(TenantAccessContext access, String bookingId) {
-        audit.execute(event(access, AuditAction.BOOKING_DELETED, "BOOKING", bookingId),
+        audit.executeDeferred(
+                () -> canonicalExistingBookingEvent(
+                        access, AuditAction.BOOKING_DELETED, bookingId,
+                        this::lockBookingDeletionDecision),
+                actorSafeBookingEvent(access, AuditAction.BOOKING_DELETED, bookingId),
                 () -> coordinator.write(() -> deleteBookingInside(access, bookingId)));
     }
 
-    private AuditCommand event(TenantAccessContext access, AuditAction action, String targetType, String targetId) {
+    private AuditCommand actorSafeBookingEvent(
+            TenantAccessContext access,
+            AuditAction action,
+            String targetId
+    ) {
+        return bookingEvent(access, action, targetId, access == null ? null : access.businessId());
+    }
+
+    private AuditCommand canonicalNewBookingEvent(
+            TenantAccessContext access,
+            AuditAction action,
+            Booking booking
+    ) {
+        BranchSnapshot branch = resolveNewBookingBranchForMutation(access, booking);
+        return bookingEvent(access, action, booking.getBookingId(), branch.businessId());
+    }
+
+    private AuditCommand canonicalExistingBookingEvent(
+            TenantAccessContext access,
+            AuditAction action,
+            String bookingId,
+            Consumer<Booking> dependencyLocks
+    ) {
+        String normalizedBookingId = normalizeId(bookingId, "Booking ID");
+        mutationLock.acquire(MutationLock.booking(normalizedBookingId));
+        Booking booking = requireBookingForMutation(access, normalizedBookingId);
+        dependencyLocks.accept(booking);
+        BranchSnapshot branch = lockBookingBusiness(access, booking);
+        return bookingEvent(access, action, normalizedBookingId, branch.businessId());
+    }
+
+    private AuditCommand bookingEvent(
+            TenantAccessContext access,
+            AuditAction action,
+            String targetId,
+            String canonicalBusinessId
+    ) {
         Objects.requireNonNull(access, "Tenant access context is required");
         AuditActor actor = AuditActor.user(access.userId(), access.canonicalRoleName(), access.businessId());
-        return AuditCommand.actionForBusiness(action, actor, access.businessId(), targetType,
+        return AuditCommand.actionForBusiness(action, actor, canonicalBusinessId, "BOOKING",
                 safeAuditId(targetId), AuditSource.API);
     }
 
@@ -956,6 +988,42 @@ public class BookingManagementService implements BookingQuery {
         if (!keys.isEmpty()) mutationLock.acquire(keys);
     }
 
+    private BranchSnapshot resolveNewBookingBranchForMutation(
+            TenantAccessContext access,
+            Booking booking
+    ) {
+        if (booking == null) throw new BusinessRuleViolationException("Booking is required");
+        if (access != null) {
+            String requestedUserId = booking.getUser() == null ? null : booking.getUser().getUserId();
+            if (access.isCustomer() && !access.userId().equals(requestedUserId)) {
+                throw new AccessDeniedException("Customer self-service access is required");
+            }
+        }
+        lockNewBooking(access, booking);
+        String normalizedBranchId = normalizeId(booking.getBranchId(), "Branch ID");
+        BranchSnapshot branch = access != null && access.isOperational()
+                ? marketplaceQuery.findBranchOptionalByBusiness(normalizedBranchId, access.requireBusinessId())
+                .orElseThrow(() -> new ResourceNotFoundException("Branch not found"))
+                : marketplaceQuery.findBranchOptional(normalizedBranchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
+        mutationLock.acquire(MutationLock.business(branch.businessId()));
+        return branch;
+    }
+
+    private void lockBookingUpdateDecision(
+            Booking booking,
+            String vehicleId,
+            String serviceOfferingId
+    ) {
+        mutationLock.acquire(List.of(
+                MutationLock.offering(booking.getServiceOfferingId()),
+                MutationLock.offering(serviceOfferingId),
+                MutationLock.customer(booking.getUser().getUserId()),
+                MutationLock.vehicle(vehicleId),
+                MutationLock.branch(booking.getBranchId())
+        ));
+    }
+
     private void lockExistingBookingDecision(Booking booking, boolean queueMutation) {
         java.util.ArrayList<String> keys = new java.util.ArrayList<>();
         keys.add(MutationLock.offering(booking.getServiceOfferingId()));
@@ -966,13 +1034,30 @@ public class BookingManagementService implements BookingQuery {
         mutationLock.acquire(keys);
     }
 
-    private void lockBookingBusiness(TenantAccessContext access, Booking booking) {
+    private void lockBookingConfirmationDecision(Booking booking) {
+        mutationLock.acquire(List.of(
+                MutationLock.offering(booking.getServiceOfferingId()),
+                MutationLock.branch(booking.getBranchId())));
+    }
+
+    private void lockBookingDeletionDecision(Booking booking) {
+        mutationLock.acquire(List.of(
+                MutationLock.offering(booking.getServiceOfferingId()),
+                MutationLock.vehicle(booking.getVehicle().getVehicleId()),
+                MutationLock.customer(booking.getUser().getUserId()),
+                MutationLock.queueBranch(booking.getBranchId()),
+                MutationLock.branch(booking.getBranchId())
+        ));
+    }
+
+    private BranchSnapshot lockBookingBusiness(TenantAccessContext access, Booking booking) {
         BranchSnapshot branch = access != null && access.isOperational()
                 ? marketplaceQuery.findBranchOptionalByBusiness(booking.getBranchId(), access.requireBusinessId())
                 .orElseThrow(() -> new ResourceNotFoundException("Branch not found"))
                 : marketplaceQuery.findBranchOptional(booking.getBranchId())
                 .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
         mutationLock.acquire(MutationLock.business(branch.businessId()));
+        return branch;
     }
 
     private BookingSnapshot snapshot(Booking booking) {

@@ -38,17 +38,32 @@ public final class AuditService implements AuditOperations {
 
     @Override
     public <T> T execute(AuditCommand successCommand, AuditCommand failureCommand, Supplier<T> protectedMutation) {
-        Prepared success = prepare(successCommand);
+        return executeDeferred(() -> successCommand, failureCommand, protectedMutation);
+    }
+
+    @Override
+    public <T> T executeDeferred(
+            Supplier<AuditCommand> successCommand,
+            AuditCommand failureCommand,
+            Supplier<T> protectedMutation
+    ) {
+        Objects.requireNonNull(successCommand, "Success audit command supplier is required");
+        Objects.requireNonNull(protectedMutation, "Protected mutation is required");
+        Prepared failure = prepare(failureCommand);
         try {
             return transactions.write(() -> {
+                AuditCommand resolvedSuccess = Objects.requireNonNull(
+                        successCommand.get(), "Success audit command is required");
+                Prepared success = prepare(resolvedSuccess);
                 // Append first: a mandatory append failure cannot leave an in-memory mutation behind.
-                AuditRecord record = append(success, AuditOutcome.SUCCESS, null, successCommand.successAction());
+                AuditRecord record = append(
+                        success, AuditOutcome.SUCCESS, null, resolvedSuccess.successAction());
                 T result = protectedMutation.get();
                 logAfterCommit(record);
                 return result;
             });
         } catch (RuntimeException original) {
-            appendFailureWithoutMasking(prepare(failureCommand), original);
+            appendFailureWithoutMasking(failure, original);
             throw original;
         }
     }

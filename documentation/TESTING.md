@@ -2,6 +2,12 @@
 
 TEST-001 separates fast unit/repository/service tests from Spring API integration tests and makes isolation, test data, execution order, and release-gate behaviour explicit.
 
+## Customer booking audit-scope regression
+
+The P1 follow-up to AUDIT-001 adds **9 unit tests** and **1 PostgreSQL integration test** without removing, skipping, disabling, or weakening an existing test. The final inventory is **414 unit tests and 207 integration tests**. `PostgresPersistenceIntegrationTest` executes **26 tests** against PostgreSQL 17.6. The public contract remains exactly **72 OpenAPI operations**, and Bruno remains **542 requests with 1,714 explicit assertions**.
+
+The focused regressions prove canonical booking-branch scope for customer create/update/reschedule/cancel/delete and platform-administrator update; owner visibility and foreign-owner exclusion through the tenant query; correct separation when one customer books at two businesses; indistinguishable missing/foreign customer failures with exactly one unscoped actor-safe DENIED record; rollback of the provisional SUCCESS record when protected work fails; and prevention of booking mutation when the mandatory audit insert fails. The in-memory tests use a deterministic clock and ID sequence. PostgreSQL repeats customer/admin canonical scope, tenant-predicate exclusion, actor-safe foreign denial, and rejected-success-insert rollback against the pinned 17.6 container. Flyway V1–V5, all 72 HTTP operations, and all Bruno requests/assertions are unchanged. Issue #126 remains out of scope.
+
 ## AUDIT-001 verification
 
 AUDIT-001 adds **18 unit/architecture tests** and **9 integration tests** without removing, skipping, or weakening an existing test. The final source inventory is **405 unit tests and 206 integration tests**. `PostgresPersistenceIntegrationTest` executes **25 tests** against PostgreSQL 17.6. The contract is exactly **72 OpenAPI operations**, **542 Bruno requests**, and **1,714 explicit Bruno assertions**.
