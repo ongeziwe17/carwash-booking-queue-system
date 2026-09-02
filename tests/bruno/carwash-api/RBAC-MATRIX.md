@@ -10,6 +10,7 @@ This matrix is derived from `RoleCatalog`, controller `@PreAuthorize` expression
 | Create/manage own vehicle | ✅ | ✅ | ✅ | ✅ |
 | Operate/list another user's vehicles | ❌ | ✅ assigned tenant | ✅ assigned tenant | ✅ explicit admin path |
 | Read service catalogue | ✅ | ✅ | ✅ | ✅ |
+| Read immutable audit history | ❌ | ❌ | ✅ authenticated tenant only | ✅ explicit tenant or platform scope |
 | Read branch-aware availability | ✅ | ✅ | ✅ | ✅ |
 | Manage global service catalogue | ❌ | ❌ | ❌ | ✅ |
 | Create/manage own booking | ✅ | ✅ | ✅ | ✅ |

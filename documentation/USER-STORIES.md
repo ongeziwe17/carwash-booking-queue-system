@@ -71,7 +71,7 @@ REC-001 is implemented as a point-in-time, non-reserving read. Future-date queue
 | US-SEC-002 | #13 | As a user, I want to authenticate securely so protected functionality can identify me. | Safe login, credential verification, token/session expiry, HTTP 401 paths. |
 | US-SEC-003 | #22 | As a platform administrator, I want RBAC so customer, staff, owner, and admin actions are protected. | Explicit role matrix and 401/403 coverage. |
 | US-TENANT-001 | #124 | As a business owner, I want strict tenant isolation so no other business can access my private operational data. | Implemented: one canonical membership, trusted/stale-invalidating `tenant_id`, scoped APIs/repositories/reports/notifications, safe foreign `404`, explicit admin paths, V4 constraints/indexes, and discovery DTO allowlists. |
-| US-AUDIT-001 | #125 | As a business/platform administrator, I want an audit trail for sensitive actions. | Append-only actor/action/resource/outcome records with privacy and tenant controls. |
+| US-AUDIT-001 | #125 | As a business/platform administrator, I want an audit trail for sensitive actions. | Implemented: immutable actor/action/resource/outcome records; same-transaction success; isolated denied/failure writes; canonical identity; bounded redaction; tenant/admin read scopes; V5 indexes/constraints; no write/delete API. |
 
 ## 8. Phase 5 — Product and Platform Expansion
 
@@ -100,6 +100,6 @@ REC-001 is implemented as a point-in-time, non-reserving read. Future-date queue
 
 - Eligibility and availability rules remain deterministic even when recommendation ranking evolves.
 - Stories should be implemented in dependency order rather than issue-number order.
-- Backup/restore operations, security auditability, observability, and deployment hardening remain required before production Marketplace use; tenant isolation is implemented.
+- Backup/restore operations, SIEM/archive/retention operations, broader observability, and deployment hardening remain required before production Marketplace use; tenant isolation and application auditability are implemented foundations.
 - The modular monolith remains the default architecture until scaling or team boundaries justify extraction.
 - No story should describe a planned capability as already implemented.

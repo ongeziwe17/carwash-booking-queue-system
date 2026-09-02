@@ -18,7 +18,7 @@ class ModularMonolithArchitectureTest {
             .importPackages("com.carwash");
     private static final String[] BUSINESS_MODULES = {
             "access", "booking", "catalog", "discovery", "identity", "marketplace", "notification", "queue", "reporting",
-            "recommendation", "vehicle"
+            "recommendation", "vehicle", "audit"
     };
 
     @Test
@@ -65,6 +65,17 @@ class ModularMonolithArchitectureTest {
     void modules_do_not_depend_on_bootstrap() {
         noClasses().that().resideInAnyPackage(businessPackages())
                 .should().dependOnClassesThat().resideInAPackage("com.carwash.bootstrap..")
+                .check(APPLICATION);
+    }
+
+    @Test
+    void audit_owns_its_model_and_depends_on_no_foreign_business_capability() {
+        noClasses().that().resideInAPackage("com.carwash.audit..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.carwash.access..", "com.carwash.booking..", "com.carwash.catalog..",
+                        "com.carwash.discovery..", "com.carwash.identity..", "com.carwash.marketplace..",
+                        "com.carwash.notification..", "com.carwash.queue..", "com.carwash.reporting..",
+                        "com.carwash.recommendation..", "com.carwash.vehicle..")
                 .check(APPLICATION);
     }
 

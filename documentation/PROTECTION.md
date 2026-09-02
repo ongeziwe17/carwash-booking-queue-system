@@ -153,3 +153,11 @@ For mutations, the authorization decision is authoritative only inside the servi
 The safe response policy is `401` for missing/invalid/forged/stale authentication, `403` for a canonical role without the required permission, and indistinguishable `404` responses for absent and foreign-tenant resources. Business owners cannot register a second business or mutate the platform-wide reusable service catalogue. Discovery remains authenticated and uses dedicated allowlisted DTOs.
 
 The complete membership lifecycle, backfill procedure, database constraints/indexes, discovery allowlist, and #125 audit boundary are documented in [Marketplace Tenant Isolation](TENANT-ISOLATION.md).
+
+## Application audit protection
+
+AUDIT-001 makes the database record authoritative and append-only. A sensitive SUCCESS record is inserted inside the same transaction as the authorized mutation; failure of that insert prevents or rolls back the protected work. A denied/failed operation first rolls back business state, then appends its safe event through an isolated write. Audit persistence failure never replaces the original safe API error and emits only a categorical operational log.
+
+Identity and tenant snapshots come only from canonical server authentication/domain state. Invalid bearer contents are never decoded for enrichment. Metadata is allowlisted, ordered, and bounded; password material, hashes, JWTs, authorization/cookie headers, credentials, bodies, personal contact/address fields, vehicle notes, booking special requests, notification bodies, stack traces, and unrestricted exception messages are prohibited. `AUDIT_READ` is granted only to business owners and platform administrators. Owners are repository-scoped to their authenticated tenant; administrators must select an explicit tenant or platform scope, never a wildcard.
+
+Flyway V1–V4 remain immutable. V5 adds the audit table, constraints/indexes, and permission reference data. There is no audit write/delete/purge endpoint, SIEM integration, archive store, payment/refund implementation, or compliance certification.

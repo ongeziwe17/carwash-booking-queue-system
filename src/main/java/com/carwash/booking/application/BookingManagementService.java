@@ -36,6 +36,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.security.access.AccessDeniedException;
+import com.carwash.audit.application.*;
+import com.carwash.audit.domain.AuditAction;
+import com.carwash.audit.domain.AuditSource;
 
 public class BookingManagementService implements BookingQuery {
 
@@ -57,6 +60,7 @@ public class BookingManagementService implements BookingQuery {
     private final BookingSlotPolicyService slotPolicy;
     private final BranchAvailabilityDecisionService branchAvailability;
     private final Clock clock;
+    private final AuditOperations audit;
 
     public BookingManagementService(
             BookingRepository bookingRepository,
@@ -78,7 +82,7 @@ public class BookingManagementService implements BookingQuery {
         this(bookingRepository, userRepository, vehicleRepository, serviceDefinitionQuery, serviceOfferingQuery,
                 marketplaceQuery, queueEntryRepository, notificationRepository, notificationPublisher,
                 queueOrdering, coordinator, MutationLock.noOp(), bookingPolicy, slotPolicy,
-                branchAvailability, clock);
+                branchAvailability, clock, AuditOperations.noOp());
     }
 
     public BookingManagementService(
@@ -99,6 +103,31 @@ public class BookingManagementService implements BookingQuery {
             BranchAvailabilityDecisionService branchAvailability,
             Clock clock
     ) {
+        this(bookingRepository, userRepository, vehicleRepository, serviceDefinitionQuery, serviceOfferingQuery,
+                marketplaceQuery, queueEntryRepository, notificationRepository, notificationPublisher,
+                queueOrdering, coordinator, mutationLock, bookingPolicy, slotPolicy, branchAvailability,
+                clock, AuditOperations.noOp());
+    }
+
+    public BookingManagementService(
+            BookingRepository bookingRepository,
+            UserRepository userRepository,
+            VehicleRepository vehicleRepository,
+            ServiceDefinitionQuery serviceDefinitionQuery,
+            ServiceOfferingQuery serviceOfferingQuery,
+            MarketplaceQuery marketplaceQuery,
+            QueueEntryRepository queueEntryRepository,
+            NotificationRepository notificationRepository,
+            BookingNotificationPublisher notificationPublisher,
+            QueueOrderingService queueOrdering,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock,
+            BookingPolicyProperties bookingPolicy,
+            BookingSlotPolicyService slotPolicy,
+            BranchAvailabilityDecisionService branchAvailability,
+            Clock clock,
+            AuditOperations audit
+    ) {
         this.bookingRepository = Objects.requireNonNull(bookingRepository, "Booking repository is required");
         this.userRepository = Objects.requireNonNull(userRepository, "User repository is required");
         this.vehicleRepository = Objects.requireNonNull(vehicleRepository, "Vehicle repository is required");
@@ -117,6 +146,7 @@ public class BookingManagementService implements BookingQuery {
         this.branchAvailability = Objects.requireNonNull(branchAvailability,
                 "Branch availability decision service is required");
         this.clock = Objects.requireNonNull(clock, "Application clock is required");
+        this.audit = Objects.requireNonNull(audit, "Audit operations are required");
     }
 
     Booking createBooking(
@@ -153,7 +183,8 @@ public class BookingManagementService implements BookingQuery {
         Booking booking = new Booking(
                 bookingId, user, vehicle, branchId, serviceOfferingId, null,
                 scheduledDateTime, specialRequest);
-        return coordinator.write(() -> createBookingInside(access, booking));
+        return audit.execute(event(access, AuditAction.BOOKING_CREATED, "BOOKING", bookingId),
+                () -> coordinator.write(() -> createBookingInside(access, booking)));
     }
 
     Booking createBooking(Booking booking) {
@@ -381,8 +412,9 @@ public class BookingManagementService implements BookingQuery {
             String serviceOfferingId,
             String specialRequest
     ) {
-        return coordinator.write(() -> updateBookingInside(
-                access, bookingId, vehicleId, serviceOfferingId, specialRequest));
+        return audit.execute(event(access, AuditAction.BOOKING_UPDATED, "BOOKING", bookingId),
+                () -> coordinator.write(() -> updateBookingInside(
+                        access, bookingId, vehicleId, serviceOfferingId, specialRequest)));
     }
 
     Booking rescheduleBooking(String bookingId, LocalDateTime scheduledDateTime) {
@@ -439,7 +471,8 @@ public class BookingManagementService implements BookingQuery {
             String bookingId,
             LocalDateTime scheduledDateTime
     ) {
-        return coordinator.write(() -> rescheduleBookingInside(access, bookingId, scheduledDateTime));
+        return audit.execute(event(access, AuditAction.BOOKING_RESCHEDULED, "BOOKING", bookingId),
+                () -> coordinator.write(() -> rescheduleBookingInside(access, bookingId, scheduledDateTime)));
     }
 
     Booking cancelBooking(String bookingId, String customerId) {
@@ -505,7 +538,8 @@ public class BookingManagementService implements BookingQuery {
     }
 
     public Booking cancelBooking(TenantAccessContext access, String bookingId) {
-        return coordinator.write(() -> cancelBookingInside(access, bookingId, null));
+        return audit.execute(event(access, AuditAction.BOOKING_CANCELLED, "BOOKING", bookingId),
+                () -> coordinator.write(() -> cancelBookingInside(access, bookingId, null)));
     }
 
     Booking confirmBooking(String bookingId) {
@@ -535,10 +569,11 @@ public class BookingManagementService implements BookingQuery {
     }
 
     public Booking confirmBooking(TenantAccessContext access, String bookingId) {
-        return coordinator.write(() -> {
+        return audit.execute(event(access, AuditAction.BOOKING_CONFIRMED, "BOOKING", bookingId),
+                () -> coordinator.write(() -> {
             if (access.isCustomer()) throw new AccessDeniedException("Operational booking access is required");
             return confirmBookingInside(access, bookingId);
-        });
+        }));
     }
 
     void deleteBooking(String bookingId) {
@@ -581,7 +616,21 @@ public class BookingManagementService implements BookingQuery {
     }
 
     public void deleteBooking(TenantAccessContext access, String bookingId) {
-        coordinator.write(() -> deleteBookingInside(access, bookingId));
+        audit.execute(event(access, AuditAction.BOOKING_DELETED, "BOOKING", bookingId),
+                () -> coordinator.write(() -> deleteBookingInside(access, bookingId)));
+    }
+
+    private AuditCommand event(TenantAccessContext access, AuditAction action, String targetType, String targetId) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        AuditActor actor = AuditActor.user(access.userId(), access.role().name(), access.businessId());
+        return AuditCommand.actionForBusiness(action, actor, access.businessId(), targetType,
+                safeAuditId(targetId), AuditSource.API);
+    }
+
+    private static String safeAuditId(String value) {
+        if (value == null) return null;
+        String normalized = value.trim();
+        return normalized.isEmpty() || normalized.length() > 64 ? null : normalized;
     }
 
     private Booking requireBooking(String bookingId) {

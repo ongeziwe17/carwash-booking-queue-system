@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import com.carwash.access.application.TenantAccessContextProvider;
 
 @RestController
 @Validated
@@ -38,9 +39,11 @@ import java.util.List;
 public class ServiceCatalogController {
 
     private final ServiceCatalogService service;
+    private final TenantAccessContextProvider tenantAccess;
 
-    public ServiceCatalogController(ServiceCatalogService service) {
+    public ServiceCatalogController(ServiceCatalogService service, TenantAccessContextProvider tenantAccess) {
         this.service = service;
+        this.tenantAccess = tenantAccess;
     }
 
     @GetMapping
@@ -108,6 +111,7 @@ public class ServiceCatalogController {
     })
     public Service create(@Valid @RequestBody CreateServiceRequest request) {
         return service.createService(
+                tenantAccess.current(),
                 request.serviceId(),
                 request.serviceName(),
                 request.description(),
@@ -141,6 +145,7 @@ public class ServiceCatalogController {
             @Valid @RequestBody UpdateServiceRequest request
     ) {
         return service.updateService(
+                tenantAccess.current(),
                 id,
                 request.serviceName(),
                 request.description(),
@@ -169,7 +174,7 @@ public class ServiceCatalogController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public void delete(@PathVariable @NotBlank @Size(max = 64) String id) {
-        service.deleteService(id);
+        service.deleteService(tenantAccess.current(), id);
     }
 
     @PostMapping("/{id}/activate")
@@ -191,7 +196,7 @@ public class ServiceCatalogController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public Service activate(@PathVariable @NotBlank @Size(max = 64) String id) {
-        return service.activateService(id);
+        return service.activateService(tenantAccess.current(), id);
     }
 
     @PostMapping("/{id}/deactivate")
@@ -213,6 +218,6 @@ public class ServiceCatalogController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public Service deactivate(@PathVariable @NotBlank @Size(max = 64) String id) {
-        return service.deactivateService(id);
+        return service.deactivateService(tenantAccess.current(), id);
     }
 }

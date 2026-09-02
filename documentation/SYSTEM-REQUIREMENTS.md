@@ -36,7 +36,7 @@ The current backend includes:
 - Docker/local development support.
 - Flyway migrations, module-owned PostgreSQL adapters, transactional workflows, cross-instance capacity/queue locking, and restart durability.
 
-The current backend does not include a frontend application, managed database provisioning/backups, payments, external notifications, audit logging, or production SaaS hardening. Marketplace tenant identity and data isolation are implemented in both persistence profiles; database-per-tenant and federation are not.
+The current backend does not include a frontend application, managed database provisioning/backups, payments, external notifications, SIEM/archive/automated audit retention, or production SaaS hardening. Marketplace tenant identity, data isolation, and append-only application audit history are implemented in both persistence profiles; database-per-tenant and federation are not.
 
 ## 2. Stakeholder Analysis Summary
 
@@ -115,7 +115,7 @@ The current backend does not include a frontend application, managed database pr
 | Requirement                                        | Status                                       |
 |----------------------------------------------------|----------------------------------------------|
 | Refresh-token/logout/revocation lifecycle, if specified | Future security work                     |
-| Security and operational audit logging                 | Future security hardening                |
+| SIEM, audit archive/automated retention, certification | Future security hardening                |
 | Marketplace tenant-scoped authorization                | Implemented                              |
 | Database-per-tenant isolation or federation             | Out of current scope                     |
 | External email/SMS notification delivery           | Future product/platform work                 |

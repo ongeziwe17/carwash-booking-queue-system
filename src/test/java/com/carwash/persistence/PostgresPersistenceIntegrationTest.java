@@ -52,6 +52,17 @@ import com.carwash.shared.exception.ResourceNotFoundException;
 import com.carwash.vehicle.application.VehicleManagementService;
 import com.carwash.vehicle.domain.Vehicle;
 import com.carwash.vehicle.domain.VehicleRepository;
+import com.carwash.audit.application.AuditActor;
+import com.carwash.audit.application.AuditCommand;
+import com.carwash.audit.application.AuditOperations;
+import com.carwash.audit.application.AuditRequestContext;
+import com.carwash.audit.domain.AuditAction;
+import com.carwash.audit.domain.AuditOutcome;
+import com.carwash.audit.domain.AuditSource;
+import com.carwash.audit.domain.AuditRepository;
+import com.carwash.audit.domain.AuditQuery;
+import com.carwash.audit.domain.AuditRecord;
+import com.carwash.marketplace.application.UpdateBusinessCommand;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -136,13 +147,15 @@ class PostgresPersistenceIntegrationTest {
     @Autowired NotificationManagementService notifications;
     @Autowired NotificationRepository notificationRepository;
     @Autowired DataTransactionOperations transactions;
+    @Autowired AuditOperations audit;
+    @Autowired AuditRepository auditRepository;
 
-    @AfterEach void cleanMutableData(){jdbc.execute("truncate table users, businesses, service_definitions cascade");}
+    @AfterEach void cleanMutableData(){jdbc.execute("truncate table audit_records, users, businesses, service_definitions cascade");}
 
     @Test void emptyDatabaseMigratesAndValidatesToLatest(){
-        assertEquals("4",flyway.info().current().getVersion().getVersion());
+        assertEquals("5",flyway.info().current().getVersion().getVersion());
         assertTrue(flyway.validateWithResult().validationSuccessful);
-        assertEquals(4,jdbc.queryForObject("select count(*) from flyway_schema_history where success",Integer.class));
+        assertEquals(5,jdbc.queryForObject("select count(*) from flyway_schema_history where success",Integer.class));
         assertEquals(4,jdbc.queryForObject("select count(*) from roles",Integer.class));
     }
 
@@ -159,12 +172,115 @@ class PostgresPersistenceIntegrationTest {
                 statement.execute("insert into "+schema+".user_role_assignments(user_id,role_id) values ('legacy-unassigned-staff','builtin:STAFF')");
             }
             Flyway latest=Flyway.configure().dataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword()).schemas(schema).defaultSchema(schema).locations("classpath:db/migration").cleanDisabled(true).load();
-            assertEquals(1,latest.migrate().migrationsExecuted);
+            assertEquals(2,latest.migrate().migrationsExecuted);
             assertTrue(latest.validateWithResult().validationSuccessful);
             assertEquals(1,jdbc.queryForObject("select count(*) from "+schema+".businesses where business_id='upgrade-business'",Integer.class));
             assertEquals(0,jdbc.queryForObject("select count(*) from "+schema+".tenant_memberships where user_id='legacy-unassigned-staff'",Integer.class));
             assertEquals(1,jdbc.queryForObject("select count(*) from pg_indexes where schemaname='"+schema+"' and indexname='ix_bookings_branch_status_time_tenant'",Integer.class));
+            assertEquals(4,jdbc.queryForObject("select count(*) from pg_indexes where schemaname='"+schema+"' and indexname like 'ix_audit_%_date'",Integer.class));
+            assertEquals(2,jdbc.queryForObject("select count(*) from "+schema+".role_permissions where permission='AUDIT_READ'",Integer.class));
         }catch(Exception failure){throw new AssertionError(failure);}finally{jdbc.execute("drop schema "+schema+" cascade");}
+    }
+
+    @Test void auditSchemaConstraintsIndexesAtomicityAndConcurrentAppendsAreDurable() throws Exception {
+        assertEquals(4,jdbc.queryForObject("select count(*) from pg_indexes where schemaname=current_schema() and indexname like 'ix_audit_%_date'",Integer.class));
+        assertEquals(2,jdbc.queryForObject("select count(*) from role_permissions where permission='AUDIT_READ'",Integer.class));
+        assertThrows(DataIntegrityViolationException.class,()->jdbc.update("""
+                insert into audit_records(audit_id,occurred_at,actor_type,action,target_type,outcome,
+                    reason_code,correlation_id,metadata,event_source)
+                values ('invalid-audit',current_timestamp,'ANONYMOUS','LOGIN_FAILURE','AUTHENTICATION',
+                    'FAILURE','INVALID','invalid-correlation','[]'::jsonb,'SECURITY')
+                """));
+        assertThrows(DataIntegrityViolationException.class,()->jdbc.update("""
+                insert into audit_records(audit_id,occurred_at,actor_type,action,target_type,outcome,
+                    correlation_id,metadata,event_source)
+                values ('unsafe-key-audit',current_timestamp,'SYSTEM','PLATFORM_ADMIN_OPERATION','DATABASE',
+                    'SUCCESS','unsafe-key-correlation','{"password":"must-not-persist"}'::jsonb,'SYSTEM')
+                """));
+
+        Instant boundary=Instant.parse("2089-01-15T12:00:00.123456000Z");
+        for(int remainder:new int[]{100,500,900}){
+            auditRepository.append(new AuditRecord("nano-audit-"+remainder,boundary.plusNanos(remainder),
+                    com.carwash.audit.domain.AuditActorType.SYSTEM,null,null,"nano-business",
+                    AuditAction.PLATFORM_ADMIN_OPERATION,"NANO_BOUNDARY","nano-"+remainder,
+                    AuditOutcome.SUCCESS,null,"nano-correlation-"+remainder,java.util.Map.of(),AuditSource.SYSTEM));
+        }
+        List<AuditRecord> exactNanos=auditRepository.queryByBusinessId("nano-business",new AuditQuery(
+                null,AuditAction.PLATFORM_ADMIN_OPERATION,null,"NANO_BOUNDARY",null,
+                boundary.plusNanos(200),boundary.plusNanos(800),null,10));
+        assertEquals(List.of("nano-audit-500"),exactNanos.stream().map(AuditRecord::auditId).toList());
+
+        marketplace.registerBusiness(ADMIN,new RegisterBusinessCommand(
+                "audit-atomic-business","Original Audit Business","audit-atomic@example.test",
+                "0123456789","audit-atomic-registration"));
+        jdbc.execute("""
+                create function reject_business_update_audit() returns trigger language plpgsql as $$
+                begin
+                    if new.action = 'BUSINESS_UPDATED' then
+                        raise exception 'injected mandatory audit failure';
+                    end if;
+                    return new;
+                end $$
+                """);
+        jdbc.execute("create trigger reject_business_update_audit before insert on audit_records for each row execute function reject_business_update_audit()");
+        try {
+            assertThrows(RuntimeException.class,()->marketplace.updateBusiness(ADMIN,"audit-atomic-business",
+                    new UpdateBusinessCommand("Must Roll Back","audit-atomic@example.test",
+                            "0123456789","audit-atomic-registration")));
+            assertEquals("Original Audit Business",marketplace.findBusiness("audit-atomic-business").businessName());
+        } finally {
+            jdbc.execute("drop trigger reject_business_update_audit on audit_records");
+            jdbc.execute("drop function reject_business_update_audit()");
+        }
+
+        int count=20;
+        CountDownLatch start=new CountDownLatch(1);
+        try(var executor=Executors.newFixedThreadPool(5)){
+            List<Future<Void>> futures=java.util.stream.IntStream.range(0,count).mapToObj(index->executor.submit(()->{
+                start.await();
+                AuditRequestContext.open("postgres-audit-"+index);
+                try{
+                    audit.appendIsolated(AuditCommand.actionForBusiness(AuditAction.PLATFORM_ADMIN_OPERATION,
+                            AuditActor.system(),"audit-atomic-business","PG_CONCURRENT","target-"+index,
+                            AuditSource.SYSTEM),AuditOutcome.SUCCESS,null);
+                }finally{AuditRequestContext.close();}
+                return null;
+            })).toList();
+            start.countDown();
+            for(Future<Void> future:futures)future.get();
+        }
+        assertEquals(count,jdbc.queryForObject(
+                "select count(*) from audit_records where target_type='PG_CONCURRENT'",Integer.class));
+        assertEquals(count,jdbc.queryForObject(
+                "select count(distinct audit_id) from audit_records where target_type='PG_CONCURRENT'",Integer.class));
+    }
+
+    @Test void failedBusinessTransactionLeavesOnlyItsIsolatedFailureAudit() {
+        AuditRequestContext.open("postgres-rollback-audit");
+        try {
+            AuditCommand command=AuditCommand.actionForBusiness(AuditAction.PLATFORM_ADMIN_OPERATION,
+                    AuditActor.system(),"rollback-audit-business","PG_ROLLBACK","rollback-audit-target",
+                    AuditSource.SYSTEM);
+            assertThrows(IllegalStateException.class,()->audit.execute(command,()->{
+                jdbc.update("""
+                        insert into businesses(business_id,business_name,contact_email,contact_phone,
+                            business_status,registered_at,updated_at)
+                        values ('rollback-audit-business','Rollback','rollback-audit@example.test',
+                            '0123456789','ACTIVE',current_timestamp,current_timestamp)
+                        """);
+                throw new IllegalStateException("injected protected failure");
+            }));
+        } finally {
+            AuditRequestContext.close();
+        }
+        assertEquals(0,jdbc.queryForObject(
+                "select count(*) from businesses where business_id='rollback-audit-business'",Integer.class));
+        List<com.carwash.audit.domain.AuditRecord> failure=auditRepository.queryByBusinessId(
+                "rollback-audit-business",new AuditQuery(null,AuditAction.PLATFORM_ADMIN_OPERATION,null,
+                        "PG_ROLLBACK",null,Instant.now().minusSeconds(60),Instant.now().plusSeconds(60),null,10));
+        assertEquals(1,failure.size());
+        assertEquals(AuditOutcome.FAILURE,failure.getFirst().outcome());
+        assertEquals("OPERATION_FAILED",failure.getFirst().reasonCode());
     }
 
     @Test void membershipConstraintsAndTransactionsEnforceOneOperationalTenant(){

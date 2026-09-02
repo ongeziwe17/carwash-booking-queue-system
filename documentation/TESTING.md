@@ -2,13 +2,21 @@
 
 TEST-001 separates fast unit/repository/service tests from Spring API integration tests and makes isolation, test data, execution order, and release-gate behaviour explicit.
 
+## AUDIT-001 verification
+
+AUDIT-001 adds **18 unit/architecture tests** and **9 integration tests** without removing, skipping, or weakening an existing test. The final source inventory is **405 unit tests and 206 integration tests**. `PostgresPersistenceIntegrationTest` executes **25 tests** against PostgreSQL 17.6. The contract is exactly **72 OpenAPI operations**, **542 Bruno requests**, and **1,714 explicit Bruno assertions**.
+
+Focused tests prove exactly-once committed success records; isolated failure survival after business rollback; mandatory audit-insert failure preventing the protected mutation; login and invalid/missing/forged bearer privacy; filter/method/service denial deduplication; owner tenant predicates; staff/customer `403`; explicit administrator tenant/platform scope; cross-tenant safe-`404` actor-tenant snapshots; no update/delete repository or HTTP contract; allowlisted bounded metadata; exact timestamp/cursor ordering; in-memory rollback registration; and concurrent append uniqueness. PostgreSQL tests cover empty and incremental V1–V5 migration, reference permissions, all four indexes, JSONB/check constraints, business rollback on rejected audit insert, isolated failure durability, and concurrent independent-thread/transaction creation. No arbitrary sleeps coordinate a race.
+
+Existing tenant locking/scoped writes, booking/offering capacity, queue ordering/call-next, lifecycle synchronization, mandatory notifications, rollback, Docker restart, migration, selected-test isolation, deterministic seeds, and branch-promotion gates remain in the verification matrix. Flyway V1–V4 are unchanged; V5 is additive. The Bruno audit folder covers owner/admin success, tenant override denial, staff/customer denial, mandatory explicit admin scope, absent audit write API, and unauthenticated rejection.
+
 ## Atomic tenant-write authorization follow-up
 
 The follow-up to #124 and PR #181 adds **7 unit tests** and **1 PostgreSQL integration test** without removing, skipping, or weakening an existing test. The final inventory is **387 unit tests and 197 integration tests**. `PostgresPersistenceIntegrationTest` executes **23 tests** against the pinned PostgreSQL 17.6 container. The HTTP contract is unchanged at exactly **71 OpenAPI operations**, **533 Bruno requests**, and **1,696 explicit Bruno assertions**.
 
 The focused regressions prove one write boundary, lock-before-authoritative-read ordering, no unscoped fallback, guarded tenant predicates during persistence, zero-row rollback, same-tenant success, indistinguishable foreign/missing `404`, customer subject isolation, explicit administrator scope, and deterministic delete/recreate replacement safety. The PostgreSQL case uses independent executor threads, transactions, and connections: one transaction holds the exact branch advisory lock while it deletes/recreates the ID under another tenant; the tenant mutation is observed waiting in `pg_locks`, then resumes and returns `404` without changing the replacement. No arbitrary sleeps are used. Existing booking-capacity, offering-capacity, queue ordering/call-next, lifecycle rollback, notification, restart, and deterministic-seed suites remain unchanged and provide the related invariant evidence.
 
-Flyway V1-V4 remain byte-for-byte unchanged and no V5 migration is introduced. Issue #125 audit logging is not implemented.
+That tenant-authorization follow-up left Flyway V1–V4 byte-for-byte unchanged. AUDIT-001 now adds the isolated, additive V5 audit migration without editing those files.
 
 ## Current TENANT-001 inventory
 
@@ -16,7 +24,7 @@ TENANT-001 adds **3 unit tests** and **6 integration tests** to the reviewed sta
 
 The Bruno collection adds **13 HTTP requests and 11 explicit `test(...)` assertions** relative to the reviewed SHA's source inventory, for exactly **533 requests and 1,696 assertions**. It covers all **71/71 OpenAPI operations** and unauthenticated rejection for all **69/69 protected operations**. The added Java and HTTP cases explicitly cover canonical membership onboarding/replacement/removal, trusted `tenant_id` validation and stale-token rejection, same-tenant success, cross-tenant safe `404`, permission `403`, authentication `401`, explicit platform-administrator scope, subject-scoped customer access, global-catalogue restriction, discovery-field privacy, repository tenant predicates, report/notification isolation, and PostgreSQL relational constraints.
 
-The complete suite remains randomized and repeatable under seeds `11001` and `11002`. PostgreSQL coverage uses the pinned PostgreSQL 17.6 Testcontainers image and includes clean V1–V4 migration, incremental V1–V3 to V4 migration, checksum validation, unassigned legacy operators, active-membership uniqueness, transactional rollback, SQL tenant predicates, and cross-tenant relational mismatch rejection.
+The complete suite remains randomized and repeatable under seeds `11001` and `11002`. PostgreSQL coverage uses the pinned PostgreSQL 17.6 Testcontainers image and includes clean V1–V5 migration, incremental V1–V3 to V5 migration, checksum validation, audit constraints/indexes/transactions/concurrency, unassigned legacy operators, active-membership uniqueness, transactional rollback, SQL tenant predicates, and cross-tenant relational mismatch rejection.
 
 ## Current DATA-002 inventory
 

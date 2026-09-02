@@ -11,6 +11,10 @@ import com.carwash.shared.application.DataTransactionOperations;
 import com.carwash.shared.application.MutationLock;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
+import com.carwash.access.application.TenantAccessContext;
+import com.carwash.audit.application.*;
+import com.carwash.audit.domain.AuditAction;
+import com.carwash.audit.domain.AuditSource;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -27,6 +31,7 @@ public final class TenantMembershipManagementService implements TenantMembership
     private final DataTransactionOperations transactions;
     private final MutationLock mutationLock;
     private final Clock clock;
+    private final AuditOperations audit;
 
     public TenantMembershipManagementService(
             UserRepository users,
@@ -36,12 +41,63 @@ public final class TenantMembershipManagementService implements TenantMembership
             MutationLock mutationLock,
             Clock clock
     ) {
+        this(users, memberships, businesses, transactions, mutationLock, clock, AuditOperations.noOp());
+    }
+
+    public TenantMembershipManagementService(
+            UserRepository users,
+            TenantMembershipRepository memberships,
+            TenantBusinessQuery businesses,
+            DataTransactionOperations transactions,
+            MutationLock mutationLock,
+            Clock clock,
+            AuditOperations audit
+    ) {
         this.users = Objects.requireNonNull(users, "User repository is required");
         this.memberships = Objects.requireNonNull(memberships, "Tenant membership repository is required");
         this.businesses = Objects.requireNonNull(businesses, "Tenant business query is required");
         this.transactions = Objects.requireNonNull(transactions, "Data transactions are required");
         this.mutationLock = Objects.requireNonNull(mutationLock, "Mutation lock is required");
         this.clock = Objects.requireNonNull(clock, "Application clock is required");
+        this.audit = Objects.requireNonNull(audit, "Audit operations are required");
+    }
+
+    public TenantMembership assignOrReplace(TenantAccessContext access, String userId, String businessId) {
+        return audit.execute(event(access, AuditAction.TENANT_MEMBERSHIP_REPLACED, businessId, userId),
+                () -> {
+                    access.requirePlatformAdministrator();
+                    return assignOrReplace(userId, businessId);
+                });
+    }
+
+    public User removeAndDemote(TenantAccessContext access, String userId) {
+        return audit.execute(event(access, AuditAction.TENANT_MEMBERSHIP_REMOVED, null, userId),
+                () -> {
+                    access.requirePlatformAdministrator();
+                    return removeAndDemote(userId);
+                });
+    }
+
+    public User assignRole(TenantAccessContext access, String userId, RoleName roleName, String businessId) {
+        AuditAction action = isOperational(roleName)
+                ? AuditAction.TENANT_MEMBERSHIP_ASSIGNED : AuditAction.ROLE_ASSIGNED;
+        return audit.execute(event(access, action, businessId, userId),
+                () -> {
+                    access.requirePlatformAdministrator();
+                    return assignRole(userId, roleName, businessId);
+                });
+    }
+
+    private AuditCommand event(TenantAccessContext access, AuditAction action, String businessId, String userId) {
+        AuditActor actor = AuditActor.user(access.userId(), access.role().name(), null);
+        return AuditCommand.actionForBusiness(action, actor, safeId(businessId), "USER",
+                safeId(userId), AuditSource.API);
+    }
+
+    private static String safeId(String value) {
+        if (value == null) return null;
+        String normalized = value.trim();
+        return normalized.isEmpty() || normalized.length() > 64 ? null : normalized;
     }
 
     public TenantMembership assignOrReplace(String userId, String businessId) {

@@ -19,7 +19,7 @@ public final class RoleCatalog {
                     Permission.VEHICLE_OPERATE, Permission.SERVICE_READ,
                     Permission.BOOKING_SELF_MANAGE, Permission.BOOKING_OPERATE, Permission.QUEUE_SELF_READ,
                     Permission.QUEUE_OPERATE, Permission.NOTIFICATION_SELF_READ, Permission.REPORT_READ,
-                    Permission.MARKETPLACE_READ, Permission.MARKETPLACE_MANAGE),
+                    Permission.MARKETPLACE_READ, Permission.MARKETPLACE_MANAGE, Permission.AUDIT_READ),
             RoleName.PLATFORM_ADMIN, EnumSet.allOf(Permission.class));
 
     private RoleCatalog() {

@@ -1,0 +1,12 @@
+info: { name: Platform admin audit scope is mandatory, type: http, seq: 5, tags: [audit, admin, security] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/audit-records"
+  auth: { type: bearer, token: "{{adminToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("missing admin audit scope returns 403", function() { expect(res.status).to.equal(403); });
+        test("no wildcard scope is inferred", function() { expect(res.body.code).to.equal("ACCESS_DENIED"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

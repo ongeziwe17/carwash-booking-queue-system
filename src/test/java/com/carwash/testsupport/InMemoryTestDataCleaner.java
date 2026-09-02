@@ -24,6 +24,7 @@ import com.carwash.marketplace.domain.CarWashBusinessRepository;
 import com.carwash.marketplace.domain.BranchOperatingScheduleRepository;
 import com.carwash.marketplace.domain.TemporaryBranchClosureRepository;
 import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.audit.infrastructure.InMemoryAuditRepository;
 
 public final class InMemoryTestDataCleaner {
 
@@ -41,6 +42,7 @@ public final class InMemoryTestDataCleaner {
     private final BranchOperatingScheduleRepository schedules;
     private final TemporaryBranchClosureRepository closures;
     private final DeterministicTestNotificationIdGenerator notificationIds;
+    private final InMemoryAuditRepository auditRecords;
 
     public InMemoryTestDataCleaner(
             InMemoryDataCoordinator coordinator,
@@ -56,7 +58,8 @@ public final class InMemoryTestDataCleaner {
             CarWashBranchRepository branches,
             BranchOperatingScheduleRepository schedules,
             TemporaryBranchClosureRepository closures,
-            DeterministicTestNotificationIdGenerator notificationIds
+            DeterministicTestNotificationIdGenerator notificationIds,
+            InMemoryAuditRepository auditRecords
     ) {
         this.coordinator = coordinator;
         this.users = users;
@@ -72,6 +75,7 @@ public final class InMemoryTestDataCleaner {
         this.schedules = schedules;
         this.closures = closures;
         this.notificationIds = notificationIds;
+        this.auditRecords = auditRecords;
     }
 
     public void clean() {
@@ -100,6 +104,7 @@ public final class InMemoryTestDataCleaner {
             users.findAll().stream().map(User::getUserId)
                     .forEach(users::deleteById);
             notificationIds.reset();
+            auditRecords.clearForTests();
         });
     }
 }

@@ -1,0 +1,14 @@
+info: { name: Audit write endpoint is not exposed, type: http, seq: 8, tags: [audit, security] }
+http:
+  method: POST
+  url: "{{baseUrl}}/api/audit-records"
+  headers: [{ name: Content-Type, value: application/json }]
+  body: { type: json, data: '{"action":"FORGED"}' }
+  auth: { type: bearer, token: "{{adminToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("audit write returns 405", function() { expect(res.status).to.equal(405); });
+        test("audit write is not accepted", function() { expect(res.body.code).to.equal("METHOD_NOT_ALLOWED"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

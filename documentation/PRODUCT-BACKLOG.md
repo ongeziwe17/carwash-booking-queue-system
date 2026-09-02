@@ -25,7 +25,7 @@ Priority guide:
 | Queues | Booking-derived branch/offering scope, branch-isolated ordering/waits/call-next/rebalance, explicit call override, synchronized call/start/complete workflow, and delete | Offering concurrent capacity is not a remaining-capacity model. |
 | Notifications | In-app notification creation and bounded recent lookup with branch/offering context | Read-status lifecycle and external delivery are incomplete. |
 | Reports | Persistence-profile daily summary with exactly one tenant-authorized branch or business scope and branch-local dates | Rich dashboards, revenue, and analytics are future work. |
-| Marketplace | Tenant-isolated businesses/branches, membership/JWT trust, location/lifecycle/discovery, schedules/closures/open status, offerings, scoped operations, nearby straight-line discovery, and branch-aware availability | Routing/geocoding, reservations, audit logging, and resource calendars remain future work. |
+| Marketplace | Tenant-isolated businesses/branches, membership/JWT trust, location/lifecycle/discovery, schedules/closures/open status, offerings, scoped operations, nearby straight-line discovery, branch-aware availability, and immutable scoped audit history | Routing/geocoding, reservations, SIEM/archive integration, and resource calendars remain future work. |
 | Recommendations | Point-in-time ranked branch recommendations for five preferences over one AVAIL-002 candidate set, with normalized component scores, validated weights, stable ties, and customer-safe explanations | No reservation, ML/personalization, traffic routing, sponsored ranking, or dynamic pricing. |
 | API/Docs | Generated Swagger/OpenAPI plus human-readable API documentation and contract quality gates | DOCS-001 keeps written and generated contracts aligned. |
 | Testing | Unit/integration suites plus deterministic repeatability, real-PostgreSQL Testcontainers coverage, OpenAPI gates, and Bruno HTTP acceptance | TEST-002 persistence, migration, transaction, restart, and concurrency coverage is delivered. |
@@ -150,7 +150,7 @@ SEC-002 (#13) authentication and SEC-003 (#22) RBAC/ownership authorization were
 | DATA-002 | #122 | Add PostgreSQL persistence, migrations, and transaction boundaries — implemented | P1 | Stable Marketplace domain |
 | TEST-002 | #123 | Add PostgreSQL integration tests with Testcontainers — implemented by PR #179 | P1 | DATA-002 |
 | TENANT-001 | #124 | Enforce Marketplace tenant isolation — implemented | P0 before production | MKT-001, DATA-002, SEC-002, SEC-003 |
-| AUDIT-001 | #125 | Add security and operational audit logging | P2 | DATA-002, SEC-002, SEC-003, TENANT-001 |
+| AUDIT-001 | #125 | Add security and operational audit logging — implemented with additive V5, atomic success/isolated failure writes, redaction, scoped reads, and parity tests | Delivered | DATA-002, SEC-002, SEC-003, TENANT-001 |
 
 ## 8. Phase 5 — Product and Platform Expansion
 
@@ -190,4 +190,4 @@ Potential later outcomes:
 - Treat availability eligibility and recommendation ranking as separate concerns.
 - Keep all new issues as top-level issues unless the project intentionally adopts sub-issues later.
 - Use `staging` as the current integration source of truth under the CI-001 branch strategy.
-- Do not claim production readiness until audit/security hardening, backup/restore operations, observability, and deployment hardening are complete; persistence and tenant isolation are implemented foundations.
+- Do not claim production readiness until backup/restore operations, SIEM/archive/retention operations, broader observability, and deployment hardening are complete; persistence, tenant isolation, and the application audit foundation are implemented.

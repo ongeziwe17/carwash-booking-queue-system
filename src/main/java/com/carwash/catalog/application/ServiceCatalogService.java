@@ -6,6 +6,10 @@ import com.carwash.catalog.domain.ServiceRepository;
 import com.carwash.shared.application.DataTransactionOperations;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
+import com.carwash.access.application.TenantAccessContext;
+import com.carwash.audit.application.*;
+import com.carwash.audit.domain.AuditAction;
+import com.carwash.audit.domain.AuditSource;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -18,6 +22,7 @@ public class ServiceCatalogService implements ServiceDefinitionQuery {
     private final ServiceOfferingRepository serviceOfferingRepository;
     private final ServiceDefinitionUsageQuery serviceUsageQuery;
     private final DataTransactionOperations coordinator;
+    private final AuditOperations audit;
 
 
     public ServiceCatalogService(
@@ -26,11 +31,75 @@ public class ServiceCatalogService implements ServiceDefinitionQuery {
             ServiceDefinitionUsageQuery serviceUsageQuery,
             DataTransactionOperations coordinator
     ) {
+        this(serviceRepository, serviceOfferingRepository, serviceUsageQuery, coordinator, AuditOperations.noOp());
+    }
+
+    public ServiceCatalogService(
+            ServiceRepository serviceRepository,
+            ServiceOfferingRepository serviceOfferingRepository,
+            ServiceDefinitionUsageQuery serviceUsageQuery,
+            DataTransactionOperations coordinator,
+            AuditOperations audit
+    ) {
         this.serviceRepository = Objects.requireNonNull(serviceRepository, "Service repository is required");
         this.serviceOfferingRepository = Objects.requireNonNull(
                 serviceOfferingRepository, "Service offering repository is required");
         this.serviceUsageQuery = Objects.requireNonNull(serviceUsageQuery, "Service usage query is required");
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
+        this.audit = Objects.requireNonNull(audit, "Audit operations are required");
+    }
+
+    public Service createService(TenantAccessContext access, String serviceId, String serviceName,
+                                 String description, BigDecimal price, int estimatedDurationMin) {
+        return audit.execute(event(access, AuditAction.SERVICE_DEFINITION_CREATED, serviceId),
+                () -> {
+                    access.requirePlatformAdministrator();
+                    return createService(serviceId, serviceName, description, price, estimatedDurationMin);
+                });
+    }
+
+    public Service updateService(TenantAccessContext access, String serviceId, String serviceName,
+                                 String description, BigDecimal price, int estimatedDurationMin) {
+        return audit.execute(event(access, AuditAction.SERVICE_DEFINITION_UPDATED, serviceId),
+                () -> {
+                    access.requirePlatformAdministrator();
+                    return updateService(serviceId, serviceName, description, price, estimatedDurationMin);
+                });
+    }
+
+    public Service activateService(TenantAccessContext access, String serviceId) {
+        return audit.execute(event(access, AuditAction.SERVICE_DEFINITION_ACTIVATED, serviceId),
+                () -> {
+                    access.requirePlatformAdministrator();
+                    return activateService(serviceId);
+                });
+    }
+
+    public Service deactivateService(TenantAccessContext access, String serviceId) {
+        return audit.execute(event(access, AuditAction.SERVICE_DEFINITION_DEACTIVATED, serviceId),
+                () -> {
+                    access.requirePlatformAdministrator();
+                    return deactivateService(serviceId);
+                });
+    }
+
+    public void deleteService(TenantAccessContext access, String serviceId) {
+        audit.execute(event(access, AuditAction.SERVICE_DEFINITION_DELETED, serviceId),
+                () -> {
+                    access.requirePlatformAdministrator();
+                    deleteService(serviceId);
+                });
+    }
+
+    private AuditCommand event(TenantAccessContext access, AuditAction action, String serviceId) {
+        AuditActor actor = AuditActor.user(access.userId(), access.role().name(), null);
+        return AuditCommand.action(action, actor, "SERVICE_DEFINITION", safeId(serviceId), AuditSource.API);
+    }
+
+    private static String safeId(String value) {
+        if (value == null) return null;
+        String normalized = value.trim();
+        return normalized.isEmpty() || normalized.length() > 64 ? null : normalized;
     }
 
     public Service createService(String serviceId, String serviceName, String description,

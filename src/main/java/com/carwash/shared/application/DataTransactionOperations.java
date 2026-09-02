@@ -10,6 +10,9 @@ public interface DataTransactionOperations {
 
     <T> T write(Supplier<T> action);
 
+    /** Runs a write in an isolated transaction after the caller's transaction has completed. */
+    default <T> T isolatedWrite(Supplier<T> action) { return write(action); }
+
     default void read(Runnable action) {
         read(() -> {
             action.run();
@@ -23,6 +26,16 @@ public interface DataTransactionOperations {
             return null;
         });
     }
+
+    default void isolatedWrite(Runnable action) {
+        isolatedWrite(() -> {
+            action.run();
+            return null;
+        });
+    }
+
+    /** Registers in-memory rollback work; database implementations rely on the transaction manager. */
+    default void onRollback(Runnable action) { }
 
     void compensate(RuntimeException failure, Runnable compensation);
 

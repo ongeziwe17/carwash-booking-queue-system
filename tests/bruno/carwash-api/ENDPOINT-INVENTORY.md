@@ -1,14 +1,15 @@
 # Current Endpoint Inventory
 
-Inventory source: the controllers and OpenAPI quality gate for TENANT-001. Generated `/v3/api-docs` is authoritative when wording differs.
+Inventory source: the controllers and OpenAPI quality gate through AUDIT-001. Generated `/v3/api-docs` is authoritative when wording differs.
 
-**Total HTTP operations: 71.**
+**Total HTTP operations: 72.**
 
 | Method | Path | Authentication | Role / permission | Ownership | Request DTO | Success | 400/401/403/404 | Important rules |
 |---|---|---|---|---|---|---:|---|---|
 | `PUT` | `/api/admin/users/{userId}/role` | Bearer | PLATFORM_ADMIN | Explicit administrator path | `AssignRoleRequest` | 200 | 400,401,403,404 | Operational roles require `businessId`; role and membership change atomically; final active admin cannot be demoted. |
 | `PUT` | `/api/admin/users/{userId}/tenant-membership` | Bearer | PLATFORM_ADMIN | Explicit administrator path | `AssignTenantMembershipRequest` | 200 | 400,401,403,404 | Assigns/replaces one existing operational user's canonical business; old token becomes stale. |
 | `DELETE` | `/api/admin/users/{userId}/tenant-membership` | Bearer | PLATFORM_ADMIN | Explicit administrator path | `—` | 204 | 401,403,404 | Atomically removes membership and demotes the user to CUSTOMER. |
+| `GET` | `/api/audit-records` | Bearer | `AUDIT_READ` | Owner: canonical tenant only; admin: explicit TENANT/business or PLATFORM scope | `—` | 200 | 400,401,403 | Bounded newest-first cursor filters; tenant SQL predicate; no wildcard; authorized reads are audited; no audit mutation endpoint. |
 | `POST` | `/api/auth/login` | Public | N/A | N/A | `LoginRequest` | 200 | 400,401 | Returns INVALID_CREDENTIALS for wrong or unknown credentials; no password leakage. |
 | `GET` | `/api/auth/me` | Bearer | Any authenticated current role | Authenticated principal | `—` | 200 | 401,404 | Token role must still match current active repository user. |
 | `GET` | `/api/availability` | Bearer | All roles via SERVICE_READ | N/A | Query `serviceId`, `date` | 200 | 400,401,403,404 | Point-in-time single-location starts; global exact-slot remaining capacity; duration must fit closing; no reservation. |

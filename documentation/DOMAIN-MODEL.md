@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The application is a Spring Boot modular monolith organized by capability. Persistence-agnostic repository contracts remain in domain packages; each capability owns in-memory and PostgreSQL infrastructure adapters. Narrow immutable application queries expose cross-capability reads, while a shared transaction port selects either the fair single-JVM in-memory coordinator or real PostgreSQL transactions. Identity owns roles, permissions, operational tenant memberships, and the credential contract; Access implements authentication, BCrypt/JWT infrastructure, canonical tenant validation, and authorization. PostgreSQL and equivalent in-memory tenant isolation are implemented; payments, capacity reservations, audit logging, and external notification delivery remain future work.
+The application is a Spring Boot modular monolith organized by capability. Persistence-agnostic repository contracts remain in domain packages; each capability owns in-memory and PostgreSQL infrastructure adapters. Narrow immutable application queries expose cross-capability reads, while a shared transaction port selects either the fair single-JVM in-memory coordinator or real PostgreSQL transactions. Identity owns roles, permissions, operational tenant memberships, and the credential contract; Access implements authentication, BCrypt/JWT infrastructure, canonical tenant validation, and authorization. Audit owns immutable security/operational history, redaction, append/query ports, and scoped reads. PostgreSQL and equivalent in-memory tenant isolation/audit semantics are implemented; payments, capacity reservations, SIEM/archive integration, and external notification delivery remain future work.
 
 ## 2. Current Entities
 
@@ -10,6 +10,13 @@ The application is a Spring Boot modular monolith organized by capability. Persi
 |---|---|---|
 | `User` | Profile, encoded credential, account state, role, and owned aggregate collections | Vehicles, bookings, and notifications are managed through focused add/remove methods. |
 | `Role` | Built-in role identity and permission catalogue | Runtime authorization derives permissions from the server-side role catalogue. |
+| `AuditRecord` | Immutable actor/action/target/outcome snapshot for a sensitive event | Append-only; exact UTC time; historical scalar IDs; safe reason code; server correlation; bounded allowlisted metadata; no cascading operational foreign keys. |
+
+### Audit catalogue
+
+Actor types are `USER`, `SYSTEM`, and `ANONYMOUS`; outcomes are `SUCCESS`, `DENIED`, and `FAILURE`; sources are `API`, `SECURITY`, and `SYSTEM`. Stable action names cover login/bearer/authorization failure; role and tenant-membership assignment/replacement/removal; business and branch create/update/activate/deactivate; schedule replacement and closure create/cancel; service definition/offering administration; booking create/update/reschedule/cancel/confirm/delete; vehicle create/update/delete; queue create/reposition/call-next/explicit-call/start/complete/remove; platform administration; and authorized audit reads.
+
+`REFUND_REQUESTED`, `REFUND_COMPLETED`, and `REFUND_FAILED` are reserved names only. No payment/refund capability or API exists, so the current system cannot emit them and makes no claim that refunds are audited.
 | `TenantMembership` | Identity-owned assignment of one operational user to one canonical Marketplace business | Required for `STAFF`/`BUSINESS_OWNER`, forbidden for `CUSTOMER`/`PLATFORM_ADMIN`, unique by user, and changed only through platform-administrator transactions. |
 | `Vehicle` | Customer-owned vehicle details | Ownership cannot change through an ordinary update; plate uniqueness is enforced per owner on create and update. |
 | `Service` | Reusable global service/wash-type definition | Booking/queue references and branch offerings prevent physical deletion; deactivate instead. Legacy global price/duration remain transitional for AVAIL-001 and internal compatibility. |
@@ -24,6 +31,8 @@ The application is a Spring Boot modular monolith organized by capability. Persi
 | `TemporaryBranchClosure` | Absolute branch closure with reason and lifecycle history | Uses half-open instant boundaries; active same-branch records may not overlap; cancellation is retained rather than deleted. |
 
 ## 3. Repository Contract
+
+Audit is intentionally narrower than the generic CRUD repository contract: `AuditRepository` exposes only `append`, tenant-predicated query, and explicit platform query operations. It has no update or delete method. Tenant queries cannot omit `businessId`, while global reads are a separately named platform operation authorized by explicit administrator scope.
 
 Repositories distinguish creation from mutation:
 
@@ -148,6 +157,8 @@ Notification creation resolves the canonical user and optional booking, inserts 
 Notifications may be cascade-deleted when their user or cancelled booking is physically removed.
 
 ## 6. Deletion Rules
+
+Audit history is never deleted through a domain/application operation. Operational aggregate deletion cannot cascade into `audit_records`; actor, business, role, target, and source identifiers remain historical snapshots. Retention is a separately approved database-operations procedure.
 
 | Resource | Physical deletion rule |
 |---|---|

@@ -26,7 +26,7 @@ Implemented on `staging`:
 - Explainable branch recommendations over the authoritative AVAIL-002 candidate set with five deterministic preferences, configurable validated weights, raw-metric ranking, and customer-safe score breakdowns.
 - Swagger/OpenAPI with CI contract export/quality gates, Maven tests, Docker, Docker Compose, and Bruno HTTP acceptance coverage.
 
-Current limitations include some non-user domain response schemas, legacy single-location availability, no managed database provisioning/backups, no payments/external notification delivery, no audit subsystem, and no production observability platform. PostgreSQL durability and Marketplace tenant isolation are available through the explicit profiles and application contracts.
+Current limitations include some non-user domain response schemas, legacy single-location availability, no managed database provisioning/backups, no payments/external notification delivery, no SIEM/archive/automated audit retention, and no production observability platform. PostgreSQL durability, Marketplace tenant isolation, and immutable application audit history are available through the explicit profiles and application contracts.
 
 ## Phase 0 — API, Data, Test, and Delivery Hardening
 
@@ -102,9 +102,9 @@ Required before public production use:
 3. **SEC-002** — Authenticate users securely (#13) — implemented foundation; retain and harden as the product evolves.
 4. **SEC-003** — Enforce role-based access control (#22) — implemented foundation and extended by TENANT-001.
 5. **TENANT-001** — Enforce Marketplace tenant isolation (#124) — implemented with canonical membership/JWT trust, scoped services/repositories, V4 constraints/indexes, safe DTOs, and in-memory/PostgreSQL parity.
-6. **AUDIT-001** — Add security and operational audit logging (#125).
+6. **AUDIT-001** — Add security and operational audit logging (#125) — implemented with a dedicated capability, V5 schema, atomic success/isolated failure semantics, privacy controls, scoped reads, and in-memory/PostgreSQL parity.
 
-Expected outcome: durable and transactionally safe data plus verified separation between independent car wash businesses. Persistence and tenant isolation are delivered; AUDIT-001 and wider production hardening remain.
+Expected outcome: durable and transactionally safe data plus verified separation between independent car wash businesses. Persistence, tenant isolation, and AUDIT-001 are delivered; SIEM/archive/retention operations, backups, and wider production hardening remain.
 
 ## Phase 5 — Product and Platform Expansion
 

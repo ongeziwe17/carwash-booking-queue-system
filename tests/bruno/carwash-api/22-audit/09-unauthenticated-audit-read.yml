@@ -1,0 +1,12 @@
+info: { name: Audit read requires authentication, type: http, seq: 9, tags: [audit, security, auth] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/audit-records?scope=PLATFORM"
+  auth: { type: none }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("unauthenticated audit query returns 401", function() { expect(res.status).to.equal(401); });
+        test("authentication error is safe", function() { expect(res.body.code).to.equal("AUTHENTICATION_REQUIRED"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

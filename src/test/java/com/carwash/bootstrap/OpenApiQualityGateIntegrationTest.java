@@ -84,7 +84,8 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
             "PUT /api/marketplace/offerings/{offeringId}",
             "POST /api/marketplace/offerings/{offeringId}/activate",
             "POST /api/marketplace/offerings/{offeringId}/deactivate",
-            "GET /api/marketplace/branches/{branchId}/offerings/discoverable"
+            "GET /api/marketplace/branches/{branchId}/offerings/discoverable",
+            "GET /api/audit-records"
     );
 
     @Autowired UserRepository users;

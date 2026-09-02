@@ -11,6 +11,9 @@ import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
 import com.carwash.access.application.TenantAccessContext;
 import org.springframework.security.access.AccessDeniedException;
+import com.carwash.audit.application.*;
+import com.carwash.audit.domain.AuditAction;
+import com.carwash.audit.domain.AuditSource;
 
 import java.util.List;
 import java.util.Objects;
@@ -23,6 +26,7 @@ public class VehicleManagementService implements VehicleQuery {
     private final BookingRepository bookingRepository;
     private final DataTransactionOperations coordinator;
     private final MutationLock mutationLock;
+    private final AuditOperations audit;
 
 
     public VehicleManagementService(
@@ -31,7 +35,8 @@ public class VehicleManagementService implements VehicleQuery {
             BookingRepository bookingRepository,
             DataTransactionOperations coordinator
     ) {
-        this(vehicleRepository, userRepository, bookingRepository, coordinator, MutationLock.noOp());
+        this(vehicleRepository, userRepository, bookingRepository, coordinator, MutationLock.noOp(),
+                AuditOperations.noOp());
     }
 
     public VehicleManagementService(
@@ -41,11 +46,23 @@ public class VehicleManagementService implements VehicleQuery {
             DataTransactionOperations coordinator,
             MutationLock mutationLock
     ) {
+        this(vehicleRepository, userRepository, bookingRepository, coordinator, mutationLock, AuditOperations.noOp());
+    }
+
+    public VehicleManagementService(
+            VehicleRepository vehicleRepository,
+            UserRepository userRepository,
+            BookingRepository bookingRepository,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock,
+            AuditOperations audit
+    ) {
         this.vehicleRepository = Objects.requireNonNull(vehicleRepository, "Vehicle repository is required");
         this.userRepository = Objects.requireNonNull(userRepository, "User repository is required");
         this.bookingRepository = bookingRepository;
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
         this.mutationLock = Objects.requireNonNull(mutationLock, "Mutation lock is required");
+        this.audit = Objects.requireNonNull(audit, "Audit operations are required");
     }
 
     Vehicle createVehicle(String userId, String vehicleId, String plateNumber, String vehicleType,
@@ -65,7 +82,8 @@ public class VehicleManagementService implements VehicleQuery {
             String notes
     ) {
         Vehicle vehicle = new Vehicle(vehicleId, plateNumber, vehicleType, brand, model, color, notes);
-        return coordinator.write(() -> createVehicleInside(access, vehicle, userId));
+        return audit.execute(event(access, AuditAction.VEHICLE_CREATED, vehicleId),
+                () -> coordinator.write(() -> createVehicleInside(access, vehicle, userId)));
     }
 
     Vehicle createVehicle(Vehicle vehicle, String userId) {
@@ -136,7 +154,8 @@ public class VehicleManagementService implements VehicleQuery {
             String notes
     ) {
         Vehicle update = new Vehicle(vehicleId, plateNumber, vehicleType, brand, model, color, notes);
-        return coordinator.write(() -> updateVehicleInside(access, update));
+        return audit.execute(event(access, AuditAction.VEHICLE_UPDATED, vehicleId),
+                () -> coordinator.write(() -> updateVehicleInside(access, update)));
     }
 
     Vehicle updateVehicle(Vehicle vehicle) {
@@ -148,7 +167,21 @@ public class VehicleManagementService implements VehicleQuery {
     }
 
     public void deleteVehicle(TenantAccessContext access, String vehicleId) {
-        coordinator.write(() -> deleteVehicleInside(access, vehicleId));
+        audit.execute(event(access, AuditAction.VEHICLE_DELETED, vehicleId),
+                () -> coordinator.write(() -> deleteVehicleInside(access, vehicleId)));
+    }
+
+    private AuditCommand event(TenantAccessContext access, AuditAction action, String vehicleId) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        AuditActor actor = AuditActor.user(access.userId(), access.role().name(), access.businessId());
+        return AuditCommand.actionForBusiness(action, actor, access.businessId(), "VEHICLE",
+                safeAuditId(vehicleId), AuditSource.API);
+    }
+
+    private static String safeAuditId(String value) {
+        if (value == null) return null;
+        String normalized = value.trim();
+        return normalized.isEmpty() || normalized.length() > 64 ? null : normalized;
     }
 
     private Vehicle createVehicleInside(TenantAccessContext access, Vehicle vehicle, String userId) {

@@ -23,6 +23,7 @@ import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.web.SecurityFilterChain;
 import tools.jackson.databind.ObjectMapper;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -94,7 +95,8 @@ public class ApiSecurityConfig {
     }
 
     @Bean
-    SecurityFilterChain apiSecurity(HttpSecurity http, ObjectMapper objectMapper, ApiErrorResponseFactory errors) throws Exception {
+    SecurityFilterChain apiSecurity(HttpSecurity http, ObjectMapper objectMapper, ApiErrorResponseFactory errors,
+                                    AuditRequestFilter auditRequestFilter) throws Exception {
         return http.csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .formLogin(AbstractHttpConfigurer::disable).httpBasic(AbstractHttpConfigurer::disable)
@@ -120,6 +122,7 @@ public class ApiSecurityConfig {
                                     org.springframework.http.HttpStatus.FORBIDDEN, ApiErrorCode.ACCESS_DENIED,
                                     "Access denied", request));
                         }))
+                .addFilterBefore(auditRequestFilter, BearerTokenAuthenticationFilter.class)
                 .build();
     }
 }

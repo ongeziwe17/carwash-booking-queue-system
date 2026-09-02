@@ -15,6 +15,9 @@ import com.carwash.shared.exception.ResourceNotFoundException;
 import com.carwash.shared.application.DataTransactionOperations;
 import com.carwash.shared.application.MutationLock;
 import com.carwash.access.application.TenantAccessContext;
+import com.carwash.audit.application.*;
+import com.carwash.audit.domain.AuditAction;
+import com.carwash.audit.domain.AuditSource;
 
 import java.time.Clock;
 import java.time.DayOfWeek;
@@ -37,6 +40,7 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
     private final DataTransactionOperations coordinator;
     private final MutationLock mutationLock;
     private final Clock clock;
+    private final AuditOperations audit;
 
     public BranchSchedulingService(
             CarWashBusinessRepository businessRepository,
@@ -47,7 +51,7 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
             Clock clock
     ) {
         this(businessRepository, branchRepository, scheduleRepository, closureRepository,
-                coordinator, MutationLock.noOp(), clock);
+                coordinator, MutationLock.noOp(), clock, AuditOperations.noOp());
     }
 
     public BranchSchedulingService(
@@ -59,6 +63,20 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
             MutationLock mutationLock,
             Clock clock
     ) {
+        this(businessRepository, branchRepository, scheduleRepository, closureRepository,
+                coordinator, mutationLock, clock, AuditOperations.noOp());
+    }
+
+    public BranchSchedulingService(
+            CarWashBusinessRepository businessRepository,
+            CarWashBranchRepository branchRepository,
+            BranchOperatingScheduleRepository scheduleRepository,
+            TemporaryBranchClosureRepository closureRepository,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock,
+            Clock clock,
+            AuditOperations audit
+    ) {
         this.businessRepository = Objects.requireNonNull(businessRepository, "Business repository is required");
         this.branchRepository = Objects.requireNonNull(branchRepository, "Branch repository is required");
         this.scheduleRepository = Objects.requireNonNull(scheduleRepository, "Schedule repository is required");
@@ -66,6 +84,7 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
         this.mutationLock = Objects.requireNonNull(mutationLock, "Mutation lock is required");
         this.clock = Objects.requireNonNull(clock, "Application clock is required");
+        this.audit = Objects.requireNonNull(audit, "Audit operations are required");
     }
 
     public BranchOperatingScheduleSnapshot getOperatingSchedule(String branchId) {
@@ -108,7 +127,9 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
             String branchId,
             ReplaceOperatingScheduleCommand command
     ) {
-        return coordinator.write(() -> replaceOperatingScheduleInside(access, branchId, command));
+        return audit.execute(event(access, AuditAction.OPERATING_SCHEDULE_REPLACED,
+                        "BRANCH_SCHEDULE", branchId),
+                () -> coordinator.write(() -> replaceOperatingScheduleInside(access, branchId, command)));
     }
 
     public List<TemporaryBranchClosureSnapshot> listTemporaryClosures(String branchId) {
@@ -143,7 +164,9 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
             String branchId,
             CreateTemporaryBranchClosureCommand command
     ) {
-        return coordinator.write(() -> createTemporaryClosureInside(access, branchId, command));
+        return audit.execute(event(access, AuditAction.TEMPORARY_CLOSURE_CREATED, "TEMPORARY_CLOSURE",
+                        command == null ? null : command.closureId()),
+                () -> coordinator.write(() -> createTemporaryClosureInside(access, branchId, command)));
     }
 
     TemporaryBranchClosureSnapshot cancelTemporaryClosure(String closureId) {
@@ -154,7 +177,22 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
             TenantAccessContext access,
             String closureId
     ) {
-        return coordinator.write(() -> cancelTemporaryClosureInside(access, closureId));
+        return audit.execute(event(access, AuditAction.TEMPORARY_CLOSURE_CANCELLED,
+                        "TEMPORARY_CLOSURE", closureId),
+                () -> coordinator.write(() -> cancelTemporaryClosureInside(access, closureId)));
+    }
+
+    private AuditCommand event(TenantAccessContext access, AuditAction action, String targetType, String targetId) {
+        Objects.requireNonNull(access, "Tenant access context is required");
+        AuditActor actor = AuditActor.user(access.userId(), access.role().name(), access.businessId());
+        return AuditCommand.actionForBusiness(action, actor, access.businessId(), targetType,
+                safeId(targetId), AuditSource.API);
+    }
+
+    private static String safeId(String value) {
+        if (value == null) return null;
+        String normalized = value.trim();
+        return normalized.isEmpty() || normalized.length() > 64 ? null : normalized;
     }
 
     private BranchOperatingScheduleSnapshot replaceOperatingScheduleInside(
