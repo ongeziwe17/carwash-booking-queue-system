@@ -284,6 +284,83 @@ class PostgresPersistenceIntegrationTest {
         assertEquals("OPERATION_FAILED",failure.getFirst().reasonCode());
     }
 
+    @Test void bookingAuditScopeUsesCanonicalTenantAndRejectedSuccessAppendPreventsMutation() {
+        Fixture tenantA=fixture("booking-audit-a",3);
+        Fixture tenantB=fixture("booking-audit-b",3);
+        TenantAccessContext customerA=new TenantAccessContext(
+                tenantA.user.getUserId(),RoleName.CUSTOMER,null);
+        TenantAccessContext customerB=new TenantAccessContext(
+                tenantB.user.getUserId(),RoleName.CUSTOMER,null);
+        LocalDateTime originalTime=LocalDateTime.of(2089,1,17,10,0);
+
+        Booking booking=bookings.createBooking(customerA,"booking-audit-customer-booking",
+                tenantA.user.getUserId(),tenantA.vehicle.getVehicleId(),tenantA.branchId,
+                tenantA.offeringId,originalTime,"must never enter audit metadata");
+
+        List<AuditRecord> created=auditRepository.queryByBusinessId(
+                "booking-audit-a-business",new AuditQuery(
+                        tenantA.user.getUserId(),AuditAction.BOOKING_CREATED,AuditOutcome.SUCCESS,
+                        "BOOKING",booking.getBookingId(),Instant.EPOCH,Instant.parse("2100-01-01T00:00:00Z"),
+                        null,10));
+        assertEquals(1,created.size());
+        assertEquals("booking-audit-a-business",created.getFirst().businessId());
+        assertEquals("CUSTOMER",created.getFirst().actorRole());
+        assertTrue(auditRepository.queryByBusinessId(
+                "booking-audit-b-business",new AuditQuery(
+                        null,AuditAction.BOOKING_CREATED,null,"BOOKING",booking.getBookingId(),
+                        Instant.EPOCH,Instant.parse("2100-01-01T00:00:00Z"),null,10)).isEmpty());
+
+        bookings.updateBooking(ADMIN,booking.getBookingId(),tenantA.vehicle.getVehicleId(),
+                tenantA.offeringId,"administrator mutation");
+        List<AuditRecord> administratorUpdate=auditRepository.queryByBusinessId(
+                "booking-audit-a-business",new AuditQuery(
+                        ADMIN.userId(),AuditAction.BOOKING_UPDATED,AuditOutcome.SUCCESS,"BOOKING",
+                        booking.getBookingId(),Instant.EPOCH,Instant.parse("2100-01-01T00:00:00Z"),null,10));
+        assertEquals(1,administratorUpdate.size());
+        assertEquals("booking-audit-a-business",administratorUpdate.getFirst().businessId());
+        assertEquals("PLATFORM_ADMIN",administratorUpdate.getFirst().actorRole());
+
+        assertThrows(ResourceNotFoundException.class,()->bookings.updateBooking(
+                customerB,booking.getBookingId(),tenantB.vehicle.getVehicleId(),tenantB.offeringId,"forbidden"));
+        assertEquals(1,jdbc.queryForObject("""
+                select count(*) from audit_records
+                where action='BOOKING_UPDATED' and target_id=? and outcome='DENIED'
+                  and actor_user_id=? and business_id is null
+                """,Integer.class,booking.getBookingId(),tenantB.user.getUserId()));
+
+        jdbc.execute("""
+                create function reject_booking_reschedule_success_audit() returns trigger language plpgsql as $$
+                begin
+                    if new.action = 'BOOKING_RESCHEDULED' and new.outcome = 'SUCCESS' then
+                        raise exception 'injected booking audit failure';
+                    end if;
+                    return new;
+                end $$
+                """);
+        jdbc.execute("""
+                create trigger reject_booking_reschedule_success_audit
+                before insert on audit_records for each row
+                execute function reject_booking_reschedule_success_audit()
+                """);
+        try {
+            assertThrows(RuntimeException.class,()->bookings.rescheduleBooking(
+                    customerA,booking.getBookingId(),originalTime.plusHours(1)));
+            assertEquals(originalTime,bookings.findById(booking.getBookingId()).getScheduledDateTime());
+            assertEquals(1,jdbc.queryForObject("""
+                    select count(*) from audit_records
+                    where action='BOOKING_RESCHEDULED' and target_id=? and outcome='FAILURE'
+                      and actor_user_id=? and business_id is null
+                    """,Integer.class,booking.getBookingId(),tenantA.user.getUserId()));
+            assertEquals(0,jdbc.queryForObject("""
+                    select count(*) from audit_records
+                    where action='BOOKING_RESCHEDULED' and target_id=? and outcome='SUCCESS'
+                    """,Integer.class,booking.getBookingId()));
+        } finally {
+            jdbc.execute("drop trigger reject_booking_reschedule_success_audit on audit_records");
+            jdbc.execute("drop function reject_booking_reschedule_success_audit()");
+        }
+    }
+
     @Test void membershipConstraintsAndTransactionsEnforceOneOperationalTenant(){
         Fixture fixture=fixture("membership",2);
         marketplace.registerBusiness(ADMIN,new RegisterBusinessCommand(

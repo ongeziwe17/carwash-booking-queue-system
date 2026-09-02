@@ -3,6 +3,7 @@ package com.carwash.audit.application;
 import com.carwash.audit.domain.*;
 import com.carwash.audit.infrastructure.InMemoryAuditRepository;
 import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
+import com.carwash.shared.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
@@ -80,6 +81,59 @@ class AuditServiceTest {
             return null;
         })).isInstanceOf(IllegalStateException.class);
         assertThat(mutated).isFalse();
+    }
+
+    @Test void deferredSuccessScopeIsResolvedInsideTheWriteBeforeMutation() {
+        AtomicBoolean scopeResolvedInsideWrite = new AtomicBoolean();
+        AtomicBoolean mutationObservedMandatoryRecord = new AtomicBoolean();
+        AuditActor customer = AuditActor.user("customer-a", "CUSTOMER", null);
+        AuditCommand failure = AuditCommand.actionForBusiness(
+                AuditAction.BOOKING_UPDATED, customer, null, "BOOKING", "booking-a", AuditSource.API);
+
+        service.executeDeferred(() -> {
+            transactions.onRollback(() -> { });
+            scopeResolvedInsideWrite.set(true);
+            return AuditCommand.actionForBusiness(
+                    AuditAction.BOOKING_UPDATED, customer, "business-a",
+                    "BOOKING", "booking-a", AuditSource.API);
+        }, failure, () -> {
+            mutationObservedMandatoryRecord.set(all().stream().anyMatch(record ->
+                    record.action() == AuditAction.BOOKING_UPDATED
+                            && record.outcome() == AuditOutcome.SUCCESS));
+            return null;
+        });
+
+        assertThat(scopeResolvedInsideWrite).isTrue();
+        assertThat(mutationObservedMandatoryRecord).isTrue();
+        assertThat(customer.businessId()).isNull();
+        assertThat(all()).singleElement().satisfies(record -> {
+            assertThat(record.businessId()).isEqualTo("business-a");
+            assertThat(record.actorUserId()).isEqualTo("customer-a");
+            assertThat(record.actorRole()).isEqualTo("CUSTOMER");
+        });
+    }
+
+    @Test void deferredScopeFailureAppendsOnlyTheActorSafeFailureCommand() {
+        AuditActor customer = AuditActor.user("customer-b", "CUSTOMER", null);
+        AuditCommand failure = AuditCommand.actionForBusiness(
+                AuditAction.BOOKING_UPDATED, customer, null, "BOOKING", "foreign-booking", AuditSource.API);
+        AtomicBoolean mutationInvoked = new AtomicBoolean();
+
+        assertThatThrownBy(() -> service.executeDeferred(() -> {
+            throw new ResourceNotFoundException("Booking not found");
+        }, failure, () -> {
+            mutationInvoked.set(true);
+            return null;
+        })).isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Booking not found");
+
+        assertThat(mutationInvoked).isFalse();
+        assertThat(all()).singleElement().satisfies(record -> {
+            assertThat(record.outcome()).isEqualTo(AuditOutcome.DENIED);
+            assertThat(record.reasonCode()).isEqualTo("RESOURCE_NOT_FOUND_OR_FOREIGN");
+            assertThat(record.businessId()).isNull();
+            assertThat(record.actorUserId()).isEqualTo("customer-b");
+        });
     }
 
     @Test void duplicateBoundaryRecordIsSuppressedWithinOneRequest() {
