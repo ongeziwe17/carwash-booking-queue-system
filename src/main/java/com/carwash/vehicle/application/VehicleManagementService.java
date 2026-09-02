@@ -173,7 +173,7 @@ public class VehicleManagementService implements VehicleQuery {
 
     private AuditCommand event(TenantAccessContext access, AuditAction action, String vehicleId) {
         Objects.requireNonNull(access, "Tenant access context is required");
-        AuditActor actor = AuditActor.user(access.userId(), access.role().name(), access.businessId());
+        AuditActor actor = AuditActor.user(access.userId(), access.canonicalRoleName(), access.businessId());
         return AuditCommand.actionForBusiness(action, actor, access.businessId(), "VEHICLE",
                 safeAuditId(vehicleId), AuditSource.API);
     }

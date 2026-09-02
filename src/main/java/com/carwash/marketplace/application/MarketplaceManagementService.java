@@ -173,7 +173,7 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
     private AuditCommand eventForBusiness(TenantAccessContext access, AuditAction action, String businessId,
                                           String targetType, String targetId) {
         Objects.requireNonNull(access, "Tenant access context is required");
-        AuditActor actor = AuditActor.user(access.userId(), access.role().name(), access.businessId());
+        AuditActor actor = AuditActor.user(access.userId(), access.canonicalRoleName(), access.businessId());
         String eventBusiness = access.isPlatformAdministrator() ? safeId(businessId) : access.businessId();
         return AuditCommand.actionForBusiness(action, actor, eventBusiness, targetType, safeId(targetId), AuditSource.API);
     }

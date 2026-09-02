@@ -33,6 +33,11 @@ public record TenantAccessContext(String userId, RoleName role, String businessI
         return role == RoleName.CUSTOMER;
     }
 
+    /** Canonical scalar snapshot for cross-capability security/audit contracts. */
+    public String canonicalRoleName() {
+        return role.name();
+    }
+
     public String requireBusinessId() {
         if (!isOperational()) {
             throw new AccessDeniedException("Operational tenant access is required");

@@ -89,7 +89,7 @@ public final class TenantMembershipManagementService implements TenantMembership
     }
 
     private AuditCommand event(TenantAccessContext access, AuditAction action, String businessId, String userId) {
-        AuditActor actor = AuditActor.user(access.userId(), access.role().name(), null);
+        AuditActor actor = AuditActor.user(access.userId(), access.canonicalRoleName(), null);
         return AuditCommand.actionForBusiness(action, actor, safeId(businessId), "USER",
                 safeId(userId), AuditSource.API);
     }

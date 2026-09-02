@@ -514,7 +514,7 @@ public class QueueManagementService implements QueueQuery {
 
     private AuditCommand event(TenantAccessContext access, AuditAction action, String targetType, String targetId) {
         Objects.requireNonNull(access, "Tenant access context is required");
-        AuditActor actor = AuditActor.user(access.userId(), access.role().name(), access.businessId());
+        AuditActor actor = AuditActor.user(access.userId(), access.canonicalRoleName(), access.businessId());
         return AuditCommand.actionForBusiness(action, actor, access.businessId(), targetType,
                 safeAuditId(targetId), AuditSource.API);
     }

@@ -92,7 +92,7 @@ public class ServiceCatalogService implements ServiceDefinitionQuery {
     }
 
     private AuditCommand event(TenantAccessContext access, AuditAction action, String serviceId) {
-        AuditActor actor = AuditActor.user(access.userId(), access.role().name(), null);
+        AuditActor actor = AuditActor.user(access.userId(), access.canonicalRoleName(), null);
         return AuditCommand.action(action, actor, "SERVICE_DEFINITION", safeId(serviceId), AuditSource.API);
     }
 
