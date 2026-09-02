@@ -15,7 +15,7 @@ Stories are grouped by delivery phase so planned capabilities are not confused w
 | US-CUR-003 | As an operator, I want to manage a wash-service catalogue. | Create, retrieve, update, delete, activate, deactivate, and filter services. | Implemented as a global catalogue only. |
 | US-CUR-004 | As an operator, I want to manage bookings. | Create future bookings with canonical branch/offering scope; tenant-scoped confirm/update/filter/cancel for operators; subject-scoped customer self-service. | Implemented with tenant predicates, branch-partitioned exact-slot capacity, and lifecycle synchronization. |
 | US-CUR-005 | As staff, I want to manage queue entries. | Inherit scope from bookings; tenant/branch-filter, order, rebalance, call, start, complete, and delete entries. | Implemented with tenant isolation, branch ordering, offering-duration waits, and synchronized booking lifecycle. |
-| US-CUR-006 | As a customer, I want to see recent in-app notifications. | Booking/queue events create bounded records with branch/offering context that can be listed by user. | Partially implemented; external delivery/read lifecycle remain future work. |
+| US-CUR-006 | As a customer, I want to manage my in-app notification inbox. | Booking/queue events create bounded records with branch/offering context; exact keyset pages, unread count/filter, and idempotent own read state are available. | Implemented; external delivery remains future work. |
 | US-CUR-007 | As an operator, I want a daily operational summary. | Return booking/queue counts for exactly one tenant-authorized branch or business scope using branch-local dates. | Implemented under both persistence profiles; richer analytics remain future work. |
 | US-CUR-008 | As a business owner, I want to manage my Marketplace business and branches. | Valid contact/location data, immutable tenant ownership, lifecycle actions, offerings, and discovery-safe views; only platform admins register businesses. | Implemented under both persistence profiles with strict tenant isolation. |
 
@@ -77,7 +77,7 @@ REC-001 is implemented as a point-in-time, non-reserving read. Future-date queue
 
 | Story ID | GitHub | User Story | Acceptance Summary |
 | --- | ---: | --- | --- |
-| US-NOTIFY-001 | #126 | As a customer, I want a complete in-app notification centre. | Pagination, unread filtering/count, mark-read, bounded privacy-safe responses. |
+| US-NOTIFY-001 | #126 | As a customer, I want a complete in-app notification centre. | Implemented: exact keyset pagination, complete unread count/filter, idempotent mark-one/atomic mark-all, subject/tenant/admin policy, bounded privacy-safe snapshots, and V6 parity. |
 | US-NOTIFY-002 | #127 | As a customer, I want reliable email/SMS updates. | Provider-neutral delivery, retries, idempotency, status tracking, preferences. |
 | US-PAY-001 | #128 | As a customer, I want secure booking deposits/payments and refunds. | Checkout, verified webhooks, reconciliation, idempotent refunds, no card storage. |
 | US-FEEDBACK-001 | #129 | As a customer, I want to rate a completed service. | Verified completed booking, one review policy, public aggregates, moderation state. |

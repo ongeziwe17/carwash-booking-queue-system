@@ -45,9 +45,27 @@ public class Notification {
         this.deliveryStatus = DeliveryStatus.SENT;
     }
 
-    public void markAsRead(LocalDateTime now) {
-        this.readAt = Objects.requireNonNull(now, "Notification read time is required");
+    /**
+     * Applies the only supported public read-state transition.
+     *
+     * @return {@code true} when this call performed {@code SENT -> READ}, or
+     * {@code false} when the notification was already read. An already-read
+     * notification deliberately retains its original timestamp.
+     */
+    public boolean markAsRead(LocalDateTime now) {
+        LocalDateTime requestedReadAt = Objects.requireNonNull(now, "Notification read time is required");
+        if (deliveryStatus == DeliveryStatus.READ) {
+            if (readAt == null) {
+                throw new IllegalStateException("A read notification must have a read timestamp");
+            }
+            return false;
+        }
+        if (deliveryStatus != DeliveryStatus.SENT || readAt != null) {
+            throw new IllegalStateException("Only a sent notification can be marked as read");
+        }
+        this.readAt = requestedReadAt;
         this.deliveryStatus = DeliveryStatus.READ;
+        return true;
     }
 
     public void retryDelivery(LocalDateTime now) {

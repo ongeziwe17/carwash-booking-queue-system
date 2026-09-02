@@ -60,7 +60,11 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
             "GET /api/bookings", "POST /api/bookings", "POST /api/bookings/{id}/confirm",
             "POST /api/bookings/{id}/cancel", "POST /api/auth/login", "GET /api/reports/daily-summary",
             "GET /api/queue-entries/{id}", "DELETE /api/queue-entries/{id}",
-            "GET /api/notifications/user/{userId}", "GET /api/auth/me",
+            "GET /api/notifications/user/{userId}",
+            "GET /api/notifications/user/{userId}/inbox",
+            "PUT /api/notifications/{notificationId}/read",
+            "PUT /api/notifications/user/{userId}/read-all",
+            "GET /api/auth/me",
             "GET /api/marketplace/businesses", "POST /api/marketplace/businesses",
             "GET /api/marketplace/businesses/{businessId}", "PUT /api/marketplace/businesses/{businessId}",
             "POST /api/marketplace/businesses/{businessId}/activate",
@@ -137,7 +141,8 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
 
     @Test
     void schemasKeepCredentialsAndInternalAggregateGraphsBounded() throws Exception {
-        JsonNode schemas = openApi().path("components").path("schemas");
+        JsonNode document = openApi();
+        JsonNode schemas = document.path("components").path("schemas");
         JsonNode user = schemas.path("User").path("properties");
         for (String forbidden : Set.of("password", "encodedPassword", "passwordHash", "vehicles", "bookings", "notifications")) {
             assertFalse(user.has(forbidden), "User schema exposed internal field " + forbidden);
@@ -149,6 +154,13 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         assertEquals(Set.of("notificationId", "userId", "bookingId", "branchId", "serviceOfferingId",
                         "type", "message", "channel", "sentAt", "readAt", "deliveryStatus"),
                 propertyNames(schemas.path("NotificationResponse")));
+        assertEquals(Set.of("notifications", "unreadCount", "nextCursor"),
+                propertyNames(schemas.path("NotificationInboxResponse")));
+        assertEquals(Set.of("affectedCount", "readAt"),
+                propertyNames(schemas.path("MarkAllNotificationsReadResponse")));
+        assertFalse(document.path("paths").has("/api/notifications"));
+        assertFalse(document.path("paths").path("/api/notifications/{notificationId}/read").has("post"));
+        assertFalse(document.path("paths").path("/api/notifications/{notificationId}/read").has("delete"));
         assertTrue(schemas.path("CreateUserRequest").path("properties").path("password").path("writeOnly").asBoolean());
         assertTrue(schemas.path("LoginRequest").path("properties").path("password").path("writeOnly").asBoolean());
     }

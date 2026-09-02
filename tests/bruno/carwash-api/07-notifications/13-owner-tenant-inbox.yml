@@ -1,0 +1,23 @@
+info:
+  name: Owner reads tenant customer inbox
+  type: http
+  seq: 13
+  tags: [owner, notification, security]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/notifications/user/{{customerUserId}}/inbox"
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns tenant inbox", function() { expect(res.status).to.equal(200); expect(res.body.notifications).to.be.an("array").and.not.empty; });
+        test("all records have tenant branch context", function() { expect(res.body.notifications.every(n => n.branchId === bru.getVar("opsBranchId"))).to.equal(true); });
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

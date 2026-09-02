@@ -20,6 +20,7 @@ This matrix is derived from `RoleCatalog`, controller `@PreAuthorize` expression
 | Operate/list queue entries | ❌ | ✅ assigned tenant | ✅ assigned tenant | ✅ explicit admin path |
 | Read own notifications | ✅ | ✅ | ✅ | ✅ |
 | Read another user's operational notifications | ❌ | ✅ assigned tenant | ✅ assigned tenant | ✅ explicit admin path |
+| Mark notification(s) read | ✅ own recipient only | ✅ own recipient only | ✅ own recipient only | ✅ own recipient only |
 | Read daily reports | ❌ | ❌ | ✅ assigned tenant | ✅ explicit scope |
 | Read discoverable Marketplace branches | ✅ | ✅ | ✅ | ✅ |
 | Read nearby Marketplace branch discovery | ✅ | ✅ | ✅ | ✅ |
@@ -37,7 +38,7 @@ This matrix is derived from `RoleCatalog`, controller `@PreAuthorize` expression
 - **BUSINESS_OWNER:** all STAFF permissions plus `REPORT_READ` and `MARKETPLACE_MANAGE`; no global `SERVICE_MANAGE`
 - **PLATFORM_ADMIN:** all current permissions, including `USER_ADMIN` and `ROLE_ASSIGN`
 
-`STAFF` and `BUSINESS_OWNER` are operational tenant roles and require exactly one canonical membership. Their vehicle, booking, queue, notification, report, and Marketplace operations use that membership. `PLATFORM_ADMIN` has no membership or wildcard tenant and uses explicit administrator paths/scopes. Customers remain subject-scoped.
+`STAFF` and `BUSINESS_OWNER` are operational tenant roles and require exactly one canonical membership. Their vehicle, booking, queue, notification-list, report, and Marketplace operations use that membership. `PLATFORM_ADMIN` has no membership or wildcard tenant and uses an exact `businessId` for another user's inbox. Read-state mutation is recipient self-service for all four roles; broader list authority never grants mutation authority. Customers remain subject-scoped and cannot submit a tenant scope.
 
 Branch filters, branch call-next, and branch/business report scopes are validated against the operator's tenant and carried into repository predicates. A foreign valid ID and missing ID both return a generic `404`; a role lacking the permission receives `403`.
 

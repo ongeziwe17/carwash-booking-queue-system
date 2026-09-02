@@ -1,8 +1,8 @@
 # Current Endpoint Inventory
 
-Inventory source: the controllers and OpenAPI quality gate through AUDIT-001. Generated `/v3/api-docs` is authoritative when wording differs.
+Inventory source: the controllers and OpenAPI quality gate through NOTIFY-001. Generated `/v3/api-docs` is authoritative when wording differs.
 
-**Total HTTP operations: 72.**
+**Total HTTP operations: 75.**
 
 | Method | Path | Authentication | Role / permission | Ownership | Request DTO | Success | 400/401/403/404 | Important rules |
 |---|---|---|---|---|---|---:|---|---|
@@ -23,6 +23,9 @@ Inventory source: the controllers and OpenAPI quality gate through AUDIT-001. Ge
 | `POST` | `/api/bookings/{id}/cancel` | Bearer | CUSTOMER: owner; STAFF/OWNER/ADMIN: operational | Booking owner for CUSTOMER | `—` | 200 | 400,401,403,404 | Cancels booking and returns updated booking; configured cancellation cutoff applies. |
 | `POST` | `/api/bookings/{id}/confirm` | Bearer | STAFF, BUSINESS_OWNER, PLATFORM_ADMIN | Operational access | `—` | 200 | 400,401,403,404 | Confirms valid booking; generates notification. |
 | `GET` | `/api/notifications/user/{userId}` | Bearer | Self, tenant operator, or PLATFORM_ADMIN | Subject, operator tenant, or explicit admin path | `—` | 200 | 400,401,403,404 | Operational records are tenant checked; bounded response exposes scalar context only. |
+| `GET` | `/api/notifications/user/{userId}/inbox` | Bearer | `NOTIFICATION_SELF_READ` | Recipient, authenticated operator tenant, or explicit admin business | `—` | 200 | 400,401,403 | Exact newest-first keyset page, optional unread filter, full-scope unread count, scope-bound opaque cursor; no wildcard. |
+| `PUT` | `/api/notifications/{notificationId}/read` | Bearer | `NOTIFICATION_SELF_READ` | Authenticated recipient only for every role | `—` | 200 | 400,401,404 | Guarded `notificationId + userId`; repeated/concurrent calls preserve the first `readAt`. |
+| `PUT` | `/api/notifications/user/{userId}/read-all` | Bearer | `NOTIFICATION_SELF_READ` | Exact authenticated recipient only for every role | `—` | 200 | 400,401,403 | Atomically marks current SENT rows with one timestamp; repeat affects zero. |
 | `GET` | `/api/queue-entries` | Bearer | STAFF, BUSINESS_OWNER, PLATFORM_ADMIN | Operator tenant or explicit admin scope | Query `branchId` | 200 | 400,401,403,404 | Operators enumerate only assigned-business entries; branch filters remain tenant validated. |
 | `POST` | `/api/queue-entries` | Bearer | STAFF, BUSINESS_OWNER, PLATFORM_ADMIN | Operational access | `CreateQueueEntryRequest` | 201 | 400,401,403,404 | Inherits branch/offering from confirmed booking; `serviceId` is consistency-only; appends within branch. |
 | `POST` | `/api/queue-entries/call-next` | Bearer | STAFF, BUSINESS_OWNER, PLATFORM_ADMIN | Operational access | Required query `branchId` | 200 | 400,401,403,404 | Selects first WAITING entry only in that branch; validates canonical associations. |

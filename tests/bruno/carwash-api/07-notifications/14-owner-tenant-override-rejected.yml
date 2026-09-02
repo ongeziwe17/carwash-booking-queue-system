@@ -1,0 +1,22 @@
+info:
+  name: Owner cannot override inbox tenant
+  type: http
+  seq: 14
+  tags: [owner, notification, security]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/notifications/user/{{customerUserId}}/inbox?businessId=foreign-business"
+  auth:
+    type: bearer
+    token: "{{ownerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 403", function() { expect(res.status).to.equal(403); expect(res.body.code).to.equal("ACCESS_DENIED"); });
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

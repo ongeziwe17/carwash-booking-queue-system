@@ -1,0 +1,22 @@
+info:
+  name: Administrator cannot alter recipient read state
+  type: http
+  seq: 17
+  tags: [admin, notification, security]
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/notifications/{{notificationReadId}}/read"
+  auth:
+    type: bearer
+    token: "{{adminToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns safe 404", function() { expect(res.status).to.equal(404); expect(res.body.code).to.equal("RESOURCE_NOT_FOUND"); });
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

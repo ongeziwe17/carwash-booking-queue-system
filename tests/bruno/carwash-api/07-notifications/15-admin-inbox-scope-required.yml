@@ -1,0 +1,22 @@
+info:
+  name: Administrator inbox scope is explicit
+  type: http
+  seq: 15
+  tags: [admin, notification, security]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/notifications/user/{{customerUserId}}/inbox"
+  auth:
+    type: bearer
+    token: "{{adminToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("rejects missing business scope", function() { expect(res.status).to.equal(400); expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); });
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

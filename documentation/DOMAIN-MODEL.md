@@ -23,7 +23,7 @@ Actor types are `USER`, `SYSTEM`, and `ANONYMOUS`; outcomes are `SUCCESS`, `DENI
 | `ServiceOffering` | One branch's price, estimated duration, configured concurrent capacity, and activation state for one reusable service | Offering/branch/service identity is immutable; one record per branch/service pair; inactive records are reactivated, not recreated or deleted; changed duration/capacity cannot undercut the peak overlap of active bookings. |
 | `Booking` | Customer, vehicle, immutable branch, selected branch offering, derived reusable service, schedule, status, and optional queue link | New records cannot be unscoped; offering replacement must stay in the immutable branch; only future `CREATED` and unqueued `CONFIRMED` bookings are editable or reschedulable. |
 | `QueueEntry` | Booking queue state, immutable inherited branch/offering, branch position, and estimated wait | Requires a confirmed canonically scoped booking and active associations; one active entry is allowed per booking and active metrics are server managed per branch. |
-| `Notification` | In-app notification record for a user and optional booking | Stores scalar `branchId`/`serviceOfferingId`; API responses expose bounded IDs rather than User/Booking graphs. |
+| `Notification` | In-app notification record for a user and optional booking | Stores scalar branch/offering context; `SENT -> READ` is valid, repeated READ is a timestamp-preserving no-op, and public paths expose immutable snapshots rather than aggregate graphs. |
 | `CarWashBusiness` | Independent Marketplace business identity, contact/onboarding metadata, and active/inactive lifecycle | Identity is immutable; updates preserve registration time and lifecycle state; deactivation retains the record. |
 | `CarWashBranch` | Physical business-owned location, address, coordinates, timezone, discovery preference, and lifecycle | `businessId` is immutable, coordinates/timezone are validated, and effective activity requires both branch and owner business to be active. |
 | `BranchOperatingSchedule` | One branch's complete recurring weekly interval set | Intervals are immutable, bounded, deterministically ordered, and atomically replaced; duplicate and overlapping ranges are invalid. |
@@ -154,7 +154,19 @@ Discovery is an orchestration capability, not a Marketplace or Catalog aggregate
 
 Notification creation resolves the canonical user and optional booking, inserts the notification, and adds it once to `User.notifications`.
 
-Notifications may be cascade-deleted when their user or cancelled booking is physically removed.
+Inbox queries use immutable `NotificationSnapshot` values with only notification, recipient, booking, branch,
+offering, type, bounded message, channel, timestamp, and status scalars. Purpose-specific repositories perform
+newest-first keyset queries, unread counts, recipient-guarded mark-one, and atomic recipient mark-all without hydrating
+User or Booking aggregates. The key is exact `sentAt` followed by `notificationId`; PostgreSQL reconstructs the Java
+nanoseconds from its timestamp plus remainder before producing or applying a cursor.
+
+`SENT -> READ` assigns the application-clock time. `READ -> READ` retains the first time. Other transitions fail and
+the V6 database constraint plus equivalent in-memory validation prohibit disagreement between `deliveryStatus` and
+`readAt`. Concurrent mark-one and mark-all operations use guarded updates; the first row transition is authoritative.
+
+Notifications may be deleted only through existing dependency cleanup when their user or an eligible cancelled
+booking is physically removed. There is no public delete/purge API, scheduler, time-based expiry, or deletion of unread
+records. External SMS, email, push, and marketing delivery remain separate capabilities.
 
 ## 6. Deletion Rules
 

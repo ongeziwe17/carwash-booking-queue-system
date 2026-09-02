@@ -17,7 +17,8 @@ Implemented on `staging`:
 - Global service catalogue CRUD with active/inactive workflows.
 - Branch/offering-scoped booking creation, guarded same-branch offering update, confirmation, queue-aware cancellation, future-time validation, ownership validation, inactive-parent rejection, and branch-partitioned exact-slot capacity validation.
 - Eligible queue entry creation with scope inherited from its booking, server-managed branch ordering, offering-duration wait estimates, branch rebalance/call-next, synchronized call/start/complete transitions, and deletion.
-- In-app notification creation and recent bounded lookup with branch/offering context.
+- Complete in-app notification lifecycle: internal creation, legacy recent lookup, keyset inbox, unread count/filter,
+  idempotent recipient mark-one/mark-all, tenant-safe reads, and PostgreSQL/in-memory parity.
 - Branch- or business-scoped daily booking and queue summary reporting using branch-local dates.
 - BCrypt credential storage, JWT authentication, RBAC, ownership authorization, and platform-admin role assignment.
 - Identity-owned operational tenant memberships, canonical `tenant_id` JWT validation, tenant-scoped repositories/services, and explicit administrator cross-tenant paths.
@@ -108,7 +109,8 @@ Expected outcome: durable and transactionally safe data plus verified separation
 
 ## Phase 5 — Product and Platform Expansion
 
-- **NOTIFY-001** — Complete the in-app notification lifecycle (#126).
+- **NOTIFY-001** — Complete the in-app notification lifecycle (#126) — implemented with three additive operations,
+  immutable scalar snapshots, V6 consistency/indexes, recipient-only mutation, and deterministic parity coverage.
 - **NOTIFY-002** — Integrate external email and SMS delivery (#127).
 - **PAY-001** — Add Marketplace payment and refund workflows (#128).
 - **FEEDBACK-001** — Add verified ratings and service feedback (#129).

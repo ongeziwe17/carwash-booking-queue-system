@@ -23,7 +23,7 @@ Priority guide:
 | Services | Reusable global service catalogue plus branch-specific offerings with independent price, duration, capacity, lifecycle, and discovery | Global price/duration remain transitional for legacy AVAIL-001. |
 | Bookings and availability | Canonical branch/offering booking creation, retrieval/filtering, guarded same-branch offering update, rescheduling, confirm/cancel, shared complete-window/configured-capacity validation, branch-aware search, plus legacy global AVAIL-001 | Staff/bay resources and capacity reservations are not implemented. |
 | Queues | Booking-derived branch/offering scope, branch-isolated ordering/waits/call-next/rebalance, explicit call override, synchronized call/start/complete workflow, and delete | Offering concurrent capacity is not a remaining-capacity model. |
-| Notifications | In-app notification creation and bounded recent lookup with branch/offering context | Read-status lifecycle and external delivery are incomplete. |
+| Notifications | Internal creation, legacy recent lookup, paginated/unread inbox, and idempotent recipient read state with branch/offering context | External delivery and automated age-based expiry remain future work. |
 | Reports | Persistence-profile daily summary with exactly one tenant-authorized branch or business scope and branch-local dates | Rich dashboards, revenue, and analytics are future work. |
 | Marketplace | Tenant-isolated businesses/branches, membership/JWT trust, location/lifecycle/discovery, schedules/closures/open status, offerings, scoped operations, nearby straight-line discovery, branch-aware availability, and immutable scoped audit history | Routing/geocoding, reservations, SIEM/archive integration, and resource calendars remain future work. |
 | Recommendations | Point-in-time ranked branch recommendations for five preferences over one AVAIL-002 candidate set, with normalized component scores, validated weights, stable ties, and customer-safe explanations | No reservation, ML/personalization, traffic routing, sponsored ranking, or dynamic pricing. |
@@ -143,7 +143,7 @@ REC-001 uses raw Haversine distance, branch-scoped queue estimates when meaningf
 
 ## 7. Phase 4 — Persistence, Tenant Isolation, and Production Security Hardening
 
-SEC-002 (#13) authentication and SEC-003 (#22) RBAC/ownership authorization were completed ahead of this original phase. TENANT-001 adds the business boundary; audit and production hardening remain.
+SEC-002 (#13) authentication and SEC-003 (#22) RBAC/ownership authorization were completed ahead of this original phase. TENANT-001, AUDIT-001, and NOTIFY-001 now provide the business boundary, immutable audit trail, and complete in-app lifecycle; external delivery and production hardening remain.
 
 | ID | GitHub | Backlog Item | Priority | Depends On |
 | --- | ---: | --- | --- | --- |
@@ -156,7 +156,7 @@ SEC-002 (#13) authentication and SEC-003 (#22) RBAC/ownership authorization were
 
 | ID | GitHub | Backlog Item | Priority |
 | --- | ---: | --- | --- |
-| NOTIFY-001 | #126 | Complete in-app notification lifecycle | P2 |
+| NOTIFY-001 | #126 | Complete in-app notification lifecycle — implemented with keyset inbox, unread count/filter, recipient read state, V6 and parity tests | Delivered |
 | NOTIFY-002 | #127 | Integrate external email and SMS delivery | P2/P3 |
 | PAY-001 | #128 | Add Marketplace payment and refund workflows | P2/P3 |
 | FEEDBACK-001 | #129 | Add verified ratings and service feedback | P3 |

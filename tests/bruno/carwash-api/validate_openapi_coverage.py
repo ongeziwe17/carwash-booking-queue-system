@@ -20,7 +20,11 @@ def normalize_bruno_path(url: str) -> str:
         return re.sub(r"/\{\{[^}]+\}\}/tenant-membership$",
                       "/{userId}/tenant-membership", path)
     if path.startswith("/api/notifications/user/"):
-        return re.sub(r"/\{\{[^}]+\}\}$", "/{userId}", path)
+        return re.sub(r"^/api/notifications/user/\{\{[^}]+\}\}",
+                      "/api/notifications/user/{userId}", path)
+    if path.startswith("/api/notifications/"):
+        return re.sub(r"^/api/notifications/\{\{[^}]+\}\}",
+                      "/api/notifications/{notificationId}", path)
     if path.startswith("/api/marketplace/businesses/"):
         return re.sub(r"^/api/marketplace/businesses/\{\{[^}]+\}\}",
                       "/api/marketplace/businesses/{businessId}", path)

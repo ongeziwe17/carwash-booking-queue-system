@@ -1,0 +1,22 @@
+info:
+  name: Customer cannot mark another inbox read
+  type: http
+  seq: 12
+  tags: [customer, notification, security]
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/notifications/user/{{otherCustomerUserId}}/read-all"
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 403", function() { expect(res.status).to.equal(403); expect(res.body.code).to.equal("ACCESS_DENIED"); });
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

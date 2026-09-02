@@ -2,11 +2,33 @@
 
 TEST-001 separates fast unit/repository/service tests from Spring API integration tests and makes isolation, test data, execution order, and release-gate behaviour explicit.
 
+## NOTIFY-001 verification
+
+NOTIFY-001 adds **9 unit/application tests** and **6 integration tests** without removing, skipping, disabling, or
+weakening an existing test. The final inventory is **423 unit/architecture tests and 213 integration tests**.
+`PostgresPersistenceIntegrationTest` executes **28 tests** against PostgreSQL 17.6. The public contract is exactly
+**75 OpenAPI operations**, and Bruno contains **562 requests with 1,746 explicit assertions**, covering all 75
+operations and every protected operation's unauthenticated path.
+
+Focused deterministic tests prove equal-time `sentAt DESC, notificationId DESC` keysets without duplicates or
+omissions; malformed/oversized/cross-scope cursors; configured default/maximum limits; unread-only pages and full
+scope counts; application-clock `SENT -> READ`; timestamp-preserving repeat; one-time mark-all timestamps/counts;
+recipient/customer isolation; operator tenant SQL predicates; explicit administrator business scope; safe foreign
+and missing `404`; scalar response privacy; and absent public creation/deletion. In-memory concurrency starts two
+requests with a barrier and verifies one final timestamp under the shared write lock.
+
+The PostgreSQL class repeats exact nanosecond cursor comparisons, recipient/business predicates, unread counts,
+idempotent and concurrent guarded updates, safe foreign-recipient failure, three V6 indexes, and read-state check
+constraints. It verifies both an empty V1-V6 migration and an incremental V1-V5-to-V6 migration that preserves a
+legacy notification. Existing booking/queue notification transaction behavior, tenant isolation, audit rollback,
+capacity, queue ordering, lifecycle synchronization, restart, and migration coverage remains intact. Flyway V1-V5
+is unchanged; V6 is additive. No arbitrary sleep coordinates concurrency.
+
 ## Customer booking audit-scope regression
 
 The P1 follow-up to AUDIT-001 adds **9 unit tests** and **1 PostgreSQL integration test** without removing, skipping, disabling, or weakening an existing test. The final inventory is **414 unit tests and 207 integration tests**. `PostgresPersistenceIntegrationTest` executes **26 tests** against PostgreSQL 17.6. The public contract remains exactly **72 OpenAPI operations**, and Bruno remains **542 requests with 1,714 explicit assertions**.
 
-The focused regressions prove canonical booking-branch scope for customer create/update/reschedule/cancel/delete and platform-administrator update; owner visibility and foreign-owner exclusion through the tenant query; correct separation when one customer books at two businesses; indistinguishable missing/foreign customer failures with exactly one unscoped actor-safe DENIED record; rollback of the provisional SUCCESS record when protected work fails; and prevention of booking mutation when the mandatory audit insert fails. The in-memory tests use a deterministic clock and ID sequence. PostgreSQL repeats customer/admin canonical scope, tenant-predicate exclusion, actor-safe foreign denial, and rejected-success-insert rollback against the pinned 17.6 container. Flyway V1–V5, all 72 HTTP operations, and all Bruno requests/assertions are unchanged. Issue #126 remains out of scope.
+The focused regressions prove canonical booking-branch scope for customer create/update/reschedule/cancel/delete and platform-administrator update; owner visibility and foreign-owner exclusion through the tenant query; correct separation when one customer books at two businesses; indistinguishable missing/foreign customer failures with exactly one unscoped actor-safe DENIED record; rollback of the provisional SUCCESS record when protected work fails; and prevention of booking mutation when the mandatory audit insert fails. The in-memory tests use a deterministic clock and ID sequence. PostgreSQL repeats customer/admin canonical scope, tenant-predicate exclusion, actor-safe foreign denial, and rejected-success-insert rollback against the pinned 17.6 container. Flyway V1–V5, all 72 HTTP operations, and all Bruno requests/assertions were unchanged by that focused fix; #126 is delivered separately by the NOTIFY-001 section above.
 
 ## AUDIT-001 verification
 

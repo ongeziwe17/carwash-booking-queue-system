@@ -1,0 +1,23 @@
+info:
+  name: Another customer cannot mark a notification
+  type: http
+  seq: 11
+  tags: [customer, notification, security]
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/notifications/{{notificationReadId}}/read"
+  auth:
+    type: bearer
+    token: "{{otherCustomerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns safe 404", function() { expect(res.status).to.equal(404); expect(res.body.code).to.equal("RESOURCE_NOT_FOUND"); });
+        test("does not reveal the identifier", function() { expect(JSON.stringify(res.body)).to.not.include(bru.getVar("notificationReadId")); });
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

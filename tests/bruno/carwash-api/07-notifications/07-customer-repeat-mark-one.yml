@@ -1,0 +1,23 @@
+info:
+  name: Repeated mark one is idempotent
+  type: http
+  seq: 7
+  tags: [customer, notification, lifecycle]
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/notifications/{{notificationReadId}}/read"
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns READ", function() { expect(res.status).to.equal(200); expect(res.body.deliveryStatus).to.equal("READ"); });
+        test("retains the first timestamp", function() { expect(res.body.readAt).to.equal(bru.getVar("notificationOriginalReadAt")); });
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

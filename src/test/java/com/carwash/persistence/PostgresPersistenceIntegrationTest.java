@@ -39,6 +39,8 @@ import com.carwash.marketplace.domain.CarWashBranchRepository;
 import com.carwash.marketplace.domain.CarWashBusinessRepository;
 import com.carwash.marketplace.domain.TemporaryBranchClosureRepository;
 import com.carwash.notification.application.NotificationManagementService;
+import com.carwash.notification.domain.Notification;
+import com.carwash.notification.domain.NotificationCursor;
 import com.carwash.notification.domain.NotificationRepository;
 import com.carwash.queue.application.QueueManagementService;
 import com.carwash.queue.domain.QueueEntry;
@@ -153,9 +155,9 @@ class PostgresPersistenceIntegrationTest {
     @AfterEach void cleanMutableData(){jdbc.execute("truncate table audit_records, users, businesses, service_definitions cascade");}
 
     @Test void emptyDatabaseMigratesAndValidatesToLatest(){
-        assertEquals("5",flyway.info().current().getVersion().getVersion());
+        assertEquals("6",flyway.info().current().getVersion().getVersion());
         assertTrue(flyway.validateWithResult().validationSuccessful);
-        assertEquals(5,jdbc.queryForObject("select count(*) from flyway_schema_history where success",Integer.class));
+        assertEquals(6,jdbc.queryForObject("select count(*) from flyway_schema_history where success",Integer.class));
         assertEquals(4,jdbc.queryForObject("select count(*) from roles",Integer.class));
     }
 
@@ -163,23 +165,99 @@ class PostgresPersistenceIntegrationTest {
         String schema="upgrade_"+UUID.randomUUID().toString().replace("-","");
         jdbc.execute("create schema "+schema);
         try{
-            Flyway first=Flyway.configure().dataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword()).schemas(schema).defaultSchema(schema).locations("classpath:db/migration").target("3").cleanDisabled(true).load();
-            assertEquals(3,first.migrate().migrationsExecuted);
+            Flyway first=Flyway.configure().dataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword()).schemas(schema).defaultSchema(schema).locations("classpath:db/migration").target("5").cleanDisabled(true).load();
+            assertEquals(5,first.migrate().migrationsExecuted);
             try(var connection=POSTGRES.createConnection("");var statement=connection.createStatement()){
                 statement.execute("insert into "+schema+".businesses(business_id,business_name,contact_email,contact_phone,business_status,registered_at,updated_at) values ('upgrade-business','Upgrade','upgrade@example.test','0123456789','ACTIVE',timestamp '2089-01-01',timestamp '2089-01-01')");
                 statement.execute("insert into "+schema+".users(user_id,full_name,email,phone,account_status,created_at) values ('legacy-unassigned-staff','Legacy Staff','legacy-staff@example.test','0123456789','ACTIVE',timestamp '2089-01-01')");
                 statement.execute("insert into "+schema+".user_credentials(user_id,encoded_password) values ('legacy-unassigned-staff','encoded')");
                 statement.execute("insert into "+schema+".user_role_assignments(user_id,role_id) values ('legacy-unassigned-staff','builtin:STAFF')");
+                statement.execute("insert into "+schema+".notifications(notification_id,user_id,notification_type,message,channel,sent_at,delivery_status) values ('legacy-notification','legacy-unassigned-staff','LEGACY','preserved','IN_APP',timestamp '2089-01-01','SENT')");
             }
             Flyway latest=Flyway.configure().dataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword()).schemas(schema).defaultSchema(schema).locations("classpath:db/migration").cleanDisabled(true).load();
-            assertEquals(2,latest.migrate().migrationsExecuted);
+            assertEquals(1,latest.migrate().migrationsExecuted);
             assertTrue(latest.validateWithResult().validationSuccessful);
             assertEquals(1,jdbc.queryForObject("select count(*) from "+schema+".businesses where business_id='upgrade-business'",Integer.class));
             assertEquals(0,jdbc.queryForObject("select count(*) from "+schema+".tenant_memberships where user_id='legacy-unassigned-staff'",Integer.class));
             assertEquals(1,jdbc.queryForObject("select count(*) from pg_indexes where schemaname='"+schema+"' and indexname='ix_bookings_branch_status_time_tenant'",Integer.class));
             assertEquals(4,jdbc.queryForObject("select count(*) from pg_indexes where schemaname='"+schema+"' and indexname like 'ix_audit_%_date'",Integer.class));
             assertEquals(2,jdbc.queryForObject("select count(*) from "+schema+".role_permissions where permission='AUDIT_READ'",Integer.class));
+            assertEquals(3,jdbc.queryForObject("select count(*) from pg_indexes where schemaname='"+schema+"' and indexname like 'ix_notifications_%_cursor'",Integer.class));
+            assertEquals(1,jdbc.queryForObject("select count(*) from "+schema+".notifications where notification_id='legacy-notification'",Integer.class));
         }catch(Exception failure){throw new AssertionError(failure);}finally{jdbc.execute("drop schema "+schema+" cascade");}
+    }
+
+    @Test void notificationLifecycleSchemaIndexesPredicatesAndExactKeysetsAreDurable() {
+        Fixture fixture=fixture("notification-inbox",3);
+        LocalDateTime sentAt=LocalDateTime.of(2089,1,17,9,0,0,123456000);
+        int bookingOrdinal=0;
+        for(int remainder:new int[]{100,500,900}){
+            Notification notification=new Notification("inbox-notification-"+remainder,fixture.user,null,
+                    "INBOX_"+remainder,"bounded message","IN_APP");
+            notification.setBranchId(fixture.branchId);
+            notification.setServiceOfferingId(fixture.offeringId);
+            // Operational scope is all-or-none, so use a canonical booking for persisted tenant context.
+            Booking booking=bookings.createBooking(ADMIN,"inbox-booking-"+remainder,
+                    fixture.user.getUserId(),fixture.vehicle.getVehicleId(),fixture.branchId,fixture.offeringId,
+                    LocalDateTime.of(2089,1,18,10,0).plusMinutes(30L*bookingOrdinal++),null);
+            notification.setBooking(booking);
+            notification.send(sentAt.plusNanos(remainder));
+            assertTrue(notificationRepository.insert(notification));
+        }
+
+        var page=notificationRepository.findPageByUserIdAndBusinessId(
+                fixture.user.getUserId(),"notification-inbox-business",false,null,2);
+        assertEquals(List.of("inbox-notification-900","inbox-notification-500"),
+                page.stream().map(value->value.notificationId()).toList());
+        var next=notificationRepository.findPageByUserIdAndBusinessId(
+                fixture.user.getUserId(),"notification-inbox-business",false,
+                new NotificationCursor(page.getLast().sentAt(),page.getLast().notificationId()),2);
+        assertEquals(List.of("inbox-notification-100"),
+                next.stream().map(value->value.notificationId()).toList());
+        assertTrue(notificationRepository.findPageByUserIdAndBusinessId(
+                fixture.user.getUserId(),"foreign-business",false,null,10).isEmpty());
+        assertEquals(3,notificationRepository.countUnreadByUserIdAndBusinessId(
+                fixture.user.getUserId(),"notification-inbox-business"));
+
+        assertEquals(3,jdbc.queryForObject("select count(*) from pg_indexes where schemaname=current_schema() and indexname like 'ix_notifications_%_cursor'",Integer.class));
+        assertThrows(DataIntegrityViolationException.class,()->jdbc.update(
+                "update notifications set delivery_status='READ',read_at=null where notification_id=?",
+                "inbox-notification-900"));
+        assertThrows(DataIntegrityViolationException.class,()->jdbc.update(
+                "update notifications set read_at=current_timestamp where notification_id=?",
+                "inbox-notification-500"));
+    }
+
+    @Test void postgresRecipientReadMutationsAreIdempotentAtomicAndConcurrentSafe() throws Exception {
+        Fixture fixture=fixture("notification-read",3);
+        Booking booking=bookings.confirmBooking(ADMIN,bookings.createBooking(ADMIN,
+                "notification-read-booking",fixture.user.getUserId(),fixture.vehicle.getVehicleId(),
+                fixture.branchId,fixture.offeringId,LocalDateTime.of(2089,1,17,10,0),null).getBookingId());
+        notifications.publishForAuthorizedBooking(booking,"SECOND_UNREAD","second");
+        List<com.carwash.notification.domain.NotificationSnapshot> initial=
+                notificationRepository.findPageByUserId(fixture.user.getUserId(),false,null,10);
+        String notificationId=initial.getFirst().notificationId();
+        TenantAccessContext customer=new TenantAccessContext(fixture.user.getUserId(),RoleName.CUSTOMER,null);
+        CyclicBarrier start=new CyclicBarrier(2);
+        try(var executor=Executors.newFixedThreadPool(2)){
+            Future<com.carwash.notification.domain.NotificationSnapshot> first=executor.submit(()->{
+                start.await();return notifications.markAsRead(customer,notificationId);
+            });
+            Future<com.carwash.notification.domain.NotificationSnapshot> second=executor.submit(()->{
+                start.await();return notifications.markAsRead(customer,notificationId);
+            });
+            assertEquals(first.get().readAt(),second.get().readAt());
+        }
+        LocalDateTime original=notificationRepository.findSnapshotByIdAndUserId(
+                notificationId,fixture.user.getUserId()).orElseThrow().readAt();
+        assertEquals(original,notifications.markAsRead(customer,notificationId).readAt());
+
+        var all=notifications.markAllAsRead(customer,fixture.user.getUserId());
+        assertEquals(1,all.affectedCount());
+        assertEquals(0,notifications.markAllAsRead(customer,fixture.user.getUserId()).affectedCount());
+        assertEquals(0,notificationRepository.countUnreadByUserId(fixture.user.getUserId()));
+        assertThrows(ResourceNotFoundException.class,()->notifications.markAsRead(
+                new TenantAccessContext("foreign-customer",RoleName.CUSTOMER,null),notificationId));
     }
 
     @Test void auditSchemaConstraintsIndexesAtomicityAndConcurrentAppendsAreDurable() throws Exception {

@@ -24,7 +24,7 @@ flowchart TD
 | `catalog` | Reusable global services, branch-specific `ServiceOffering` aggregates, offering lifecycle/query contracts, module-owned repositories, and service/offering HTTP APIs |
 | `booking` | Canonically branch/offering-scoped bookings, immutable `BookingSnapshot` queries, scheduling/availability policies, persistence, and booking/availability HTTP APIs |
 | `queue` | Branch-scoped queue entries, immutable `QueueEntrySnapshot` queries, partitioned ordering/lifecycle policies, persistence, and queue HTTP API |
-| `notification` | Notification records, scalar branch/offering context, bounded response DTOs, ID generation, policy, persistence, and HTTP API |
+| `notification` | Internal creation, scalar snapshots, scope-bound keyset inbox queries, idempotent recipient read state, ID generation, policy, persistence, and HTTP API |
 | `reporting` | Explicit branch/business daily summaries composed from published immutable queries and report HTTP API |
 | `marketplace` | Business/branch aggregates, weekly schedules, temporary closures, `MarketplaceQuery`/`BranchScheduleQuery`, lifecycle/scheduling services, module-owned repositories, bounded DTO mapping, and Marketplace HTTP APIs |
 | `discovery` | Nearby-search orchestration, immutable coordinate/search/result values, the `DistanceCalculator` port, Haversine adapter, and bounded discovery HTTP API |
@@ -105,6 +105,18 @@ Application services depend on `shared.application.DataTransactionOperations`, n
 
 Optional notifications still use after-commit best effort where documented; mandatory lifecycle notifications remain in the parent transaction and roll it back on failure. Cross-module lifecycle notification creation uses `BookingNotificationPublisher`, which receives the already-authorized booking instead of reloading it globally. Structured audit logs are emitted only after successful durable append/commit registration and contain categorical fields and identifiers, never metadata, credentials, bodies, or exception text.
 
+Notification reads and read-state writes also use `DataTransactionOperations`. Public list paths return immutable
+scalar snapshots and call purpose-specific repository queries; they do not hydrate full User/Booking graphs. Recipient
+mark-one uses one `notificationId + authenticated userId` guarded update, then reads only through the same subject
+predicate. Mark-all updates one recipient's current `SENT` rows atomically with one application-clock timestamp. The
+in-memory shared write lock serializes duplicate requests; PostgreSQL row updates provide the equivalent winner and
+stable timestamp without an unscoped retry or leaked optimistic conflict.
+
+Inbox cursors contain a versioned, opaque keyset position and a SHA-256 scope fingerprint over the authenticated
+actor/role/tenant, requested recipient, resolved tenant scope, and unread filter. Cursors do not grant access: every
+query still includes its user predicate and, for operator/admin reads, the joined business predicate. Newest-first
+comparison is `sent_at`, `sent_at_nano_remainder`, then `notification_id` in both adapters.
+
 Every persistence adapter is owned by its capability infrastructure package. Flat JPA entities, Spring Data repositories, and mappers reconstruct bounded domain objects without annotating domain aggregates or exposing proxies/lazy collections. Database foreign keys may cross capability tables, but Java modules cannot import another module's infrastructure. Hibernate Open Session in View is disabled and `ddl-auto=validate`; only immutable Flyway migrations own schema changes.
 
 ## Relational schema
@@ -134,7 +146,7 @@ erDiagram
     BOOKINGS ||--o{ NOTIFICATIONS : contextualizes
 ```
 
-Case-insensitive indexes enforce unique user email and owner/plate pairs. `tenant_memberships.user_id` permits at most one operational tenant, and deferred final-state triggers require operational roles to have one membership while forbidding memberships for customers/platform administrators. A retained offering is unique per branch/service. One schedule row owns ordered interval rows. Queue and notification rows repeat canonical operational scope only so composite foreign keys reject cross-tenant relationships; application mappers never treat repeated scalars as an alternate authority. Tenant indexes cover business/branch, offering, booking, queue, report, and notification query paths. `audit_records` has no cascading operational foreign keys: actor, business, target, role, and source values are historical snapshots. Its four indexes cover tenant/date, actor/date, action/date, and resource/date cursor scans. Deletes are restrictive except for private owned records documented by the schema.
+Case-insensitive indexes enforce unique user email and owner/plate pairs. `tenant_memberships.user_id` permits at most one operational tenant, and deferred final-state triggers require operational roles to have one membership while forbidding memberships for customers/platform administrators. A retained offering is unique per branch/service. One schedule row owns ordered interval rows. Queue and notification rows repeat canonical operational scope only so composite foreign keys reject cross-tenant relationships; application mappers never treat repeated scalars as an alternate authority. Tenant indexes cover business/branch, offering, booking, queue, report, and notification query paths. V6 adds notification read-state consistency plus user cursor, partial unread cursor, and branch/user cursor indexes; V1-V5 remain immutable. `audit_records` has no cascading operational foreign keys: actor, business, target, role, and source values are historical snapshots. Its four indexes cover tenant/date, actor/date, action/date, and resource/date cursor scans. Deletes are restrictive except for private owned records documented by the schema.
 
 Java `LocalDateTime` values are stored as PostgreSQL `timestamp(6)` plus a `0..999` nanosecond remainder. Weekly `LocalTime` uses nano-of-day. Absolute closures use epoch-second plus nano. These mappings round-trip all supported Java nanoseconds and retain branch-local/timezone semantics.
 

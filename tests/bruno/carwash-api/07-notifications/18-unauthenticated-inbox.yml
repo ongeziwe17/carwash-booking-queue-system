@@ -1,0 +1,21 @@
+info:
+  name: Notification inbox requires authentication
+  type: http
+  seq: 18
+  tags: [notification, security]
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/notifications/user/{{customerUserId}}/inbox"
+  auth:
+    type: none
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns 401", function() { expect(res.status).to.equal(401); expect(res.body.code).to.equal("AUTHENTICATION_REQUIRED"); });
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

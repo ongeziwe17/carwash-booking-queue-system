@@ -10,6 +10,8 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Predicate;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 public abstract class InMemoryRepository<T, ID extends Comparable<? super ID>> implements Repository<T, ID> {
 
@@ -105,6 +107,34 @@ public abstract class InMemoryRepository<T, ID extends Comparable<? super ID>> i
             if (current == null || !predicate.test(current)) return false;
             storage.put(id, entity);
             return true;
+        }
+    }
+
+    /** Atomically inspects and mutates one value while the repository guard remains held. */
+    protected final <R> Optional<R> mutateMatching(
+            ID id, Predicate<T> predicate, Function<T, R> mutation) {
+        requireId(id);
+        if (predicate == null || mutation == null) throw new IllegalArgumentException("Mutation is required");
+        synchronized (repositoryMonitor) {
+            T current = storage.get(id);
+            if (current == null || !predicate.test(current)) return Optional.empty();
+            return Optional.ofNullable(mutation.apply(current));
+        }
+    }
+
+    /** Atomically mutates all matching values and returns the affected count. */
+    protected final int mutateMatching(Predicate<T> predicate, Consumer<T> mutation) {
+        if (predicate == null || mutation == null) throw new IllegalArgumentException("Mutation is required");
+        synchronized (repositoryMonitor) {
+            int affected = 0;
+            for (Map.Entry<ID, T> entry : storage.entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey()).toList()) {
+                if (predicate.test(entry.getValue())) {
+                    mutation.accept(entry.getValue());
+                    affected++;
+                }
+            }
+            return affected;
         }
     }
 

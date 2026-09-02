@@ -1,0 +1,22 @@
+info:
+  name: Repeated mark all is idempotent
+  type: http
+  seq: 9
+  tags: [customer, notification, lifecycle]
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/notifications/user/{{customerUserId}}/read-all"
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns success with zero affected", function() { expect(res.status).to.equal(200); expect(res.body.affectedCount).to.equal(0); });
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false

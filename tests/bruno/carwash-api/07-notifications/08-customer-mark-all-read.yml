@@ -1,0 +1,23 @@
+info:
+  name: Customer marks all notifications read
+  type: http
+  seq: 8
+  tags: [customer, notification, lifecycle]
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/notifications/user/{{customerUserId}}/read-all"
+  auth:
+    type: bearer
+    token: "{{customerToken}}"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("marks all remaining unread records", function() { expect(res.status).to.equal(200); expect(res.body.affectedCount).to.be.greaterThan(0); });
+        test("returns one operation timestamp", function() { expect(res.body.readAt).to.be.a("string"); });
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false
