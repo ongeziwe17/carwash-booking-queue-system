@@ -190,6 +190,7 @@ class PostgresPersistenceIntegrationTest {
     @Test void notificationLifecycleSchemaIndexesPredicatesAndExactKeysetsAreDurable() {
         Fixture fixture=fixture("notification-inbox",3);
         LocalDateTime sentAt=LocalDateTime.of(2089,1,17,9,0,0,123456000);
+        int bookingOrdinal=0;
         for(int remainder:new int[]{100,500,900}){
             Notification notification=new Notification("inbox-notification-"+remainder,fixture.user,null,
                     "INBOX_"+remainder,"bounded message","IN_APP");
@@ -198,7 +199,7 @@ class PostgresPersistenceIntegrationTest {
             // Operational scope is all-or-none, so use a canonical booking for persisted tenant context.
             Booking booking=bookings.createBooking(ADMIN,"inbox-booking-"+remainder,
                     fixture.user.getUserId(),fixture.vehicle.getVehicleId(),fixture.branchId,fixture.offeringId,
-                    LocalDateTime.of(2089,1,18,10,0),null);
+                    LocalDateTime.of(2089,1,18,10,0).plusMinutes(30L*bookingOrdinal++),null);
             notification.setBooking(booking);
             notification.send(sentAt.plusNanos(remainder));
             assertTrue(notificationRepository.insert(notification));
