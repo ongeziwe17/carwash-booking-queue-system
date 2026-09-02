@@ -17,7 +17,7 @@ import java.time.Instant;
 @RestController
 @RequestMapping("/api/audit-records")
 @SecurityRequirement(name = "bearerAuth")
-public final class AuditController {
+public class AuditController {
     private final AuditQueryService service;
     private final AuditPrincipalProvider principals;
 
