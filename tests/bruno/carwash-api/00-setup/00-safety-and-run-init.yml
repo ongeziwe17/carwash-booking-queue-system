@@ -37,8 +37,8 @@ runtime:
         const vars = {
           customerUserId: `customer-${runId}`, otherCustomerUserId: `other-${runId}`,
           staffUserId: `staff-${runId}`, ownerUserId: `owner-${runId}`, disposableUserId: `delete-user-${runId}`,
-          customerEmail: `customer-${runId}@example.test`, otherCustomerEmail: `other-${runId}@example.test`,
-          staffEmail: `staff-${runId}@example.test`, ownerEmail: `owner-${runId}@example.test`, disposableEmail: `delete-user-${runId}@example.test`,
+          customerEmail: `customer-${runId}@gmail.com`, otherCustomerEmail: `other-${runId}@gmail.com`,
+          staffEmail: `staff-${runId}@gmail.com`, ownerEmail: `owner-${runId}@gmail.com`, disposableEmail: `delete-user-${runId}@gmail.com`,
           customerVehicleId: `vehicle-customer-${runId}`, otherCustomerVehicleId: `vehicle-other-${runId}`,
           disposableVehicleId: `vehicle-delete-${runId}`, plateConflictVehicleId: `vehicle-plate-${runId}`,
           serviceId: `service-${runId}`, toggleServiceId: `service-toggle-${runId}`, inactiveServiceId: `service-inactive-${runId}`,
@@ -50,7 +50,7 @@ runtime:
           conflictBookingId: `booking-conflict-a-${runId}`, duplicateQueueBookingId: `booking-duplicate-queue-${runId}`,
           queueEntryId: `queue-${runId}`, otherQueueEntryId: `queue-other-${runId}`,
           deleteQueueEntryId: `queue-delete-${runId}`, activeDeleteQueueEntryId: `queue-active-delete-${runId}`,
-          e2eCustomerUserId: `e2e-customer-${runId}`, e2eCustomerEmail: `e2e-customer-${runId}@example.test`,
+          e2eCustomerUserId: `e2e-customer-${runId}`, e2eCustomerEmail: `e2e-customer-${runId}@gmail.com`,
           e2eVehicleId: `e2e-vehicle-${runId}`, e2eBookingId: `e2e-booking-${runId}`,
           opsBookingId: `ops-booking-${runId}`, opsQueueId: `ops-queue-${runId}`,
           workflowCancelWaitingBookingId: `workflow-cancel-waiting-booking-${runId}`,
@@ -115,7 +115,7 @@ runtime:
           queueOrderingEntry2Id: `queue-ordering-entry-2-${runId}`,
           queueOrderingEntry3Id: `queue-ordering-entry-3-${runId}`,
           ownerJourneyServiceId: `owner-journey-service-${runId}`, adminRbacServiceId: `admin-rbac-service-${runId}`, adminJourneyUserId: `admin-journey-${runId}`,
-          adminJourneyEmail: `admin-journey-${runId}@example.test`
+          adminJourneyEmail: `admin-journey-${runId}@gmail.com`
         };
         for (const [key,value] of Object.entries(vars)) bru.setVar(key,value);
         for (let i=1;i<=48;i++) {
