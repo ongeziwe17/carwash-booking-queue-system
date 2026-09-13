@@ -6,6 +6,7 @@ import com.carwash.marketplace.application.MarketplaceQuery;
 import com.carwash.notification.domain.Notification;
 import com.carwash.notification.domain.NotificationCursor;
 import com.carwash.notification.domain.NotificationRepository;
+import com.carwash.notification.domain.NotificationInboxSnapshot;
 import com.carwash.notification.domain.NotificationSnapshot;
 import com.carwash.notification.domain.DeliveryStatus;
 
@@ -82,6 +83,20 @@ public class InMemoryNotificationRepository extends InMemoryRepository<Notificat
         return page(findMatching(notification -> belongsToUser(notification, userId)
                 && branchBelongsTo(notification.getBranchId(), businessId)
                 && (!unreadOnly || notification.getDeliveryStatus() == DeliveryStatus.SENT)), cursor, limit);
+    }
+
+    @Override
+    public NotificationInboxSnapshot findInboxByUserId(
+            String userId, boolean unreadOnly, NotificationCursor cursor, int limit) {
+        return readAtomically(() -> inbox(findMatching(notification -> belongsToUser(notification, userId)),
+                unreadOnly, cursor, limit));
+    }
+
+    @Override
+    public NotificationInboxSnapshot findInboxByUserIdAndBusinessId(
+            String userId, String businessId, boolean unreadOnly, NotificationCursor cursor, int limit) {
+        return readAtomically(() -> inbox(findMatching(notification -> belongsToUser(notification, userId)
+                && branchBelongsTo(notification.getBranchId(), businessId)), unreadOnly, cursor, limit));
     }
 
     @Override
@@ -178,6 +193,18 @@ public class InMemoryNotificationRepository extends InMemoryRepository<Notificat
                 .limit(limit)
                 .map(InMemoryNotificationRepository::snapshot)
                 .toList();
+    }
+
+    private static NotificationInboxSnapshot inbox(
+            List<Notification> authorized, boolean unreadOnly, NotificationCursor cursor, int limit) {
+        long unreadCount = authorized.stream()
+                .filter(notification -> notification.getDeliveryStatus() == DeliveryStatus.SENT)
+                .count();
+        List<Notification> visible = authorized.stream()
+                .filter(notification -> !unreadOnly
+                        || notification.getDeliveryStatus() == DeliveryStatus.SENT)
+                .toList();
+        return new NotificationInboxSnapshot(page(visible, cursor, limit), unreadCount);
     }
 
     private static boolean beforeCursor(Notification notification, NotificationCursor cursor) {

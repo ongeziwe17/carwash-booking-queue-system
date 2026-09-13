@@ -17,6 +17,10 @@
 
 ### Changed
 
+- Made notification inbox rows, unread totals, and cursor derivation use one authoritative repository snapshot in
+  both PostgreSQL and in-memory profiles, including count-preserving empty pages and deterministic concurrency tests.
+- Upgraded the Spring Boot-managed embedded Tomcat line from 11.0.24 to 11.0.25 to remediate
+  `CVE-2026-65182`, `CVE-2026-65905`, and `CVE-2026-68525` without suppressing the fixed-critical Trivy gate.
 - Corrected customer and platform-administrator booking audit scope so successful create, update, reschedule, confirmation, cancellation, and deletion events derive `business_id` from the canonically locked branch/booking inside the authoritative write transaction. Actor snapshots remain membership-accurate, while missing/foreign failures remain unscoped and actor-safe.
 - Enforced Marketplace tenant isolation with one Identity-owned membership per operational user, server-validated `tenant_id` JWT claims, bounded tenant access context, tenant-scoped application/repository operations across Marketplace and operational resources, customer subject scope, explicit platform-admin paths, global-catalogue restrictions, safe foreign-resource `404` responses, discovery-specific DTOs, additive Flyway V4 constraints/indexes, and in-memory/PostgreSQL/API/Bruno coverage.
 - Added an explicit PostgreSQL persistence profile with Flyway-owned schema, module-local JPA adapters for every repository port, transaction/after-commit abstraction, optimistic versions, cross-instance advisory locks for booking capacity and queue ordering, lossless nanosecond mappings, persistent Docker Compose storage, Testcontainers concurrency/restart tests, and CI acceptance coverage.

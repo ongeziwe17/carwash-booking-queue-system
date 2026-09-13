@@ -323,6 +323,10 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
 
         assertEquals(1, notificationService.findInbox(owner, userId, null, false, null, 10)
                 .notifications().size());
+        assertEquals(1, notificationService.findInbox(TestAccess.customer(userId),
+                userId, null, false, null, 10).notifications().size());
+        assertEquals(1, notificationService.findInbox(TestAccess.platformAdministrator(),
+                userId, defaultBusinessId, false, null, 10).notifications().size());
         assertTrue(notificationService.findInbox(new TenantAccessContext(
                         "foreign-owner", RoleName.BUSINESS_OWNER, "foreign-business"),
                 userId, null, false, null, 10).notifications().isEmpty());
@@ -337,6 +341,25 @@ class NotificationManagementServiceTest extends ServiceTestSupport {
                         notification.getNotificationId()));
         assertThrows(org.springframework.security.access.AccessDeniedException.class,
                 () -> notificationService.markAllAsRead(TestAccess.platformAdministrator(), userId));
+    }
+
+    @Test
+    void emptyCursorPageRetainsCompleteUnreadCountForBothFilters() {
+        Booking booking = createSavedBooking();
+        notificationService.createNotification(booking.getUser(), booking, "FIRST", "first");
+        notificationService.createNotification(booking.getUser(), booking, "SECOND", "second");
+        var cursor = new com.carwash.notification.domain.NotificationCursor(
+                LocalDateTime.now(clock).minusSeconds(1), "after-all-notifications");
+
+        var emptyAll = notificationRepository.findInboxByUserId(
+                booking.getUser().getUserId(), false, cursor, 2);
+        var emptyUnread = notificationRepository.findInboxByUserId(
+                booking.getUser().getUserId(), true, cursor, 2);
+
+        assertTrue(emptyAll.notifications().isEmpty());
+        assertEquals(2, emptyAll.unreadCount());
+        assertTrue(emptyUnread.notifications().isEmpty());
+        assertEquals(2, emptyUnread.unreadCount());
     }
 
     @Test
