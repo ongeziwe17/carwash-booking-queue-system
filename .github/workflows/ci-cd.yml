@@ -133,6 +133,25 @@ jobs:
       - name: Run Maven verification
         run: ./mvnw --batch-mode clean verify
 
+      - name: Verify managed Tomcat dependency alignment
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree_output="$(./mvnw --batch-mode dependency:tree \
+            '-Dincludes=org.apache.tomcat.embed:*')"
+          echo "${tree_output}"
+          mapfile -t tomcat_versions < <(printf '%s\n' "${tree_output}" \
+            | sed -nE 's/.*org\.apache\.tomcat\.embed:[^:]+:jar:([^:]+):.*/\1/p')
+          if [[ "${#tomcat_versions[@]}" -lt 3 ]]; then
+            echo "Expected all embedded Tomcat artifacts in the dependency tree."
+            exit 1
+          fi
+          if [[ "$(printf '%s\n' "${tomcat_versions[@]}" | sort -u | wc -l)" -ne 1 \
+              || "${tomcat_versions[0]}" != "11.0.25" ]]; then
+            echo "Embedded Tomcat artifacts are not uniformly resolved to 11.0.25."
+            exit 1
+          fi
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7
