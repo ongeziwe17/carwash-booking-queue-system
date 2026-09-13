@@ -74,8 +74,10 @@ public class PostgresNotificationRepository implements NotificationRepository {
         short cursorNano=cursor==null?0:PersistenceSupport.nanoRemainder(cursor.sentAt());
         String cursorId=cursor==null?"":cursor.notificationId();
         Object[] arguments=businessId==null
-                ? new Object[]{userId,unreadOnly,cursorAt,cursorAt,cursorAt,cursorNano,cursorAt,cursorNano,cursorId,limit}
-                : new Object[]{userId,businessId,unreadOnly,cursorAt,cursorAt,cursorAt,cursorNano,cursorAt,cursorNano,cursorId,limit};
+                ? new Object[]{userId,userId,unreadOnly,cursorAt,cursorAt,cursorAt,cursorNano,
+                        cursorAt,cursorNano,cursorId,limit}
+                : new Object[]{userId,businessId,userId,businessId,unreadOnly,cursorAt,cursorAt,
+                        cursorAt,cursorNano,cursorAt,cursorNano,cursorId,limit};
         List<InboxRow> rows=jdbc.query(sql,INBOX_ROW_MAPPER,arguments);
         if(rows.isEmpty())throw new IllegalStateException("Notification inbox query did not return its count row");
         long unreadCount=rows.getFirst().unreadCount();
@@ -99,35 +101,34 @@ public class PostgresNotificationRepository implements NotificationRepository {
     };
     private record InboxRow(NotificationSnapshot notification,long unreadCount){}
     private static final String USER_INBOX_SQL="""
-            with authorized as (
-                select n.* from notifications n where n.user_id=?
-            ), unread as (
-                select count(*) as unread_count from authorized where delivery_status='SENT'
+            with unread as (
+                select count(*) as unread_count from notifications n
+                where n.user_id=? and n.delivery_status='SENT'
             ), page as (
-                select * from authorized
-                where (?=false or delivery_status='SENT') and sent_at is not null
-                  and (cast(? as timestamp) is null or sent_at < cast(? as timestamp)
-                    or (sent_at=cast(? as timestamp) and sent_at_nano_remainder<?)
-                    or (sent_at=cast(? as timestamp) and sent_at_nano_remainder=? and notification_id<?))
-                order by sent_at desc,sent_at_nano_remainder desc,notification_id desc limit ?
+                select n.* from notifications n
+                where n.user_id=? and (?=false or n.delivery_status='SENT') and n.sent_at is not null
+                  and (cast(? as timestamp) is null or n.sent_at < cast(? as timestamp)
+                    or (n.sent_at=cast(? as timestamp) and n.sent_at_nano_remainder<?)
+                    or (n.sent_at=cast(? as timestamp) and n.sent_at_nano_remainder=? and n.notification_id<?))
+                order by n.sent_at desc,n.sent_at_nano_remainder desc,n.notification_id desc limit ?
             )
             select page.*,unread.unread_count from unread left join page on true
             order by page.sent_at desc nulls last,page.sent_at_nano_remainder desc nulls last,
                 page.notification_id desc nulls last
             """;
     private static final String TENANT_INBOX_SQL="""
-            with authorized as (
+            with unread as (
+                select count(*) as unread_count from notifications n
+                join branches b on b.branch_id=n.branch_id
+                where n.user_id=? and b.business_id=? and n.delivery_status='SENT'
+            ), page as (
                 select n.* from notifications n join branches b on b.branch_id=n.branch_id
                 where n.user_id=? and b.business_id=?
-            ), unread as (
-                select count(*) as unread_count from authorized where delivery_status='SENT'
-            ), page as (
-                select * from authorized
-                where (?=false or delivery_status='SENT') and sent_at is not null
-                  and (cast(? as timestamp) is null or sent_at < cast(? as timestamp)
-                    or (sent_at=cast(? as timestamp) and sent_at_nano_remainder<?)
-                    or (sent_at=cast(? as timestamp) and sent_at_nano_remainder=? and notification_id<?))
-                order by sent_at desc,sent_at_nano_remainder desc,notification_id desc limit ?
+                  and (?=false or n.delivery_status='SENT') and n.sent_at is not null
+                  and (cast(? as timestamp) is null or n.sent_at < cast(? as timestamp)
+                    or (n.sent_at=cast(? as timestamp) and n.sent_at_nano_remainder<?)
+                    or (n.sent_at=cast(? as timestamp) and n.sent_at_nano_remainder=? and n.notification_id<?))
+                order by n.sent_at desc,n.sent_at_nano_remainder desc,n.notification_id desc limit ?
             )
             select page.*,unread.unread_count from unread left join page on true
             order by page.sent_at desc nulls last,page.sent_at_nano_remainder desc nulls last,

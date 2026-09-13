@@ -114,9 +114,10 @@ stable timestamp without an unscoped retry or leaked optimistic conflict.
 
 Each inbox repository call returns its page candidates and complete authorized unread count as one immutable result.
 The PostgreSQL adapter derives both values in one statement and therefore one statement-level MVCC snapshot under
-`READ_COMMITTED`; its count-producing CTE is left-joined to the page so an exhausted cursor still returns the full
-unread total. The in-memory adapter derives both values while holding its existing repository monitor. Neither design
-changes isolation for unrelated reads or relies on a JVM-wide/distributed lock.
+`READ_COMMITTED`; independently optimizable count and page CTEs query the authorized table scope directly, and the
+count is left-joined to the page so an exhausted cursor still returns the full unread total. The in-memory adapter
+derives both values while holding its existing repository monitor. Neither design changes isolation for unrelated
+reads or relies on a JVM-wide/distributed lock.
 
 Inbox cursors contain a versioned, opaque keyset position and a SHA-256 scope fingerprint over the authenticated
 actor/role/tenant, requested recipient, resolved tenant scope, and unread filter. Cursors do not grant access: every
