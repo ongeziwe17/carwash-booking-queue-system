@@ -19,6 +19,10 @@ public interface NotificationRepository extends Repository<Notification, String>
             String userId, boolean unreadOnly, NotificationCursor cursor, int limit);
     List<NotificationSnapshot> findPageByUserIdAndBusinessId(
             String userId, String businessId, boolean unreadOnly, NotificationCursor cursor, int limit);
+    NotificationInboxSnapshot findInboxByUserId(
+            String userId, boolean unreadOnly, NotificationCursor cursor, int limit);
+    NotificationInboxSnapshot findInboxByUserIdAndBusinessId(
+            String userId, String businessId, boolean unreadOnly, NotificationCursor cursor, int limit);
     long countUnreadByUserId(String userId);
     long countUnreadByUserIdAndBusinessId(String userId, String businessId);
     Optional<NotificationSnapshot> findSnapshotByIdAndUserId(String notificationId, String userId);

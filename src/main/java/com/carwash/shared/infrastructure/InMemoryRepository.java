@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.function.Predicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 public abstract class InMemoryRepository<T, ID extends Comparable<? super ID>> implements Repository<T, ID> {
 
@@ -86,6 +87,14 @@ public abstract class InMemoryRepository<T, ID extends Comparable<? super ID>> i
                     .sorted(Map.Entry.comparingByKey())
                     .map(Map.Entry::getValue)
                     .toList();
+        }
+    }
+
+    /** Executes a compound read against one repository-local snapshot. */
+    protected final <R> R readAtomically(Supplier<R> read) {
+        if (read == null) throw new IllegalArgumentException("Read is required");
+        synchronized (repositoryMonitor) {
+            return read.get();
         }
     }
 

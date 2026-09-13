@@ -39,6 +39,7 @@ import com.carwash.marketplace.domain.CarWashBranchRepository;
 import com.carwash.marketplace.domain.CarWashBusinessRepository;
 import com.carwash.marketplace.domain.TemporaryBranchClosureRepository;
 import com.carwash.notification.application.NotificationManagementService;
+import com.carwash.notification.domain.DeliveryStatus;
 import com.carwash.notification.domain.Notification;
 import com.carwash.notification.domain.NotificationCursor;
 import com.carwash.notification.domain.NotificationRepository;
@@ -205,17 +206,26 @@ class PostgresPersistenceIntegrationTest {
             assertTrue(notificationRepository.insert(notification));
         }
 
-        var page=notificationRepository.findPageByUserIdAndBusinessId(
+        var inbox=notificationRepository.findInboxByUserIdAndBusinessId(
                 fixture.user.getUserId(),"notification-inbox-business",false,null,2);
+        var page=inbox.notifications();
         assertEquals(List.of("inbox-notification-900","inbox-notification-500"),
                 page.stream().map(value->value.notificationId()).toList());
-        var next=notificationRepository.findPageByUserIdAndBusinessId(
+        assertEquals(3,inbox.unreadCount());
+        var next=notificationRepository.findInboxByUserIdAndBusinessId(
                 fixture.user.getUserId(),"notification-inbox-business",false,
-                new NotificationCursor(page.getLast().sentAt(),page.getLast().notificationId()),2);
+                new NotificationCursor(page.getLast().sentAt(),page.getLast().notificationId()),2).notifications();
         assertEquals(List.of("inbox-notification-100"),
                 next.stream().map(value->value.notificationId()).toList());
-        assertTrue(notificationRepository.findPageByUserIdAndBusinessId(
-                fixture.user.getUserId(),"foreign-business",false,null,10).isEmpty());
+        var emptyTenant=notificationRepository.findInboxByUserIdAndBusinessId(
+                fixture.user.getUserId(),"foreign-business",false,null,10);
+        assertTrue(emptyTenant.notifications().isEmpty());
+        assertEquals(0,emptyTenant.unreadCount());
+        var emptyPage=notificationRepository.findInboxByUserIdAndBusinessId(
+                fixture.user.getUserId(),"notification-inbox-business",true,
+                new NotificationCursor(sentAt.minusSeconds(1),"after-all"),10);
+        assertTrue(emptyPage.notifications().isEmpty());
+        assertEquals(3,emptyPage.unreadCount());
         assertEquals(3,notificationRepository.countUnreadByUserIdAndBusinessId(
                 fixture.user.getUserId(),"notification-inbox-business"));
 
@@ -258,6 +268,92 @@ class PostgresPersistenceIntegrationTest {
         assertEquals(0,notificationRepository.countUnreadByUserId(fixture.user.getUserId()));
         assertThrows(ResourceNotFoundException.class,()->notifications.markAsRead(
                 new TenantAccessContext("foreign-customer",RoleName.CUSTOMER,null),notificationId));
+    }
+
+    @Test void concurrentMarkOneCommitCannotContradictPostgresInboxSnapshot() throws Exception {
+        Fixture fixture=fixture("notification-snapshot-one",3);
+        Booking booking=bookings.confirmBooking(ADMIN,bookings.createBooking(ADMIN,
+                "notification-snapshot-one-booking",fixture.user.getUserId(),fixture.vehicle.getVehicleId(),
+                fixture.branchId,fixture.offeringId,LocalDateTime.of(2089,1,17,10,0),null).getBookingId());
+        String notificationId=notificationRepository.findByBookingId(booking.getBookingId())
+                .getFirst().getNotificationId();
+        CountDownLatch updateApplied=new CountDownLatch(1);
+        CountDownLatch allowCommit=new CountDownLatch(1);
+
+        try(var executor=Executors.newSingleThreadExecutor()){
+            Future<?> writer=executor.submit(()->{
+                try(var connection=POSTGRES.createConnection("");var statement=connection.prepareStatement("""
+                        update notifications set delivery_status='READ',read_at=current_timestamp,
+                            read_at_nano_remainder=0,version=version+1
+                        where notification_id=? and user_id=? and delivery_status='SENT'
+                        """)){
+                    connection.setAutoCommit(false);
+                    statement.setString(1,notificationId);
+                    statement.setString(2,fixture.user.getUserId());
+                    assertEquals(1,statement.executeUpdate());
+                    updateApplied.countDown();
+                    assertTrue(allowCommit.await(5,TimeUnit.SECONDS));
+                    connection.commit();
+                }
+                return null;
+            });
+            assertTrue(updateApplied.await(5,TimeUnit.SECONDS));
+            var snapshot=notificationRepository.findInboxByUserId(
+                    fixture.user.getUserId(),false,null,10);
+            allowCommit.countDown();
+            writer.get(5,TimeUnit.SECONDS);
+
+            assertEquals(DeliveryStatus.SENT,snapshot.notifications().getFirst().deliveryStatus());
+            assertEquals(1,snapshot.unreadCount());
+            assertEquals(0,notificationRepository.findInboxByUserId(
+                    fixture.user.getUserId(),false,null,10).unreadCount());
+        }finally{
+            allowCommit.countDown();
+        }
+    }
+
+    @Test void concurrentMarkAllCommitCannotContradictPostgresInboxSnapshot() throws Exception {
+        Fixture fixture=fixture("notification-snapshot-all",3);
+        Booking booking=bookings.confirmBooking(ADMIN,bookings.createBooking(ADMIN,
+                "notification-snapshot-all-booking",fixture.user.getUserId(),fixture.vehicle.getVehicleId(),
+                fixture.branchId,fixture.offeringId,LocalDateTime.of(2089,1,17,10,0),null).getBookingId());
+        notifications.publishForAuthorizedBooking(booking,"SECOND_UNREAD","second");
+        CountDownLatch updateApplied=new CountDownLatch(1);
+        CountDownLatch allowCommit=new CountDownLatch(1);
+
+        try(var executor=Executors.newSingleThreadExecutor()){
+            Future<?> writer=executor.submit(()->{
+                try(var connection=POSTGRES.createConnection("");var statement=connection.prepareStatement("""
+                        update notifications set delivery_status='READ',read_at=current_timestamp,
+                            read_at_nano_remainder=0,version=version+1
+                        where user_id=? and delivery_status='SENT'
+                        """)){
+                    connection.setAutoCommit(false);
+                    statement.setString(1,fixture.user.getUserId());
+                    assertEquals(2,statement.executeUpdate());
+                    updateApplied.countDown();
+                    assertTrue(allowCommit.await(5,TimeUnit.SECONDS));
+                    connection.commit();
+                }
+                return null;
+            });
+            assertTrue(updateApplied.await(5,TimeUnit.SECONDS));
+            var snapshot=notificationRepository.findInboxByUserId(
+                    fixture.user.getUserId(),true,null,10);
+            allowCommit.countDown();
+            writer.get(5,TimeUnit.SECONDS);
+
+            assertEquals(2,snapshot.notifications().size());
+            assertTrue(snapshot.notifications().stream()
+                    .allMatch(notification->notification.deliveryStatus()==DeliveryStatus.SENT));
+            assertEquals(2,snapshot.unreadCount());
+            var after=notificationRepository.findInboxByUserId(
+                    fixture.user.getUserId(),true,null,10);
+            assertTrue(after.notifications().isEmpty());
+            assertEquals(0,after.unreadCount());
+        }finally{
+            allowCommit.countDown();
+        }
     }
 
     @Test void auditSchemaConstraintsIndexesAtomicityAndConcurrentAppendsAreDurable() throws Exception {

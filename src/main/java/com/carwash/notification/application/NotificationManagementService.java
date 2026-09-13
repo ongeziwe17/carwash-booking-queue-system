@@ -6,6 +6,7 @@ import com.carwash.identity.domain.User;
 import com.carwash.booking.domain.BookingRepository;
 import com.carwash.notification.domain.NotificationRepository;
 import com.carwash.notification.domain.NotificationCursor;
+import com.carwash.notification.domain.NotificationInboxSnapshot;
 import com.carwash.notification.domain.NotificationSnapshot;
 import com.carwash.notification.domain.DeliveryStatus;
 import com.carwash.identity.domain.UserRepository;
@@ -144,21 +145,18 @@ public class NotificationManagementService implements BookingNotificationPublish
         String scopeKey = cursorScope(access, normalizedUserId, scope.businessId(), unreadOnly);
         NotificationCursor cursor = decodeCursor(encodedCursor, scopeKey);
         return coordinator.read(() -> {
-            List<NotificationSnapshot> selected = scope.businessId() == null
-                    ? notificationRepository.findPageByUserId(
+            NotificationInboxSnapshot snapshot = scope.businessId() == null
+                    ? notificationRepository.findInboxByUserId(
                             normalizedUserId, unreadOnly, cursor, limit + 1)
-                    : notificationRepository.findPageByUserIdAndBusinessId(
+                    : notificationRepository.findInboxByUserIdAndBusinessId(
                             normalizedUserId, scope.businessId(), unreadOnly, cursor, limit + 1);
-            long unreadCount = scope.businessId() == null
-                    ? notificationRepository.countUnreadByUserId(normalizedUserId)
-                    : notificationRepository.countUnreadByUserIdAndBusinessId(
-                            normalizedUserId, scope.businessId());
+            List<NotificationSnapshot> selected = snapshot.notifications();
             boolean more = selected.size() > limit;
             List<NotificationSnapshot> notifications = more
                     ? List.copyOf(selected.subList(0, limit)) : List.copyOf(selected);
             String nextCursor = more && !notifications.isEmpty()
                     ? encodeCursor(notifications.getLast(), scopeKey) : null;
-            return new NotificationInboxPage(notifications, unreadCount, nextCursor);
+            return new NotificationInboxPage(notifications, snapshot.unreadCount(), nextCursor);
         });
     }
 

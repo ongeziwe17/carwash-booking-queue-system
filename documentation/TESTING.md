@@ -4,9 +4,9 @@ TEST-001 separates fast unit/repository/service tests from Spring API integratio
 
 ## NOTIFY-001 verification
 
-NOTIFY-001 adds **9 unit/application tests** and **6 integration tests** without removing, skipping, disabling, or
-weakening an existing test. The final inventory is **423 unit/architecture tests and 213 integration tests**.
-`PostgresPersistenceIntegrationTest` executes **28 tests** against PostgreSQL 17.6. The public contract is exactly
+NOTIFY-001 and its snapshot repair add **12 unit/application tests** and **8 integration tests** without removing,
+skipping, disabling, or weakening an existing test. The final source inventory is **426 unit/architecture tests and
+215 integration tests**. `PostgresPersistenceIntegrationTest` executes **30 tests** against PostgreSQL 17.6. The public contract is exactly
 **75 OpenAPI operations**, and Bruno contains **562 requests with 1,746 explicit assertions**, covering all 75
 operations and every protected operation's unauthenticated path.
 
@@ -23,6 +23,13 @@ constraints. It verifies both an empty V1-V6 migration and an incremental V1-V5-
 legacy notification. Existing booking/queue notification transaction behavior, tenant isolation, audit rollback,
 capacity, queue ordering, lifecycle synchronization, restart, and migration coverage remains intact. Flyway V1-V5
 is unchanged; V6 is additive. No arbitrary sleep coordinates concurrency.
+
+The notification snapshot repair adds deterministic latch-controlled mark-one and mark-all regressions. Application
+tests pause after the immutable composite snapshot is captured and commit the mutation before the response is
+released. PostgreSQL tests hold the corresponding update uncommitted on an independent connection while the inbox
+statement reads its MVCC snapshot, then commit at a barrier. The assertions cover `SENT` row/count agreement,
+`unreadOnly` filtering, exhausted pages with full counts, customer subject scope, operator/admin tenant scope, exact
+nanosecond keysets, and in-memory/PostgreSQL parity without sleeps.
 
 ## Customer booking audit-scope regression
 

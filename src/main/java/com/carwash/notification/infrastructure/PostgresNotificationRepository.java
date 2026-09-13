@@ -5,12 +5,15 @@ import com.carwash.identity.domain.User;
 import com.carwash.notification.domain.DeliveryStatus;
 import com.carwash.notification.domain.Notification;
 import com.carwash.notification.domain.NotificationRepository;
+import com.carwash.notification.domain.NotificationInboxSnapshot;
 import com.carwash.notification.domain.NotificationCursor;
 import com.carwash.notification.domain.NotificationSnapshot;
 import com.carwash.shared.infrastructure.PersistenceSupport;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import java.util.List;
 import java.util.Optional;
 import java.time.LocalDateTime;
@@ -18,7 +21,10 @@ import java.time.LocalDateTime;
 @Repository @Profile("postgres") @Transactional
 public class PostgresNotificationRepository implements NotificationRepository {
     private final NotificationSpringDataRepository repository;
-    public PostgresNotificationRepository(NotificationSpringDataRepository repository){this.repository=repository;}
+    private final JdbcTemplate jdbc;
+    public PostgresNotificationRepository(NotificationSpringDataRepository repository,JdbcTemplate jdbc){
+        this.repository=repository;this.jdbc=jdbc;
+    }
     @Override public List<Notification> findByUserId(String id){return domains(repository.findByUserIdOrderByIdAsc(id));}
     @Override public List<Notification> findByBookingId(String id){return domains(repository.findByBookingIdOrderByIdAsc(id));}
     @Override public List<Notification> findByUserIdAndBusinessId(String userId,String businessId){return domains(repository.findByUserTenant(userId,businessId));}
@@ -34,6 +40,11 @@ public class PostgresNotificationRepository implements NotificationRepository {
             userId,businessId,unreadOnly,cursor==null?null:PersistenceSupport.databaseTime(cursor.sentAt()),
             cursor==null?0:PersistenceSupport.nanoRemainder(cursor.sentAt()),
             cursor==null?"":cursor.notificationId(),limit));}
+    @Override public NotificationInboxSnapshot findInboxByUserId(String userId,boolean unreadOnly,
+            NotificationCursor cursor,int limit){return inbox(USER_INBOX_SQL,userId,null,unreadOnly,cursor,limit);}
+    @Override public NotificationInboxSnapshot findInboxByUserIdAndBusinessId(String userId,String businessId,
+            boolean unreadOnly,NotificationCursor cursor,int limit){return inbox(
+            TENANT_INBOX_SQL,userId,businessId,unreadOnly,cursor,limit);}
     @Override public long countUnreadByUserId(String userId){return repository.countUnreadByUserId(userId);}
     @Override public long countUnreadByUserIdAndBusinessId(String userId,String businessId){return repository.countTenantUnread(userId,businessId);}
     @Override public Optional<NotificationSnapshot> findSnapshotByIdAndUserId(String id,String userId){return repository.findByIdAndUserId(id,userId).map(this::snapshot);}
@@ -57,6 +68,72 @@ public class PostgresNotificationRepository implements NotificationRepository {
     @Override public boolean existsById(String id){return repository.existsById(id);}
     private List<Notification> domains(List<NotificationJpaEntity> values){return values.stream().map(this::domain).toList();}
     private List<NotificationSnapshot> snapshots(List<NotificationJpaEntity> values){return values.stream().map(this::snapshot).toList();}
+    private NotificationInboxSnapshot inbox(String sql,String userId,String businessId,boolean unreadOnly,
+            NotificationCursor cursor,int limit){
+        LocalDateTime cursorAt=cursor==null?null:PersistenceSupport.databaseTime(cursor.sentAt());
+        short cursorNano=cursor==null?0:PersistenceSupport.nanoRemainder(cursor.sentAt());
+        String cursorId=cursor==null?"":cursor.notificationId();
+        Object[] arguments=businessId==null
+                ? new Object[]{userId,userId,unreadOnly,cursorAt,cursorAt,cursorAt,cursorNano,
+                        cursorAt,cursorNano,cursorId,limit}
+                : new Object[]{userId,businessId,userId,businessId,unreadOnly,cursorAt,cursorAt,
+                        cursorAt,cursorNano,cursorAt,cursorNano,cursorId,limit};
+        List<InboxRow> rows=jdbc.query(sql,INBOX_ROW_MAPPER,arguments);
+        if(rows.isEmpty())throw new IllegalStateException("Notification inbox query did not return its count row");
+        long unreadCount=rows.getFirst().unreadCount();
+        return new NotificationInboxSnapshot(rows.stream().filter(row->row.notification()!=null)
+                .map(InboxRow::notification).toList(),unreadCount);
+    }
+    private static final RowMapper<InboxRow> INBOX_ROW_MAPPER=(result,rowNumber)->{
+        long unreadCount=result.getLong("unread_count");
+        String notificationId=result.getString("notification_id");
+        if(notificationId==null)return new InboxRow(null,unreadCount);
+        LocalDateTime sentAt=result.getObject("sent_at",LocalDateTime.class);
+        LocalDateTime readAt=result.getObject("read_at",LocalDateTime.class);
+        short sentNano=result.getShort("sent_at_nano_remainder");
+        short readNano=result.getShort("read_at_nano_remainder");
+        NotificationSnapshot notification=new NotificationSnapshot(notificationId,result.getString("user_id"),
+                result.getString("booking_id"),result.getString("branch_id"),result.getString("offering_id"),
+                result.getString("notification_type"),result.getString("message"),result.getString("channel"),
+                PersistenceSupport.domainTime(sentAt,sentNano),PersistenceSupport.domainTime(readAt,readNano),
+                DeliveryStatus.valueOf(result.getString("delivery_status")));
+        return new InboxRow(notification,unreadCount);
+    };
+    private record InboxRow(NotificationSnapshot notification,long unreadCount){}
+    private static final String USER_INBOX_SQL="""
+            with unread as (
+                select count(*) as unread_count from notifications n
+                where n.user_id=? and n.delivery_status='SENT'
+            ), page as (
+                select n.* from notifications n
+                where n.user_id=? and (?=false or n.delivery_status='SENT') and n.sent_at is not null
+                  and (cast(? as timestamp) is null or n.sent_at < cast(? as timestamp)
+                    or (n.sent_at=cast(? as timestamp) and n.sent_at_nano_remainder<?)
+                    or (n.sent_at=cast(? as timestamp) and n.sent_at_nano_remainder=? and n.notification_id<?))
+                order by n.sent_at desc,n.sent_at_nano_remainder desc,n.notification_id desc limit ?
+            )
+            select page.*,unread.unread_count from unread left join page on true
+            order by page.sent_at desc nulls last,page.sent_at_nano_remainder desc nulls last,
+                page.notification_id desc nulls last
+            """;
+    private static final String TENANT_INBOX_SQL="""
+            with unread as (
+                select count(*) as unread_count from notifications n
+                join branches b on b.branch_id=n.branch_id
+                where n.user_id=? and b.business_id=? and n.delivery_status='SENT'
+            ), page as (
+                select n.* from notifications n join branches b on b.branch_id=n.branch_id
+                where n.user_id=? and b.business_id=?
+                  and (?=false or n.delivery_status='SENT') and n.sent_at is not null
+                  and (cast(? as timestamp) is null or n.sent_at < cast(? as timestamp)
+                    or (n.sent_at=cast(? as timestamp) and n.sent_at_nano_remainder<?)
+                    or (n.sent_at=cast(? as timestamp) and n.sent_at_nano_remainder=? and n.notification_id<?))
+                order by n.sent_at desc,n.sent_at_nano_remainder desc,n.notification_id desc limit ?
+            )
+            select page.*,unread.unread_count from unread left join page on true
+            order by page.sent_at desc nulls last,page.sent_at_nano_remainder desc nulls last,
+                page.notification_id desc nulls last
+            """;
     private NotificationSnapshot snapshot(NotificationJpaEntity e){return new NotificationSnapshot(e.id,e.userId,e.bookingId,
             e.branchId,e.offeringId,e.type,e.message,e.channel,PersistenceSupport.domainTime(e.sentAt,e.sentAtNano),
             PersistenceSupport.domainTime(e.readAt,e.readAtNano),DeliveryStatus.valueOf(e.status));}
