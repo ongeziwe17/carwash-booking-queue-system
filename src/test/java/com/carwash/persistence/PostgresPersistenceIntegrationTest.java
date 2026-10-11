@@ -153,8 +153,8 @@ class PostgresPersistenceIntegrationTest {
 
     @Test void queueTelemetryReportsDatabaseWideCommittedStateWithoutHydratingRecords() {
         Fixture fixture = fixture("telemetry-depth", 1);
-        Booking booking = createConfirmed(fixture, "telemetry-depth-booking", "telemetry-depth-user",
-                "telemetry-depth-vehicle", "TELEMETRY-1", LocalDateTime.of(2089, 1, 17, 10, 0));
+        Booking booking = createConfirmed(fixture, "telemetry-depth-booking", "telemetry-depth-queued-user",
+                "telemetry-depth-queued-vehicle", "TELEMETRY-1", LocalDateTime.of(2089, 1, 17, 10, 0));
         queues.createQueueEntry(ADMIN, "telemetry-depth-entry", booking.getBookingId(), fixture.service.getServiceId());
         telemetrySampler.refresh();
         Long expected = jdbc.queryForObject("select count(*) from queue_entries where queue_status in ('WAITING','CALLED','IN_PROGRESS')", Long.class);
