@@ -12,7 +12,25 @@ import java.util.List;
 import java.util.Optional;
 
 public class InMemoryQueueEntryRepository extends InMemoryRepository<QueueEntry, String>
-        implements QueueEntryRepository {
+        implements QueueEntryRepository, com.carwash.queue.application.QueueTelemetryQuery {
+
+    private final java.util.Map<String, Integer> activeWaits = new java.util.HashMap<>();
+    private long waitMinutes;
+
+    @Override protected void stored(String id, QueueEntry entry) {
+        Integer previous = activeWaits.remove(id);
+        if (previous != null) waitMinutes -= previous;
+        if (entry != null && entry.getQueueStatus().isActive()) {
+            int wait = Math.max(0, entry.getEstimatedWaitMin());
+            activeWaits.put(id, wait);
+            waitMinutes += wait;
+        }
+    }
+
+    @Override public State telemetryState() {
+        return readAtomically(() -> new State(activeWaits.size(),
+                activeWaits.isEmpty() ? 0 : 60.0 * waitMinutes / activeWaits.size()));
+    }
 
     private final MarketplaceQuery marketplace;
 

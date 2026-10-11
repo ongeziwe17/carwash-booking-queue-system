@@ -18,15 +18,20 @@ import java.util.function.Supplier;
  */
 public final class InMemoryDataCoordinator implements DataTransactionOperations {
 
+    private final com.carwash.shared.application.Telemetry telemetry;
+    public InMemoryDataCoordinator() { this(com.carwash.shared.application.Telemetry.NONE); }
+    public InMemoryDataCoordinator(com.carwash.shared.application.Telemetry telemetry) { this.telemetry = telemetry; }
+
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
     private final ThreadLocal<Deque<Runnable>> rollbackActions = new ThreadLocal<>();
+    private final ThreadLocal<java.util.List<java.util.function.Consumer<Boolean>>> completion = new ThreadLocal<>();
 
     @Override
     public <T> T read(Supplier<T> operation) {
         Objects.requireNonNull(operation, "Operation is required");
         lock.readLock().lock();
         try {
-            return operation.get();
+            return telemetry.observe(com.carwash.shared.application.Telemetry.Operation.PERSISTENCE_READ, operation);
         } finally {
             lock.readLock().unlock();
         }
@@ -45,9 +50,15 @@ public final class InMemoryDataCoordinator implements DataTransactionOperations 
         Objects.requireNonNull(operation, "Operation is required");
         lock.writeLock().lock();
         boolean outermost = rollbackActions.get() == null;
-        if (outermost) rollbackActions.set(new ArrayDeque<>());
+        if (outermost) {
+            rollbackActions.set(new ArrayDeque<>());
+            completion.set(new java.util.ArrayList<>());
+        }
+        boolean committed = false;
         try {
-            return operation.get();
+            T result = telemetry.observe(com.carwash.shared.application.Telemetry.Operation.PERSISTENCE_WRITE, operation);
+            committed = true;
+            return result;
         } catch (RuntimeException failure) {
             if (outermost) {
                 Deque<Runnable> actions = rollbackActions.get();
@@ -55,7 +66,12 @@ public final class InMemoryDataCoordinator implements DataTransactionOperations 
             }
             throw failure;
         } finally {
-            if (outermost) rollbackActions.remove();
+            if (outermost) {
+                var callbacks = completion.get();
+                rollbackActions.remove();
+                completion.remove();
+                for (var callback : callbacks) safelyComplete(callback, committed);
+            }
             lock.writeLock().unlock();
         }
     }
@@ -101,5 +117,16 @@ public final class InMemoryDataCoordinator implements DataTransactionOperations 
         } catch (RuntimeException failure) {
             failureHandler.accept(failure);
         }
+    }
+
+    @Override
+    public void afterCompletion(java.util.function.Consumer<Boolean> callback) {
+        var callbacks = completion.get();
+        if (callbacks == null) safelyComplete(callback, true);
+        else callbacks.add(callback);
+    }
+
+    private static void safelyComplete(java.util.function.Consumer<Boolean> callback, boolean committed) {
+        try { callback.accept(committed); } catch (RuntimeException ignored) { /* telemetry is best effort */ }
     }
 }

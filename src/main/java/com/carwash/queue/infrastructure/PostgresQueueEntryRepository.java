@@ -17,10 +17,15 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository @Profile("postgres") @Transactional
-public class PostgresQueueEntryRepository implements QueueEntryRepository {
+public class PostgresQueueEntryRepository implements QueueEntryRepository, com.carwash.queue.application.QueueTelemetryQuery {
     private static final List<String> ACTIVE=List.of("WAITING","CALLED","IN_PROGRESS");
     private final QueueEntrySpringDataRepository repository;
     public PostgresQueueEntryRepository(QueueEntrySpringDataRepository repository){this.repository=repository;}
+    @Override public State telemetryState() {
+        Object[] values = repository.telemetryState().getFirst();
+        return new State(((Number) values[0]).longValue(),
+                values[1] == null ? 0 : ((Number) values[1]).doubleValue() * 60);
+    }
     @Override public List<QueueEntry> findAllOrdered(){return domains(repository.ordered());}
     @Override public List<QueueEntry> findActiveOrdered(){return domains(repository.activeOrdered());}
     @Override public List<QueueEntry> findActiveOrderedByBranch(String id){return domains(repository.activeByBranch(id));}

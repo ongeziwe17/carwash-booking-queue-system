@@ -1,5 +1,8 @@
 package com.carwash.booking.application;
 
+import com.carwash.shared.application.Telemetry;
+import com.carwash.shared.application.Telemetry.Operation;
+
 import com.carwash.catalog.application.ServiceDefinitionQuery;
 import com.carwash.catalog.application.ServiceDefinitionSnapshot;
 import com.carwash.catalog.application.ServiceOfferingQuery;
@@ -28,6 +31,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public final class BranchAvailabilitySearchService implements BranchAvailabilityCandidateQuery {
+    private final Telemetry telemetry;
+
 
     public static final int RESPONSE_DISTANCE_SCALE = 2;
     public static final RoundingMode RESPONSE_DISTANCE_ROUNDING = RoundingMode.HALF_UP;
@@ -51,6 +56,21 @@ public final class BranchAvailabilitySearchService implements BranchAvailability
             DataTransactionOperations coordinator,
             Clock clock
     ) {
+        this(marketplaceQuery, serviceOfferingQuery, serviceDefinitionQuery, branchAvailabilityQuery, queueQuery, distanceCalculator, coordinator, clock, Telemetry.NONE);
+    }
+
+    public BranchAvailabilitySearchService(
+            MarketplaceQuery marketplaceQuery,
+            ServiceOfferingQuery serviceOfferingQuery,
+            ServiceDefinitionQuery serviceDefinitionQuery,
+            BranchAvailabilityQuery branchAvailabilityQuery,
+            QueueQuery queueQuery,
+            DistanceCalculator distanceCalculator,
+            DataTransactionOperations coordinator,
+            Clock clock,
+            Telemetry telemetry
+    ) {
+        this.telemetry = Objects.requireNonNull(telemetry, "Telemetry is required");
         this.marketplaceQuery = Objects.requireNonNull(marketplaceQuery, "Marketplace query is required");
         this.serviceOfferingQuery = Objects.requireNonNull(serviceOfferingQuery, "Service offering query is required");
         this.serviceDefinitionQuery = Objects.requireNonNull(serviceDefinitionQuery,
@@ -64,24 +84,28 @@ public final class BranchAvailabilitySearchService implements BranchAvailability
     }
 
     public List<BranchAvailabilitySnapshot> findAvailableBranches(BranchAvailabilitySearchCriteria criteria) {
-        validateSearch(criteria);
-        return coordinator.read(() -> orderedCandidates(criteria).stream()
-                .map(this::publicSnapshot)
-                .toList());
+        return telemetry.observe(Operation.AVAILABILITY_SEARCH, () -> {
+            validateSearch(criteria);
+            return coordinator.read(() -> orderedCandidates(criteria).stream()
+                    .map(this::publicSnapshot)
+                    .toList());
+        });
     }
 
     @Override
     public List<BranchAvailabilityCandidateSnapshot> findEligibleCandidates(
             BranchAvailabilitySearchCriteria criteria
     ) {
-        validateSearch(criteria);
-        if (!criteria.hasOrigin()) {
-            throw new BusinessRuleViolationException(
-                    "Recommendation candidates require latitude and longitude");
-        }
-        return coordinator.read(() -> orderedCandidates(criteria).stream()
-                .map(this::candidateSnapshot)
-                .toList());
+        return telemetry.observe(Operation.AVAILABILITY_SEARCH, () -> {
+            validateSearch(criteria);
+            if (!criteria.hasOrigin()) {
+                throw new BusinessRuleViolationException(
+                        "Recommendation candidates require latitude and longitude");
+            }
+            return coordinator.read(() -> orderedCandidates(criteria).stream()
+                    .map(this::candidateSnapshot)
+                    .toList());
+        });
     }
 
     private void validateSearch(BranchAvailabilitySearchCriteria criteria) {

@@ -36,3 +36,6 @@ build/
 
 ### Bruno generated reports ###
 tests/bruno/carwash-api/results/
+
+# Local observability credentials and generated files
+.observability/

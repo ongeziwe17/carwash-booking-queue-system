@@ -20,8 +20,16 @@ public final class PostgresTransactionOperations implements DataTransactionOpera
     private final TransactionTemplate readOnly;
     private final TransactionTemplate required;
     private final TransactionTemplate requiresNew;
+    private final com.carwash.shared.application.Telemetry telemetry;
 
     public PostgresTransactionOperations(PlatformTransactionManager transactionManager) {
+        this(transactionManager, com.carwash.shared.application.Telemetry.NONE);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public PostgresTransactionOperations(PlatformTransactionManager transactionManager,
+                                        com.carwash.shared.application.Telemetry telemetry) {
+        this.telemetry = telemetry;
         this.readOnly = template(transactionManager, TransactionDefinition.PROPAGATION_REQUIRED, true);
         this.required = template(transactionManager, TransactionDefinition.PROPAGATION_REQUIRED, false);
         this.requiresNew = template(transactionManager, TransactionDefinition.PROPAGATION_REQUIRES_NEW, false);
@@ -29,17 +37,20 @@ public final class PostgresTransactionOperations implements DataTransactionOpera
 
     @Override
     public <T> T read(Supplier<T> action) {
-        return readOnly.execute(status -> action.get());
+        return telemetry.observe(com.carwash.shared.application.Telemetry.Operation.PERSISTENCE_READ,
+                () -> readOnly.execute(status -> action.get()));
     }
 
     @Override
     public <T> T write(Supplier<T> action) {
-        return required.execute(status -> action.get());
+        return telemetry.observe(com.carwash.shared.application.Telemetry.Operation.PERSISTENCE_WRITE,
+                () -> required.execute(status -> action.get()));
     }
 
     @Override
     public <T> T isolatedWrite(Supplier<T> action) {
-        return requiresNew.execute(status -> action.get());
+        return telemetry.observe(com.carwash.shared.application.Telemetry.Operation.PERSISTENCE_WRITE,
+                () -> requiresNew.execute(status -> action.get()));
     }
 
     @Override
@@ -85,5 +96,22 @@ public final class PostgresTransactionOperations implements DataTransactionOpera
         template.setPropagationBehavior(propagation);
         template.setReadOnly(readOnly);
         return template;
+    }
+
+    @Override
+    public void afterCompletion(Consumer<Boolean> callback) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCompletion(int status) {
+                    safelyComplete(callback, status == STATUS_COMMITTED);
+                }
+            });
+        } else {
+            safelyComplete(callback, true);
+        }
+    }
+
+    private static void safelyComplete(Consumer<Boolean> callback, boolean committed) {
+        try { callback.accept(committed); } catch (RuntimeException ignored) { /* telemetry is best effort */ }
     }
 }

@@ -1,5 +1,8 @@
 package com.carwash.booking.application;
 
+import com.carwash.shared.application.Telemetry;
+import com.carwash.shared.application.Telemetry.Operation;
+
 import com.carwash.booking.domain.Booking;
 import com.carwash.booking.domain.BookingRepository;
 import com.carwash.booking.domain.BookingStatus;
@@ -29,6 +32,8 @@ import java.util.Objects;
  * which remain booking-command concerns.
  */
 public final class BranchAvailabilityDecisionService implements BranchAvailabilityQuery {
+    private final Telemetry telemetry;
+
 
     private final BookingRepository bookingRepository;
     private final MarketplaceQuery marketplaceQuery;
@@ -47,6 +52,20 @@ public final class BranchAvailabilityDecisionService implements BranchAvailabili
             BookingPolicyProperties bookingPolicy,
             Clock clock
     ) {
+        this(bookingRepository, marketplaceQuery, branchScheduleQuery, serviceOfferingQuery, serviceDefinitionQuery, bookingPolicy, clock, Telemetry.NONE);
+    }
+
+    public BranchAvailabilityDecisionService(
+            BookingRepository bookingRepository,
+            MarketplaceQuery marketplaceQuery,
+            BranchScheduleQuery branchScheduleQuery,
+            ServiceOfferingQuery serviceOfferingQuery,
+            ServiceDefinitionQuery serviceDefinitionQuery,
+            BookingPolicyProperties bookingPolicy,
+            Clock clock,
+            Telemetry telemetry
+    ) {
+        this.telemetry = Objects.requireNonNull(telemetry, "Telemetry is required");
         this.bookingRepository = Objects.requireNonNull(bookingRepository, "Booking repository is required");
         this.marketplaceQuery = Objects.requireNonNull(marketplaceQuery, "Marketplace query is required");
         this.branchScheduleQuery = Objects.requireNonNull(branchScheduleQuery, "Branch schedule query is required");
@@ -64,58 +83,60 @@ public final class BranchAvailabilityDecisionService implements BranchAvailabili
             Instant startsAt,
             String excludedBookingId
     ) {
-        String normalizedBranchId = normalizeId(branchId, "Branch ID");
-        String normalizedOfferingId = normalizeId(serviceOfferingId, "Service offering ID");
-        if (startsAt == null) {
-            throw new BusinessRuleViolationException("Availability start instant is required");
-        }
-        BranchSnapshot branch = marketplaceQuery.findBranchOptional(normalizedBranchId)
-                .orElseThrow(() -> new ResourceNotFoundException("Branch not found: " + normalizedBranchId));
-        ServiceOfferingSnapshot offering = serviceOfferingQuery.findOfferingOptional(normalizedOfferingId)
-                .orElseThrow(() -> new ResourceNotFoundException("Offering not found: " + normalizedOfferingId));
-        if (!branch.branchId().equals(offering.branchId())) {
-            throw new BusinessRuleViolationException("Service offering does not belong to the requested branch");
-        }
-        ServiceDefinitionSnapshot service = serviceDefinitionQuery
-                .findServiceDefinitionOptional(offering.serviceId())
-                .orElseThrow(() -> new ResourceNotFoundException("Service not found: " + offering.serviceId()));
+        return telemetry.observe(Operation.AVAILABILITY_DECISION, () -> {
+            String normalizedBranchId = normalizeId(branchId, "Branch ID");
+            String normalizedOfferingId = normalizeId(serviceOfferingId, "Service offering ID");
+            if (startsAt == null) {
+                throw new BusinessRuleViolationException("Availability start instant is required");
+            }
+            BranchSnapshot branch = marketplaceQuery.findBranchOptional(normalizedBranchId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Branch not found: " + normalizedBranchId));
+            ServiceOfferingSnapshot offering = serviceOfferingQuery.findOfferingOptional(normalizedOfferingId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Offering not found: " + normalizedOfferingId));
+            if (!branch.branchId().equals(offering.branchId())) {
+                throw new BusinessRuleViolationException("Service offering does not belong to the requested branch");
+            }
+            ServiceDefinitionSnapshot service = serviceDefinitionQuery
+                    .findServiceDefinitionOptional(offering.serviceId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Service not found: " + offering.serviceId()));
 
-        Instant endsAt = startsAt.plus(Duration.ofMinutes(offering.estimatedDurationMin()));
-        ZoneId zone = ZoneId.of(branch.timezone());
-        boolean unambiguousLocalStart = hasExactlyOneValidOffset(startsAt, zone);
-        BranchServiceWindowSnapshot window = branchScheduleQuery
-                .getServiceWindowStatus(branch.branchId(), startsAt, endsAt);
-        boolean future = startsAt.isAfter(clock.instant());
-        boolean aligned = isAligned(startsAt, zone, window.branchLocalOperatingWindowStartsAt());
-        boolean effectiveEligible = branch.effectiveActive() && offering.effectiveActive() && service.active();
-        int occupied = occupiedCapacity(
-                branch.branchId(), offering.offeringId(), startsAt, endsAt, zone, excludedBookingId);
-        int remaining = Math.max(0, offering.concurrentCapacity() - occupied);
+            Instant endsAt = startsAt.plus(Duration.ofMinutes(offering.estimatedDurationMin()));
+            ZoneId zone = ZoneId.of(branch.timezone());
+            boolean unambiguousLocalStart = hasExactlyOneValidOffset(startsAt, zone);
+            BranchServiceWindowSnapshot window = branchScheduleQuery
+                    .getServiceWindowStatus(branch.branchId(), startsAt, endsAt);
+            boolean future = startsAt.isAfter(clock.instant());
+            boolean aligned = isAligned(startsAt, zone, window.branchLocalOperatingWindowStartsAt());
+            boolean effectiveEligible = branch.effectiveActive() && offering.effectiveActive() && service.active();
+            int occupied = occupiedCapacity(
+                    branch.branchId(), offering.offeringId(), startsAt, endsAt, zone, excludedBookingId);
+            int remaining = Math.max(0, offering.concurrentCapacity() - occupied);
 
-        BranchAvailabilityReason reason = reason(
-                unambiguousLocalStart, future, aligned, branch, offering, service, window, remaining);
-        boolean available = reason == BranchAvailabilityReason.AVAILABLE;
-        return new BranchAvailabilityDecisionSnapshot(
-                branch.branchId(),
-                offering.offeringId(),
-                service.serviceId(),
-                service.serviceName(),
-                offering.price(),
-                offering.estimatedDurationMin(),
-                zone.getId(),
-                startsAt,
-                endsAt,
-                startsAt.atZone(zone).toOffsetDateTime(),
-                endsAt.atZone(zone).toOffsetDateTime(),
-                effectiveEligible,
-                window.withinWeeklyHours(),
-                window.temporarilyClosed(),
-                offering.concurrentCapacity(),
-                occupied,
-                remaining,
-                available,
-                reason
-        );
+            BranchAvailabilityReason reason = reason(
+                    unambiguousLocalStart, future, aligned, branch, offering, service, window, remaining);
+            boolean available = reason == BranchAvailabilityReason.AVAILABLE;
+            return new BranchAvailabilityDecisionSnapshot(
+                    branch.branchId(),
+                    offering.offeringId(),
+                    service.serviceId(),
+                    service.serviceName(),
+                    offering.price(),
+                    offering.estimatedDurationMin(),
+                    zone.getId(),
+                    startsAt,
+                    endsAt,
+                    startsAt.atZone(zone).toOffsetDateTime(),
+                    endsAt.atZone(zone).toOffsetDateTime(),
+                    effectiveEligible,
+                    window.withinWeeklyHours(),
+                    window.temporarilyClosed(),
+                    offering.concurrentCapacity(),
+                    occupied,
+                    remaining,
+                    available,
+                    reason
+            );
+        });
     }
 
     public BranchAvailabilityDecisionSnapshot evaluateLocal(
@@ -124,9 +145,11 @@ public final class BranchAvailabilityDecisionService implements BranchAvailabili
             LocalDateTime branchLocalStartsAt,
             String excludedBookingId
     ) {
-        BranchSnapshot branch = requireBranch(branchId);
-        Instant startsAt = resolveUnambiguousInstant(branchLocalStartsAt, ZoneId.of(branch.timezone()));
-        return evaluate(branch.branchId(), serviceOfferingId, startsAt, excludedBookingId);
+        return telemetry.observe(Operation.AVAILABILITY_DECISION, () -> {
+            BranchSnapshot branch = requireBranch(branchId);
+            Instant startsAt = resolveUnambiguousInstant(branchLocalStartsAt, ZoneId.of(branch.timezone()));
+            return evaluate(branch.branchId(), serviceOfferingId, startsAt, excludedBookingId);
+        });
     }
 
     public BranchAvailabilityDecisionSnapshot requireAvailableLocal(
@@ -135,12 +158,14 @@ public final class BranchAvailabilityDecisionService implements BranchAvailabili
             LocalDateTime branchLocalStartsAt,
             String excludedBookingId
     ) {
-        BranchAvailabilityDecisionSnapshot decision = evaluateLocal(
-                branchId, serviceOfferingId, branchLocalStartsAt, excludedBookingId);
-        if (!decision.available()) {
-            throw new BusinessRuleViolationException(message(decision.reason()));
-        }
-        return decision;
+        return telemetry.observe(Operation.AVAILABILITY_DECISION, () -> {
+            BranchAvailabilityDecisionSnapshot decision = evaluateLocal(
+                    branchId, serviceOfferingId, branchLocalStartsAt, excludedBookingId);
+            if (!decision.available()) {
+                throw new BusinessRuleViolationException(message(decision.reason()));
+            }
+            return decision;
+        });
     }
 
     private int occupiedCapacity(

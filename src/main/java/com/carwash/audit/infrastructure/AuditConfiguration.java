@@ -3,6 +3,7 @@ package com.carwash.audit.infrastructure;
 import com.carwash.audit.application.*;
 import com.carwash.audit.domain.AuditRepository;
 import com.carwash.shared.application.DataTransactionOperations;
+import com.carwash.shared.application.Telemetry;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,8 +32,8 @@ public class AuditConfiguration {
 
     @Bean
     AuditOperations auditOperations(AuditRepository repository, DataTransactionOperations transactions,
-                                    AuditMetadataPolicy metadataPolicy, AuditIdGenerator ids, Clock clock) {
-        return new AuditService(repository, transactions, metadataPolicy, ids, clock);
+                                    AuditMetadataPolicy metadataPolicy, AuditIdGenerator ids, Clock clock, Telemetry telemetry) {
+        return new AuditService(repository, transactions, metadataPolicy, ids, clock, telemetry);
     }
 
     @Bean

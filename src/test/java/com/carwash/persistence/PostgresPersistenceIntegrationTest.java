@@ -108,23 +108,80 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
+@org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 @ActiveProfiles(profiles={"test","postgres"},inheritProfiles=false)
 @Testcontainers
 class PostgresPersistenceIntegrationTest {
     private static final String PASSWORD="StrongPassword!123";
     private static final TenantAccessContext ADMIN =
             new TenantAccessContext("test-platform-admin", RoleName.PLATFORM_ADMIN, null);
-    @Container static final PostgreSQLContainer POSTGRES=new PostgreSQLContainer("postgres:17.6-alpine3.22");
+    @Container static final PostgreSQLContainer POSTGRES=new PostgreSQLContainer("postgres:17.6-alpine3.22")
+            .withUrlParam("socketTimeout", "2");
 
     @DynamicPropertySource static void postgres(DynamicPropertyRegistry properties){
         properties.add("spring.autoconfigure.exclude",()->"");
         properties.add("spring.datasource.url",POSTGRES::getJdbcUrl);
         properties.add("spring.datasource.username",POSTGRES::getUsername);
         properties.add("spring.datasource.password",POSTGRES::getPassword);
+        properties.add("spring.datasource.hikari.connection-timeout", () -> "1000");
     }
 
     @Autowired JdbcTemplate jdbc;
     @Autowired Flyway flyway;
+    @Autowired org.springframework.test.web.servlet.MockMvc managementMvc;
+    @Autowired com.carwash.queue.infrastructure.QueueTelemetrySampler telemetrySampler;
+    @Autowired io.micrometer.core.instrument.MeterRegistry telemetryMeters;
+
+    @Test void databaseOutageFailsReadinessWhileLivenessAndProbeAccessRemainIndependent() throws Exception {
+        managementMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/actuator/health/readiness"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+        POSTGRES.getDockerClient().pauseContainerCmd(POSTGRES.getContainerId()).exec();
+        try {
+            managementMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/actuator/health/readiness")
+                            .header("Authorization", "Bearer invalid-outage-token"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isServiceUnavailable())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().json("{\"status\":\"DOWN\"}"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.components").doesNotExist());
+            managementMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/actuator/health/liveness"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+        } finally {
+            POSTGRES.getDockerClient().unpauseContainerCmd(POSTGRES.getContainerId()).exec();
+        }
+        managementMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/actuator/health/readiness"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+    }
+
+    @Test void queueTelemetryReportsDatabaseWideCommittedStateWithoutHydratingRecords() {
+        Fixture fixture = fixture("telemetry-depth", 1);
+        Booking booking = createConfirmed(fixture, "telemetry-depth-booking", "telemetry-depth-user",
+                "telemetry-depth-vehicle", "TELEMETRY-1", LocalDateTime.of(2089, 1, 17, 10, 0));
+        queues.createQueueEntry(ADMIN, "telemetry-depth-entry", booking.getBookingId(), fixture.service.getServiceId());
+        telemetrySampler.refresh();
+        Long expected = jdbc.queryForObject("select count(*) from queue_entries where queue_status in ('WAITING','CALLED','IN_PROGRESS')", Long.class);
+        assertEquals(expected.doubleValue(), telemetryMeters.get("carwash.queue.depth").gauge().value());
+        assertTrue(expected >= 1);
+    }
+
+    @Test void rolledBackBookingNeverIncrementsCommittedOutcome() {
+        Fixture fixture = fixture("telemetry-rollback", 1);
+        double committed = telemetryOutcome("committed");
+        double rollback = telemetryOutcome("rollback");
+        assertThrows(IllegalStateException.class, () -> transactions.write(() -> {
+            bookings.createBooking(ADMIN, "telemetry-rollback-booking", fixture.user.getUserId(),
+                    fixture.vehicle.getVehicleId(), fixture.branchId, fixture.offeringId,
+                    LocalDateTime.of(2089, 1, 17, 10, 0), null);
+            throw new IllegalStateException("force outer rollback");
+        }));
+        assertFalse(bookingRepository.existsById("telemetry-rollback-booking"));
+        assertEquals(committed, telemetryOutcome("committed"));
+        assertEquals(rollback + 1, telemetryOutcome("rollback"));
+    }
+
+    private double telemetryOutcome(String outcome) {
+        var counter = telemetryMeters.find("carwash.workflow.outcomes")
+                .tags("operation", "booking_create", "outcome", outcome).counter();
+        return counter == null ? 0 : counter.count();
+    }
     @Autowired UserManagementService users;
     @Autowired UserRepository userRepository;
     @Autowired RoleRepository roleRepository;

@@ -1,5 +1,8 @@
 package com.carwash.booking.application;
 
+import com.carwash.shared.application.Telemetry;
+import com.carwash.shared.application.Telemetry.Operation;
+
 import com.carwash.booking.domain.Booking;
 import com.carwash.booking.domain.BookingRepository;
 import com.carwash.booking.domain.BookingStatus;
@@ -42,6 +45,8 @@ import com.carwash.audit.domain.AuditAction;
 import com.carwash.audit.domain.AuditSource;
 
 public class BookingManagementService implements BookingQuery {
+    private final Telemetry telemetry;
+
 
     private static final Logger LOGGER = LoggerFactory.getLogger(BookingManagementService.class);
 
@@ -129,6 +134,30 @@ public class BookingManagementService implements BookingQuery {
             Clock clock,
             AuditOperations audit
     ) {
+        this(bookingRepository, userRepository, vehicleRepository, serviceDefinitionQuery, serviceOfferingQuery, marketplaceQuery, queueEntryRepository, notificationRepository, notificationPublisher, queueOrdering, coordinator, mutationLock, bookingPolicy, slotPolicy, branchAvailability, clock, audit, Telemetry.NONE);
+    }
+
+    public BookingManagementService(
+            BookingRepository bookingRepository,
+            UserRepository userRepository,
+            VehicleRepository vehicleRepository,
+            ServiceDefinitionQuery serviceDefinitionQuery,
+            ServiceOfferingQuery serviceOfferingQuery,
+            MarketplaceQuery marketplaceQuery,
+            QueueEntryRepository queueEntryRepository,
+            NotificationRepository notificationRepository,
+            BookingNotificationPublisher notificationPublisher,
+            QueueOrderingService queueOrdering,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock,
+            BookingPolicyProperties bookingPolicy,
+            BookingSlotPolicyService slotPolicy,
+            BranchAvailabilityDecisionService branchAvailability,
+            Clock clock,
+            AuditOperations audit,
+            Telemetry telemetry
+    ) {
+        this.telemetry = Objects.requireNonNull(telemetry, "Telemetry is required");
         this.bookingRepository = Objects.requireNonNull(bookingRepository, "Booking repository is required");
         this.userRepository = Objects.requireNonNull(userRepository, "User repository is required");
         this.vehicleRepository = Objects.requireNonNull(vehicleRepository, "Vehicle repository is required");
@@ -159,12 +188,14 @@ public class BookingManagementService implements BookingQuery {
             LocalDateTime scheduledDateTime,
             String specialRequest
     ) {
-        User user = new User();
-        user.setUserId(userId);
-        Vehicle vehicle = new Vehicle();
-        vehicle.setVehicleId(vehicleId);
-        return createBooking(new Booking(
-                bookingId, user, vehicle, branchId, serviceOfferingId, null, scheduledDateTime, specialRequest));
+        return telemetry.observe(Operation.BOOKING_CREATE, () -> {
+            User user = new User();
+            user.setUserId(userId);
+            Vehicle vehicle = new Vehicle();
+            vehicle.setVehicleId(vehicleId);
+            return createBooking(new Booking(
+                    bookingId, user, vehicle, branchId, serviceOfferingId, null, scheduledDateTime, specialRequest));
+        });
     }
 
     public Booking createBooking(
@@ -177,21 +208,25 @@ public class BookingManagementService implements BookingQuery {
             LocalDateTime scheduledDateTime,
             String specialRequest
     ) {
-        User user = new User();
-        user.setUserId(userId);
-        Vehicle vehicle = new Vehicle();
-        vehicle.setVehicleId(vehicleId);
-        Booking booking = new Booking(
-                bookingId, user, vehicle, branchId, serviceOfferingId, null,
-                scheduledDateTime, specialRequest);
-        return audit.executeDeferred(
-                () -> canonicalNewBookingEvent(access, AuditAction.BOOKING_CREATED, booking),
-                actorSafeBookingEvent(access, AuditAction.BOOKING_CREATED, bookingId),
-                () -> coordinator.write(() -> createBookingInside(access, booking)));
+        return telemetry.observe(Operation.BOOKING_CREATE, () -> {
+            User user = new User();
+            user.setUserId(userId);
+            Vehicle vehicle = new Vehicle();
+            vehicle.setVehicleId(vehicleId);
+            Booking booking = new Booking(
+                    bookingId, user, vehicle, branchId, serviceOfferingId, null,
+                    scheduledDateTime, specialRequest);
+            return audit.executeDeferred(
+                    () -> canonicalNewBookingEvent(access, AuditAction.BOOKING_CREATED, booking),
+                    actorSafeBookingEvent(access, AuditAction.BOOKING_CREATED, bookingId),
+                    () -> coordinator.write(() -> createBookingInside(access, booking)));
+        });
     }
 
     Booking createBooking(Booking booking) {
-        return coordinator.write(() -> createBookingInside(null, booking));
+        return telemetry.observe(Operation.BOOKING_CREATE, () -> {
+            return coordinator.write(() -> createBookingInside(null, booking));
+        });
     }
 
     private Booking createBookingInside(TenantAccessContext access, Booking booking) {
@@ -332,8 +367,10 @@ public class BookingManagementService implements BookingQuery {
             String serviceOfferingId,
             String specialRequest
     ) {
-        return coordinator.write(() -> updateBookingInside(
-                null, bookingId, vehicleId, serviceOfferingId, specialRequest));
+        return telemetry.observe(Operation.BOOKING_UPDATE, () -> {
+            return coordinator.write(() -> updateBookingInside(
+                    null, bookingId, vehicleId, serviceOfferingId, specialRequest));
+        });
     }
 
     private Booking updateBookingInside(
@@ -391,17 +428,21 @@ public class BookingManagementService implements BookingQuery {
             String serviceOfferingId,
             String specialRequest
     ) {
-        return audit.executeDeferred(
-                () -> canonicalExistingBookingEvent(
-                        access, AuditAction.BOOKING_UPDATED, bookingId,
-                        booking -> lockBookingUpdateDecision(booking, vehicleId, serviceOfferingId)),
-                actorSafeBookingEvent(access, AuditAction.BOOKING_UPDATED, bookingId),
-                () -> coordinator.write(() -> updateBookingInside(
-                        access, bookingId, vehicleId, serviceOfferingId, specialRequest)));
+        return telemetry.observe(Operation.BOOKING_UPDATE, () -> {
+            return audit.executeDeferred(
+                    () -> canonicalExistingBookingEvent(
+                            access, AuditAction.BOOKING_UPDATED, bookingId,
+                            booking -> lockBookingUpdateDecision(booking, vehicleId, serviceOfferingId)),
+                    actorSafeBookingEvent(access, AuditAction.BOOKING_UPDATED, bookingId),
+                    () -> coordinator.write(() -> updateBookingInside(
+                            access, bookingId, vehicleId, serviceOfferingId, specialRequest)));
+        });
     }
 
     Booking rescheduleBooking(String bookingId, LocalDateTime scheduledDateTime) {
-        return coordinator.write(() -> rescheduleBookingInside(null, bookingId, scheduledDateTime));
+        return telemetry.observe(Operation.BOOKING_RESCHEDULE, () -> {
+            return coordinator.write(() -> rescheduleBookingInside(null, bookingId, scheduledDateTime));
+        });
     }
 
     private Booking rescheduleBookingInside(
@@ -454,16 +495,20 @@ public class BookingManagementService implements BookingQuery {
             String bookingId,
             LocalDateTime scheduledDateTime
     ) {
-        return audit.executeDeferred(
-                () -> canonicalExistingBookingEvent(
-                        access, AuditAction.BOOKING_RESCHEDULED, bookingId,
-                        booking -> lockExistingBookingDecision(booking, false)),
-                actorSafeBookingEvent(access, AuditAction.BOOKING_RESCHEDULED, bookingId),
-                () -> coordinator.write(() -> rescheduleBookingInside(access, bookingId, scheduledDateTime)));
+        return telemetry.observe(Operation.BOOKING_RESCHEDULE, () -> {
+            return audit.executeDeferred(
+                    () -> canonicalExistingBookingEvent(
+                            access, AuditAction.BOOKING_RESCHEDULED, bookingId,
+                            booking -> lockExistingBookingDecision(booking, false)),
+                    actorSafeBookingEvent(access, AuditAction.BOOKING_RESCHEDULED, bookingId),
+                    () -> coordinator.write(() -> rescheduleBookingInside(access, bookingId, scheduledDateTime)));
+        });
     }
 
     Booking cancelBooking(String bookingId, String customerId) {
-        return coordinator.write(() -> cancelBookingInside(null, bookingId, customerId));
+        return telemetry.observe(Operation.BOOKING_CANCEL, () -> {
+            return coordinator.write(() -> cancelBookingInside(null, bookingId, customerId));
+        });
     }
 
     private Booking cancelBookingInside(
@@ -521,20 +566,26 @@ public class BookingManagementService implements BookingQuery {
     }
 
     Booking cancelBooking(String bookingId) {
-        return coordinator.write(() -> cancelBookingInside(null, bookingId, null));
+        return telemetry.observe(Operation.BOOKING_CANCEL, () -> {
+            return coordinator.write(() -> cancelBookingInside(null, bookingId, null));
+        });
     }
 
     public Booking cancelBooking(TenantAccessContext access, String bookingId) {
-        return audit.executeDeferred(
-                () -> canonicalExistingBookingEvent(
-                        access, AuditAction.BOOKING_CANCELLED, bookingId,
-                        booking -> lockExistingBookingDecision(booking, true)),
-                actorSafeBookingEvent(access, AuditAction.BOOKING_CANCELLED, bookingId),
-                () -> coordinator.write(() -> cancelBookingInside(access, bookingId, null)));
+        return telemetry.observe(Operation.BOOKING_CANCEL, () -> {
+            return audit.executeDeferred(
+                    () -> canonicalExistingBookingEvent(
+                            access, AuditAction.BOOKING_CANCELLED, bookingId,
+                            booking -> lockExistingBookingDecision(booking, true)),
+                    actorSafeBookingEvent(access, AuditAction.BOOKING_CANCELLED, bookingId),
+                    () -> coordinator.write(() -> cancelBookingInside(access, bookingId, null)));
+        });
     }
 
     Booking confirmBooking(String bookingId) {
-        return coordinator.write(() -> confirmBookingInside(null, bookingId));
+        return telemetry.observe(Operation.BOOKING_CONFIRM, () -> {
+            return coordinator.write(() -> confirmBookingInside(null, bookingId));
+        });
     }
 
     private Booking confirmBookingInside(TenantAccessContext access, String bookingId) {
@@ -558,24 +609,28 @@ public class BookingManagementService implements BookingQuery {
     }
 
     public Booking confirmBooking(TenantAccessContext access, String bookingId) {
-        return audit.executeDeferred(
-                () -> {
-                    if (access.isCustomer()) {
-                        throw new AccessDeniedException("Operational booking access is required");
-                    }
-                    return canonicalExistingBookingEvent(
-                            access, AuditAction.BOOKING_CONFIRMED, bookingId,
-                            this::lockBookingConfirmationDecision);
-                },
-                actorSafeBookingEvent(access, AuditAction.BOOKING_CONFIRMED, bookingId),
-                () -> coordinator.write(() -> {
-            if (access.isCustomer()) throw new AccessDeniedException("Operational booking access is required");
-            return confirmBookingInside(access, bookingId);
-        }));
+        return telemetry.observe(Operation.BOOKING_CONFIRM, () -> {
+            return audit.executeDeferred(
+                    () -> {
+                        if (access.isCustomer()) {
+                            throw new AccessDeniedException("Operational booking access is required");
+                        }
+                        return canonicalExistingBookingEvent(
+                                access, AuditAction.BOOKING_CONFIRMED, bookingId,
+                                this::lockBookingConfirmationDecision);
+                    },
+                    actorSafeBookingEvent(access, AuditAction.BOOKING_CONFIRMED, bookingId),
+                    () -> coordinator.write(() -> {
+                if (access.isCustomer()) throw new AccessDeniedException("Operational booking access is required");
+                return confirmBookingInside(access, bookingId);
+            }));
+        });
     }
 
     void deleteBooking(String bookingId) {
-        coordinator.write(() -> deleteBookingInside(null, bookingId));
+        telemetry.observe(Operation.BOOKING_DELETE, () -> {
+            coordinator.write(() -> deleteBookingInside(null, bookingId));
+        });
     }
 
     private void deleteBookingInside(TenantAccessContext access, String bookingId) {
@@ -608,12 +663,14 @@ public class BookingManagementService implements BookingQuery {
     }
 
     public void deleteBooking(TenantAccessContext access, String bookingId) {
-        audit.executeDeferred(
-                () -> canonicalExistingBookingEvent(
-                        access, AuditAction.BOOKING_DELETED, bookingId,
-                        this::lockBookingDeletionDecision),
-                actorSafeBookingEvent(access, AuditAction.BOOKING_DELETED, bookingId),
-                () -> coordinator.write(() -> deleteBookingInside(access, bookingId)));
+        telemetry.observe(Operation.BOOKING_DELETE, () -> {
+            audit.executeDeferred(
+                    () -> canonicalExistingBookingEvent(
+                            access, AuditAction.BOOKING_DELETED, bookingId,
+                            this::lockBookingDeletionDecision),
+                    actorSafeBookingEvent(access, AuditAction.BOOKING_DELETED, bookingId),
+                    () -> coordinator.write(() -> deleteBookingInside(access, bookingId)));
+        });
     }
 
     private AuditCommand actorSafeBookingEvent(
@@ -962,8 +1019,9 @@ public class BookingManagementService implements BookingQuery {
     private void notifyCustomerBestEffort(Booking booking, String type, String message) {
         coordinator.afterCommitBestEffort(
                 () -> notifyCustomer(booking, type, message),
-                exception -> LOGGER.warn("Unable to create {} notification for booking {}",
-                        type, booking.getBookingId(), exception));
+                exception -> LOGGER.warn("notification_creation_failed exceptionType={} location={}",
+                        exception.getClass().getSimpleName(),
+                        com.carwash.shared.application.SafeDiagnostics.location(exception)));
     }
 
     private void lockNewBooking(TenantAccessContext access, Booking booking) {

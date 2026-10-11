@@ -12,6 +12,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -22,6 +26,7 @@ import java.util.Map;
 
 /** Records terminal resource-server failures without inspecting invalid bearer contents. */
 @Component
+@Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public final class AuditRequestFilter extends OncePerRequestFilter {
     private static final Logger LOGGER = LoggerFactory.getLogger(AuditRequestFilter.class);
     private final AuditOperations audit;
@@ -36,12 +41,27 @@ public final class AuditRequestFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         String correlationId = AuditRequestContext.open();
+        MDC.put("correlationId", correlationId);
         response.setHeader("X-Correlation-ID", correlationId);
+        boolean completed = false;
         try {
             chain.doFilter(request, response);
+            completed = true;
             recordTerminalFailure(request, response);
         } finally {
-            AuditRequestContext.close();
+            try {
+                if (!request.getRequestURI().startsWith("/actuator")) {
+                    Object pattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+                    String route = pattern instanceof String value && value.startsWith("/api/")
+                            && value.length() < 160 ? value : "unmatched";
+                    LOGGER.info("request_completed route={} status={}", route, completed ? response.getStatus() : 500);
+                }
+            } catch (RuntimeException loggingFailure) {
+                // Operational logging must not mask the request's original result/failure.
+            } finally {
+                MDC.remove("correlationId");
+                AuditRequestContext.close();
+            }
         }
     }
 

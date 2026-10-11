@@ -13,6 +13,12 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 class ModularMonolithArchitectureTest {
 
+    @Test void business_layers_do_not_depend_on_telemetry_frameworks() {
+        noClasses().that().resideInAnyPackage("..domain..", "..application..")
+                .should().dependOnClassesThat().resideInAnyPackage("io.micrometer..", "io.opentelemetry..")
+                .check(APPLICATION);
+    }
+
     private static final JavaClasses APPLICATION = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .importPackages("com.carwash");

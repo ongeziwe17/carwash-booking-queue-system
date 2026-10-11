@@ -10,3 +10,5 @@ target
 .DS_Store
 documentation
 *.md
+
+.observability

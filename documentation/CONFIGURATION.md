@@ -131,3 +131,12 @@ CARWASH_RECOMMENDATION_MAX_RADIUS_KM=75.00
 The values are non-secret and are mapped in `.env.example`, `application.properties`, deterministic test configuration, and Docker Compose. They affect ranking only; they never change AVAIL-002 eligibility or reserve capacity.
 
 Runtime policies are internal configuration only. No public configuration endpoint is exposed.
+
+## Observability configuration
+
+Management exposes minimal public GET liveness/readiness probes and a separate Basic-authenticated
+GET Prometheus scrape. Empty scrape credentials deny access; empty `CARWASH_TRACE_OTLP_ENDPOINT`
+disables network export. Sampling defaults to 10%, queue snapshots refresh every 15 seconds,
+and logs use a privacy-filtered Logstash JSON format. PostgreSQL health participates only in
+readiness. See [OBSERVABILITY.md](OBSERVABILITY.md) for all variables, endpoint access policy,
+safe defaults, dotenv hash quoting, secret rotation and local tooling.
