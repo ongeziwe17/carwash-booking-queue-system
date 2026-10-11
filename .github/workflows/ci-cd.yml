@@ -164,6 +164,21 @@ jobs:
             exit 1
           fi
 
+      - name: Verify Spring Framework security alignment
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mvnw --batch-mode dependency:tree '-Dincludes=org.springframework:*' -DoutputFile=target/framework-dependency-tree.txt
+          python3 - <<'PYCODE'
+          import re
+          from pathlib import Path
+          tree = Path('target/framework-dependency-tree.txt').read_text()
+          versions = set(re.findall(r'org\.springframework:[^:]+:jar:([^:]+):', tree))
+          assert versions == {'7.0.9'}, f'Framework artifacts must align to the security patch: {versions}'
+          assert 'spring-webmvc' in tree and 'spring-core' in tree
+          print('Spring Framework artifacts uniformly resolve to 7.0.9.')
+          PYCODE
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7

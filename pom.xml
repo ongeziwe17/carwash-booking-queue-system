@@ -18,6 +18,8 @@
     <url>https://github.com/ongeziwe17/carwash-booking-queue-system</url>
 
     <properties>
+        <!-- Security patch: CVE-2026-47884 / CVE-2026-47890; keep Boot 4.0.6 and align the Framework BOM. -->
+        <spring-framework.version>7.0.9</spring-framework.version>
         <java.version>21</java.version>
         <tomcat.version>11.0.25</tomcat.version>
         <jacoco.minimum.line.coverage>0.80</jacoco.minimum.line.coverage>
