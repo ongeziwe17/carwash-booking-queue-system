@@ -142,12 +142,12 @@ class RecommendationWorkflowIntegrationTest extends ApiIntegrationTestSupport {
 
         recommend(fixture, RecommendationPreference.SHORTEST_QUEUE, FUTURE_AT)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].branchId", contains(fixture.nearBranch(), fixture.farBranch())))
-                .andExpect(jsonPath("$[0].queueWaitEstimateMin").doesNotExist())
-                .andExpect(jsonPath("$[0].estimatedTotalTimeMin").doesNotExist())
-                .andExpect(jsonPath("$[0].scoreBreakdown.queueWait.available").value(false))
-                .andExpect(jsonPath("$[0].scoreBreakdown.queueWait.normalizedScore").value(0.0))
-                .andExpect(jsonPath("$[0].explanation").value(
+                .andExpect(jsonPath("$.content[*].branchId", contains(fixture.nearBranch(), fixture.farBranch())))
+                .andExpect(jsonPath("$.content[0].queueWaitEstimateMin").doesNotExist())
+                .andExpect(jsonPath("$.content[0].estimatedTotalTimeMin").doesNotExist())
+                .andExpect(jsonPath("$.content[0].scoreBreakdown.queueWait.available").value(false))
+                .andExpect(jsonPath("$.content[0].scoreBreakdown.queueWait.normalizedScore").value(0.0))
+                .andExpect(jsonPath("$.content[0].explanation").value(
                         org.hamcrest.Matchers.containsString("unavailable")));
     }
 
@@ -156,7 +156,7 @@ class RecommendationWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         Fixture fixture = fixture(false);
         MvcResult result = recommend(fixture, RecommendationPreference.NEAREST, AT)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].branchId").value(fixture.nearBranch()))
+                .andExpect(jsonPath("$.content[0].branchId").value(fixture.nearBranch()))
                 .andReturn();
         JsonNode selected = body(result).get(0);
 
@@ -218,7 +218,7 @@ class RecommendationWorkflowIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(status().isOk());
         recommend(fixture, RecommendationPreference.NEAREST, AT)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.content.length()").value(0));
     }
 
     private Fixture fixture(boolean queuedFarBranch) throws Exception {
@@ -316,7 +316,7 @@ class RecommendationWorkflowIntegrationTest extends ApiIntegrationTestSupport {
     private void assertRecommendedBranches(Fixture fixture, String... expected) throws Exception {
         recommend(fixture, RecommendationPreference.NEAREST, AT)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].branchId", contains(expected)));
+                .andExpect(jsonPath("$.content[*].branchId", contains(expected)));
     }
 
     private RequestPostProcessor reader() {
@@ -334,8 +334,22 @@ class RecommendationWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         return parameters;
     }
 
+    @Test
+    void rankAndNormalizationRemainGlobalWhenSelectingLaterPages() throws Exception {
+        Fixture f = fixture(false);
+        var full = body(recommend(f, RecommendationPreference.NEAREST, AT).andExpect(status().isOk()).andReturn());
+        var selected = mockMvc.perform(get("/api/recommendations/branches").with(reader())
+                .param("latitude", "-33.9249").param("longitude", "18.4241").param("serviceId", f.serviceId())
+                .param("at", AT).param("preference", "NEAREST").param("size", "1").param("page", "1"))
+                .andExpect(status().isOk()).andReturn();
+        var envelope = objectMapper.readTree(selected.getResponse().getContentAsString());
+        assertEquals(full.size(), envelope.path("totalElements").asInt());
+        assertEquals(full.get(1), envelope.path("content").get(0));
+        assertEquals(2, envelope.path("content").get(0).path("rank").asInt());
+    }
+
     private JsonNode body(MvcResult result) throws Exception {
-        return objectMapper.readTree(result.getResponse().getContentAsString());
+        return objectMapper.readTree(result.getResponse().getContentAsString()).path("content");
     }
 
     private record Identity(String userId, String vehicleId) {

@@ -8,6 +8,15 @@ import java.util.Optional;
 
 public final class InMemoryCarWashBusinessRepository extends InMemoryRepository<CarWashBusiness, String>
         implements CarWashBusinessRepository {
+    @Override public com.carwash.shared.application.PageResult<CarWashBusiness> findPage(com.carwash.shared.application.ListQuery query) {
+        var scope = query.scope();
+        java.util.List<CarWashBusiness> source = scope.businessId() == null ? findMatching(v -> true) : findByIdAndTenantId(scope.businessId(), scope.businessId()).stream().toList();
+        return query.select(source, java.util.Map.ofEntries(java.util.Map.entry("id", (java.util.function.Function<CarWashBusiness, Object>) v -> v.getBusinessId()),
+                java.util.Map.entry("name", (java.util.function.Function<CarWashBusiness, Object>) v -> v.getBusinessName()),
+                java.util.Map.entry("registeredAt", (java.util.function.Function<CarWashBusiness, Object>) v -> v.getRegisteredAt()),
+                java.util.Map.entry("status", (java.util.function.Function<CarWashBusiness, Object>) v -> v.getStatus())));
+    }
+
 
     @Override
     public boolean existsByRegistrationNumberIgnoreCase(String registrationNumber, String excludedBusinessId) {

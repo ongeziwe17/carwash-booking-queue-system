@@ -13,6 +13,20 @@ import java.util.Optional;
 
 public class InMemoryQueueEntryRepository extends InMemoryRepository<QueueEntry, String>
         implements QueueEntryRepository, com.carwash.queue.application.QueueTelemetryQuery {
+    @Override public com.carwash.shared.application.PageResult<QueueEntry> findPage(com.carwash.shared.application.ListQuery query) {
+        var scope = query.scope();
+        java.util.List<QueueEntry> source = scope.businessId() == null ? findMatching(v -> true) : findByBusinessId(scope.businessId());
+        source = source.stream().filter(v -> scope.branchId() == null || scope.branchId().equals(v.getBranchId())).toList();
+        return query.select(source, java.util.Map.ofEntries(java.util.Map.entry("id", (java.util.function.Function<QueueEntry, Object>) v -> v.getQueueEntryId()),
+                java.util.Map.entry("branchId", (java.util.function.Function<QueueEntry, Object>) v -> v.getBranchId()),
+                java.util.Map.entry("activeRank", (java.util.function.Function<QueueEntry, Object>) v -> (v.getQueueStatus().isActive() ? 0 : 1)),
+                java.util.Map.entry("position", (java.util.function.Function<QueueEntry, Object>) v -> v.getPosition()),
+                java.util.Map.entry("joinedAt", (java.util.function.Function<QueueEntry, Object>) v -> v.getJoinedAt()),
+                java.util.Map.entry("status", (java.util.function.Function<QueueEntry, Object>) v -> v.getQueueStatus()),
+                java.util.Map.entry("serviceId", (java.util.function.Function<QueueEntry, Object>) v -> v.getService().getServiceId()),
+                java.util.Map.entry("offeringId", (java.util.function.Function<QueueEntry, Object>) v -> v.getServiceOfferingId())));
+    }
+
 
     private final java.util.Map<String, Integer> activeWaits = new java.util.HashMap<>();
     private long waitMinutes;

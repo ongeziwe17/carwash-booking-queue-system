@@ -86,7 +86,7 @@ class BranchSchedulingWorkflowIntegrationTest extends ApiIntegrationTestSupport 
         mockMvc.perform(get("/api/marketplace/branches/{branchId}/closures", branchId)
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].status").value("ACTIVE"));
+                .andExpect(jsonPath("$.content[0].status").value("ACTIVE"));
 
         mockMvc.perform(post("/api/marketplace/closures/{closureId}/cancel", closureId)
                         .with(authentication.platformAdminJwt()))

@@ -1,0 +1,24 @@
+info:
+  name: Exact filtered totals on out-of-range page
+  type: http
+  seq: 1
+  tags: [pagination, regression]
+http:
+  method: GET
+  url: "{{baseUrl}}/api/services?id={{serviceId}}&page=1&size=1"
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("status and pagination contract", function() {
+          expect(res.status).to.equal(200);
+
+          expect(res.body.content).to.deep.equal([]); expect(res.body.page).to.equal(1); expect(res.body.size).to.equal(1); expect(res.body.totalElements).to.equal(1); expect(res.body.totalPages).to.equal(1); expect(res.body.hasPrevious).to.equal(true); expect(res.body.hasNext).to.equal(false);
+        });
+        test("no sensitive diagnostics", function() {
+          const payload=JSON.stringify(res.body).toLowerCase();
+          for(const forbidden of ["passwordhash", "encodedpassword", "stacktrace", "authorization", "java.lang"])
+            expect(payload).to.not.include(forbidden);
+        });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

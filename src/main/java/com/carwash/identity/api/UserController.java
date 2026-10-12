@@ -33,6 +33,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import com.carwash.shared.api.PageResponse;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @RestController
 @Validated
@@ -42,18 +44,21 @@ public class UserController {
 
     private final UserManagementService service;
     private final UserMapper mapper;
+    private final com.carwash.access.application.TenantAccessContextProvider tenantAccess;
 
-    public UserController(UserManagementService service, UserMapper mapper) {
+    public UserController(UserManagementService service, UserMapper mapper, com.carwash.access.application.TenantAccessContextProvider tenantAccess) {
         this.service = service;
         this.mapper = mapper;
+        this.tenantAccess = tenantAccess;
     }
 
     @GetMapping
     @PreAuthorize("hasRole('PLATFORM_ADMIN')")
     @Operation(summary = "List users")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Users returned",
-                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = UserResponse.class)))),
+            @ApiResponse(responseCode = "400", description = "Invalid pagination, filter or sort",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "200", description = "Users returned", useReturnTypeSchema = true),
             @ApiResponse(responseCode = "401", description = "Authentication required",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "403", description = "Access denied",
@@ -63,8 +68,17 @@ public class UserController {
             @ApiResponse(responseCode = "500", description = "Internal server error",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public List<UserResponse> getAll() {
-        return mapper.toResponseList(service.findAll());
+    @io.swagger.v3.oas.annotations.Parameters({
+        @io.swagger.v3.oas.annotations.Parameter(name = "id", description = "Exact resource ID; narrows authorized scope only.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", maxLength = 64)),
+        @io.swagger.v3.oas.annotations.Parameter(name = "page", description = "Zero-based page; default 0. Invalid or overflowing offsets return ApiErrorResponse 400.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "0", defaultValue = "0")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "size", description = "Page size, default 20; rejects values outside 1-100.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "1", maximum = "100", defaultValue = "20")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "sort", description = "Repeat up to three field,asc|desc terms from the endpoint allowlist; unique ID tie-breaker and NULLS LAST. See API-PAGINATION.md.", style = io.swagger.v3.oas.annotations.enums.ParameterStyle.FORM, explode = io.swagger.v3.oas.annotations.enums.Explode.TRUE, array = @io.swagger.v3.oas.annotations.media.ArraySchema(maxItems = 3, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string"))),
+        @io.swagger.v3.oas.annotations.Parameter(name = "accountStatus", description = "Exact PENDING, ACTIVE, SUSPENDED or DEACTIVATED; sorts id,name,createdAt.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string"))
+    })
+    public PageResponse<UserResponse> getAll(
+            @io.swagger.v3.oas.annotations.Parameter(hidden = true) @RequestParam org.springframework.util.MultiValueMap<String, String> parameters
+    ) {
+        return PageResponse.from(service.findPage(tenantAccess.current(), com.carwash.identity.application.UserListPolicy.POLICY.parse(parameters)).map(mapper::toListResponse));
     }
 
     @GetMapping("/{id}")

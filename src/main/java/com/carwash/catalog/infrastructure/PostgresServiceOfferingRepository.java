@@ -17,6 +17,24 @@ import java.util.Optional;
 @Profile("postgres")
 @Transactional
 public class PostgresServiceOfferingRepository implements ServiceOfferingRepository {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.carwash.shared.infrastructure.JpaPageQueries pages;
+
+    @Override public com.carwash.shared.application.PageResult<ServiceOffering> findPage(com.carwash.shared.application.ListQuery query) {
+        var scope = query.scope();
+        var clauses = new java.util.ArrayList<String>(); clauses.add("1=1");
+        var parameters = new java.util.LinkedHashMap<String, Object>();
+        if (scope.businessId() != null) { clauses.add("exists (select b.id from BranchJpaEntity b where b.id=q.branchId and b.businessId=:business)"); parameters.put("business", scope.businessId()); }
+        if (scope.branchId() != null) { clauses.add("q.branchId = :branch"); parameters.put("branch", scope.branchId()); }
+        if (scope.discoverable()) clauses.add("q.status='ACTIVE' and exists (select s.id from ServiceJpaEntity s where s.id=q.serviceId and s.active=true) and exists (select b.id from BranchJpaEntity b, BusinessJpaEntity business where b.id=q.branchId and business.id=b.businessId and b.status='ACTIVE' and b.publicDiscovery=true and business.status='ACTIVE')");
+        var page = pages.find(ServiceOfferingJpaEntity.class, query, String.join(" and ", clauses), parameters, java.util.Map.ofEntries(java.util.Map.entry("id", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.id")),
+                java.util.Map.entry("price", com.carwash.shared.infrastructure.JpaPageQueries.Field.value("q.price")),
+                java.util.Map.entry("duration", com.carwash.shared.infrastructure.JpaPageQueries.Field.value("q.duration")),
+                java.util.Map.entry("status", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.status")),
+                java.util.Map.entry("serviceId", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.serviceId"))));
+        return page.map(this::domain);
+    }
+
     private final ServiceOfferingSpringDataRepository repository;
     public PostgresServiceOfferingRepository(ServiceOfferingSpringDataRepository repository) { this.repository = repository; }
 

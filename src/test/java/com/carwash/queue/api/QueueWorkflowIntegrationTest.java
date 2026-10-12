@@ -181,15 +181,15 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt())
                         .param("businessId", api.defaultBusiness().businessId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].queueEntryId").value(first.queueEntryId()))
-                .andExpect(jsonPath("$[0].position").value(1))
-                .andExpect(jsonPath("$[0].estimatedWaitMin").value(0))
-                .andExpect(jsonPath("$[1].queueEntryId").value(second.queueEntryId()))
-                .andExpect(jsonPath("$[1].position").value(2))
-                .andExpect(jsonPath("$[1].estimatedWaitMin").value(10))
-                .andExpect(jsonPath("$[2].queueEntryId").value(third.queueEntryId()))
-                .andExpect(jsonPath("$[2].position").value(3))
-                .andExpect(jsonPath("$[2].estimatedWaitMin").value(35));
+                .andExpect(jsonPath("$.content[0].queueEntryId").value(first.queueEntryId()))
+                .andExpect(jsonPath("$.content[0].position").value(1))
+                .andExpect(jsonPath("$.content[0].estimatedWaitMin").value(0))
+                .andExpect(jsonPath("$.content[1].queueEntryId").value(second.queueEntryId()))
+                .andExpect(jsonPath("$.content[1].position").value(2))
+                .andExpect(jsonPath("$.content[1].estimatedWaitMin").value(10))
+                .andExpect(jsonPath("$.content[2].queueEntryId").value(third.queueEntryId()))
+                .andExpect(jsonPath("$.content[2].position").value(3))
+                .andExpect(jsonPath("$.content[2].estimatedWaitMin").value(35));
     }
 
     @Test
@@ -209,14 +209,14 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt())
                         .param("businessId", api.defaultBusiness().businessId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].queueEntryId").value(second.queueEntryId()))
-                .andExpect(jsonPath("$[0].position").value(1))
-                .andExpect(jsonPath("$[0].estimatedWaitMin").value(0))
-                .andExpect(jsonPath("$[1].queueEntryId").value(third.queueEntryId()))
-                .andExpect(jsonPath("$[1].position").value(2))
-                .andExpect(jsonPath("$[1].estimatedWaitMin").value(25))
-                .andExpect(jsonPath("$[2].queueEntryId").value(first.queueEntryId()))
-                .andExpect(jsonPath("$[2].queueStatus").value("COMPLETED"));
+                .andExpect(jsonPath("$.content[0].queueEntryId").value(second.queueEntryId()))
+                .andExpect(jsonPath("$.content[0].position").value(1))
+                .andExpect(jsonPath("$.content[0].estimatedWaitMin").value(0))
+                .andExpect(jsonPath("$.content[1].queueEntryId").value(third.queueEntryId()))
+                .andExpect(jsonPath("$.content[1].position").value(2))
+                .andExpect(jsonPath("$.content[1].estimatedWaitMin").value(25))
+                .andExpect(jsonPath("$.content[2].queueEntryId").value(first.queueEntryId()))
+                .andExpect(jsonPath("$.content[2].queueStatus").value("COMPLETED"));
     }
 
     @Test
@@ -232,13 +232,13 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt())
                         .param("businessId", api.defaultBusiness().businessId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].queueEntryId").value(first.queueEntryId()))
-                .andExpect(jsonPath("$[0].position").value(1))
-                .andExpect(jsonPath("$[0].estimatedWaitMin").value(0))
-                .andExpect(jsonPath("$[1].queueEntryId").value(third.queueEntryId()))
-                .andExpect(jsonPath("$[1].position").value(2))
-                .andExpect(jsonPath("$[1].estimatedWaitMin").value(10));
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].queueEntryId").value(first.queueEntryId()))
+                .andExpect(jsonPath("$.content[0].position").value(1))
+                .andExpect(jsonPath("$.content[0].estimatedWaitMin").value(0))
+                .andExpect(jsonPath("$.content[1].queueEntryId").value(third.queueEntryId()))
+                .andExpect(jsonPath("$.content[1].position").value(2))
+                .andExpect(jsonPath("$.content[1].estimatedWaitMin").value(10));
     }
 
     @Test
@@ -259,15 +259,15 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt())
                         .param("businessId", api.defaultBusiness().businessId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].queueEntryId").value(third.queueEntryId()))
-                .andExpect(jsonPath("$[0].position").value(1))
-                .andExpect(jsonPath("$[0].estimatedWaitMin").value(0))
-                .andExpect(jsonPath("$[1].queueEntryId").value(first.queueEntryId()))
-                .andExpect(jsonPath("$[1].position").value(2))
-                .andExpect(jsonPath("$[1].estimatedWaitMin").value(30))
-                .andExpect(jsonPath("$[2].queueEntryId").value(second.queueEntryId()))
-                .andExpect(jsonPath("$[2].position").value(3))
-                .andExpect(jsonPath("$[2].estimatedWaitMin").value(40));
+                .andExpect(jsonPath("$.content[0].queueEntryId").value(third.queueEntryId()))
+                .andExpect(jsonPath("$.content[0].position").value(1))
+                .andExpect(jsonPath("$.content[0].estimatedWaitMin").value(0))
+                .andExpect(jsonPath("$.content[1].queueEntryId").value(first.queueEntryId()))
+                .andExpect(jsonPath("$.content[1].position").value(2))
+                .andExpect(jsonPath("$.content[1].estimatedWaitMin").value(30))
+                .andExpect(jsonPath("$.content[2].queueEntryId").value(second.queueEntryId()))
+                .andExpect(jsonPath("$.content[2].position").value(3))
+                .andExpect(jsonPath("$.content[2].estimatedWaitMin").value(40));
     }
 
     @Test
@@ -371,18 +371,18 @@ class QueueWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         mockMvc.perform(get("/api/queue-entries").with(authentication.platformAdminJwt())
                         .param("businessId", api.defaultBusiness().businessId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].queueEntryId").value(first.queueEntryId()))
-                .andExpect(jsonPath("$[0].queueStatus").value("IN_PROGRESS"))
-                .andExpect(jsonPath("$[0].position").value(1))
-                .andExpect(jsonPath("$[0].estimatedWaitMin").value(0))
-                .andExpect(jsonPath("$[1].queueEntryId").value(second.queueEntryId()))
-                .andExpect(jsonPath("$[1].queueStatus").value("CALLED"))
-                .andExpect(jsonPath("$[1].position").value(2))
-                .andExpect(jsonPath("$[1].estimatedWaitMin").value(10))
-                .andExpect(jsonPath("$[2].queueEntryId").value(third.queueEntryId()))
-                .andExpect(jsonPath("$[2].queueStatus").value("WAITING"))
-                .andExpect(jsonPath("$[2].position").value(3))
-                .andExpect(jsonPath("$[2].estimatedWaitMin").value(30));
+                .andExpect(jsonPath("$.content[0].queueEntryId").value(first.queueEntryId()))
+                .andExpect(jsonPath("$.content[0].queueStatus").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.content[0].position").value(1))
+                .andExpect(jsonPath("$.content[0].estimatedWaitMin").value(0))
+                .andExpect(jsonPath("$.content[1].queueEntryId").value(second.queueEntryId()))
+                .andExpect(jsonPath("$.content[1].queueStatus").value("CALLED"))
+                .andExpect(jsonPath("$.content[1].position").value(2))
+                .andExpect(jsonPath("$.content[1].estimatedWaitMin").value(10))
+                .andExpect(jsonPath("$.content[2].queueEntryId").value(third.queueEntryId()))
+                .andExpect(jsonPath("$.content[2].queueStatus").value("WAITING"))
+                .andExpect(jsonPath("$.content[2].position").value(3))
+                .andExpect(jsonPath("$.content[2].estimatedWaitMin").value(30));
     }
 
     @Test

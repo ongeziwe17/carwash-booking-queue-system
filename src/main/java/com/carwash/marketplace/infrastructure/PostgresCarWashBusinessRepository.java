@@ -15,6 +15,23 @@ import java.util.Optional;
 
 @Repository @Profile("postgres") @Transactional
 public class PostgresCarWashBusinessRepository implements CarWashBusinessRepository {
+    @Override public java.util.List<CarWashBusiness> findByIds(java.util.Collection<String> ids) { return repository.findAllById(ids).stream().map(this::domain).toList(); }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.carwash.shared.infrastructure.JpaPageQueries pages;
+
+    @Override public com.carwash.shared.application.PageResult<CarWashBusiness> findPage(com.carwash.shared.application.ListQuery query) {
+        var scope = query.scope();
+        var clauses = new java.util.ArrayList<String>(); clauses.add("1=1");
+        var parameters = new java.util.LinkedHashMap<String, Object>();
+        if (scope.businessId() != null) { clauses.add("q.id = :business"); parameters.put("business", scope.businessId()); }
+        var page = pages.find(BusinessJpaEntity.class, query, String.join(" and ", clauses), parameters, java.util.Map.ofEntries(java.util.Map.entry("id", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.id")),
+                java.util.Map.entry("name", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.name")),
+                java.util.Map.entry("registeredAt", com.carwash.shared.infrastructure.JpaPageQueries.Field.time("q.registeredAt", "q.registeredAtNano")),
+                java.util.Map.entry("status", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.status"))));
+        return page.map(this::domain);
+    }
+
     private final BusinessSpringDataRepository repository;
     public PostgresCarWashBusinessRepository(BusinessSpringDataRepository repository) { this.repository=repository; }
     @Override public boolean existsByRegistrationNumberIgnoreCase(String registrationNumber,String excludedBusinessId) { return registrationNumber!=null&&repository.duplicateRegistrationNumber(registrationNumber,excludedBusinessId); }

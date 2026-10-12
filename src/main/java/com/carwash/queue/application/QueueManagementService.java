@@ -1,5 +1,9 @@
 package com.carwash.queue.application;
 
+import com.carwash.shared.application.ListQuery;
+import com.carwash.shared.application.ListScope;
+import com.carwash.shared.application.PageResult;
+
 import com.carwash.shared.application.Telemetry;
 import com.carwash.shared.application.Telemetry.Operation;
 
@@ -39,6 +43,28 @@ import com.carwash.audit.domain.AuditAction;
 import com.carwash.audit.domain.AuditSource;
 
 public class QueueManagementService implements QueueQuery {
+    public PageResult<QueueEntrySnapshot> findPage(TenantAccessContext access, String branchId,
+                                             String administratorBusinessId, ListQuery query) {
+        String businessId;
+        if (access.isPlatformAdministrator()) businessId = normalizeId(administratorBusinessId, "Business ID");
+        else {
+            if (!access.isOperational()) throw new AccessDeniedException("Operational access is required");
+            if (administratorBusinessId != null) throw new BusinessRuleViolationException("Tenant identity is derived from authentication");
+            businessId = access.requireBusinessId();
+        }
+        return coordinator.readSnapshot(() -> {
+            String branch = branchId == null ? null : normalizeId(branchId, "Branch ID");
+            if (branch != null) marketplaceQuery.findBranchOptionalByBusiness(branch, businessId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
+            var page = queueEntryRepository.findPage(query.scoped(new ListScope(businessId, branch, null, false)));
+            var bookings = bookingRepository.findListByIds(page.content().stream().map(this::bookingId)
+                    .filter(Objects::nonNull).toList()).stream().collect(java.util.stream.Collectors.toMap(
+                            Booking::getBookingId, java.util.function.Function.identity()));
+            return page.map(entry -> snapshot(entry, bookings.getOrDefault(bookingId(entry), entry.getBooking())));
+        });
+    }
+
+
     private final Telemetry telemetry;
 
 

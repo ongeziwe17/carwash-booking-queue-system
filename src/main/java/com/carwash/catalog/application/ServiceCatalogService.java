@@ -1,5 +1,9 @@
 package com.carwash.catalog.application;
 
+import com.carwash.shared.application.ListQuery;
+import com.carwash.shared.application.ListScope;
+import com.carwash.shared.application.PageResult;
+
 import com.carwash.catalog.domain.Service;
 import com.carwash.catalog.domain.ServiceOfferingRepository;
 import com.carwash.catalog.domain.ServiceRepository;
@@ -17,6 +21,11 @@ import java.util.Objects;
 import java.util.Optional;
 
 public class ServiceCatalogService implements ServiceDefinitionQuery {
+    public PageResult<ServiceDefinitionSnapshot> findPage(ListQuery query) {
+        return coordinator.readSnapshot(() -> serviceRepository.findPage(query.scoped(ListScope.GLOBAL)).map(this::snapshot));
+    }
+
+
 
     private final ServiceRepository serviceRepository;
     private final ServiceOfferingRepository serviceOfferingRepository;

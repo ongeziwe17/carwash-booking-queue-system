@@ -31,6 +31,10 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import com.carwash.shared.api.PageResponse;
+import org.springframework.web.bind.annotation.RequestParam;
+import com.carwash.shared.api.PageResponse;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @RestController
 @Validated
@@ -67,13 +71,20 @@ public class ServiceOfferingController {
     @PreAuthorize("hasAuthority('PERM_MARKETPLACE_MANAGE')")
     @Operation(summary = "List branch service offerings",
             description = "Returns all stored offerings for the branch, including inactive or currently ineffective records, in offering-ID order.")
-    @ApiResponse(responseCode = "200", description = "Branch offerings returned")
-    public List<ServiceOfferingResponse> listByBranch(
-            @PathVariable @NotBlank @Size(max = 64) String branchId
+    @ApiResponse(responseCode = "200", description = "Branch offerings returned", useReturnTypeSchema = true)
+    @io.swagger.v3.oas.annotations.Parameters({
+        @io.swagger.v3.oas.annotations.Parameter(name = "id", description = "Exact resource ID; narrows authorized scope only.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", maxLength = 64)),
+        @io.swagger.v3.oas.annotations.Parameter(name = "page", description = "Zero-based page; default 0. Invalid or overflowing offsets return ApiErrorResponse 400.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "0", defaultValue = "0")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "size", description = "Page size, default 20; rejects values outside 1-100.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "1", maximum = "100", defaultValue = "20")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "sort", description = "Repeat up to three field,asc|desc terms from the endpoint allowlist; unique ID tie-breaker and NULLS LAST. See API-PAGINATION.md.", style = io.swagger.v3.oas.annotations.enums.ParameterStyle.FORM, explode = io.swagger.v3.oas.annotations.enums.Explode.TRUE, array = @io.swagger.v3.oas.annotations.media.ArraySchema(maxItems = 3, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string"))),
+        @io.swagger.v3.oas.annotations.Parameter(name = "status", description = "ACTIVE or INACTIVE; sorts id,price,duration.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "serviceId", description = "Exact reusable service ID.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string"))
+    })
+    public PageResponse<ServiceOfferingResponse> listByBranch(
+            @PathVariable @NotBlank @Size(max = 64) String branchId,
+            @io.swagger.v3.oas.annotations.Parameter(hidden = true) @RequestParam org.springframework.util.MultiValueMap<String, String> parameters
     ) {
-        return offerings.findOfferingsByBranch(tenantAccess.current(), branchId).stream()
-                .map(ServiceOfferingMapper::toManagementResponse)
-                .toList();
+        return PageResponse.from(offerings.findOfferingsPage(tenantAccess.current(), branchId, com.carwash.catalog.application.OfferingListPolicy.POLICY.parse(parameters)).map(ServiceOfferingMapper::toManagementResponse));
     }
 
     @PostMapping("/branches/{branchId}/offerings")
@@ -156,12 +167,18 @@ public class ServiceOfferingController {
     @PreAuthorize("hasAuthority('PERM_MARKETPLACE_READ')")
     @Operation(summary = "List discoverable branch service offerings",
             description = "Returns customer-facing offerings only when offering, global service, branch, and business are active and branch public discovery is enabled. Operating hours and remaining capacity are not evaluated.")
-    @ApiResponse(responseCode = "200", description = "Discoverable branch offerings returned")
-    public List<DiscoverableServiceOfferingResponse> listDiscoverable(
-            @PathVariable @NotBlank @Size(max = 64) String branchId
+    @ApiResponse(responseCode = "200", description = "Discoverable branch offerings returned", useReturnTypeSchema = true)
+    @io.swagger.v3.oas.annotations.Parameters({
+        @io.swagger.v3.oas.annotations.Parameter(name = "id", description = "Exact resource ID; narrows authorized scope only.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", maxLength = 64)),
+        @io.swagger.v3.oas.annotations.Parameter(name = "page", description = "Zero-based page; default 0. Invalid or overflowing offsets return ApiErrorResponse 400.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "0", defaultValue = "0")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "size", description = "Page size, default 20; rejects values outside 1-100.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "1", maximum = "100", defaultValue = "20")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "sort", description = "Repeat up to three field,asc|desc terms from the endpoint allowlist; unique ID tie-breaker and NULLS LAST. See API-PAGINATION.md.", style = io.swagger.v3.oas.annotations.enums.ParameterStyle.FORM, explode = io.swagger.v3.oas.annotations.enums.Explode.TRUE, array = @io.swagger.v3.oas.annotations.media.ArraySchema(maxItems = 3, schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string"))),
+        @io.swagger.v3.oas.annotations.Parameter(name = "serviceId", description = "Exact reusable service ID; sorts id,price,duration. Eligibility predicates are mandatory.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string"))
+    })
+    public PageResponse<DiscoverableServiceOfferingResponse> listDiscoverable(
+            @PathVariable @NotBlank @Size(max = 64) String branchId,
+            @io.swagger.v3.oas.annotations.Parameter(hidden = true) @RequestParam org.springframework.util.MultiValueMap<String, String> parameters
     ) {
-        return offerings.findDiscoverableOfferingsByBranch(branchId).stream()
-                .map(ServiceOfferingMapper::toDiscoveryResponse)
-                .toList();
+        return PageResponse.from(offerings.findDiscoverablePage(branchId, com.carwash.catalog.application.DiscoverableOfferingListPolicy.POLICY.parse(parameters)).map(ServiceOfferingMapper::toDiscoveryResponse));
     }
 }

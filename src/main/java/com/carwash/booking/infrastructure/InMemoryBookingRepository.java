@@ -11,6 +11,21 @@ import java.util.List;
 
 public class InMemoryBookingRepository extends InMemoryRepository<Booking, String>
         implements BookingRepository {
+    @Override public com.carwash.shared.application.PageResult<Booking> findPage(com.carwash.shared.application.ListQuery query) {
+        var scope = query.scope();
+        java.util.List<Booking> source = scope.businessId() == null ? findMatching(v -> true) : findByBusinessId(scope.businessId());
+        source = source.stream().filter(v -> scope.branchId() == null || scope.branchId().equals(v.getBranchId())).toList();
+        return query.select(source, java.util.Map.ofEntries(java.util.Map.entry("id", (java.util.function.Function<Booking, Object>) v -> v.getBookingId()),
+                java.util.Map.entry("scheduledAt", (java.util.function.Function<Booking, Object>) v -> v.getScheduledDateTime()),
+                java.util.Map.entry("createdAt", (java.util.function.Function<Booking, Object>) v -> v.getCreatedAt()),
+                java.util.Map.entry("status", (java.util.function.Function<Booking, Object>) v -> v.getStatus()),
+                java.util.Map.entry("userId", (java.util.function.Function<Booking, Object>) v -> v.getUser().getUserId()),
+                java.util.Map.entry("serviceId", (java.util.function.Function<Booking, Object>) v -> v.getService().getServiceId()),
+                java.util.Map.entry("offeringId", (java.util.function.Function<Booking, Object>) v -> v.getServiceOfferingId()),
+                java.util.Map.entry("from", (java.util.function.Function<Booking, Object>) v -> v.getScheduledDateTime()),
+                java.util.Map.entry("to", (java.util.function.Function<Booking, Object>) v -> v.getScheduledDateTime())));
+    }
+
 
     private final MarketplaceQuery marketplace;
 

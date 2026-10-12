@@ -1,5 +1,9 @@
 package com.carwash.catalog.application;
 
+import com.carwash.shared.application.ListQuery;
+import com.carwash.shared.application.ListScope;
+import com.carwash.shared.application.PageResult;
+
 import com.carwash.catalog.domain.Service;
 import com.carwash.catalog.domain.ServiceOffering;
 import com.carwash.catalog.domain.ServiceOfferingRepository;
@@ -26,6 +30,30 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public final class ServiceOfferingService implements ServiceOfferingQuery {
+    public PageResult<ServiceOfferingSnapshot> findOfferingsPage(TenantAccessContext access, String branchId, ListQuery query) {
+        return coordinator.readSnapshot(() -> {
+            BranchSnapshot branch = access.isPlatformAdministrator() ? requireBranch(branchId)
+                    : requireTenantBranch(branchId, access.requireBusinessId());
+            return offeringsPage(branch, query.scoped(new ListScope(branch.businessId(), branch.branchId(), null, false)));
+        });
+    }
+
+    public PageResult<ServiceOfferingSnapshot> findDiscoverablePage(String branchId, ListQuery query) {
+        return coordinator.readSnapshot(() -> {
+            BranchSnapshot branch = requireBranch(branchId);
+            return offeringsPage(branch, query.scoped(new ListScope(branch.businessId(), branch.branchId(), null, true)));
+        });
+    }
+
+    private PageResult<ServiceOfferingSnapshot> offeringsPage(BranchSnapshot branch, ListQuery query) {
+        var page = offeringRepository.findPage(query);
+        var services = serviceRepository.findByIds(page.content().stream()
+                .map(ServiceOffering::getServiceId).distinct().toList()).stream()
+                .collect(Collectors.toMap(Service::getServiceId, Function.identity()));
+        return page.map(offering -> snapshot(offering, services.get(offering.getServiceId()), branch));
+    }
+
+
 
     private final ServiceOfferingRepository offeringRepository;
     private final ServiceRepository serviceRepository;

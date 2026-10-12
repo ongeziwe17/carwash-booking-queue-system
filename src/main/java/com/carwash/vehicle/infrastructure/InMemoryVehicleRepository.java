@@ -10,6 +10,16 @@ import java.util.List;
 
 public class InMemoryVehicleRepository extends InMemoryRepository<Vehicle, String>
         implements VehicleRepository {
+    @Override public com.carwash.shared.application.PageResult<Vehicle> findPage(com.carwash.shared.application.ListQuery query) {
+        var scope = query.scope();
+        java.util.List<Vehicle> source = scope.businessId() == null ? findMatching(v -> true) : findByBusinessId(scope.businessId());
+        return query.select(source, java.util.Map.ofEntries(java.util.Map.entry("id", (java.util.function.Function<Vehicle, Object>) v -> v.getVehicleId()),
+                java.util.Map.entry("brand", (java.util.function.Function<Vehicle, Object>) v -> v.getBrand()),
+                java.util.Map.entry("model", (java.util.function.Function<Vehicle, Object>) v -> v.getModel()),
+                java.util.Map.entry("userId", (java.util.function.Function<Vehicle, Object>) v -> v.getUserId()),
+                java.util.Map.entry("vehicleType", (java.util.function.Function<Vehicle, Object>) v -> v.getVehicleType())));
+    }
+
 
     private final BookingRepository bookings;
 

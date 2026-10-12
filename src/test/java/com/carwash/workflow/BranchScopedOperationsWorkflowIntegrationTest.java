@@ -61,9 +61,9 @@ class BranchScopedOperationsWorkflowIntegrationTest extends ApiIntegrationTestSu
                         .param("businessId", resources.business().businessId())
                         .param("branchId", resources.branch().branchId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].branchId").value(resources.branch().branchId()))
-                .andExpect(jsonPath("$[0].serviceOfferingId").value(resources.offering().offeringId()));
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].branchId").value(resources.branch().branchId()))
+                .andExpect(jsonPath("$.content[0].serviceOfferingId").value(resources.offering().offeringId()));
         mockMvc.perform(get("/api/bookings")
                         .with(authentication.platformAdminJwt())
                         .param("businessId", resources.business().businessId())
@@ -109,9 +109,9 @@ class BranchScopedOperationsWorkflowIntegrationTest extends ApiIntegrationTestSu
                         .param("businessId", resources.business().businessId())
                         .param("branchId", resources.branch().branchId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].queueEntryId").value(queueA.queueEntryId()))
-                .andExpect(jsonPath("$[0].queueStatus").value("WAITING"));
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].queueEntryId").value(queueA.queueEntryId()))
+                .andExpect(jsonPath("$.content[0].queueStatus").value("WAITING"));
 
         mockMvc.perform(get("/api/notifications/user/{userId}", resources.user().userId())
                         .with(authentication.platformAdminJwt())

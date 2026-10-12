@@ -1,5 +1,9 @@
 package com.carwash.identity.application;
 
+import com.carwash.shared.application.ListQuery;
+import com.carwash.shared.application.ListScope;
+import com.carwash.shared.application.PageResult;
+
 import com.carwash.identity.domain.User;
 import com.carwash.identity.domain.AccountStatus;
 import com.carwash.booking.domain.BookingRepository;
@@ -22,6 +26,12 @@ import java.util.Objects;
 import java.util.Optional;
 
 public class UserManagementService implements UserQuery {
+    public PageResult<UserListSnapshot> findPage(com.carwash.access.application.TenantAccessContext access, ListQuery query) {
+        access.requirePlatformAdministrator();
+        return coordinator.readSnapshot(() -> userRepository.findPage(query.scoped(ListScope.GLOBAL)).map(UserListSnapshot::from));
+    }
+
+
 
     private final UserRepository userRepository;
     private final CredentialService credentialService;

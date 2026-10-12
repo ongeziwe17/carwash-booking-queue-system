@@ -29,8 +29,18 @@ runtime:
         const bootstrapPassword = bru.interpolate("{{process.env.BRUNO_BOOTSTRAP_ADMIN_PASSWORD}}");
         if (bootstrapPassword && !bootstrapPassword.includes("process.env")) expect(payload).to.not.include(bootstrapPassword);
         test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
-        test("branch filter returns no other branch", function() { expect(res.body.some(q => q.queueEntryId === bru.getVar("queueEntryId"))).to.equal(true); expect(res.body.every(q => q.branchId === bru.getVar("opsBranchId") && typeof q.serviceOfferingId === "string")).to.equal(true); });
+        test("branch filter returns no other branch", function() { expect(res.body.content.some(q => q.queueEntryId === bru.getVar("queueEntryId"))).to.equal(true); expect(res.body.content.every(q => q.branchId === bru.getVar("opsBranchId") && typeof q.serviceOfferingId === "string")).to.equal(true); });
 
+        test("bounded page envelope", function() {
+          expect(res.body.content).to.be.an("array");
+          expect(res.body.page).to.be.at.least(0);
+          expect(res.body.size).to.be.within(1, 100);
+          expect(res.body.content.length).to.be.at.most(res.body.size);
+          expect(res.body.totalElements).to.be.at.least(res.body.content.length);
+          expect(res.body.totalPages).to.equal(Math.ceil(res.body.totalElements / res.body.size));
+          expect(res.body.hasNext).to.equal(res.body.page + 1 < res.body.totalPages);
+          expect(res.body.hasPrevious).to.equal(res.body.page > 0);
+        });
 settings:
   encodeUrl: true
   timeout: 15000

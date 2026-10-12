@@ -11,6 +11,19 @@ import java.util.Optional;
 public final class InMemoryTemporaryBranchClosureRepository
         extends InMemoryRepository<TemporaryBranchClosure, String>
         implements TemporaryBranchClosureRepository {
+    @Override public com.carwash.shared.application.PageResult<TemporaryBranchClosure> findPage(com.carwash.shared.application.ListQuery query) {
+        var scope = query.scope();
+        java.util.List<TemporaryBranchClosure> source = scope.branchId() == null ? findMatching(v -> true) : findByBranchId(scope.branchId());
+        source = source.stream().filter(v -> scope.branchId() == null || scope.branchId().equals(v.getBranchId())).toList();
+        if (scope.businessId() != null) source = source.stream().filter(v -> branchBelongsTo(v.getBranchId(), scope.businessId())).toList();
+        return query.select(source, java.util.Map.ofEntries(java.util.Map.entry("id", (java.util.function.Function<TemporaryBranchClosure, Object>) v -> v.getClosureId()),
+                java.util.Map.entry("startsAt", (java.util.function.Function<TemporaryBranchClosure, Object>) v -> v.getStartAt()),
+                java.util.Map.entry("endsAt", (java.util.function.Function<TemporaryBranchClosure, Object>) v -> v.getEndAt()),
+                java.util.Map.entry("status", (java.util.function.Function<TemporaryBranchClosure, Object>) v -> v.getStatus()),
+                java.util.Map.entry("from", (java.util.function.Function<TemporaryBranchClosure, Object>) v -> v.getStartAt()),
+                java.util.Map.entry("to", (java.util.function.Function<TemporaryBranchClosure, Object>) v -> v.getStartAt())));
+    }
+
 
     private final CarWashBranchRepository branches;
 

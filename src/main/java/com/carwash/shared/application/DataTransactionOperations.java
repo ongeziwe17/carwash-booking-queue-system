@@ -10,6 +10,9 @@ public interface DataTransactionOperations {
 
     <T> T write(Supplier<T> action);
 
+    /** Consistent read snapshot used only by bounded HTTP collection queries. */
+    default <T> T readSnapshot(Supplier<T> action) { return read(action); }
+
     /** Runs a write in an isolated transaction after the caller's transaction has completed. */
     default <T> T isolatedWrite(Supplier<T> action) { return write(action); }
 

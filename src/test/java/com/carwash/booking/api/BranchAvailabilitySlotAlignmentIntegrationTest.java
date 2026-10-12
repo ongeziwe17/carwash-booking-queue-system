@@ -119,10 +119,10 @@ class BranchAvailabilitySlotAlignmentIntegrationTest extends ApiIntegrationTestS
                 .param("at", requestedAt));
         if (expectedAvailable) {
             search.andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].branchId", contains(branchId)));
+                    .andExpect(jsonPath("$.content[*].branchId", contains(branchId)));
         } else {
             search.andExpect(status().isOk())
-                    .andExpect(jsonPath("$.length()").value(0));
+                    .andExpect(jsonPath("$.content.length()").value(0));
         }
 
         CreateBookingRequest booking = BookingFixtureBuilder.valid(

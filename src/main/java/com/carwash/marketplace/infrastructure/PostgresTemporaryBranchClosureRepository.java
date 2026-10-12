@@ -13,6 +13,24 @@ import java.util.Optional;
 
 @Repository @Profile("postgres") @Transactional
 public class PostgresTemporaryBranchClosureRepository implements TemporaryBranchClosureRepository {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.carwash.shared.infrastructure.JpaPageQueries pages;
+
+    @Override public com.carwash.shared.application.PageResult<TemporaryBranchClosure> findPage(com.carwash.shared.application.ListQuery query) {
+        var scope = query.scope();
+        var clauses = new java.util.ArrayList<String>(); clauses.add("1=1");
+        var parameters = new java.util.LinkedHashMap<String, Object>();
+        if (scope.businessId() != null) { clauses.add("exists (select b.id from BranchJpaEntity b where b.id=q.branchId and b.businessId=:business)"); parameters.put("business", scope.businessId()); }
+        if (scope.branchId() != null) { clauses.add("q.branchId = :branch"); parameters.put("branch", scope.branchId()); }
+        var page = pages.find(ClosureJpaEntity.class, query, String.join(" and ", clauses), parameters, java.util.Map.ofEntries(java.util.Map.entry("id", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.id")),
+                java.util.Map.entry("startsAt", com.carwash.shared.infrastructure.JpaPageQueries.Field.time("q.startSecond", "q.startNano")),
+                java.util.Map.entry("endsAt", com.carwash.shared.infrastructure.JpaPageQueries.Field.time("q.endSecond", "q.endNano")),
+                java.util.Map.entry("status", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.status")),
+                java.util.Map.entry("from", com.carwash.shared.infrastructure.JpaPageQueries.Field.time("q.startSecond", "q.startNano")),
+                java.util.Map.entry("to", com.carwash.shared.infrastructure.JpaPageQueries.Field.time("q.startSecond", "q.startNano"))));
+        return page.map(this::domain);
+    }
+
     private final ClosureSpringDataRepository repository;
     public PostgresTemporaryBranchClosureRepository(ClosureSpringDataRepository repository){this.repository=repository;}
     @Override public List<TemporaryBranchClosure> findByBranchId(String id){return repository.findByBranchIdOrderByIdAsc(id).stream().map(this::domain).toList();}

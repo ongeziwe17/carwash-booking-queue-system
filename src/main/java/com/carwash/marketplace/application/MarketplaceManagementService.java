@@ -1,5 +1,9 @@
 package com.carwash.marketplace.application;
 
+import com.carwash.shared.application.ListQuery;
+import com.carwash.shared.application.ListScope;
+import com.carwash.shared.application.PageResult;
+
 import com.carwash.marketplace.domain.BranchStatus;
 import com.carwash.marketplace.domain.BusinessStatus;
 import com.carwash.marketplace.domain.CarWashBranch;
@@ -29,6 +33,32 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 public final class MarketplaceManagementService implements MarketplaceQuery {
+    public PageResult<BusinessSnapshot> findBusinessesPage(TenantAccessContext access, ListQuery query) {
+        String businessId = access.isPlatformAdministrator() ? null : access.requireBusinessId();
+        return coordinator.readSnapshot(() -> businessRepository.findPage(query.scoped(
+                new ListScope(businessId, null, null, false))).map(BusinessSnapshot::from));
+    }
+
+    public PageResult<BranchSnapshot> findBranchesPage(TenantAccessContext access, String businessId, ListQuery query) {
+        return coordinator.readSnapshot(() -> {
+            requireAccessibleBusiness(access, businessId);
+            return branchPage(query.scoped(new ListScope(businessId, null, null, false)));
+        });
+    }
+
+    public PageResult<BranchSnapshot> findDiscoverablePage(ListQuery query) {
+        return coordinator.readSnapshot(() -> branchPage(query.scoped(new ListScope(null, null, null, true))));
+    }
+
+    private PageResult<BranchSnapshot> branchPage(ListQuery query) {
+        var page = branchRepository.findPage(query);
+        var businesses = businessRepository.findByIds(page.content().stream()
+                .map(CarWashBranch::getBusinessId).distinct().toList()).stream()
+                .collect(java.util.stream.Collectors.toMap(CarWashBusiness::getBusinessId, java.util.function.Function.identity()));
+        return page.map(branch -> BranchSnapshot.from(branch, businesses.get(branch.getBusinessId())));
+    }
+
+
 
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
     private static final Pattern PHONE = Pattern.compile("^[0-9+() .-]{7,32}$");

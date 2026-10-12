@@ -43,7 +43,7 @@ class ServiceOfferingWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         mockMvc.perform(get("/api/marketplace/branches/{branchId}/offerings", fixture.branchId())
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].offeringId").value(request.offeringId()));
+                .andExpect(jsonPath("$.content[0].offeringId").value(request.offeringId()));
         mockMvc.perform(get("/api/marketplace/offerings/{offeringId}", request.offeringId())
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isOk())
@@ -66,11 +66,11 @@ class ServiceOfferingWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         mockMvc.perform(get("/api/marketplace/branches/{branchId}/offerings/discoverable", fixture.branchId())
                         .with(reader("customer")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].offeringId").value(request.offeringId()))
-                .andExpect(jsonPath("$[0].price").value(149.99))
-                .andExpect(jsonPath("$[0].status").doesNotExist())
-                .andExpect(jsonPath("$[0].effectiveActive").doesNotExist())
-                .andExpect(jsonPath("$[0].createdAt").doesNotExist());
+                .andExpect(jsonPath("$.content[0].offeringId").value(request.offeringId()))
+                .andExpect(jsonPath("$.content[0].price").value(149.99))
+                .andExpect(jsonPath("$.content[0].status").doesNotExist())
+                .andExpect(jsonPath("$.content[0].effectiveActive").doesNotExist())
+                .andExpect(jsonPath("$.content[0].createdAt").doesNotExist());
 
         mockMvc.perform(post("/api/marketplace/offerings/{offeringId}/deactivate", request.offeringId())
                         .with(authentication.platformAdminJwt()))
@@ -265,7 +265,7 @@ class ServiceOfferingWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         mockMvc.perform(get("/api/marketplace/branches/{branchId}/offerings/discoverable", branchId)
                         .with(reader("customer")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(size));
+                .andExpect(jsonPath("$.content.length()").value(size));
     }
 
     private void assertStoredOfferingStillActive(String offeringId) throws Exception {

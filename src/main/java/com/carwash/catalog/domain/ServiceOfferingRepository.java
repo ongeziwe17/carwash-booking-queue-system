@@ -5,7 +5,7 @@ import com.carwash.shared.domain.Repository;
 import java.util.List;
 import java.util.Optional;
 
-public interface ServiceOfferingRepository extends Repository<ServiceOffering, String> {
+public interface ServiceOfferingRepository extends Repository<ServiceOffering, String>, com.carwash.shared.application.PagedRepository<ServiceOffering> {
 
     List<ServiceOffering> findByBranchId(String branchId);
 

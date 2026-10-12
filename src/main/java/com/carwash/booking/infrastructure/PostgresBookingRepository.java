@@ -27,6 +27,27 @@ import java.util.Optional;
 
 @Repository @Profile("postgres") @Transactional
 public class PostgresBookingRepository implements BookingRepository {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.carwash.shared.infrastructure.JpaPageQueries pages;
+
+    @Override public com.carwash.shared.application.PageResult<Booking> findPage(com.carwash.shared.application.ListQuery query) {
+        var scope = query.scope();
+        var clauses = new java.util.ArrayList<String>(); clauses.add("1=1");
+        var parameters = new java.util.LinkedHashMap<String, Object>();
+        if (scope.businessId() != null) { clauses.add("exists (select b.id from BranchJpaEntity b where b.id=q.branchId and b.businessId=:business)"); parameters.put("business", scope.businessId()); }
+        if (scope.branchId() != null) { clauses.add("q.branchId = :branch"); parameters.put("branch", scope.branchId()); }
+        var page = pages.find(BookingJpaEntity.class, query, String.join(" and ", clauses), parameters, java.util.Map.ofEntries(java.util.Map.entry("id", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.id")),
+                java.util.Map.entry("scheduledAt", com.carwash.shared.infrastructure.JpaPageQueries.Field.time("q.scheduledAt", "q.scheduledAtNano")),
+                java.util.Map.entry("createdAt", com.carwash.shared.infrastructure.JpaPageQueries.Field.time("q.createdAt", "q.createdAtNano")),
+                java.util.Map.entry("status", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.status")),
+                java.util.Map.entry("userId", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.userId")),
+                java.util.Map.entry("serviceId", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.serviceId")),
+                java.util.Map.entry("offeringId", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.offeringId")),
+                java.util.Map.entry("from", com.carwash.shared.infrastructure.JpaPageQueries.Field.time("q.scheduledAt", "q.scheduledAtNano")),
+                java.util.Map.entry("to", com.carwash.shared.infrastructure.JpaPageQueries.Field.time("q.scheduledAt", "q.scheduledAtNano"))));
+        return page.map(this::listDomain);
+    }
+
     private final BookingSpringDataRepository repository;
     private final JdbcTemplate jdbc;
     public PostgresBookingRepository(BookingSpringDataRepository repository,JdbcTemplate jdbc){this.repository=repository;this.jdbc=jdbc;}
@@ -37,6 +58,10 @@ public class PostgresBookingRepository implements BookingRepository {
     @Override public List<Booking> findByBranchId(String id){return domains(repository.findByBranchIdOrderByIdAsc(id));}
     @Override public List<Booking> findByServiceOfferingId(String id){return domains(repository.findByOfferingIdOrderByIdAsc(id));}
     @Override public List<Booking> findByIds(Collection<String> ids){if(ids==null||ids.isEmpty())return List.of();return domains(repository.findAllById(ids).stream().sorted(java.util.Comparator.comparing(entity->entity.id)).toList());}
+    @Override public List<Booking> findListByIds(Collection<String> ids) {
+        if (ids == null || ids.isEmpty()) return List.of();
+        return repository.findAllById(ids).stream().map(this::listDomain).toList();
+    }
     @Override public List<Booking> findByScheduledDateTime(LocalDateTime time){return domains(repository.findByScheduledAtAndScheduledAtNanoOrderByIdAsc(PersistenceSupport.databaseTime(time),PersistenceSupport.nanoRemainder(time)));}
     @Override public List<Booking> findByBusinessId(String id){return domains(repository.findByTenant(id));}
     @Override public List<Booking> findByBranchIdAndBusinessId(String branchId,String businessId){return domains(repository.findByBranchTenant(branchId,businessId));}
@@ -98,6 +123,17 @@ public class PostgresBookingRepository implements BookingRepository {
                 value.getBookingId(),value.getVehicle().getVehicleId(),value.getServiceOfferingId(),
                 value.getService().getServiceId(),scheduledAt,scheduledAtNano,value.getStatus().name(),
                 value.getSpecialRequest(),queueEntryId,version)==1;
+    }
+
+    private Booking listDomain(BookingJpaEntity entity) {
+        User user = new User(); user.setUserId(entity.userId);
+        Vehicle vehicle = new Vehicle(); vehicle.setVehicleId(entity.vehicleId);
+        Service service = new Service(); service.setServiceId(entity.serviceId);
+        Booking value = new Booking(entity.id, user, vehicle, entity.branchId, entity.offeringId,
+                service, PersistenceSupport.domainTime(entity.scheduledAt, entity.scheduledAtNano), null);
+        value.setStatus(BookingStatus.valueOf(entity.status));
+        value.setCreatedAt(PersistenceSupport.domainTime(entity.createdAt, entity.createdAtNano));
+        return value;
     }
 
     private List<Booking> domains(List<BookingJpaEntity> entities){if(entities.isEmpty())return List.of();Map<String,User> users=loadUsers(entities.stream().map(e->e.userId).distinct().toList());Map<String,Vehicle> vehicles=loadVehicles(entities.stream().map(e->e.vehicleId).distinct().toList());Map<String,Service> services=loadServices(entities.stream().map(e->e.serviceId).distinct().toList());return entities.stream().map(e->domain(e,users,vehicles,services)).toList();}

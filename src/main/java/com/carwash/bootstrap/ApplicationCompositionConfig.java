@@ -128,8 +128,8 @@ public class ApplicationCompositionConfig {
 
     @Bean
     @Profile("!postgres")
-    public ServiceOfferingRepository serviceOfferingRepository(MarketplaceQuery marketplaceQuery) {
-        return new InMemoryServiceOfferingRepository(marketplaceQuery);
+    public ServiceOfferingRepository serviceOfferingRepository(MarketplaceQuery marketplaceQuery, ServiceRepository serviceRepository) {
+        return new InMemoryServiceOfferingRepository(marketplaceQuery, serviceRepository);
     }
 
     @Bean
@@ -158,8 +158,8 @@ public class ApplicationCompositionConfig {
 
     @Bean
     @Profile("!postgres")
-    public CarWashBranchRepository carWashBranchRepository() {
-        return new InMemoryCarWashBranchRepository();
+    public CarWashBranchRepository carWashBranchRepository(CarWashBusinessRepository businessRepository) {
+        return new InMemoryCarWashBranchRepository(businessRepository);
     }
 
     @Bean

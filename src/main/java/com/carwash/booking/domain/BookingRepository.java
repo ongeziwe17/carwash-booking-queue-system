@@ -9,12 +9,15 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-public interface BookingRepository extends Repository<Booking, String> {
+public interface BookingRepository extends Repository<Booking, String>, com.carwash.shared.application.PagedRepository<Booking> {
     default List<Booking> findByIds(Collection<String> ids) {
         if (ids == null || ids.isEmpty()) return List.of();
         return ids.stream().filter(java.util.Objects::nonNull).distinct().sorted()
                 .map(this::findById).flatMap(java.util.Optional::stream).toList();
     }
+
+    /** Bounded list projection associations; complete workflow hydration remains available through findByIds. */
+    default List<Booking> findListByIds(Collection<String> ids) { return findByIds(ids); }
 
     List<Booking> findByUserId(String userId);
     List<Booking> findByVehicleId(String vehicleId);

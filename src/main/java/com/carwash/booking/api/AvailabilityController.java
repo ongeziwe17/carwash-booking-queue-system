@@ -1,4 +1,5 @@
 package com.carwash.booking.api;
+import com.carwash.shared.api.PageResponse;
 
 import com.carwash.shared.api.error.ApiErrorResponse;
 import com.carwash.booking.api.dto.AvailabilityRequest;
@@ -97,9 +98,7 @@ public class AvailabilityController {
                     + "can be represented by the branch-local booking contract. Results do not reserve capacity."
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Available branch offerings returned",
-                    content = @Content(array = @ArraySchema(
-                            schema = @Schema(implementation = BranchAvailabilityResponse.class)))),
+            @ApiResponse(responseCode = "200", description = "Available branch offerings returned", useReturnTypeSchema = true),
             @ApiResponse(responseCode = "400", description = "Invalid or conflicting search parameter",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Authentication required",
@@ -113,7 +112,12 @@ public class AvailabilityController {
             @ApiResponse(responseCode = "500", description = "Internal server error",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public List<BranchAvailabilityResponse> findBranchAvailability(
+    @io.swagger.v3.oas.annotations.Parameters({
+        @io.swagger.v3.oas.annotations.Parameter(name = "page", description = "Zero-based page; default 0. Invalid or overflowing offsets return ApiErrorResponse 400.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "0", defaultValue = "0")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "size", description = "Page size, default 20; rejects values outside 1-100.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "1", maximum = "100", defaultValue = "20")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "sort", description = "Fixed eligibility/ranking order; alternate sort is rejected.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string"))
+    })
+    public PageResponse<BranchAvailabilityResponse> findBranchAvailability(
             @Parameter(required = true, description = "Reusable service ID (1-64 characters).")
             @RequestParam @NotBlank @Size(max = 64) String serviceId,
             @Parameter(required = true, description = "Required RFC 3339 requested start instant.")
@@ -124,13 +128,16 @@ public class AvailabilityController {
             @RequestParam(required = false) @DecimalMin("-180.0") @DecimalMax("180.0") BigDecimal longitude,
             @Parameter(description = "Optional inclusive raw-distance radius in kilometres (0, 20000].")
             @RequestParam(required = false) @DecimalMin(value = "0.0", inclusive = false)
-            @DecimalMax("20000.0") BigDecimal radiusKm
+            @DecimalMax("20000.0") BigDecimal radiusKm,
+            @io.swagger.v3.oas.annotations.Parameter(hidden = true) @RequestParam org.springframework.util.MultiValueMap<String, String> parameters
     ) {
-        return branchAvailabilitySearchService.findAvailableBranches(new BranchAvailabilitySearchCriteria(
+        var page = new com.carwash.shared.application.ListPolicy(java.util.Set.of(), java.util.List.of(), java.util.Map.of(), java.util.Set.of("serviceId","at","latitude","longitude","radiusKm")).parse(parameters).page();
+        var ranked = branchAvailabilitySearchService.findAvailableBranches(new BranchAvailabilitySearchCriteria(
                         serviceId, at.toInstant(), latitude, longitude, radiusKm))
                 .stream()
                 .map(AvailabilityController::toResponse)
                 .toList();
+        return PageResponse.from(com.carwash.shared.application.PageResult.select(ranked, page));
     }
 
     private static BranchAvailabilityResponse toResponse(BranchAvailabilitySnapshot snapshot) {

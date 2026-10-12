@@ -126,7 +126,7 @@ Errors do not echo request bodies, Java exception names, stack traces, passwords
 
 | Method | Path | Auth / access | Success | Expected errors | Purpose |
 |---|---|---|---|---|---|
-| GET | `/api/users` | Bearer; `PLATFORM_ADMIN` | `200 UserResponse[]` | 401, 403, 405, 500 | List users. |
+| GET | `/api/users` | Bearer; `PLATFORM_ADMIN` | `200 PageResponse<UserResponse>` | 400, 401, 403, 405, 500 | List a bounded user page. |
 | GET | `/api/users/{id}` | Bearer; self or `PLATFORM_ADMIN` | `200 UserResponse` | 400, 401, 403, 404, 405, 500 | Get a user profile. |
 | POST | `/api/users` | Public | `201 UserResponse` | 400, 405, 415, 500 | Register a customer. |
 | PUT | `/api/users/{id}` | Bearer; self or `PLATFORM_ADMIN` | `200 UserResponse` | 400, 401, 403, 404, 405, 415, 500 | Update profile fields. |
@@ -145,7 +145,7 @@ User deletion is rejected while vehicles or bookings still reference the user; a
 
 | Method | Path | Auth / access | Success | Expected errors | Purpose |
 |---|---|---|---|---|---|
-| GET | `/api/vehicles` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 Vehicle[]` | 401, 403, 405, 500 | List all vehicles. |
+| GET | `/api/vehicles` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 PageResponse<VehicleListResponse>` | 400, 401, 403, 405, 500 | List the authorized business vehicle page; platform administrators require businessId. |
 | GET | `/api/vehicles/{id}` | Bearer; owner or operational role | `200 Vehicle` | 400, 401, 403, 404, 405, 500 | Get a vehicle. |
 | POST | `/api/vehicles` | Bearer; customer for self, operational role for any user | `201 Vehicle` | 400, 401, 403, 404, 405, 415, 500 | Create a vehicle for `userId`. |
 | PUT | `/api/vehicles/{id}` | Bearer; owner or operational role | `200 Vehicle` | 400, 401, 403, 404, 405, 415, 500 | Update details without changing ownership. |
@@ -161,7 +161,7 @@ Plate numbers are unique per owner during create and update, compared case-insen
 
 | Method | Path | Auth / access | Success | Expected errors | Purpose |
 |---|---|---|---|---|---|
-| GET | `/api/services` | Bearer; all roles | `200 Service[]` | 400, 401, 403, 405, 500 | List the global catalogue; optional `active` filter. |
+| GET | `/api/services` | Bearer; all roles | `200 PageResponse<ServiceListResponse>` | 400, 401, 403, 405, 500 | List the global catalogue; optional `active` filter. |
 | GET | `/api/services/{id}` | Bearer; all roles | `200 Service` | 400, 401, 403, 404, 405, 500 | Get a service. |
 | POST | `/api/services` | Bearer; `PLATFORM_ADMIN` | `201 Service` | 400, 401, 403, 405, 415, 500 | Create a platform-owned service definition. |
 | PUT | `/api/services/{id}` | Bearer; `PLATFORM_ADMIN` | `200 Service` | 400, 401, 403, 404, 405, 415, 500 | Update platform-owned service-definition details. |
@@ -182,7 +182,7 @@ New services are active. Activation/deactivation changes that state without chan
 | Method | Path | Auth / access | Success | Expected errors | Purpose |
 |---|---|---|---|---|---|
 | GET | `/api/availability?serviceId={serviceId}&date={YYYY-MM-DD}` | Bearer; all roles through `PERM_SERVICE_READ` | `200 ServiceAvailabilityResponse` | 400, 401, 403, 404, 405, 500 | Return currently bookable exact-start slots for one active service and date. |
-| GET | `/api/availability/branches?serviceId={serviceId}&at={RFC3339}[&latitude={lat}&longitude={lon}&radiusKm={km}]` | Bearer; all roles through `PERM_SERVICE_READ` | `200 BranchAvailabilityResponse[]` | 400, 401, 403, 404, 405, 500 | Return effective public branch offerings available for the complete requested service window. |
+| GET | `/api/availability/branches?serviceId={serviceId}&at={RFC3339}[&latitude={lat}&longitude={lon}&radiusKm={km}]` | Bearer; all roles through `PERM_SERVICE_READ` | `200 PageResponse<BranchAvailabilityResponse>` | 400, 401, 403, 404, 405, 500 | Return effective public branch offerings available for the complete requested service window. |
 
 `serviceId` is a required trimmed identifier with a maximum length of 64. `date` is a required ISO `YYYY-MM-DD` date that must be today or later according to the configured application `Clock`. Unknown services return `404 RESOURCE_NOT_FOUND`; inactive services return `400 BUSINESS_RULE_VIOLATION`. A valid request with no available slots returns `200` with an empty `slots` list.
 
@@ -202,9 +202,9 @@ Latitude and longitude are optional but must appear together; radius additionall
 
 | Method | Path | Auth / access | Success | Expected errors | Purpose |
 |---|---|---|---|---|---|
-| GET | `/api/recommendations/branches?latitude={lat}&longitude={lon}&serviceId={serviceId}&at={RFC3339}&preference={preference}[&maxRadiusKm={km}]` | Bearer; all roles through `PERM_MARKETPLACE_READ` | `200 BranchRecommendationResponse[]` | 400, 401, 403, 404, 405, 500 | Return deterministic, explainable rankings over one AVAIL-002-eligible candidate set. |
+| GET | `/api/recommendations/branches?latitude={lat}&longitude={lon}&serviceId={serviceId}&at={RFC3339}&preference={preference}[&maxRadiusKm={km}]` | Bearer; all roles through `PERM_MARKETPLACE_READ` | `200 PageResponse<BranchRecommendationResponse>` | 400, 401, 403, 404, 405, 500 | Return deterministic, explainable rankings over one AVAIL-002-eligible candidate set. |
 
-Required `preference` values are `NEAREST`, `SHORTEST_QUEUE`, `FASTEST_TOTAL_TIME`, `LOWEST_PRICE`, and `BEST_OVERALL`. Coordinates are always required. `maxRadiusKm` is optional, positive, inclusive, defaults to the server's configured `50.00 km`, and may not exceed that configured maximum. Unknown services return 404; inactive services or a valid search with no eligible candidate return an empty array. Desired `at` is an offset-aware RFC 3339 start strictly in the future.
+Required `preference` values are `NEAREST`, `SHORTEST_QUEUE`, `FASTEST_TOTAL_TIME`, `LOWEST_PRICE`, and `BEST_OVERALL`. Coordinates are always required. `maxRadiusKm` is optional, positive, inclusive, defaults to the server's configured `50.00 km`, and may not exceed that configured maximum. Unknown services return 404; inactive services or a valid search with no eligible candidate return an empty page envelope. Desired `at` is an offset-aware RFC 3339 start strictly in the future.
 
 Candidate eligibility is not reimplemented by Recommendation. Booking's detached `BranchAvailabilityCandidateQuery` executes the authoritative AVAIL-002 path, preserving effective business/branch/service/offering visibility, complete weekly-hours/closure windows, continuous-window slot alignment, offering duration/price/concurrent capacity, overlapping active-booking capacity, same-day branch queue relevance, raw-radius filtering, timezone handling, DST-gap rejection, both DST-overlap occurrence exclusion, and multi-business isolation. The query adds raw internal distance and business name for scoring without changing `BranchAvailabilityResponse`.
 
@@ -226,7 +226,7 @@ Recommendations do not hold or reserve capacity. Booking creation remains author
 
 | Method | Path | Auth / access | Success | Expected errors | Purpose |
 |---|---|---|---|---|---|
-| GET | `/api/bookings?branchId={branchId}` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 Booking[]` | 400, 401, 403, 404, 405, 500 | List bookings, optionally filtered to one existing branch. |
+| GET | `/api/bookings?branchId={branchId}` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 PageResponse<BookingListResponse>` | 400, 401, 403, 404, 405, 500 | List bookings, optionally filtered to one existing branch. |
 | GET | `/api/bookings/{id}` | Bearer; owner or operational role | `200 Booking` | 400, 401, 403, 404, 405, 500 | Get a booking. |
 | POST | `/api/bookings` | Bearer; customer for self, operational role for any user | `201 Booking` | 400, 401, 403, 404, 405, 415, 500 | Create a booking. |
 | PUT | `/api/bookings/{id}` | Bearer; owner or operational role | `200 Booking` | 400, 401, 403, 404, 405, 415, 500 | Update non-schedule booking details when no active queue entry exists. |
@@ -249,7 +249,7 @@ The schedule update is committed inside the shared single-JVM write boundary. If
 
 | Method | Path | Auth / access | Success | Expected errors | Purpose |
 |---|---|---|---|---|---|
-| GET | `/api/queue-entries?branchId={branchId}` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry[]` | 400, 401, 403, 404, 405, 500 | List entries, optionally filtered to one existing branch. |
+| GET | `/api/queue-entries?branchId={branchId}` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 PageResponse<QueueListResponse>` | 400, 401, 403, 404, 405, 500 | List entries, optionally filtered to one existing branch. |
 | GET | `/api/queue-entries/{id}` | Bearer; booking owner or operational role | `200 QueueEntry` | 400, 401, 403, 404, 405, 500 | Get a queue entry. |
 | POST | `/api/queue-entries` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `201 QueueEntry` | 400, 401, 403, 404, 405, 415, 500 | Append and attach an eligible entry with server-generated metrics. |
 | PUT | `/api/queue-entries/{id}/position` | Bearer; `STAFF`, `BUSINESS_OWNER`, `PLATFORM_ADMIN` | `200 QueueEntry` | 400, 401, 403, 404, 405, 415, 500 | Move a waiting entry and rebalance the active queue. |
@@ -330,15 +330,15 @@ The required `date` uses ISO `yyyy-MM-dd`. Exactly one nonblank bounded `branchI
 
 | Method | Path | Auth / access | Success | Purpose |
 |---|---|---|---|---|
-| GET/POST | `/api/marketplace/businesses` | `MARKETPLACE_MANAGE` | `200 BusinessResponse[]` / `201 BusinessResponse` | Operators list only their assigned business; only a platform administrator may register a business. |
+| GET/POST | `/api/marketplace/businesses` | `MARKETPLACE_MANAGE` | `200 PageResponse<BusinessResponse>` / `201 BusinessResponse` | Operators list only their assigned business; only a platform administrator may register a business. |
 | GET/PUT | `/api/marketplace/businesses/{businessId}` | `MARKETPLACE_MANAGE` | `200 BusinessResponse` | Retrieve or update bounded business details. |
 | POST | `/api/marketplace/businesses/{businessId}/activate` | `MARKETPLACE_MANAGE` | `200 BusinessResponse` | Activate without replacing identity. |
 | POST | `/api/marketplace/businesses/{businessId}/deactivate` | `MARKETPLACE_MANAGE` | `200 BusinessResponse` | Deactivate without deleting history. |
-| GET/POST | `/api/marketplace/businesses/{businessId}/branches` | `MARKETPLACE_MANAGE` | `200 BranchResponse[]` / `201 BranchResponse` | List owned branches or create one permanently under the business. |
+| GET/POST | `/api/marketplace/businesses/{businessId}/branches` | `MARKETPLACE_MANAGE` | `200 PageResponse<BranchResponse>` / `201 BranchResponse` | List owned branches or create one permanently under the business. |
 | GET/PUT | `/api/marketplace/branches/{branchId}` | `MARKETPLACE_MANAGE` | `200 BranchResponse` | Retrieve or update a branch while preserving identity/ownership. |
 | POST | `/api/marketplace/branches/{branchId}/activate` | `MARKETPLACE_MANAGE` | `200 BranchResponse` | Activate the branch record. |
 | POST | `/api/marketplace/branches/{branchId}/deactivate` | `MARKETPLACE_MANAGE` | `200 BranchResponse` | Deactivate without physical deletion. |
-| GET | `/api/marketplace/branches/discoverable` | `MARKETPLACE_READ` | `200 DiscoverableBranchResponse[]` | List customer-safe public branches whose branch and owning business are active. |
+| GET | `/api/marketplace/branches/discoverable` | `MARKETPLACE_READ` | `200 PageResponse<DiscoverableBranchResponse>` | List customer-safe public branches whose branch and owning business are active. |
 
 `CreateBusinessRequest` requires a bounded ID/name, valid contact email/phone, and optional registration number. `CreateBranchRequest` requires a bounded ID/name/address, two-letter country code, latitude `-90..90`, longitude `-180..180`, a valid Java timezone identifier, and an explicit public-discovery flag. Update requests omit IDs and business ownership.
 
@@ -348,7 +348,7 @@ Business and branch records begin active. Business deactivation leaves branch re
 
 | Method | Endpoint | Access | Success | Errors | Behaviour |
 |---|---|---|---|---|---|
-| GET | `/api/marketplace/branches/discoverable/nearby?latitude={lat}&longitude={lon}` | Bearer; all roles via `MARKETPLACE_READ` | `200 NearbyBranchResponse[]` | 400, 401, 403, 404, 405, 500 | Find effective active, public branches near required coordinates. Optional `radiusKm`, `serviceId`, `openAt`, and `sort=distance` filters are composable. |
+| GET | `/api/marketplace/branches/discoverable/nearby?latitude={lat}&longitude={lon}` | Bearer; all roles via `MARKETPLACE_READ` | `200 PageResponse<NearbyBranchResponse>` | 400, 401, 403, 404, 405, 500 | Find effective active, public branches near required coordinates. Optional `radiusKm`, `serviceId`, `openAt`, and `sort=distance` filters are composable. |
 
 Latitude is bounded to `[-90, 90]`, longitude to `[-180, 180]`, and optional radius must be greater than zero and at most `20000 km`. A malformed/blank optional identifier is 400; an unknown canonical service is 404; a known service with no matching effective discoverable offering returns an empty list. `openAt` must be an explicit RFC 3339 offset timestamp—server time is never substituted.
 
@@ -360,7 +360,7 @@ Distance is deterministic Haversine straight-line distance using the IUGG mean E
 |---|---|---|---|---|
 | GET | `/api/marketplace/branches/{branchId}/operating-hours` | `MARKETPLACE_MANAGE` | `200 BranchOperatingHoursResponse` | Return the current timezone and complete weekly schedule; no stored schedule is returned as an empty/closed schedule. |
 | PUT | `/api/marketplace/branches/{branchId}/operating-hours` | `MARKETPLACE_MANAGE` | `200 BranchOperatingHoursResponse` | Atomically insert or replace all weekly intervals. |
-| GET | `/api/marketplace/branches/{branchId}/closures` | `MARKETPLACE_MANAGE` | `200 TemporaryClosureResponse[]` | List active and cancelled closure records in closure-ID order. |
+| GET | `/api/marketplace/branches/{branchId}/closures` | `MARKETPLACE_MANAGE` | `200 PageResponse<TemporaryClosureResponse>` | List active and cancelled closure pages by exact start instant then ID. |
 | POST | `/api/marketplace/branches/{branchId}/closures` | `MARKETPLACE_MANAGE` | `201 TemporaryClosureResponse` | Create an active absolute temporary closure. |
 | POST | `/api/marketplace/closures/{closureId}/cancel` | `MARKETPLACE_MANAGE` | `200 TemporaryClosureResponse` | Cancel without deleting closure history. |
 | GET | `/api/marketplace/branches/{branchId}/open-status?at=<timestamp>` | `MARKETPLACE_READ` | `200 BranchOpenStatusResponse` | Decide whether the branch is open at the required RFC 3339 instant. |
@@ -377,13 +377,13 @@ MKT-002 publishes instant and complete-window decisions. AVAIL-002 consumes the 
 
 | Method | Path | Auth / access | Success | Purpose |
 |---|---|---|---|---|
-| GET | `/api/marketplace/branches/{branchId}/offerings` | `MARKETPLACE_MANAGE` | `200 ServiceOfferingResponse[]` | List all stored branch offerings, including inactive/ineffective records, in offering-ID order. |
+| GET | `/api/marketplace/branches/{branchId}/offerings` | `MARKETPLACE_MANAGE` | `200 PageResponse<ServiceOfferingResponse>` | List all stored branch offerings, including inactive/ineffective records, in offering-ID order. |
 | POST | `/api/marketplace/branches/{branchId}/offerings` | `MARKETPLACE_MANAGE` | `201 ServiceOfferingResponse` | Create one active offering with explicit branch terms. |
 | GET | `/api/marketplace/offerings/{offeringId}` | `MARKETPLACE_MANAGE` | `200 ServiceOfferingResponse` | Retrieve one bounded management view. |
 | PUT | `/api/marketplace/offerings/{offeringId}` | `MARKETPLACE_MANAGE` | `200 ServiceOfferingResponse` | Update only price, duration, and configured capacity. |
 | POST | `/api/marketplace/offerings/{offeringId}/activate` | `MARKETPLACE_MANAGE` | `200 ServiceOfferingResponse` | Reactivate without recreating the relationship. |
 | POST | `/api/marketplace/offerings/{offeringId}/deactivate` | `MARKETPLACE_MANAGE` | `200 ServiceOfferingResponse` | Deactivate without deleting history. |
-| GET | `/api/marketplace/branches/{branchId}/offerings/discoverable` | `MARKETPLACE_READ` | `200 DiscoverableServiceOfferingResponse[]` | Return only customer-facing discoverable offerings. |
+| GET | `/api/marketplace/branches/{branchId}/offerings/discoverable` | `MARKETPLACE_READ` | `200 PageResponse<DiscoverableServiceOfferingResponse>` | Return only customer-facing discoverable offerings. |
 
 `CreateServiceOfferingRequest` contains bounded `offeringId` and `serviceId`, explicit non-negative `BigDecimal` price with at most 10 integer and 2 fraction digits, duration `1..1440` minutes, and configured concurrent capacity `1..1000`. The branch comes only from the path. `UpdateServiceOfferingRequest` contains only those three mutable terms; offering identity, branch ownership, service identity, and status cannot be replaced. Duplicate offering IDs and duplicate branch/service pairs return `400 BUSINESS_RULE_VIOLATION`; unknown branches, services, and offerings return `404 RESOURCE_NOT_FOUND`.
 
@@ -668,3 +668,7 @@ The following are roadmap capabilities, not implemented endpoints. No paths are 
 - observability/health hardening, frontend applications, predictive/personalized ranking, and traffic-aware routing.
 
 For the broader sequencing, see the [Product Roadmap](ROADMAP.md). For executable HTTP coverage, see the [Bruno API Acceptance Suite](../tests/bruno/carwash-api/README.md).
+
+## Bounded collection responses
+
+The fourteen offset list endpoints documented in [API pagination](API-PAGINATION.md) now return `content` plus page metadata. The default is page 0, size 20 (maximum 100). Booking/queue list items use scalar IDs. Existing audit/inbox cursor contracts, bounded recent notifications and aggregate responses remain unchanged. Consult the inventory for the intentional array-to-envelope compatibility changes and endpoint-specific filters/sorts.
