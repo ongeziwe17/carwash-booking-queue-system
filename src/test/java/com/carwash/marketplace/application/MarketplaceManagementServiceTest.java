@@ -1,5 +1,7 @@
 package com.carwash.marketplace.application;
 
+import com.carwash.access.application.TenantAccessContext;
+import com.carwash.identity.domain.RoleName;
 import com.carwash.marketplace.domain.BranchStatus;
 import com.carwash.marketplace.domain.BusinessStatus;
 import com.carwash.marketplace.infrastructure.InMemoryCarWashBranchRepository;
@@ -15,6 +17,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -109,6 +112,55 @@ class MarketplaceManagementServiceTest {
                 .stream().map(BranchSnapshot::branchId).toList());
         assertEquals(second, marketplace.findBranch("branch-002"));
         assertTrue(marketplace.findBranchOptional(" branch-001 ").isPresent());
+    }
+
+    @Test
+    void branchPagesResolveCanonicalBusinessAndKeepTenantScopedTotals() {
+        marketplace.registerBusiness(validBusiness("business-001"));
+        marketplace.registerBusiness(validBusiness("business-002"));
+        marketplace.registerBusiness(validBusiness("business-empty"));
+        marketplace.createBranch("business-001", validBranch("branch-001", true));
+        marketplace.createBranch("business-001", validBranch("branch-002", true));
+        marketplace.createBranch("business-002", validBranch("branch-foreign", true));
+        var admin = new TenantAccessContext("admin", RoleName.PLATFORM_ADMIN, null);
+        var owner = new TenantAccessContext("owner", RoleName.BUSINESS_OWNER, "business-001");
+        var all = BranchListPolicy.POLICY.parse(Map.of());
+
+        assertEquals("Business not found: missing", assertThrows(ResourceNotFoundException.class,
+                () -> marketplace.findBranchesPage(admin, " missing ", all)).getMessage());
+        var empty = marketplace.findBranchesPage(admin, "business-empty", all);
+        assertTrue(empty.content().isEmpty());
+        assertEquals(0, empty.totalElements());
+        assertEquals(0, empty.page());
+        assertEquals(20, empty.size());
+        assertEquals(marketplace.findBranchesPage(admin, "business-001", all),
+                marketplace.findBranchesPage(admin, " business-001 ", all));
+        assertEquals(marketplace.findBranchesPage(owner, "business-001", all),
+                marketplace.findBranchesPage(owner, " business-001 ", all));
+        assertEquals(2, marketplace.findBranchesPage(owner, "business-001", all).totalElements());
+        for (String inaccessible : List.of("business-002", "missing")) {
+            assertEquals("Business not found", assertThrows(ResourceNotFoundException.class,
+                    () -> marketplace.findBranchesPage(owner, inaccessible, all)).getMessage());
+        }
+
+        var filtered = BranchListPolicy.POLICY.parse(Map.of("city", List.of("Cape Town"),
+                "status", List.of("ACTIVE"), "size", List.of("1"), "page", List.of("5"),
+                "sort", List.of("name,desc", "id,asc")));
+        var page = marketplace.findBranchesPage(owner, " business-001 ", filtered);
+        assertTrue(page.content().isEmpty());
+        assertEquals(2, page.totalElements());
+        assertEquals(2, page.totalPages());
+        assertTrue(page.hasPrevious());
+        assertFalse(page.hasNext());
+        assertEquals(0, marketplace.findBranchesPage(owner, "business-001", BranchListPolicy.POLICY.parse(
+                Map.of("city", List.of("Elsewhere")))).totalElements());
+
+        var captured = marketplace.findBranchesPage(owner, "business-001", all);
+        marketplace.updateBranch("branch-001", new UpdateBranchCommand("Waterfront", "2 Dock Road", null,
+                "Cape Town", "Western Cape", "8001", "ZA", BigDecimal.valueOf(-33.908),
+                BigDecimal.valueOf(18.42), "Africa/Johannesburg", true));
+        assertEquals("City Bowl", captured.content().getFirst().branchName());
+        assertEquals("Waterfront", marketplace.findBranchesPage(owner, "business-001", all).content().getFirst().branchName());
     }
 
     @Test

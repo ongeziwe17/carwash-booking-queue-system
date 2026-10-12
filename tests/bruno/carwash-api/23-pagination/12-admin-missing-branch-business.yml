@@ -1,0 +1,15 @@
+info: { name: Admin branch page requires an existing business, type: http, seq: 12, tags: [pagination, regression, marketplace] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/businesses/missing-branch-page-{{runId}}/branches"
+  auth: { type: bearer, token: "{{adminToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("missing business uses the existing error contract", function() {
+          expect(res.status).to.equal(404);
+          expect(res.body.code).to.equal("RESOURCE_NOT_FOUND");
+          expect(res.body.content).to.equal(undefined);
+        });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

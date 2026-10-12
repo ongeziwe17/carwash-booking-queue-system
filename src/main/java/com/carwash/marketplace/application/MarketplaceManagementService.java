@@ -41,8 +41,11 @@ public final class MarketplaceManagementService implements MarketplaceQuery {
 
     public PageResult<BranchSnapshot> findBranchesPage(TenantAccessContext access, String businessId, ListQuery query) {
         return coordinator.readSnapshot(() -> {
-            requireAccessibleBusiness(access, businessId);
-            return branchPage(query.scoped(new ListScope(businessId, null, null, false)));
+            Objects.requireNonNull(access, "Tenant access context is required");
+            CarWashBusiness business = access.isPlatformAdministrator()
+                    ? requireBusiness(businessId)
+                    : requireTenantBusiness(businessId, access.requireBusinessId());
+            return branchPage(query.scoped(new ListScope(business.getBusinessId(), null, null, false)));
         });
     }
 

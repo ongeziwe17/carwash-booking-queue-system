@@ -235,6 +235,51 @@ class PostgresPersistenceIntegrationTest {
         });
     }
 
+    @Test void branchBusinessResolutionAndPaginationMatchInMemoryForBothRoles() {
+        var own = fixture("branch-page-own", 1);
+        var foreign = fixture("branch-page-foreign", 1);
+        String ownId = "branch-page-own-business";
+        String foreignId = "branch-page-foreign-business";
+        String emptyId = "branch-page-empty-business";
+        marketplace.registerBusiness(ADMIN, new RegisterBusinessCommand(emptyId, "Empty business",
+                "branch-page-empty@example.test", "0123456789", "REG-branch-page-empty"));
+
+        var memoryBusinesses = new com.carwash.marketplace.infrastructure.InMemoryCarWashBusinessRepository();
+        var memoryBranches = new com.carwash.marketplace.infrastructure.InMemoryCarWashBranchRepository();
+        for (String id : List.of(ownId, foreignId, emptyId))
+            assertTrue(memoryBusinesses.insert(businessRepository.findById(id).orElseThrow()));
+        for (String id : List.of(own.branchId, foreign.branchId))
+            assertTrue(memoryBranches.insert(branchRepository.findById(id).orElseThrow()));
+        var memory = new MarketplaceManagementService(memoryBusinesses, memoryBranches,
+                new com.carwash.shared.infrastructure.InMemoryDataCoordinator(), java.time.Clock.systemUTC());
+        var owner = new TenantAccessContext("page-owner", RoleName.BUSINESS_OWNER, ownId);
+        var all = com.carwash.marketplace.application.BranchListPolicy.POLICY.parse(java.util.Map.of());
+        var outOfRange = com.carwash.marketplace.application.BranchListPolicy.POLICY.parse(java.util.Map.of(
+                "city", List.of("Cape Town"), "status", List.of("ACTIVE"),
+                "sort", List.of("name,desc", "id,asc"), "page", List.of("7"), "size", List.of("1")));
+
+        for (var service : List.of(marketplace, memory)) {
+            assertThrows(ResourceNotFoundException.class, () -> service.findBranchesPage(ADMIN, "missing", all));
+            var empty = service.findBranchesPage(ADMIN, emptyId, all);
+            assertEquals(0, empty.totalElements());
+            assertTrue(empty.content().isEmpty());
+            assertEquals(service.findBranchesPage(ADMIN, ownId, all),
+                    service.findBranchesPage(ADMIN, " " + ownId + " ", all));
+            assertEquals(service.findBranchesPage(owner, ownId, all),
+                    service.findBranchesPage(owner, " " + ownId + " ", all));
+            assertEquals(own.branchId, service.findBranchesPage(owner, ownId, all).content().getFirst().branchId());
+            for (String inaccessible : List.of(foreignId, "missing"))
+                assertEquals("Business not found", assertThrows(ResourceNotFoundException.class,
+                        () -> service.findBranchesPage(owner, inaccessible, all)).getMessage());
+            var page = service.findBranchesPage(owner, ownId, outOfRange);
+            assertEquals(1, page.totalElements());
+            assertEquals(1, page.totalPages());
+            assertTrue(page.content().isEmpty());
+        }
+        assertEquals(memory.findBranchesPage(owner, ownId, outOfRange),
+                marketplace.findBranchesPage(owner, ownId, outOfRange));
+    }
+
     @Test void closureRangesUseExactInstantsAndDiscoveryTotalsTrackEligibility() {
         var f=fixture("page-eligibility",1);
         var start=Instant.parse("2089-01-18T10:00:00.123456789Z");

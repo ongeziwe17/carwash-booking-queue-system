@@ -1,0 +1,15 @@
+info: { name: Admin registers an empty business for branch paging, type: http, seq: 13, tags: [pagination, regression, marketplace] }
+http:
+  method: POST
+  url: "{{baseUrl}}/api/marketplace/businesses"
+  headers: [{ name: Content-Type, value: application/json }]
+  body:
+    type: json
+    data: |-
+      {"businessId":"pagination-empty-{{runId}}","businessName":"Empty pagination business","contactEmail":"pagination-empty-{{runId}}@example.test","contactPhone":"0123456789","registrationNumber":"REG-PAGINATION-EMPTY-{{runId}}"}
+  auth: { type: bearer, token: "{{adminToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("empty business created", function() { expect(res.status).to.equal(201); expect(res.body.businessId).to.equal("pagination-empty-" + bru.getVar("runId")); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

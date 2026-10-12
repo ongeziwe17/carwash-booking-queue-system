@@ -1,0 +1,10 @@
+info: { name: Owner cannot distinguish missing from foreign business, type: http, seq: 18, tags: [pagination, regression, tenant] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/businesses/missing-branch-page-{{runId}}/branches"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("missing business has the same safe 404", function() { expect(res.status).to.equal(404); expect(res.body.code).to.equal("RESOURCE_NOT_FOUND"); expect(res.body.message).to.equal("Business not found"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

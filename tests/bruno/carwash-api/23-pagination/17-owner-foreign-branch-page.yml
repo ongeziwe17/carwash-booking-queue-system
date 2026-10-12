@@ -1,0 +1,10 @@
+info: { name: Owner cannot page a foreign business, type: http, seq: 17, tags: [pagination, regression, tenant] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/businesses/{{marketplaceSecondBusinessId}}/branches"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("foreign business has a safe 404", function() { expect(res.status).to.equal(404); expect(res.body.code).to.equal("RESOURCE_NOT_FOUND"); expect(res.body.message).to.equal("Business not found"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

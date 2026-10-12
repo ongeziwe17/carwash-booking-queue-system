@@ -1,0 +1,10 @@
+info: { name: Admin padded business path uses canonical scope, type: http, seq: 16, tags: [pagination, regression, marketplace] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/businesses/%20{{marketplaceBusinessId}}%20/branches"
+  auth: { type: bearer, token: "{{adminToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("administrator sees the same canonical business", function() { expect(res.status).to.equal(200); expect(res.body.totalElements).to.equal(Number(bru.getVar("branchPaginationTotal"))); expect(res.body.content.some(branch => branch.branchId === bru.getVar("marketplaceBranchId"))).to.equal(true); expect(res.body.content.every(branch => branch.businessId === bru.getVar("marketplaceBusinessId"))).to.equal(true); });
+settings: { encodeUrl: false, timeout: 15000, followRedirects: false }
