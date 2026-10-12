@@ -24,7 +24,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 public class VehicleManagementService implements VehicleQuery {
-    public PageResult<Vehicle> findPage(TenantAccessContext access, String administratorBusinessId, ListQuery query) {
+    public PageResult<VehicleListSnapshot> findPage(TenantAccessContext access, String administratorBusinessId, ListQuery query) {
         String businessId;
         if (access.isPlatformAdministrator()) businessId = normalizeBusinessId(administratorBusinessId);
         else {
@@ -32,7 +32,7 @@ public class VehicleManagementService implements VehicleQuery {
             if (administratorBusinessId != null) throw new BusinessRuleViolationException("Tenant identity is derived from authentication");
             businessId = access.requireBusinessId();
         }
-        return coordinator.readSnapshot(() -> vehicleRepository.findPage(query.scoped(new ListScope(businessId, null, null, false))));
+        return coordinator.readSnapshot(() -> vehicleRepository.findPage(query.scoped(new ListScope(businessId, null, null, false))).map(VehicleListSnapshot::from));
     }
 
 

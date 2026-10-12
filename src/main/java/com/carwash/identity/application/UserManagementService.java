@@ -26,9 +26,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 public class UserManagementService implements UserQuery {
-    public PageResult<User> findPage(com.carwash.access.application.TenantAccessContext access, ListQuery query) {
+    public PageResult<UserListSnapshot> findPage(com.carwash.access.application.TenantAccessContext access, ListQuery query) {
         access.requirePlatformAdministrator();
-        return coordinator.readSnapshot(() -> userRepository.findPage(query.scoped(ListScope.GLOBAL)));
+        return coordinator.readSnapshot(() -> userRepository.findPage(query.scoped(ListScope.GLOBAL)).map(UserListSnapshot::from));
     }
 
 

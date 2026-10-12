@@ -78,7 +78,7 @@ public class UserController {
     public PageResponse<UserResponse> getAll(
             @io.swagger.v3.oas.annotations.Parameter(hidden = true) @RequestParam org.springframework.util.MultiValueMap<String, String> parameters
     ) {
-        return PageResponse.from(service.findPage(tenantAccess.current(), com.carwash.identity.application.UserListPolicy.POLICY.parse(parameters)).map(mapper::toResponse));
+        return PageResponse.from(service.findPage(tenantAccess.current(), com.carwash.identity.application.UserListPolicy.POLICY.parse(parameters)).map(mapper::toListResponse));
     }
 
     @GetMapping("/{id}")

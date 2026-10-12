@@ -21,8 +21,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 public class ServiceCatalogService implements ServiceDefinitionQuery {
-    public PageResult<Service> findPage(ListQuery query) {
-        return coordinator.readSnapshot(() -> serviceRepository.findPage(query.scoped(ListScope.GLOBAL)));
+    public PageResult<ServiceDefinitionSnapshot> findPage(ListQuery query) {
+        return coordinator.readSnapshot(() -> serviceRepository.findPage(query.scoped(ListScope.GLOBAL)).map(this::snapshot));
     }
 
 

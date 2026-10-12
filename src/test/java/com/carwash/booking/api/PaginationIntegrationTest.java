@@ -11,6 +11,38 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @TestPropertySource(properties = "spring.application.name=pagination-api-isolation")
 class PaginationIntegrationTest extends ApiIntegrationTestSupport {
+    @org.springframework.beans.factory.annotation.Autowired com.carwash.identity.application.UserManagementService userManagement;
+    @org.springframework.beans.factory.annotation.Autowired com.carwash.vehicle.application.VehicleManagementService vehicleManagement;
+    @org.springframework.beans.factory.annotation.Autowired com.carwash.catalog.application.ServiceCatalogService catalog;
+    @org.springframework.beans.factory.annotation.Autowired com.carwash.identity.domain.UserRepository users;
+    @org.springframework.beans.factory.annotation.Autowired com.carwash.vehicle.domain.VehicleRepository vehicles;
+    @org.springframework.beans.factory.annotation.Autowired com.carwash.catalog.domain.ServiceRepository services;
+    @org.springframework.beans.factory.annotation.Autowired com.carwash.shared.application.DataTransactionOperations transactions;
+
+    @Test void listProjectionsStayDetachedAfterTheReadSnapshotIsReleased() throws Exception {
+        var f=new BookingApiFixture(api,ids).createBooking(LocalDateTime.of(2089,1,15,10,0));
+        var r=f.resources();
+        var admin=new com.carwash.access.application.TenantAccessContext("snapshot-reader",com.carwash.identity.domain.RoleName.PLATFORM_ADMIN,null);
+        var userQuery=com.carwash.identity.application.UserListPolicy.POLICY.parse(java.util.Map.of("id",java.util.List.of(r.user().userId())));
+        var vehicleQuery=com.carwash.vehicle.application.VehicleListPolicy.POLICY.parse(java.util.Map.of("id",java.util.List.of(r.vehicle().vehicleId())));
+        var serviceQuery=com.carwash.catalog.application.ServiceListPolicy.POLICY.parse(java.util.Map.of("id",java.util.List.of(r.service().serviceId())));
+        var user=userManagement.findPage(admin,userQuery).content().getFirst();
+        var vehicle=vehicleManagement.findPage(admin,r.business().businessId(),vehicleQuery).content().getFirst();
+        var service=catalog.findPage(serviceQuery).content().getFirst();
+        transactions.write(() -> {
+            var changedUser=users.findById(user.userId()).orElseThrow(); changedUser.setFullName("Changed profile");
+            var changedVehicle=vehicles.findById(vehicle.vehicleId()).orElseThrow(); changedVehicle.setBrand("Changed brand");
+            var changedService=services.findById(service.serviceId()).orElseThrow(); changedService.setServiceName("Changed service");
+            users.update(changedUser);vehicles.update(changedVehicle);services.update(changedService);
+        });
+        org.junit.jupiter.api.Assertions.assertNotEquals("Changed profile",user.fullName());
+        org.junit.jupiter.api.Assertions.assertNotEquals("Changed brand",vehicle.brand());
+        org.junit.jupiter.api.Assertions.assertNotEquals("Changed service",service.serviceName());
+        assertEquals("Changed profile",userManagement.findPage(admin,userQuery).content().getFirst().fullName());
+        assertEquals("Changed brand",vehicleManagement.findPage(admin,r.business().businessId(),vehicleQuery).content().getFirst().brand());
+        assertEquals("Changed service",catalog.findPage(serviceQuery).content().getFirst().serviceName());
+    }
+
     @Test void allOrdinaryResourcesUseDefaultPagesExactFiltersAndRejectInvalidQueries() throws Exception {
         var f = new BookingApiFixture(api, ids).createResources();
         var paths = java.util.Map.of(

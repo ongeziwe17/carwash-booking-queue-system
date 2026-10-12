@@ -32,7 +32,7 @@ public class PostgresUserRepository implements UserRepository {
                 java.util.Map.entry("name", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.fullName")),
                 java.util.Map.entry("createdAt", com.carwash.shared.infrastructure.JpaPageQueries.Field.time("q.createdAt", "q.createdAtNano")),
                 java.util.Map.entry("accountStatus", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.accountStatus"))));
-        return com.carwash.shared.application.PageResult.of(domains(page.content()), query.page(), page.totalElements());
+        return com.carwash.shared.application.PageResult.of(listDomains(page.content()), query.page(), page.totalElements());
     }
 
     private final UserSpringDataRepository users;
@@ -96,6 +96,24 @@ public class PostgresUserRepository implements UserRepository {
     @Override public List<User> findAll() {
         List<UserJpaEntity> found = users.findAllByOrderByIdAsc();
         return domains(found);
+    }
+
+    private List<User> listDomains(List<UserJpaEntity> found) {
+        if (found.isEmpty()) return List.of();
+        var assignmentByUser = assignments.findAllById(found.stream().map(entity -> entity.id).toList()).stream()
+                .collect(Collectors.toMap(entity -> entity.userId, Function.identity()));
+        var roleById = roles.findByIds(assignmentByUser.values().stream().map(entity -> entity.roleId).distinct().toList());
+        return found.stream().map(entity -> {
+            User user = new User();
+            user.setUserId(entity.id); user.setFullName(entity.fullName); user.setEmail(entity.email); user.setPhone(entity.phone);
+            user.setAccountStatus(AccountStatus.valueOf(entity.accountStatus));
+            user.setCreatedAt(PersistenceSupport.domainTime(entity.createdAt, entity.createdAtNano));
+            user.setLastLoginAt(PersistenceSupport.domainTime(entity.lastLoginAt, entity.lastLoginAtNano));
+            var assignment = requireAssociated(assignmentByUser, entity.id, "Role assignment");
+            user.setRole(Optional.ofNullable(roleById.get(assignment.roleId))
+                    .orElseThrow(() -> new IllegalStateException("Role missing for list user")));
+            return user;
+        }).toList();
     }
 
     private List<User> domains(List<UserJpaEntity> found) {

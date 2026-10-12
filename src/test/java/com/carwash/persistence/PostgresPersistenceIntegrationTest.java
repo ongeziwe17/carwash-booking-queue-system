@@ -251,7 +251,13 @@ class PostgresPersistenceIntegrationTest {
         var after=com.carwash.marketplace.application.ClosureListPolicy.POLICY.parse(java.util.Map.of("from",java.util.List.of(start.plusNanos(1).toString()))).scoped(scope);
         assertEquals(0,transactions.readSnapshot(() -> closureRepository.findPage(after).totalElements()));
         var userQuery=com.carwash.identity.application.UserListPolicy.POLICY.parse(java.util.Map.of("id",java.util.List.of(f.user.getUserId()),"sort",java.util.List.of("createdAt,desc","name,asc")));
-        assertEquals(1,transactions.readSnapshot(() -> userRepository.findPage(userQuery).totalElements()));
+        var pageSql=new java.util.concurrent.CopyOnWriteArrayList<String>(); pageStatements.hook.set(pageSql::add);
+        try {
+            var userPage=transactions.readSnapshot(() -> userRepository.findPage(userQuery));
+            assertEquals(1,userPage.totalElements()); assertNull(userPage.content().getFirst().getEncodedPassword());
+            assertEquals(f.user.getFullName(),userPage.content().getFirst().getFullName());
+            assertFalse(pageSql.stream().anyMatch(sql -> sql.contains("user_credentials")));
+        } finally { pageStatements.hook.set(null); }
         var discoveryScope=new com.carwash.shared.application.ListScope("page-eligibility-business",f.branchId,null,true);
         var branchQuery=com.carwash.marketplace.application.DiscoverableBranchListPolicy.POLICY.parse(java.util.Map.of()).scoped(discoveryScope);
         var offeringQuery=com.carwash.catalog.application.DiscoverableOfferingListPolicy.POLICY.parse(java.util.Map.of()).scoped(discoveryScope);
