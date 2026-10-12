@@ -44,6 +44,26 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class TenantIsolationIntegrationTest extends ApiIntegrationTestSupport {
 
     @Test
+    void paginationSortingAndForeignFiltersCannotChangeMandatoryScopeOrCounts() throws Exception {
+        Fixture f=fixture();
+        for (String endpoint : java.util.List.of("/api/bookings","/api/queue-entries","/api/vehicles")) {
+            for (String page : java.util.List.of("0","1","100000")) {
+                mockMvc.perform(get(endpoint).with(owner("page-owner",f.tenantA().businessId()))
+                                .param("page",page).param("size","1").param("sort","id,desc"))
+                        .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
+                        .andExpect(jsonPath("$.page").value(Integer.parseInt(page)))
+                        .andExpect(jsonPath("$.content.length()").value(page.equals("0")?1:0));
+            }
+            mockMvc.perform(get(endpoint).with(staff("page-staff",f.tenantA().businessId()))
+                            .param("businessId",f.tenantB().businessId()).param("page","100000"))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.totalElements").doesNotExist());
+        }
+        mockMvc.perform(get("/api/bookings").with(owner("page-owner",f.tenantA().businessId()))
+                        .param("branchId",f.tenantB().branchId()).param("sort","createdAt,desc"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void ownersStaffCustomersAndAdministratorsRemainInsideTheirCanonicalScopes() throws Exception {
         Fixture fixture = fixture();
         RequestPostProcessor ownerA = owner("owner-a", fixture.tenantA().businessId());
@@ -123,16 +143,16 @@ class TenantIsolationIntegrationTest extends ApiIntegrationTestSupport {
 
         mockMvc.perform(get("/api/bookings").with(ownerA))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].bookingId", hasItem(fixture.tenantA().bookingId())))
-                .andExpect(jsonPath("$[*].bookingId", not(hasItem(fixture.tenantB().bookingId()))));
+                .andExpect(jsonPath("$.content[*].bookingId", hasItem(fixture.tenantA().bookingId())))
+                .andExpect(jsonPath("$.content[*].bookingId", not(hasItem(fixture.tenantB().bookingId()))));
         mockMvc.perform(get("/api/marketplace/businesses").with(ownerA))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].businessId", hasItem(fixture.tenantA().businessId())))
-                .andExpect(jsonPath("$[*].businessId", not(hasItem(fixture.tenantB().businessId()))));
+                .andExpect(jsonPath("$.content[*].businessId", hasItem(fixture.tenantA().businessId())))
+                .andExpect(jsonPath("$.content[*].businessId", not(hasItem(fixture.tenantB().businessId()))));
         mockMvc.perform(get("/api/queue-entries").with(staffA))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].queueEntryId", hasItem(fixture.tenantA().queueId())))
-                .andExpect(jsonPath("$[*].queueEntryId", not(hasItem(fixture.tenantB().queueId()))));
+                .andExpect(jsonPath("$.content[*].queueEntryId", hasItem(fixture.tenantA().queueId())))
+                .andExpect(jsonPath("$.content[*].queueEntryId", not(hasItem(fixture.tenantB().queueId()))));
         assertTenantNotFound(get("/api/bookings/{id}", fixture.tenantB().bookingId()).with(staffA));
         mockMvc.perform(get("/api/reports/daily-summary").with(staffA)
                         .param("date", fixture.tenantA().scheduledAt().toLocalDate().toString())
@@ -152,8 +172,8 @@ class TenantIsolationIntegrationTest extends ApiIntegrationTestSupport {
         assertTenantNotFound(get("/api/queue-entries/{id}", fixture.tenantA().queueId()).with(staffB));
         mockMvc.perform(get("/api/queue-entries").with(staffB))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].queueEntryId", hasItem(fixture.tenantB().queueId())))
-                .andExpect(jsonPath("$[*].queueEntryId", not(hasItem(fixture.tenantA().queueId()))));
+                .andExpect(jsonPath("$.content[*].queueEntryId", hasItem(fixture.tenantB().queueId())))
+                .andExpect(jsonPath("$.content[*].queueEntryId", not(hasItem(fixture.tenantA().queueId()))));
 
         mockMvc.perform(get("/api/bookings/{id}", fixture.tenantA().bookingId())
                         .with(authentication.customerJwt(fixture.customerId())))
@@ -184,7 +204,7 @@ class TenantIsolationIntegrationTest extends ApiIntegrationTestSupport {
         mockMvc.perform(get("/api/bookings").with(authentication.platformAdminJwt())
                         .param("businessId", fixture.tenantB().businessId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].bookingId", everyItem(is(fixture.tenantB().bookingId()))));
+                .andExpect(jsonPath("$.content[*].bookingId", everyItem(is(fixture.tenantB().bookingId()))));
         mockMvc.perform(get("/api/bookings/{id}", fixture.tenantA().bookingId())
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isOk());
@@ -207,7 +227,7 @@ class TenantIsolationIntegrationTest extends ApiIntegrationTestSupport {
         Set<String> expected = Set.of(
                 "branchId", "businessId", "branchName", "addressLine1", "addressLine2", "city",
                 "province", "postalCode", "countryCode", "latitude", "longitude", "timezone");
-        objectMapper.readTree(body).forEach(node -> {
+        objectMapper.readTree(body).path("content").forEach(node -> {
             Set<String> actual = new HashSet<>();
             node.properties().forEach(property -> actual.add(property.getKey()));
             assertEquals(expected, actual);

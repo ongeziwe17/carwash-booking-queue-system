@@ -204,7 +204,7 @@ Latitude and longitude are optional but must appear together; radius additionall
 |---|---|---|---|---|---|
 | GET | `/api/recommendations/branches?latitude={lat}&longitude={lon}&serviceId={serviceId}&at={RFC3339}&preference={preference}[&maxRadiusKm={km}]` | Bearer; all roles through `PERM_MARKETPLACE_READ` | `200 BranchRecommendationResponse[]` | 400, 401, 403, 404, 405, 500 | Return deterministic, explainable rankings over one AVAIL-002-eligible candidate set. |
 
-Required `preference` values are `NEAREST`, `SHORTEST_QUEUE`, `FASTEST_TOTAL_TIME`, `LOWEST_PRICE`, and `BEST_OVERALL`. Coordinates are always required. `maxRadiusKm` is optional, positive, inclusive, defaults to the server's configured `50.00 km`, and may not exceed that configured maximum. Unknown services return 404; inactive services or a valid search with no eligible candidate return an empty array. Desired `at` is an offset-aware RFC 3339 start strictly in the future.
+Required `preference` values are `NEAREST`, `SHORTEST_QUEUE`, `FASTEST_TOTAL_TIME`, `LOWEST_PRICE`, and `BEST_OVERALL`. Coordinates are always required. `maxRadiusKm` is optional, positive, inclusive, defaults to the server's configured `50.00 km`, and may not exceed that configured maximum. Unknown services return 404; inactive services or a valid search with no eligible candidate return an empty page envelope. Desired `at` is an offset-aware RFC 3339 start strictly in the future.
 
 Candidate eligibility is not reimplemented by Recommendation. Booking's detached `BranchAvailabilityCandidateQuery` executes the authoritative AVAIL-002 path, preserving effective business/branch/service/offering visibility, complete weekly-hours/closure windows, continuous-window slot alignment, offering duration/price/concurrent capacity, overlapping active-booking capacity, same-day branch queue relevance, raw-radius filtering, timezone handling, DST-gap rejection, both DST-overlap occurrence exclusion, and multi-business isolation. The query adds raw internal distance and business name for scoring without changing `BranchAvailabilityResponse`.
 
@@ -668,3 +668,7 @@ The following are roadmap capabilities, not implemented endpoints. No paths are 
 - observability/health hardening, frontend applications, predictive/personalized ranking, and traffic-aware routing.
 
 For the broader sequencing, see the [Product Roadmap](ROADMAP.md). For executable HTTP coverage, see the [Bruno API Acceptance Suite](../tests/bruno/carwash-api/README.md).
+
+## Bounded collection responses
+
+The fourteen offset list endpoints documented in [API pagination](API-PAGINATION.md) now return `content` plus page metadata. The default is page 0, size 20 (maximum 100). Booking/queue list items use scalar IDs. Existing audit/inbox cursor contracts, bounded recent notifications and aggregate responses remain unchanged. Consult the inventory for the intentional array-to-envelope compatibility changes and endpoint-specific filters/sorts.

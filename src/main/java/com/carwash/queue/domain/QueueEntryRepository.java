@@ -7,7 +7,7 @@ import com.carwash.queue.domain.QueueEntry;
 import java.util.List;
 import java.util.Optional;
 
-public interface QueueEntryRepository extends Repository<QueueEntry, String> {
+public interface QueueEntryRepository extends Repository<QueueEntry, String>, com.carwash.shared.application.PagedRepository<QueueEntry> {
     List<QueueEntry> findAllOrdered();
     List<QueueEntry> findActiveOrdered();
     List<QueueEntry> findActiveOrderedByBranch(String branchId);

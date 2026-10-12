@@ -1,4 +1,5 @@
 package com.carwash.recommendation.api;
+import com.carwash.shared.api.PageResponse;
 
 import com.carwash.recommendation.api.dto.BranchRecommendationResponse;
 import com.carwash.recommendation.api.dto.RecommendationScoreBreakdownResponse;
@@ -75,10 +76,13 @@ public class RecommendationController {
                     + "Results are point-in-time reads, do not reserve capacity, and booking creation authoritatively "
                     + "revalidates the returned branch, offering, and local start."
     )
-    @ApiResponse(responseCode = "200", description = "Ranked recommendations returned",
-            content = @Content(array = @ArraySchema(
-                    schema = @Schema(implementation = BranchRecommendationResponse.class))))
-    public List<BranchRecommendationResponse> recommendBranches(
+    @ApiResponse(responseCode = "200", description = "Ranked recommendations returned", useReturnTypeSchema = true)
+    @io.swagger.v3.oas.annotations.Parameters({
+        @io.swagger.v3.oas.annotations.Parameter(name = "page", description = "Zero-based page; default 0. Invalid or overflowing offsets return ApiErrorResponse 400.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "0", defaultValue = "0")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "size", description = "Page size, default 20; rejects values outside 1-100.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "1", maximum = "100", defaultValue = "20")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "sort", description = "Fixed eligibility/ranking order; alternate sort is rejected.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string"))
+    })
+    public PageResponse<BranchRecommendationResponse> recommendBranches(
             @Parameter(required = true, description = "Origin latitude in decimal degrees (-90 to 90).")
             @RequestParam @NotNull @DecimalMin("-90.0") @DecimalMax("90.0") BigDecimal latitude,
             @Parameter(required = true, description = "Origin longitude in decimal degrees (-180 to 180).")
@@ -91,13 +95,16 @@ public class RecommendationController {
             @RequestParam @NotNull RecommendationPreference preference,
             @Parameter(description = "Optional inclusive radius in kilometres; defaults to and cannot exceed the configured server maximum.")
             @RequestParam(required = false) @DecimalMin(value = "0.0", inclusive = false)
-            @DecimalMax("20000.0") BigDecimal maxRadiusKm
+            @DecimalMax("20000.0") BigDecimal maxRadiusKm,
+            @io.swagger.v3.oas.annotations.Parameter(hidden = true) @RequestParam org.springframework.util.MultiValueMap<String, String> parameters
     ) {
-        return recommendations.recommend(new RecommendationSearchCriteria(
+        var page = new com.carwash.shared.application.ListPolicy(java.util.Set.of(), java.util.List.of(), java.util.Map.of(), java.util.Set.of("latitude","longitude","serviceId","at","preference","maxRadiusKm")).parse(parameters).page();
+        var ranked = recommendations.recommend(new RecommendationSearchCriteria(
                         latitude, longitude, serviceId, at.toInstant(), preference, maxRadiusKm))
                 .stream()
                 .map(RecommendationController::response)
                 .toList();
+        return PageResponse.from(com.carwash.shared.application.PageResult.select(ranked, page));
     }
 
     private static BranchRecommendationResponse response(RecommendationSnapshot snapshot) {

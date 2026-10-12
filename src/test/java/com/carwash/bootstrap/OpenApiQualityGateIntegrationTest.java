@@ -105,6 +105,32 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
     @Autowired TemporaryBranchClosureRepository closures;
 
     @Test
+    void everyOffsetListHasConcretePageSchemaBoundsAndStandardValidationErrors() throws Exception {
+        JsonNode document = openApi();
+        for (String path : java.util.List.of("/api/users", "/api/vehicles", "/api/services", "/api/bookings",
+                "/api/queue-entries", "/api/marketplace/businesses", "/api/marketplace/businesses/{businessId}/branches",
+                "/api/marketplace/branches/discoverable", "/api/marketplace/branches/{branchId}/offerings",
+                "/api/marketplace/branches/{branchId}/offerings/discoverable", "/api/marketplace/branches/{branchId}/closures",
+                "/api/marketplace/branches/discoverable/nearby", "/api/availability/branches", "/api/recommendations/branches")) {
+            JsonNode operation = document.path("paths").path(path).path("get");
+            String ref = responseSchemaRef(operation.path("responses").path("200"));
+            assertTrue(ref.startsWith("#/components/schemas/"), path + " needs a named page schema");
+            JsonNode page = document.at(ref.substring(1));
+            assertEquals(Set.of("content", "page", "size", "totalElements", "totalPages", "hasNext", "hasPrevious"), propertyNames(page), path);
+            assertEquals("array", page.path("properties").path("content").path("type").asText(), path);
+            assertTrue(page.path("properties").path("content").path("items").path("$ref").asText().startsWith("#/components/schemas/"), path);
+            JsonNode size = findParameter(operation.path("parameters"), "query", "size").path("schema");
+            assertEquals(1,size.path("minimum").asInt(),path); assertEquals(100,size.path("maximum").asInt(),path);
+            assertEquals("20",size.path("default").asText(),path);
+            assertEquals("#/components/schemas/ApiErrorResponse", responseSchemaRef(operation.path("responses").path("400")),path);
+        }
+        for(String type: Set.of("BookingListResponse", "QueueListResponse")) {
+            JsonNode properties=document.path("components").path("schemas").path(type).path("properties");
+            for(String unsafe:Set.of("user","vehicle","service","booking","specialRequest","password","email")) assertFalse(properties.has(unsafe),type);
+        }
+    }
+
+    @Test
     void openApiDocsEndpointAvailableWithoutBusinessData() throws Exception {
         assertRepositoriesEmpty();
         mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
@@ -342,7 +368,7 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         Map<String, JsonNode> parameters = new java.util.HashMap<>();
         operation.path("parameters").forEach(parameter ->
                 parameters.put(parameter.path("name").asText(), parameter));
-        assertEquals(Set.of("latitude", "longitude", "radiusKm", "serviceId", "openAt", "sort"),
+        assertEquals(Set.of("latitude", "longitude", "radiusKm", "serviceId", "openAt", "sort", "page", "size"),
                 parameters.keySet());
         assertTrue(parameters.get("latitude").path("required").asBoolean());
         assertTrue(parameters.get("longitude").path("required").asBoolean());
@@ -376,7 +402,7 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         Map<String, JsonNode> parameters = new java.util.HashMap<>();
         operation.path("parameters").forEach(parameter ->
                 parameters.put(parameter.path("name").asText(), parameter));
-        assertEquals(Set.of("serviceId", "at", "latitude", "longitude", "radiusKm"), parameters.keySet());
+        assertEquals(Set.of("serviceId", "at", "latitude", "longitude", "radiusKm", "page", "size", "sort"), parameters.keySet());
         assertTrue(parameters.get("serviceId").path("required").asBoolean());
         assertTrue(parameters.get("at").path("required").asBoolean());
         assertEquals("date-time", parameters.get("at").path("schema").path("format").asText());
@@ -410,7 +436,7 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
         Map<String, JsonNode> parameters = new java.util.HashMap<>();
         operation.path("parameters").forEach(parameter ->
                 parameters.put(parameter.path("name").asText(), parameter));
-        assertEquals(Set.of("latitude", "longitude", "serviceId", "at", "preference", "maxRadiusKm"),
+        assertEquals(Set.of("latitude", "longitude", "serviceId", "at", "preference", "maxRadiusKm", "page", "size", "sort"),
                 parameters.keySet());
         for (String required : Set.of("latitude", "longitude", "serviceId", "at", "preference")) {
             assertTrue(parameters.get(required).path("required").asBoolean());

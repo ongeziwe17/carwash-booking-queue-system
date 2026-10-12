@@ -37,6 +37,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import com.carwash.shared.api.PageResponse;
 
 @RestController
 @Validated
@@ -103,13 +104,21 @@ public class BranchSchedulingController {
     @PreAuthorize("hasAuthority('PERM_MARKETPLACE_MANAGE')")
     @Operation(summary = "List branch temporary closures",
             description = "Returns active and cancelled closure records in deterministic closure-ID order.")
-    @ApiResponse(responseCode = "200", description = "Temporary closures returned")
-    public List<TemporaryClosureResponse> listClosures(
-            @PathVariable @NotBlank @Size(max = 64) String branchId
+    @ApiResponse(responseCode = "200", description = "Temporary closures returned", useReturnTypeSchema = true)
+    @io.swagger.v3.oas.annotations.Parameters({
+        @io.swagger.v3.oas.annotations.Parameter(name = "id", description = "Exact resource ID; narrows authorized scope only.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", maxLength = 64)),
+        @io.swagger.v3.oas.annotations.Parameter(name = "page", description = "Zero-based page; default 0. Invalid or overflowing offsets return ApiErrorResponse 400.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "0", defaultValue = "0")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "size", description = "Page size, default 20; rejects values outside 1-100.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "1", maximum = "100", defaultValue = "20")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "sort", description = "Repeat up to three field,asc|desc terms from the endpoint allowlist; unique ID tie-breaker and NULLS LAST. See API-PAGINATION.md.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "status", description = "ACTIVE or CANCELLED; sorts id,startsAt,endsAt.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "from", description = "Inclusive closure-start RFC 3339 instant, exact nanoseconds.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "to", description = "Inclusive closure-start RFC 3339 instant, must not precede from.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string"))
+    })
+    public PageResponse<TemporaryClosureResponse> listClosures(
+            @PathVariable @NotBlank @Size(max = 64) String branchId,
+            @io.swagger.v3.oas.annotations.Parameter(hidden = true) @RequestParam org.springframework.util.MultiValueMap<String, String> parameters
     ) {
-        return scheduling.listTemporaryClosures(tenantAccess.current(), branchId).stream()
-                .map(MarketplaceMapper::toResponse)
-                .toList();
+        return PageResponse.from(scheduling.findClosuresPage(tenantAccess.current(), branchId, com.carwash.marketplace.application.ClosureListPolicy.POLICY.parse(parameters)).map(MarketplaceMapper::toResponse));
     }
 
     @PostMapping("/branches/{branchId}/closures")

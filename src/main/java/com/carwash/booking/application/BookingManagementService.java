@@ -1,5 +1,9 @@
 package com.carwash.booking.application;
 
+import com.carwash.shared.application.ListQuery;
+import com.carwash.shared.application.ListScope;
+import com.carwash.shared.application.PageResult;
+
 import com.carwash.shared.application.Telemetry;
 import com.carwash.shared.application.Telemetry.Operation;
 
@@ -45,6 +49,25 @@ import com.carwash.audit.domain.AuditAction;
 import com.carwash.audit.domain.AuditSource;
 
 public class BookingManagementService implements BookingQuery {
+    public PageResult<BookingSnapshot> findPage(TenantAccessContext access, String branchId,
+                                             String administratorBusinessId, ListQuery query) {
+        String businessId;
+        if (access.isPlatformAdministrator()) businessId = normalizeId(administratorBusinessId, "Business ID");
+        else {
+            if (!access.isOperational()) throw new AccessDeniedException("Operational access is required");
+            if (administratorBusinessId != null) throw new BusinessRuleViolationException("Tenant identity is derived from authentication");
+            businessId = access.requireBusinessId();
+        }
+        return coordinator.readSnapshot(() -> {
+            String branch = branchId == null ? null : normalizeId(branchId, "Branch ID");
+            if (branch != null) marketplaceQuery.findBranchOptionalByBusiness(branch, businessId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Branch not found"));
+            var page = bookingRepository.findPage(query.scoped(new ListScope(businessId, branch, null, false)));
+            return page.map(this::snapshot);
+        });
+    }
+
+
     private final Telemetry telemetry;
 
 

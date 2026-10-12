@@ -284,7 +284,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: postgres-test-reports-${{ github.run_number }}-${{ github.sha }}
-          path: target/failsafe-reports/**
+          path: |
+            target/failsafe-reports/**
+            target/pagination-query-plans.txt
           if-no-files-found: error
           retention-days: 14
 
@@ -396,6 +398,9 @@ jobs:
 
       - name: Run tracing observability test independently
         run: ./mvnw --batch-mode -Djacoco.skip=true -Dit.test=TracingObservabilityIntegrationTest verify
+
+      - name: Run pagination API tests independently
+        run: ./mvnw --batch-mode -Djacoco.skip=true -Dit.test=PaginationIntegrationTest verify
 
       - name: Upload selected-test reports on failure
         if: failure()

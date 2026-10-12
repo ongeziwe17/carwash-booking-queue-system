@@ -47,12 +47,12 @@ class MarketplaceWorkflowIntegrationTest extends ApiIntegrationTestSupport {
         mockMvc.perform(get("/api/marketplace/businesses/{id}/branches", business.businessId())
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].branchId").value(branch.branchId()));
+                .andExpect(jsonPath("$.content[0].branchId").value(branch.branchId()));
         mockMvc.perform(get("/api/marketplace/branches/discoverable")
                         .with(authentication.roleJwt("customer", "CUSTOMER", "ROLE_CUSTOMER",
                                 "PERM_MARKETPLACE_READ")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].branchId").value(branch.branchId()));
+                .andExpect(jsonPath("$.content[0].branchId").value(branch.branchId()));
 
         UpdateBusinessRequest businessUpdate = new UpdateBusinessRequest(
                 "Updated Wash Group", "updated@example.test", "+27 21 555 0100", "REG-UPDATED");
@@ -90,7 +90,7 @@ class MarketplaceWorkflowIntegrationTest extends ApiIntegrationTestSupport {
                 .with(authentication.roleJwt("customer", "CUSTOMER", "ROLE_CUSTOMER",
                                 "PERM_MARKETPLACE_READ")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.content.length()").value(0));
 
         mockMvc.perform(post("/api/marketplace/businesses/{id}/activate", business.businessId())
                         .with(authentication.platformAdminJwt()))

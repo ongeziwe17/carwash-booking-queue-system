@@ -1,4 +1,5 @@
 package com.carwash.discovery.api;
+import com.carwash.shared.api.PageResponse;
 
 import com.carwash.discovery.api.dto.NearbyBranchResponse;
 import com.carwash.discovery.application.NearbyBranchDiscoveryService;
@@ -59,8 +60,13 @@ public class NearbyBranchDiscoveryController {
     @PreAuthorize("hasAuthority('PERM_MARKETPLACE_READ')")
     @Operation(summary = "Discover nearby Marketplace branches",
             description = "Returns only effective active, public-discovery-enabled branches. Radius filtering and distance sorting use the unrounded Haversine distance; responses use kilometres rounded to two decimals with HALF_UP. When sort is omitted results use branch-ID order. Equal distances use branch ID as the tie-breaker. serviceId requires a discoverable effective branch offering, and openAt reuses the branch scheduling decision for the supplied instant.")
-    @ApiResponse(responseCode = "200", description = "Nearby branches returned")
-    public List<NearbyBranchResponse> findNearby(
+    @ApiResponse(responseCode = "200", description = "Nearby branches returned", useReturnTypeSchema = true)
+    @io.swagger.v3.oas.annotations.Parameters({
+        @io.swagger.v3.oas.annotations.Parameter(name = "page", description = "Zero-based page; default 0. Invalid or overflowing offsets return ApiErrorResponse 400.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "0", defaultValue = "0")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "size", description = "Page size, default 20; rejects values outside 1-100.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "1", maximum = "100", defaultValue = "20")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "sort", description = "Existing distance-only ordering.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string"))
+    })
+    public PageResponse<NearbyBranchResponse> findNearby(
             @Parameter(required = true, description = "Origin latitude in decimal degrees (-90 to 90).")
             @RequestParam @NotNull @DecimalMin("-90.0") @DecimalMax("90.0") BigDecimal latitude,
             @Parameter(required = true, description = "Origin longitude in decimal degrees (-180 to 180).")
@@ -73,9 +79,13 @@ public class NearbyBranchDiscoveryController {
             @Parameter(description = "Optional RFC 3339 instant; only branches open at this exact instant are returned.")
             @RequestParam(required = false) OffsetDateTime openAt,
             @Parameter(description = "Optional sort mode. The only supported value is 'distance'.")
-            @RequestParam(required = false) @Size(max = 16) String sort
+            @RequestParam(required = false) @Size(max = 16) String sort,
+            @io.swagger.v3.oas.annotations.Parameter(hidden = true) @RequestParam org.springframework.util.MultiValueMap<String, String> parameters
     ) {
-        return discovery.findNearby(new NearbyBranchSearchCriteria(
+        var offsetParameters = new java.util.LinkedHashMap<String, java.util.List<String>>(parameters);
+        offsetParameters.remove("sort");
+        var page = new com.carwash.shared.application.ListPolicy(java.util.Set.of(), java.util.List.of(), java.util.Map.of(), java.util.Set.of("latitude","longitude","radiusKm","serviceId","openAt","sort")).parse(offsetParameters).page();
+        var ranked = discovery.findNearby(new NearbyBranchSearchCriteria(
                         latitude,
                         longitude,
                         radiusKm,
@@ -85,6 +95,7 @@ public class NearbyBranchDiscoveryController {
                 .stream()
                 .map(NearbyBranchDiscoveryController::toResponse)
                 .toList();
+        return PageResponse.from(com.carwash.shared.application.PageResult.select(ranked, page));
     }
 
     private static NearbyBranchResponse toResponse(NearbyBranchSnapshot branch) {

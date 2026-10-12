@@ -9,6 +9,16 @@ runtime:
       code: |-
         test("returns only the canonical owner tenant", function() {
           expect(res.status).to.equal(200);
-          expect(res.body.map(item => item.businessId)).to.deep.equal([bru.getVar("marketplaceBusinessId")]);
+          expect(res.body.content.map(item => item.businessId)).to.deep.equal([bru.getVar("marketplaceBusinessId")]);
+        });
+        test("bounded page envelope", function() {
+          expect(res.body.content).to.be.an("array");
+          expect(res.body.page).to.be.at.least(0);
+          expect(res.body.size).to.be.within(1, 100);
+          expect(res.body.content.length).to.be.at.most(res.body.size);
+          expect(res.body.totalElements).to.be.at.least(res.body.content.length);
+          expect(res.body.totalPages).to.equal(Math.ceil(res.body.totalElements / res.body.size));
+          expect(res.body.hasNext).to.equal(res.body.page + 1 < res.body.totalPages);
+          expect(res.body.hasPrevious).to.equal(res.body.page > 0);
         });
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

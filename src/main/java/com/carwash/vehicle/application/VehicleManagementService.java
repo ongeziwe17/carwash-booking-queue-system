@@ -1,5 +1,9 @@
 package com.carwash.vehicle.application;
 
+import com.carwash.shared.application.ListQuery;
+import com.carwash.shared.application.ListScope;
+import com.carwash.shared.application.PageResult;
+
 import com.carwash.identity.domain.User;
 import com.carwash.vehicle.domain.Vehicle;
 import com.carwash.booking.domain.BookingRepository;
@@ -20,6 +24,18 @@ import java.util.Objects;
 import java.util.Optional;
 
 public class VehicleManagementService implements VehicleQuery {
+    public PageResult<Vehicle> findPage(TenantAccessContext access, String administratorBusinessId, ListQuery query) {
+        String businessId;
+        if (access.isPlatformAdministrator()) businessId = normalizeBusinessId(administratorBusinessId);
+        else {
+            if (!access.isOperational()) throw new AccessDeniedException("Operational vehicle access is required");
+            if (administratorBusinessId != null) throw new BusinessRuleViolationException("Tenant identity is derived from authentication");
+            businessId = access.requireBusinessId();
+        }
+        return coordinator.readSnapshot(() -> vehicleRepository.findPage(query.scoped(new ListScope(businessId, null, null, false))));
+    }
+
+
 
     private final VehicleRepository vehicleRepository;
     private final UserRepository userRepository;

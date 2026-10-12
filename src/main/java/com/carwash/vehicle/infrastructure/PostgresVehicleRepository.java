@@ -16,6 +16,22 @@ import java.util.Optional;
 @Profile("postgres")
 @Transactional
 public class PostgresVehicleRepository implements VehicleRepository {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.carwash.shared.infrastructure.JpaPageQueries pages;
+
+    @Override public com.carwash.shared.application.PageResult<Vehicle> findPage(com.carwash.shared.application.ListQuery query) {
+        var scope = query.scope();
+        var clauses = new java.util.ArrayList<String>(); clauses.add("1=1");
+        var parameters = new java.util.LinkedHashMap<String, Object>();
+        if (scope.businessId() != null) { clauses.add("exists (select bk.id from BookingJpaEntity bk, BranchJpaEntity b where bk.vehicleId=q.id and b.id=bk.branchId and b.businessId=:business)"); parameters.put("business", scope.businessId()); }
+        var page = pages.find(VehicleJpaEntity.class, query, String.join(" and ", clauses), parameters, java.util.Map.ofEntries(java.util.Map.entry("id", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.id")),
+                java.util.Map.entry("brand", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.brand")),
+                java.util.Map.entry("model", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.model")),
+                java.util.Map.entry("userId", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.userId")),
+                java.util.Map.entry("vehicleType", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.vehicleType"))));
+        return page.map(this::domain);
+    }
+
     private final VehicleSpringDataRepository repository;
 
     public PostgresVehicleRepository(VehicleSpringDataRepository repository) { this.repository = repository; }

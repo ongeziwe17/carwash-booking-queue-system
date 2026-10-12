@@ -8,6 +8,16 @@ runtime:
     - type: tests
       code: |-
         test("returns 200", function() { expect(res.status).to.equal(200); });
-        test("keeps the identical eligible candidate set", function() { expect(JSON.stringify(res.body.map(item => item.branchId).sort())).to.equal(bru.getVar("recommendationCandidateIds")); });
-        test("returns price objective and explanation", function() { expect(res.body[0].appliedPreference).to.equal("LOWEST_PRICE"); expect(res.body[0].scoreBreakdown.price.available).to.equal(true); expect(res.body[0].explanation).to.include("price"); });
+        test("keeps the identical eligible candidate set", function() { expect(JSON.stringify(res.body.content.map(item => item.branchId).sort())).to.equal(bru.getVar("recommendationCandidateIds")); });
+        test("returns price objective and explanation", function() { expect(res.body.content[0].appliedPreference).to.equal("LOWEST_PRICE"); expect(res.body.content[0].scoreBreakdown.price.available).to.equal(true); expect(res.body.content[0].explanation).to.include("price"); });
+        test("bounded page envelope", function() {
+          expect(res.body.content).to.be.an("array");
+          expect(res.body.page).to.be.at.least(0);
+          expect(res.body.size).to.be.within(1, 100);
+          expect(res.body.content.length).to.be.at.most(res.body.size);
+          expect(res.body.totalElements).to.be.at.least(res.body.content.length);
+          expect(res.body.totalPages).to.equal(Math.ceil(res.body.totalElements / res.body.size));
+          expect(res.body.hasNext).to.equal(res.body.page + 1 < res.body.totalPages);
+          expect(res.body.hasPrevious).to.equal(res.body.page > 0);
+        });
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

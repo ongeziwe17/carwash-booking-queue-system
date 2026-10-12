@@ -18,6 +18,26 @@ import java.util.Optional;
 
 @Repository @Profile("postgres") @Transactional
 public class PostgresQueueEntryRepository implements QueueEntryRepository, com.carwash.queue.application.QueueTelemetryQuery {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.carwash.shared.infrastructure.JpaPageQueries pages;
+
+    @Override public com.carwash.shared.application.PageResult<QueueEntry> findPage(com.carwash.shared.application.ListQuery query) {
+        var scope = query.scope();
+        var clauses = new java.util.ArrayList<String>(); clauses.add("1=1");
+        var parameters = new java.util.LinkedHashMap<String, Object>();
+        if (scope.businessId() != null) { clauses.add("exists (select b.id from BranchJpaEntity b where b.id=q.branchId and b.businessId=:business)"); parameters.put("business", scope.businessId()); }
+        if (scope.branchId() != null) { clauses.add("q.branchId = :branch"); parameters.put("branch", scope.branchId()); }
+        var page = pages.find(QueueEntryJpaEntity.class, query, String.join(" and ", clauses), parameters, java.util.Map.ofEntries(java.util.Map.entry("id", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.id")),
+                java.util.Map.entry("branchId", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.branchId")),
+                java.util.Map.entry("activeRank", com.carwash.shared.infrastructure.JpaPageQueries.Field.value("case when q.status in ('WAITING','CALLED','IN_PROGRESS') then 0 else 1 end")),
+                java.util.Map.entry("position", com.carwash.shared.infrastructure.JpaPageQueries.Field.value("q.position")),
+                java.util.Map.entry("joinedAt", com.carwash.shared.infrastructure.JpaPageQueries.Field.time("q.joinedAt", "q.joinedAtNano")),
+                java.util.Map.entry("status", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.status")),
+                java.util.Map.entry("serviceId", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.serviceId")),
+                java.util.Map.entry("offeringId", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.offeringId"))));
+        return com.carwash.shared.application.PageResult.of(domains(page.content()), query.page(), page.totalElements());
+    }
+
     private static final List<String> ACTIVE=List.of("WAITING","CALLED","IN_PROGRESS");
     private final QueueEntrySpringDataRepository repository;
     public PostgresQueueEntryRepository(QueueEntrySpringDataRepository repository){this.repository=repository;}

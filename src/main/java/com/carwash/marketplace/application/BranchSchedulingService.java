@@ -1,5 +1,9 @@
 package com.carwash.marketplace.application;
 
+import com.carwash.shared.application.ListQuery;
+import com.carwash.shared.application.ListScope;
+import com.carwash.shared.application.PageResult;
+
 import com.carwash.marketplace.domain.BranchOperatingSchedule;
 import com.carwash.marketplace.domain.BranchOperatingScheduleRepository;
 import com.carwash.marketplace.domain.CarWashBranch;
@@ -32,6 +36,16 @@ import java.util.List;
 import java.util.Objects;
 
 public final class BranchSchedulingService implements BranchScheduleQuery {
+    public PageResult<TemporaryBranchClosureSnapshot> findClosuresPage(TenantAccessContext access, String branchId, ListQuery query) {
+        return coordinator.readSnapshot(() -> {
+            CarWashBranch branch = access.isPlatformAdministrator() ? requireBranch(branchId)
+                    : requireTenantBranch(branchId, access.requireBusinessId());
+            return closureRepository.findPage(query.scoped(new ListScope(branch.getBusinessId(), branch.getBranchId(), null, false)))
+                    .map(TemporaryBranchClosureSnapshot::from);
+        });
+    }
+
+
 
     private final CarWashBusinessRepository businessRepository;
     private final CarWashBranchRepository branchRepository;

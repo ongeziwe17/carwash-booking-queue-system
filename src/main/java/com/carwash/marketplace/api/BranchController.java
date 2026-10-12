@@ -27,6 +27,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import com.carwash.shared.api.PageResponse;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @RestController
 @Validated
@@ -62,11 +64,18 @@ public class BranchController {
     @PreAuthorize("hasAuthority('PERM_MARKETPLACE_READ')")
     @Operation(summary = "List discoverable Marketplace branches",
             description = "Returns only public-discovery-enabled branches whose branch and owning business are both active. No distance ranking is performed.")
-    @ApiResponse(responseCode = "200", description = "Discoverable branches returned")
-    public List<DiscoverableBranchResponse> findDiscoverable() {
-        return marketplace.findDiscoverableBranches().stream()
-                .map(MarketplaceMapper::toDiscoverableResponse)
-                .toList();
+    @ApiResponse(responseCode = "200", description = "Discoverable branches returned", useReturnTypeSchema = true)
+    @io.swagger.v3.oas.annotations.Parameters({
+        @io.swagger.v3.oas.annotations.Parameter(name = "id", description = "Exact resource ID; narrows authorized scope only.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", maxLength = 64)),
+        @io.swagger.v3.oas.annotations.Parameter(name = "page", description = "Zero-based page; default 0. Invalid or overflowing offsets return ApiErrorResponse 400.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "0", defaultValue = "0")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "size", description = "Page size, default 20; rejects values outside 1-100.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "1", maximum = "100", defaultValue = "20")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "sort", description = "Repeat up to three field,asc|desc terms from the endpoint allowlist; unique ID tie-breaker and NULLS LAST. See API-PAGINATION.md.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "city", description = "Exact case-sensitive city; sorts id,name,createdAt. Mandatory discoverability cannot be overridden.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string"))
+    })
+    public PageResponse<DiscoverableBranchResponse> findDiscoverable(
+            @io.swagger.v3.oas.annotations.Parameter(hidden = true) @RequestParam org.springframework.util.MultiValueMap<String, String> parameters
+    ) {
+        return PageResponse.from(marketplace.findDiscoverablePage(com.carwash.marketplace.application.DiscoverableBranchListPolicy.POLICY.parse(parameters)).map(MarketplaceMapper::toDiscoverableResponse));
     }
 
     @GetMapping("/{branchId}")

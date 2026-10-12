@@ -31,6 +31,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import com.carwash.shared.api.PageResponse;
 
 @RestController
 @Validated
@@ -54,7 +55,7 @@ public class BookingController {
                     + "must provide an explicit businessId; branchId may narrow that business scope."
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Bookings returned"),
+            @ApiResponse(responseCode = "200", description = "Bookings returned", useReturnTypeSchema = true),
             @ApiResponse(responseCode = "400", description = "Invalid branch filter",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Authentication required",
@@ -68,11 +69,24 @@ public class BookingController {
             @ApiResponse(responseCode = "500", description = "Internal server error",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public List<Booking> getAll(
+    @io.swagger.v3.oas.annotations.Parameters({
+        @io.swagger.v3.oas.annotations.Parameter(name = "id", description = "Exact resource ID; narrows authorized scope only.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", maxLength = 64)),
+        @io.swagger.v3.oas.annotations.Parameter(name = "page", description = "Zero-based page; default 0. Invalid or overflowing offsets return ApiErrorResponse 400.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "0", defaultValue = "0")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "size", description = "Page size, default 20; rejects values outside 1-100.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "1", maximum = "100", defaultValue = "20")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "sort", description = "Repeat up to three field,asc|desc terms from the endpoint allowlist; unique ID tie-breaker and NULLS LAST. See API-PAGINATION.md.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "status", description = "Exact documented lifecycle state.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "serviceId", description = "Exact service ID.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "offeringId", description = "Exact offering ID.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "userId", description = "Exact customer ID within mandatory business scope.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "from", description = "Inclusive branch-local scheduled time with full nanosecond precision; no offset.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "to", description = "Inclusive branch-local scheduled time, must not precede from.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string"))
+    })
+    public PageResponse<com.carwash.booking.api.dto.BookingListResponse> getAll(
             @RequestParam(required = false) @Size(max = 64) String branchId,
-            @RequestParam(required = false) @Size(max = 64) String businessId
+            @RequestParam(required = false) @Size(max = 64) String businessId,
+            @io.swagger.v3.oas.annotations.Parameter(hidden = true) @RequestParam org.springframework.util.MultiValueMap<String, String> parameters
     ) {
-        return service.findAll(tenantAccess.current(), branchId, businessId);
+        return PageResponse.from(service.findPage(tenantAccess.current(), branchId, businessId, com.carwash.booking.application.BookingListPolicy.POLICY.parse(parameters)).map(com.carwash.booking.api.dto.BookingListResponse::from));
     }
 
     @GetMapping("/{id}")

@@ -69,16 +69,16 @@ class BranchAvailabilityDstOverlapIntegrationTest extends ApiIntegrationTestSupp
 
         search(serviceId, "2090-11-05T01:30:00-04:00")
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.content.length()").value(0));
         recommend(serviceId, "2090-11-05T01:30:00-04:00")
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.content.length()").value(0));
         search(serviceId, "2090-11-05T01:30:00-05:00")
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.content.length()").value(0));
         recommend(serviceId, "2090-11-05T01:30:00-05:00")
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.content.length()").value(0));
 
         CreateBookingRequest ambiguous = BookingFixtureBuilder.valid(
                         ids, user.userId(), vehicle.vehicleId(), branchId, offeringId)
@@ -119,14 +119,14 @@ class BranchAvailabilityDstOverlapIntegrationTest extends ApiIntegrationTestSupp
     ) throws Exception {
         search(serviceId, requestedAt)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].branchId", contains(branchId)))
-                .andExpect(jsonPath("$[0].availableStartAt").value(requestedAt))
-                .andExpect(jsonPath("$[0].reason").doesNotExist());
+                .andExpect(jsonPath("$.content[*].branchId", contains(branchId)))
+                .andExpect(jsonPath("$.content[0].availableStartAt").value(requestedAt))
+                .andExpect(jsonPath("$.content[0].reason").doesNotExist());
         recommend(serviceId, requestedAt)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].branchId", contains(branchId)))
-                .andExpect(jsonPath("$[0].availableStartAt").value(requestedAt))
-                .andExpect(jsonPath("$[0].reason").doesNotExist());
+                .andExpect(jsonPath("$.content[*].branchId", contains(branchId)))
+                .andExpect(jsonPath("$.content[0].availableStartAt").value(requestedAt))
+                .andExpect(jsonPath("$.content[0].reason").doesNotExist());
 
         CreateBookingRequest booking = BookingFixtureBuilder.valid(
                         ids, userId, vehicleId, branchId, offeringId)

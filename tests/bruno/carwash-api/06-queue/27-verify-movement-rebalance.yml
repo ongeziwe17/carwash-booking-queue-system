@@ -19,7 +19,7 @@ runtime:
       code: |-
         test("returns 200", function() { expect(res.status).to.equal(200); });
         test("all moved positions and waits are recalculated", function() {
-          const active = res.body.filter(entry => ["WAITING", "CALLED", "IN_PROGRESS"].includes(entry.queueStatus));
+          const active = res.body.content.filter(entry => ["WAITING", "CALLED", "IN_PROGRESS"].includes(entry.queueStatus));
           const entries = [
             bru.getVar("queueOrderingEntry3Id"), bru.getVar("queueOrderingEntry1Id"), bru.getVar("queueOrderingEntry2Id")
           ].map(id => active.find(entry => entry.queueEntryId === id));
@@ -31,6 +31,16 @@ runtime:
         });
         test("does not expose access tokens", function() { expect(JSON.stringify(res.body ?? {}).toLowerCase()).to.not.include("accesstoken"); });
 
+        test("bounded page envelope", function() {
+          expect(res.body.content).to.be.an("array");
+          expect(res.body.page).to.be.at.least(0);
+          expect(res.body.size).to.be.within(1, 100);
+          expect(res.body.content.length).to.be.at.most(res.body.size);
+          expect(res.body.totalElements).to.be.at.least(res.body.content.length);
+          expect(res.body.totalPages).to.equal(Math.ceil(res.body.totalElements / res.body.size));
+          expect(res.body.hasNext).to.equal(res.body.page + 1 < res.body.totalPages);
+          expect(res.body.hasPrevious).to.equal(res.body.page > 0);
+        });
 settings:
   encodeUrl: true
   timeout: 15000

@@ -110,6 +110,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest
 @org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 @ActiveProfiles(profiles={"test","postgres"},inheritProfiles=false)
+@org.springframework.context.annotation.Import(PostgresPersistenceIntegrationTest.PageStatementConfiguration.class)
 @Testcontainers
 class PostgresPersistenceIntegrationTest {
     private static final String PASSWORD="StrongPassword!123";
@@ -131,6 +132,152 @@ class PostgresPersistenceIntegrationTest {
     @Autowired org.springframework.test.web.servlet.MockMvc managementMvc;
     @Autowired com.carwash.queue.infrastructure.QueueTelemetrySampler telemetrySampler;
     @Autowired io.micrometer.core.instrument.MeterRegistry telemetryMeters;
+
+    @Autowired PageStatements pageStatements;
+
+    @org.springframework.boot.test.context.TestConfiguration(proxyBeanMethods=false)
+    static class PageStatementConfiguration {
+        @org.springframework.context.annotation.Bean PageStatements pageStatements() { return new PageStatements(); }
+        @org.springframework.context.annotation.Bean
+        org.springframework.boot.hibernate.autoconfigure.HibernatePropertiesCustomizer pageStatementCustomizer(PageStatements statements) {
+            return properties -> properties.put("hibernate.session_factory.statement_inspector", statements);
+        }
+    }
+    static class PageStatements implements org.hibernate.resource.jdbc.spi.StatementInspector {
+        private final java.util.concurrent.atomic.AtomicReference<java.util.function.Consumer<String>> hook =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        @Override public String inspect(String sql) {
+            var observer = hook.get(); if(observer != null) observer.accept(sql); return sql;
+        }
+    }
+
+    @Test void contentAndCountStayOnOneSnapshotAcrossAControlledConcurrentCommit() throws Exception {
+        var initial=service("page-snapshot-initial"); initial.setActive(false); initial.setServiceName("Snapshot cohort"); assertTrue(serviceRepository.insert(initial));
+        var query=com.carwash.catalog.application.ServiceListPolicy.POLICY.parse(java.util.Map.of("active",java.util.List.of("false"),"name",java.util.List.of("Snapshot cohort")));
+        long before=transactions.readSnapshot(() -> serviceRepository.findPage(query).totalElements());
+        var contentReached=new CountDownLatch(1); var committed=new CountDownLatch(1);
+        pageStatements.hook.set(sql -> {
+            if(sql.toLowerCase(java.util.Locale.ROOT).contains("from service_definitions") && sql.contains("fetch first")) {
+                pageStatements.hook.set(null); contentReached.countDown();
+                try { assertTrue(committed.await(10,TimeUnit.SECONDS)); }
+                catch(InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IllegalStateException(interrupted); }
+            }
+        });
+        try(var executor=Executors.newFixedThreadPool(2)) {
+            var reader=executor.submit(() -> transactions.readSnapshot(() -> serviceRepository.findPage(query)));
+            assertTrue(contentReached.await(10,TimeUnit.SECONDS));
+            var writer=executor.submit(() -> transactions.write(() -> {
+                var later=service("page-snapshot-later"); later.setActive(false); later.setServiceName("Snapshot cohort"); assertTrue(serviceRepository.insert(later));
+            }));
+            writer.get(10,TimeUnit.SECONDS); committed.countDown();
+            var page=reader.get(10,TimeUnit.SECONDS);
+            assertEquals(before,page.totalElements());
+            assertFalse(page.content().stream().anyMatch(v -> v.getServiceId().equals("page-snapshot-later")));
+            assertEquals(before+1,transactions.readSnapshot(() -> serviceRepository.findPage(query).totalElements()));
+        } finally { committed.countDown(); pageStatements.hook.set(null); }
+    }
+
+    @Test void persistentAndMemoryPagesAgreeOnFiltersSortTiesPrecisionAndEmptyMetadata() {
+        var memory=new com.carwash.catalog.infrastructure.InMemoryServiceRepository();
+        for(int i=0;i<23;i++) {
+            var value=service("page-equivalence-"+String.format("%02d",i)); value.setActive(true);
+            value.setPrice(new BigDecimal("123.45")); value.setServiceName("Page equivalence cohort"); assertTrue(serviceRepository.insert(value)); memory.insert(value);
+        }
+        for(String direction:java.util.List.of("asc","desc")) for(int page:java.util.List.of(0,1,2,3,4)) {
+            var query=com.carwash.catalog.application.ServiceListPolicy.POLICY.parse(java.util.Map.of(
+                    "name",java.util.List.of("Page equivalence cohort"),"active",java.util.List.of("true"),
+                    "sort",java.util.List.of("price,"+direction,"id,"+direction),"size",java.util.List.of("7"),"page",java.util.List.of(String.valueOf(page))));
+            var persistent=transactions.readSnapshot(() -> serviceRepository.findPage(query));var inMemory=memory.findPage(query);
+            assertEquals(23,persistent.totalElements());assertEquals(inMemory.totalPages(),persistent.totalPages());
+            assertEquals(inMemory.content().stream().map(Service::getServiceId).toList(),persistent.content().stream().map(Service::getServiceId).toList());
+            assertEquals(inMemory.hasNext(),persistent.hasNext());assertEquals(inMemory.hasPrevious(),persistent.hasPrevious());
+        }
+        var f=fixture("page-precision",1);
+        var at=LocalDateTime.of(2089,1,17,10,0,0,123456789);
+        var booking=bookings.createBooking(ADMIN,"page-precision-booking",f.user.getUserId(),f.vehicle.getVehicleId(),f.branchId,f.offeringId,at.withNano(0),null);
+        booking.setScheduledDateTime(at); transactions.write(() -> assertTrue(bookingRepository.update(booking)));
+        var memBookings=new com.carwash.booking.infrastructure.InMemoryBookingRepository();memBookings.insert(booking);
+        for(int page:java.util.List.of(0,1,100000)) {
+            var query=com.carwash.booking.application.BookingListPolicy.POLICY.parse(java.util.Map.of(
+                    "userId",java.util.List.of(f.user.getUserId()),"from",java.util.List.of(at.toString()),
+                    "to",java.util.List.of(at.toString()),"page",java.util.List.of(String.valueOf(page)),"size",java.util.List.of("1")));
+            var persistent=transactions.readSnapshot(() -> bookingRepository.findPage(query));var inMemory=memBookings.findPage(query);
+            assertEquals(inMemory.totalElements(),persistent.totalElements());assertEquals(inMemory.totalPages(),persistent.totalPages());
+            assertEquals(inMemory.content().stream().map(Booking::getBookingId).toList(),persistent.content().stream().map(Booking::getBookingId).toList());
+            assertEquals(inMemory.hasPrevious(),persistent.hasPrevious());assertEquals(inMemory.hasNext(),persistent.hasNext());
+        }
+        var after=com.carwash.booking.application.BookingListPolicy.POLICY.parse(java.util.Map.of(
+                "userId",java.util.List.of(f.user.getUserId()),"from",java.util.List.of(at.plusNanos(1).toString())));
+        assertEquals(0,transactions.readSnapshot(() -> bookingRepository.findPage(after)).totalElements());
+    }
+
+    @Test void snapshotCannotSilentlyJoinAReadCommittedTransaction() {
+        var query=com.carwash.catalog.application.ServiceListPolicy.POLICY.parse(java.util.Map.of());
+        assertThrows(IllegalStateException.class, () -> transactions.read(() -> transactions.readSnapshot(() -> serviceRepository.findPage(query))));
+    }
+
+    @Test void persistentScopePredicatesAndEligibilityApplyBeforeTotalsAndLimits() {
+        var f=fixture("page-query-owner",2);
+        Booking booking=bookings.createBooking(ADMIN,"page-query-booking",f.user.getUserId(),f.vehicle.getVehicleId(),f.branchId,f.offeringId,
+                LocalDateTime.of(2089,1,17,10,0),null);
+        bookings.confirmBooking(ADMIN,booking.getBookingId());queues.createQueueEntry(ADMIN,"page-query-entry",booking.getBookingId(),f.service.getServiceId());
+        var scope=new com.carwash.shared.application.ListScope("page-query-owner-business",f.branchId,null,false);
+        transactions.readSnapshot(() -> {
+            assertEquals(1,bookingRepository.findPage(com.carwash.booking.application.BookingListPolicy.POLICY.parse(java.util.Map.of()).scoped(scope)).totalElements());
+            assertEquals(1,queueRepository.findPage(com.carwash.queue.application.QueueListPolicy.POLICY.parse(java.util.Map.of()).scoped(scope)).totalElements());
+            assertEquals(1,vehicleRepository.findPage(com.carwash.vehicle.application.VehicleListPolicy.POLICY.parse(java.util.Map.of()).scoped(scope)).totalElements());
+            assertEquals(1,branchRepository.findPage(com.carwash.marketplace.application.BranchListPolicy.POLICY.parse(java.util.Map.of()).scoped(scope)).totalElements());
+            assertEquals(1,offeringRepository.findPage(com.carwash.catalog.application.OfferingListPolicy.POLICY.parse(java.util.Map.of()).scoped(scope)).totalElements());
+            assertEquals(1,businessRepository.findPage(com.carwash.marketplace.application.BusinessListPolicy.POLICY.parse(java.util.Map.of()).scoped(scope)).totalElements());
+            var foreign=new com.carwash.shared.application.ListScope("page-query-foreign",null,null,false);
+            assertEquals(0,bookingRepository.findPage(com.carwash.booking.application.BookingListPolicy.POLICY.parse(java.util.Map.of("page",java.util.List.of("999999"))).scoped(foreign)).totalElements());
+            return null;
+        });
+    }
+
+    @Test void closureRangesUseExactInstantsAndDiscoveryTotalsTrackEligibility() {
+        var f=fixture("page-eligibility",1);
+        var start=Instant.parse("2089-01-18T10:00:00.123456789Z");
+        scheduling.createTemporaryClosure(ADMIN,f.branchId,new com.carwash.marketplace.application.CreateTemporaryBranchClosureCommand(
+                "page-closure",start,start.plusSeconds(10),"closure"));
+        var scope=new com.carwash.shared.application.ListScope("page-eligibility-business",f.branchId,null,false);
+        var exact=com.carwash.marketplace.application.ClosureListPolicy.POLICY.parse(java.util.Map.of(
+                "from",java.util.List.of(start.toString()),"to",java.util.List.of(start.toString()),"status",java.util.List.of("ACTIVE"))).scoped(scope);
+        var mem=new com.carwash.marketplace.infrastructure.InMemoryTemporaryBranchClosureRepository();
+        mem.insert(closureRepository.findById("page-closure").orElseThrow());
+        assertEquals(mem.findPage(exact).totalElements(),transactions.readSnapshot(() -> closureRepository.findPage(exact).totalElements()));
+        var after=com.carwash.marketplace.application.ClosureListPolicy.POLICY.parse(java.util.Map.of("from",java.util.List.of(start.plusNanos(1).toString()))).scoped(scope);
+        assertEquals(0,transactions.readSnapshot(() -> closureRepository.findPage(after).totalElements()));
+        var userQuery=com.carwash.identity.application.UserListPolicy.POLICY.parse(java.util.Map.of("id",java.util.List.of(f.user.getUserId()),"sort",java.util.List.of("createdAt,desc","name,asc")));
+        assertEquals(1,transactions.readSnapshot(() -> userRepository.findPage(userQuery).totalElements()));
+        var discoveryScope=new com.carwash.shared.application.ListScope("page-eligibility-business",f.branchId,null,true);
+        var branchQuery=com.carwash.marketplace.application.DiscoverableBranchListPolicy.POLICY.parse(java.util.Map.of()).scoped(discoveryScope);
+        var offeringQuery=com.carwash.catalog.application.DiscoverableOfferingListPolicy.POLICY.parse(java.util.Map.of()).scoped(discoveryScope);
+        assertEquals(1,transactions.readSnapshot(() -> branchRepository.findPage(branchQuery).totalElements()));
+        assertEquals(1,transactions.readSnapshot(() -> offeringRepository.findPage(offeringQuery).totalElements()));
+        catalog.deactivateService(ADMIN,f.service.getServiceId());
+        assertEquals(0,transactions.readSnapshot(() -> offeringRepository.findPage(offeringQuery).totalElements()));
+        marketplace.deactivateBusiness(ADMIN,"page-eligibility-business");
+        assertEquals(0,transactions.readSnapshot(() -> branchRepository.findPage(branchQuery).totalElements()));
+    }
+
+    @Test void representativeListPlansUseExistingIndexesAndKeepLimitsInSql() throws Exception {
+        var f=fixture("page-plan",1);
+        bookings.createBooking(ADMIN,"page-plan-booking",f.user.getUserId(),f.vehicle.getVehicleId(),f.branchId,f.offeringId,
+                LocalDateTime.of(2089,1,17,10,0),null);
+        var plans=new java.util.ArrayList<java.util.Map<String,Object>>();
+        for(String sql:java.util.List.of(
+                "select booking_id from bookings where branch_id='page-plan-branch' order by scheduled_at, scheduled_at_nano_remainder, booking_id limit 20",
+                "select vehicle_id from vehicles v where exists(select 1 from bookings bk join branches b on b.branch_id=bk.branch_id where bk.vehicle_id=v.vehicle_id and b.business_id='page-plan-business') order by vehicle_id limit 20")) {
+            String plan=jdbc.queryForObject("explain (analyze, buffers, format json) "+sql,String.class);
+            assertTrue(plan.contains("Limit"));
+            // Only structural plan data is exported; no query/filter literals or customer data.
+            var nodes=java.util.regex.Pattern.compile("\"Node Type\"\\s*:\\s*\"([^\"]+)\"").matcher(plan);
+            var types=new java.util.ArrayList<String>();while(nodes.find())types.add(nodes.group(1));
+            plans.add(java.util.Map.of("nodeTypes",types));
+        }
+        java.nio.file.Files.writeString(java.nio.file.Path.of("target/pagination-query-plans.txt"),plans.toString());
+    }
 
     @Test void databaseOutageFailsReadinessWhileLivenessAndProbeAccessRemainIndependent() throws Exception {
         managementMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/actuator/health/readiness"))

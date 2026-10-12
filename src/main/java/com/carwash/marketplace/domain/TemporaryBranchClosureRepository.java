@@ -5,7 +5,7 @@ import com.carwash.shared.domain.Repository;
 import java.util.List;
 import java.util.Optional;
 
-public interface TemporaryBranchClosureRepository extends Repository<TemporaryBranchClosure, String> {
+public interface TemporaryBranchClosureRepository extends Repository<TemporaryBranchClosure, String>, com.carwash.shared.application.PagedRepository<TemporaryBranchClosure> {
 
     List<TemporaryBranchClosure> findByBranchId(String branchId);
     List<TemporaryBranchClosure> findByBranchIdAndBusinessId(String branchId, String businessId);

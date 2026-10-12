@@ -89,3 +89,5 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 - Bruno requests/assertions: **562 requests / 1,746 assertions**
 
 The full authorization suite also exercises each significant role/capability allow/deny cell rather than relying only on per-operation counts.
+
+Offset collection GET responses use `content` and bounded page metadata. The `23-pagination` group verifies exact filtered totals on empty pages, maximum size, multiple sorts, invalid bounds/overflow/allowlists and scoped count privacy. See [pagination contracts](../../../documentation/API-PAGINATION.md). Cursor inbox/audit and management requests retain their separate existing contracts.

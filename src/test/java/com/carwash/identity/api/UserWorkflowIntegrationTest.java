@@ -20,6 +20,6 @@ class UserWorkflowIntegrationTest extends ApiIntegrationTestSupport {
 
         mockMvc.perform(get("/api/users").with(authentication.platformAdminJwt()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.userId == '" + user.userId() + "')]").isNotEmpty());
+                .andExpect(jsonPath("$.content[?(@.userId == '" + user.userId() + "')]").isNotEmpty());
     }
 }

@@ -33,6 +33,10 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import com.carwash.shared.api.PageResponse;
+import org.springframework.web.bind.annotation.RequestParam;
+import com.carwash.shared.api.PageResponse;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @RestController
 @Validated
@@ -68,10 +72,18 @@ public class BusinessController {
     @PreAuthorize("hasAuthority('PERM_MARKETPLACE_MANAGE')")
     @Operation(summary = "List Marketplace businesses",
             description = "Returns bounded business records for Marketplace management.")
-    @ApiResponse(responseCode = "200", description = "Businesses returned")
-    public List<BusinessResponse> findAll() {
-        return marketplace.findAccessibleBusinesses(tenantAccess.current()).stream()
-                .map(MarketplaceMapper::toResponse).toList();
+    @ApiResponse(responseCode = "200", description = "Businesses returned", useReturnTypeSchema = true)
+    @io.swagger.v3.oas.annotations.Parameters({
+        @io.swagger.v3.oas.annotations.Parameter(name = "id", description = "Exact resource ID; narrows authorized scope only.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", maxLength = 64)),
+        @io.swagger.v3.oas.annotations.Parameter(name = "page", description = "Zero-based page; default 0. Invalid or overflowing offsets return ApiErrorResponse 400.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "0", defaultValue = "0")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "size", description = "Page size, default 20; rejects values outside 1-100.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "1", maximum = "100", defaultValue = "20")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "sort", description = "Repeat up to three field,asc|desc terms from the endpoint allowlist; unique ID tie-breaker and NULLS LAST. See API-PAGINATION.md.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "status", description = "ACTIVE or INACTIVE; sorts id,name,registeredAt.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string"))
+    })
+    public PageResponse<BusinessResponse> findAll(
+            @io.swagger.v3.oas.annotations.Parameter(hidden = true) @RequestParam org.springframework.util.MultiValueMap<String, String> parameters
+    ) {
+        return PageResponse.from(marketplace.findBusinessesPage(tenantAccess.current(), com.carwash.marketplace.application.BusinessListPolicy.POLICY.parse(parameters)).map(MarketplaceMapper::toResponse));
     }
 
     @PostMapping
@@ -143,13 +155,20 @@ public class BusinessController {
     @PreAuthorize("hasAuthority('PERM_MARKETPLACE_MANAGE')")
     @Operation(summary = "List business branches",
             description = "Returns every branch owned by exactly the requested business, including inactive records.")
-    @ApiResponse(responseCode = "200", description = "Branches returned")
-    public List<BranchResponse> findBranches(
-            @PathVariable @NotBlank @Size(max = 64) String businessId
+    @ApiResponse(responseCode = "200", description = "Branches returned", useReturnTypeSchema = true)
+    @io.swagger.v3.oas.annotations.Parameters({
+        @io.swagger.v3.oas.annotations.Parameter(name = "id", description = "Exact resource ID; narrows authorized scope only.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", maxLength = 64)),
+        @io.swagger.v3.oas.annotations.Parameter(name = "page", description = "Zero-based page; default 0. Invalid or overflowing offsets return ApiErrorResponse 400.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "0", defaultValue = "0")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "size", description = "Page size, default 20; rejects values outside 1-100.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "1", maximum = "100", defaultValue = "20")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "sort", description = "Repeat up to three field,asc|desc terms from the endpoint allowlist; unique ID tie-breaker and NULLS LAST. See API-PAGINATION.md.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "status", description = "ACTIVE or INACTIVE.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "city", description = "Exact case-sensitive city; sorts id,name,createdAt.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string"))
+    })
+    public PageResponse<BranchResponse> findBranches(
+            @PathVariable @NotBlank @Size(max = 64) String businessId,
+            @io.swagger.v3.oas.annotations.Parameter(hidden = true) @RequestParam org.springframework.util.MultiValueMap<String, String> parameters
     ) {
-        return marketplace.findBranchesByBusiness(tenantAccess.current(), businessId).stream()
-                .map(MarketplaceMapper::toResponse)
-                .toList();
+        return PageResponse.from(marketplace.findBranchesPage(tenantAccess.current(), businessId, com.carwash.marketplace.application.BranchListPolicy.POLICY.parse(parameters)).map(MarketplaceMapper::toResponse));
     }
 
     @PostMapping("/{businessId}/branches")

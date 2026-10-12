@@ -21,6 +21,20 @@ import java.util.stream.Collectors;
 @Profile("postgres")
 @Transactional
 public class PostgresUserRepository implements UserRepository {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.carwash.shared.infrastructure.JpaPageQueries pages;
+
+    @Override public com.carwash.shared.application.PageResult<User> findPage(com.carwash.shared.application.ListQuery query) {
+        var scope = query.scope();
+        var clauses = new java.util.ArrayList<String>(); clauses.add("1=1");
+        var parameters = new java.util.LinkedHashMap<String, Object>();
+        var page = pages.find(UserJpaEntity.class, query, String.join(" and ", clauses), parameters, java.util.Map.ofEntries(java.util.Map.entry("id", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.id")),
+                java.util.Map.entry("name", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.fullName")),
+                java.util.Map.entry("createdAt", com.carwash.shared.infrastructure.JpaPageQueries.Field.time("q.createdAt", "q.createdAtNano")),
+                java.util.Map.entry("accountStatus", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.accountStatus"))));
+        return com.carwash.shared.application.PageResult.of(domains(page.content()), query.page(), page.totalElements());
+    }
+
     private final UserSpringDataRepository users;
     private final UserCredentialSpringDataRepository credentials;
     private final UserRoleAssignmentSpringDataRepository assignments;
@@ -81,6 +95,10 @@ public class PostgresUserRepository implements UserRepository {
     @Override public Optional<User> findById(String id) { return users.findById(id).map(this::domain); }
     @Override public List<User> findAll() {
         List<UserJpaEntity> found = users.findAllByOrderByIdAsc();
+        return domains(found);
+    }
+
+    private List<User> domains(List<UserJpaEntity> found) {
         List<String> ids = found.stream().map(entity -> entity.id).toList();
         Map<String, UserCredentialJpaEntity> credentialByUser = credentials.findAllById(ids).stream()
                 .collect(Collectors.toMap(entity -> entity.userId, Function.identity()));

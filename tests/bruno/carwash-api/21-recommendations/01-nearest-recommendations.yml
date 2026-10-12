@@ -13,26 +13,36 @@ runtime:
       code: |-
         test("returns 200", function() { expect(res.status).to.equal(200); });
         test("returns ranked customer-safe explanations", function() {
-          expect(res.body).to.be.an("array");
-          expect(res.body.length).to.be.greaterThan(1);
-          expect(res.body[0].rank).to.equal(1);
-          expect(res.body[0].appliedPreference).to.equal("NEAREST");
-          expect(res.body[0].businessId).to.be.a("string");
-          expect(res.body[0].businessName).to.be.a("string");
-          expect(res.body[0].branchId).to.be.a("string");
-          expect(res.body[0].serviceOfferingId).to.be.a("string");
-          expect(res.body[0].distanceKm).to.be.a("number");
-          expect(res.body[0].recommendationScore).to.be.a("number");
-          expect(res.body[0].scoreBreakdown.distance.normalizedScore).to.be.a("number");
-          expect(res.body[0].scoreBreakdown.distance.configuredWeight).to.equal(0.25);
-          expect(res.body[0].explanation).to.include("distance");
-          expect(res.body[0].reason).to.equal(undefined);
-          expect(res.body[0].effectiveActive).to.equal(undefined);
-          expect(res.body[0].repository).to.equal(undefined);
+          expect(res.body.content).to.be.an("array");
+          expect(res.body.content.length).to.be.greaterThan(1);
+          expect(res.body.content[0].rank).to.equal(1);
+          expect(res.body.content[0].appliedPreference).to.equal("NEAREST");
+          expect(res.body.content[0].businessId).to.be.a("string");
+          expect(res.body.content[0].businessName).to.be.a("string");
+          expect(res.body.content[0].branchId).to.be.a("string");
+          expect(res.body.content[0].serviceOfferingId).to.be.a("string");
+          expect(res.body.content[0].distanceKm).to.be.a("number");
+          expect(res.body.content[0].recommendationScore).to.be.a("number");
+          expect(res.body.content[0].scoreBreakdown.distance.normalizedScore).to.be.a("number");
+          expect(res.body.content[0].scoreBreakdown.distance.configuredWeight).to.equal(0.25);
+          expect(res.body.content[0].explanation).to.include("distance");
+          expect(res.body.content[0].reason).to.equal(undefined);
+          expect(res.body.content[0].effectiveActive).to.equal(undefined);
+          expect(res.body.content[0].repository).to.equal(undefined);
         });
         test("nearest uses raw distance and stable ordering", function() {
-          const ids = res.body.map(item => item.branchId);
+          const ids = res.body.content.map(item => item.branchId);
           expect(ids.indexOf(bru.getVar("marketplaceBranchId"))).to.be.lessThan(ids.indexOf(bru.getVar("marketplaceSecondBranchId")));
           bru.setVar("recommendationCandidateIds", JSON.stringify([...ids].sort()));
+        });
+        test("bounded page envelope", function() {
+          expect(res.body.content).to.be.an("array");
+          expect(res.body.page).to.be.at.least(0);
+          expect(res.body.size).to.be.within(1, 100);
+          expect(res.body.content.length).to.be.at.most(res.body.size);
+          expect(res.body.totalElements).to.be.at.least(res.body.content.length);
+          expect(res.body.totalPages).to.equal(Math.ceil(res.body.totalElements / res.body.size));
+          expect(res.body.hasNext).to.equal(res.body.page + 1 < res.body.totalPages);
+          expect(res.body.hasPrevious).to.equal(res.body.page > 0);
         });
 settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -38,16 +38,16 @@ class NearbyBranchDiscoveryWorkflowIntegrationTest extends ApiIntegrationTestSup
                         .param("latitude", "-33.9249")
                         .param("longitude", "18.4241"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].branchId", contains(fixture.capeTownBranch(), fixture.johannesburgBranch())))
-                .andExpect(jsonPath("$[0].businessId").value(fixture.activeBusiness()))
-                .andExpect(jsonPath("$[0].branchName").value("Cape Town Branch"))
-                .andExpect(jsonPath("$[0].latitude").value(-33.9249))
-                .andExpect(jsonPath("$[0].longitude").value(18.4241))
-                .andExpect(jsonPath("$[0].timezone").value("Africa/Johannesburg"))
-                .andExpect(jsonPath("$[0].distanceKm").isNumber())
-                .andExpect(jsonPath("$[0].status").doesNotExist())
-                .andExpect(jsonPath("$[0].publicDiscoveryEnabled").doesNotExist())
-                .andExpect(jsonPath("$[0].offerings").doesNotExist());
+                .andExpect(jsonPath("$.content[*].branchId", contains(fixture.capeTownBranch(), fixture.johannesburgBranch())))
+                .andExpect(jsonPath("$.content[0].businessId").value(fixture.activeBusiness()))
+                .andExpect(jsonPath("$.content[0].branchName").value("Cape Town Branch"))
+                .andExpect(jsonPath("$.content[0].latitude").value(-33.9249))
+                .andExpect(jsonPath("$.content[0].longitude").value(18.4241))
+                .andExpect(jsonPath("$.content[0].timezone").value("Africa/Johannesburg"))
+                .andExpect(jsonPath("$.content[0].distanceKm").isNumber())
+                .andExpect(jsonPath("$.content[0].status").doesNotExist())
+                .andExpect(jsonPath("$.content[0].publicDiscoveryEnabled").doesNotExist())
+                .andExpect(jsonPath("$.content[0].offerings").doesNotExist());
 
         mockMvc.perform(get("/api/marketplace/branches/discoverable/nearby")
                         .with(reader("staff", "STAFF"))
@@ -58,9 +58,9 @@ class NearbyBranchDiscoveryWorkflowIntegrationTest extends ApiIntegrationTestSup
                         .param("openAt", OPEN_AT)
                         .param("sort", "distance"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].branchId").value(fixture.capeTownBranch()))
-                .andExpect(jsonPath("$[0].distanceKm").value(0.00));
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].branchId").value(fixture.capeTownBranch()))
+                .andExpect(jsonPath("$.content[0].distanceKm").value(0.00));
     }
 
     @Test
@@ -227,7 +227,7 @@ class NearbyBranchDiscoveryWorkflowIntegrationTest extends ApiIntegrationTestSup
                         .param("longitude", "23")
                         .param(parameter, value))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(size));
+                .andExpect(jsonPath("$.content.length()").value(size));
     }
 
     private CreateBusinessRequest business(String id, String email) {

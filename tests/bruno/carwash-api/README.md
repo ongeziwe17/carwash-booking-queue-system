@@ -189,3 +189,5 @@ Cleanup is best-effort and uses only public API operations permitted by the doma
 For a fully clean manual run, restart the local application before executing the complete suite.
 
 No repository-reset endpoint, authentication bypass, test-only HTTP endpoint, or hard-coded privileged user is added by this suite.
+
+Offset collection GET responses use `content` and bounded page metadata. The `23-pagination` group verifies exact filtered totals on empty pages, maximum size, multiple sorts, invalid bounds/overflow/allowlists and scoped count privacy. See [pagination contracts](../../../documentation/API-PAGINATION.md). Cursor inbox/audit and management requests retain their separate existing contracts.

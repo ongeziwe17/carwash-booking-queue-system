@@ -12,6 +12,24 @@ import java.util.Optional;
 
 @Repository @Profile("postgres") @Transactional
 public class PostgresCarWashBranchRepository implements CarWashBranchRepository {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.carwash.shared.infrastructure.JpaPageQueries pages;
+
+    @Override public com.carwash.shared.application.PageResult<CarWashBranch> findPage(com.carwash.shared.application.ListQuery query) {
+        var scope = query.scope();
+        var clauses = new java.util.ArrayList<String>(); clauses.add("1=1");
+        var parameters = new java.util.LinkedHashMap<String, Object>();
+        if (scope.businessId() != null) { clauses.add("q.businessId = :business"); parameters.put("business", scope.businessId()); }
+        if (scope.branchId() != null) { clauses.add("q.id = :branch"); parameters.put("branch", scope.branchId()); }
+        if (scope.discoverable()) clauses.add("q.status='ACTIVE' and q.publicDiscovery=true and exists (select b.id from BusinessJpaEntity b where b.id=q.businessId and b.status='ACTIVE')");
+        var page = pages.find(BranchJpaEntity.class, query, String.join(" and ", clauses), parameters, java.util.Map.ofEntries(java.util.Map.entry("id", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.id")),
+                java.util.Map.entry("name", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.name")),
+                java.util.Map.entry("createdAt", com.carwash.shared.infrastructure.JpaPageQueries.Field.time("q.createdAt", "q.createdAtNano")),
+                java.util.Map.entry("status", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.status")),
+                java.util.Map.entry("city", com.carwash.shared.infrastructure.JpaPageQueries.Field.text("q.city"))));
+        return page.map(this::domain);
+    }
+
     private final BranchSpringDataRepository repository;
     public PostgresCarWashBranchRepository(BranchSpringDataRepository repository){this.repository=repository;}
     @Override public List<CarWashBranch> findByBusinessId(String id){return repository.findByBusinessIdOrderByIdAsc(id).stream().map(this::domain).toList();}

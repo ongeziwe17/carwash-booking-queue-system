@@ -11,15 +11,34 @@ import java.util.Optional;
 public final class InMemoryServiceOfferingRepository
         extends InMemoryRepository<ServiceOffering, String>
         implements ServiceOfferingRepository {
+    @Override public com.carwash.shared.application.PageResult<ServiceOffering> findPage(com.carwash.shared.application.ListQuery query) {
+        var scope = query.scope();
+        java.util.List<ServiceOffering> source = scope.branchId() == null ? findMatching(v -> true) : findByBranchId(scope.branchId());
+        source = source.stream().filter(v -> scope.branchId() == null || scope.branchId().equals(v.getBranchId())).toList();
+        if (scope.businessId() != null) source = source.stream().filter(v -> branchBelongsTo(v.getBranchId(), scope.businessId())).toList();
+        if (scope.discoverable()) source = source.stream().filter(v -> v.isActive() && services != null && services.findById(v.getServiceId()).map(com.carwash.catalog.domain.Service::isActive).orElse(false) && marketplace != null && marketplace.findBranchOptional(v.getBranchId()).map(com.carwash.marketplace.application.BranchSnapshot::discoverable).orElse(false)).toList();
+        return query.select(source, java.util.Map.ofEntries(java.util.Map.entry("id", (java.util.function.Function<ServiceOffering, Object>) v -> v.getOfferingId()),
+                java.util.Map.entry("price", (java.util.function.Function<ServiceOffering, Object>) v -> v.getPrice()),
+                java.util.Map.entry("duration", (java.util.function.Function<ServiceOffering, Object>) v -> v.getEstimatedDurationMin()),
+                java.util.Map.entry("status", (java.util.function.Function<ServiceOffering, Object>) v -> v.getStatus()),
+                java.util.Map.entry("serviceId", (java.util.function.Function<ServiceOffering, Object>) v -> v.getServiceId())));
+    }
+
 
     private final MarketplaceQuery marketplace;
+    private final com.carwash.catalog.domain.ServiceRepository services;
 
     public InMemoryServiceOfferingRepository() {
         this(null);
     }
 
     public InMemoryServiceOfferingRepository(MarketplaceQuery marketplace) {
+        this(marketplace, null);
+    }
+
+    public InMemoryServiceOfferingRepository(MarketplaceQuery marketplace, com.carwash.catalog.domain.ServiceRepository services) {
         this.marketplace = marketplace;
+        this.services = services;
     }
 
     @Override

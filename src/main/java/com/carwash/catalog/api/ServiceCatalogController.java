@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import com.carwash.shared.api.PageResponse;
 import com.carwash.access.application.TenantAccessContextProvider;
 
 @RestController
@@ -50,7 +51,7 @@ public class ServiceCatalogController {
     @PreAuthorize("hasAuthority('PERM_SERVICE_READ')")
     @Operation(summary = "List services", description = "Optionally filter the global catalogue by active state.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Services returned"),
+            @ApiResponse(responseCode = "200", description = "Services returned", useReturnTypeSchema = true),
             @ApiResponse(responseCode = "400", description = "Invalid active parameter",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Authentication required",
@@ -62,10 +63,19 @@ public class ServiceCatalogController {
             @ApiResponse(responseCode = "500", description = "Internal server error",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public List<Service> getAll(
-            @Parameter(description = "Optional active-state filter") @RequestParam(required = false) Boolean active
+    @io.swagger.v3.oas.annotations.Parameters({
+        @io.swagger.v3.oas.annotations.Parameter(name = "id", description = "Exact resource ID; narrows authorized scope only.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", maxLength = 64)),
+        @io.swagger.v3.oas.annotations.Parameter(name = "page", description = "Zero-based page; default 0. Invalid or overflowing offsets return ApiErrorResponse 400.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "0", defaultValue = "0")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "size", description = "Page size, default 20; rejects values outside 1-100.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", minimum = "1", maximum = "100", defaultValue = "20")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "sort", description = "Repeat up to three field,asc|desc terms from the endpoint allowlist; unique ID tie-breaker and NULLS LAST. See API-PAGINATION.md.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "name", description = "Exact case-sensitive service name", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string")),
+        @io.swagger.v3.oas.annotations.Parameter(name = "active", description = "Strict true or false; sorts id,name,price,duration.", schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string"))
+    })
+    public PageResponse<com.carwash.catalog.api.dto.ServiceListResponse> getAll(
+            @RequestParam(required = false) Boolean active,
+            @io.swagger.v3.oas.annotations.Parameter(hidden = true) @RequestParam org.springframework.util.MultiValueMap<String, String> parameters
     ) {
-        return active == null ? service.findAll() : service.findByActive(active);
+        return PageResponse.from(service.findPage(com.carwash.catalog.application.ServiceListPolicy.POLICY.parse(parameters)).map(com.carwash.catalog.api.dto.ServiceListResponse::from));
     }
 
     @GetMapping("/{id}")

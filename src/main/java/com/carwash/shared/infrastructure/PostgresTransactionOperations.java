@@ -18,6 +18,7 @@ import java.util.function.Supplier;
 public final class PostgresTransactionOperations implements DataTransactionOperations {
 
     private final TransactionTemplate readOnly;
+    private final TransactionTemplate snapshot;
     private final TransactionTemplate required;
     private final TransactionTemplate requiresNew;
     private final com.carwash.shared.application.Telemetry telemetry;
@@ -30,6 +31,8 @@ public final class PostgresTransactionOperations implements DataTransactionOpera
     public PostgresTransactionOperations(PlatformTransactionManager transactionManager,
                                         com.carwash.shared.application.Telemetry telemetry) {
         this.telemetry = telemetry;
+        this.snapshot = template(transactionManager, TransactionDefinition.PROPAGATION_REQUIRED, true);
+        this.snapshot.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
         this.readOnly = template(transactionManager, TransactionDefinition.PROPAGATION_REQUIRED, true);
         this.required = template(transactionManager, TransactionDefinition.PROPAGATION_REQUIRED, false);
         this.requiresNew = template(transactionManager, TransactionDefinition.PROPAGATION_REQUIRES_NEW, false);
@@ -39,6 +42,17 @@ public final class PostgresTransactionOperations implements DataTransactionOpera
     public <T> T read(Supplier<T> action) {
         return telemetry.observe(com.carwash.shared.application.Telemetry.Operation.PERSISTENCE_READ,
                 () -> readOnly.execute(status -> action.get()));
+    }
+
+    @Override
+    public <T> T readSnapshot(Supplier<T> action) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            Integer isolation = TransactionSynchronizationManager.getCurrentTransactionIsolationLevel();
+            if (isolation == null || isolation < TransactionDefinition.ISOLATION_REPEATABLE_READ)
+                throw new IllegalStateException("List snapshot cannot join a weaker existing transaction");
+        }
+        return telemetry.observe(com.carwash.shared.application.Telemetry.Operation.PERSISTENCE_READ,
+                () -> snapshot.execute(status -> action.get()));
     }
 
     @Override

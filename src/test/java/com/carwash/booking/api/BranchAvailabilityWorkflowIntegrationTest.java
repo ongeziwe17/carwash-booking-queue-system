@@ -49,24 +49,24 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
 
         search(fixture.serviceId(), AT)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].branchId", contains(fixture.nearBranch(), fixture.farBranch())))
-                .andExpect(jsonPath("$[0].serviceOfferingId").value(fixture.nearOffering()))
-                .andExpect(jsonPath("$[0].price").value(100.00))
-                .andExpect(jsonPath("$[0].estimatedDurationMin").value(30))
-                .andExpect(jsonPath("$[0].concurrentCapacity").value(1))
-                .andExpect(jsonPath("$[0].capacityRemaining").value(1))
-                .andExpect(jsonPath("$[0].availableStartAt").value(AT))
-                .andExpect(jsonPath("$[0].estimatedEndAt").value("2090-01-15T09:30:00+02:00"))
-                .andExpect(jsonPath("$[0].queueWaitEstimateMin").value(0))
-                .andExpect(jsonPath("$[0].distanceKm").isNumber())
-                .andExpect(jsonPath("$[0].status").doesNotExist())
-                .andExpect(jsonPath("$[0].reason").doesNotExist())
-                .andExpect(jsonPath("$[0].createdAt").doesNotExist())
-                .andExpect(jsonPath("$[0].updatedAt").doesNotExist())
-                .andExpect(jsonPath("$[0].effectiveActive").doesNotExist())
-                .andExpect(jsonPath("$[1].price").value(175.50))
-                .andExpect(jsonPath("$[1].estimatedDurationMin").value(60))
-                .andExpect(jsonPath("$[1].concurrentCapacity").value(2));
+                .andExpect(jsonPath("$.content[*].branchId", contains(fixture.nearBranch(), fixture.farBranch())))
+                .andExpect(jsonPath("$.content[0].serviceOfferingId").value(fixture.nearOffering()))
+                .andExpect(jsonPath("$.content[0].price").value(100.00))
+                .andExpect(jsonPath("$.content[0].estimatedDurationMin").value(30))
+                .andExpect(jsonPath("$.content[0].concurrentCapacity").value(1))
+                .andExpect(jsonPath("$.content[0].capacityRemaining").value(1))
+                .andExpect(jsonPath("$.content[0].availableStartAt").value(AT))
+                .andExpect(jsonPath("$.content[0].estimatedEndAt").value("2090-01-15T09:30:00+02:00"))
+                .andExpect(jsonPath("$.content[0].queueWaitEstimateMin").value(0))
+                .andExpect(jsonPath("$.content[0].distanceKm").isNumber())
+                .andExpect(jsonPath("$.content[0].status").doesNotExist())
+                .andExpect(jsonPath("$.content[0].reason").doesNotExist())
+                .andExpect(jsonPath("$.content[0].createdAt").doesNotExist())
+                .andExpect(jsonPath("$.content[0].updatedAt").doesNotExist())
+                .andExpect(jsonPath("$.content[0].effectiveActive").doesNotExist())
+                .andExpect(jsonPath("$.content[1].price").value(175.50))
+                .andExpect(jsonPath("$.content[1].estimatedDurationMin").value(60))
+                .andExpect(jsonPath("$.content[1].concurrentCapacity").value(2));
 
         CreateBookingRequest booking = BookingFixtureBuilder.valid(
                         ids, fixture.userId(), fixture.vehicleId(), fixture.nearBranch(), fixture.nearOffering())
@@ -75,14 +75,14 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
         api.createBooking(booking).andExpect(status().isCreated());
         search(fixture.serviceId(), AT)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].branchId", contains(fixture.farBranch())));
+                .andExpect(jsonPath("$.content[*].branchId", contains(fixture.farBranch())));
 
         mockMvc.perform(post("/api/bookings/{id}/cancel", booking.bookingId())
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isOk());
         search(fixture.serviceId(), AT)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].branchId", contains(fixture.nearBranch(), fixture.farBranch())));
+                .andExpect(jsonPath("$.content[*].branchId", contains(fixture.nearBranch(), fixture.farBranch())));
     }
 
     @Test
@@ -94,14 +94,14 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
                 .andExpect(status().isOk());
         search(fixture.serviceId(), AT)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].branchId", contains(fixture.farBranch())));
+                .andExpect(jsonPath("$.content[*].branchId", contains(fixture.farBranch())));
 
         mockMvc.perform(post("/api/marketplace/businesses/{id}/activate", fixture.nearBusiness())
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isOk());
         search(fixture.serviceId(), AT)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].branchId", contains(fixture.nearBranch(), fixture.farBranch())));
+                .andExpect(jsonPath("$.content[*].branchId", contains(fixture.nearBranch(), fixture.farBranch())));
 
         CreateBookingRequest booking = BookingFixtureBuilder.valid(
                         ids, fixture.userId(), fixture.vehicleId(), fixture.nearBranch(), fixture.nearOffering())
@@ -110,17 +110,17 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
         api.createBooking(booking).andExpect(status().isCreated());
         search(fixture.serviceId(), AT)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].branchId", contains(fixture.farBranch())))
-                .andExpect(jsonPath("$[0].capacityRemaining").value(2));
+                .andExpect(jsonPath("$.content[*].branchId", contains(fixture.farBranch())))
+                .andExpect(jsonPath("$.content[0].capacityRemaining").value(2));
 
         mockMvc.perform(post("/api/bookings/{id}/cancel", booking.bookingId())
                         .with(authentication.platformAdminJwt()))
                 .andExpect(status().isOk());
         search(fixture.serviceId(), AT)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].branchId", contains(fixture.nearBranch(), fixture.farBranch())))
-                .andExpect(jsonPath("$[0].capacityRemaining").value(1))
-                .andExpect(jsonPath("$[1].capacityRemaining").value(2));
+                .andExpect(jsonPath("$.content[*].branchId", contains(fixture.nearBranch(), fixture.farBranch())))
+                .andExpect(jsonPath("$.content[0].capacityRemaining").value(1))
+                .andExpect(jsonPath("$.content[1].capacityRemaining").value(2));
     }
 
     @Test
@@ -140,14 +140,14 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
 
         search(fixture.serviceId(), AT)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].branchId", contains(fixture.nearBranch(), fixture.farBranch())))
-                .andExpect(jsonPath("$[0].queueWaitEstimateMin").value(30))
-                .andExpect(jsonPath("$[1].queueWaitEstimateMin").value(0));
+                .andExpect(jsonPath("$.content[*].branchId", contains(fixture.nearBranch(), fixture.farBranch())))
+                .andExpect(jsonPath("$.content[0].queueWaitEstimateMin").value(30))
+                .andExpect(jsonPath("$.content[1].queueWaitEstimateMin").value(0));
 
         search(fixture.serviceId(), "2090-01-22T09:00:00+02:00")
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].queueWaitEstimateMin").doesNotExist())
-                .andExpect(jsonPath("$[1].queueWaitEstimateMin").doesNotExist());
+                .andExpect(jsonPath("$.content[0].queueWaitEstimateMin").doesNotExist())
+                .andExpect(jsonPath("$.content[1].queueWaitEstimateMin").doesNotExist());
 
         mockMvc.perform(post("/api/queue-entries/{id}/call", queueEntryId)
                         .with(authentication.platformAdminJwt()))
@@ -169,9 +169,9 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
 
         search(fixture.serviceId(), AT)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].branchId", contains(fixture.nearBranch(), fixture.farBranch())))
-                .andExpect(jsonPath("$[0].queueWaitEstimateMin").value(0))
-                .andExpect(jsonPath("$[1].queueWaitEstimateMin").value(0));
+                .andExpect(jsonPath("$.content[*].branchId", contains(fixture.nearBranch(), fixture.farBranch())))
+                .andExpect(jsonPath("$.content[0].queueWaitEstimateMin").value(0))
+                .andExpect(jsonPath("$.content[1].queueWaitEstimateMin").value(0));
     }
 
     @Test
@@ -189,7 +189,7 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
 
         search(fixture.serviceId(), AT)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].branchId", contains(fixture.farBranch())));
+                .andExpect(jsonPath("$.content[*].branchId", contains(fixture.farBranch())));
 
         mockMvc.perform(post("/api/marketplace/closures/{closureId}/cancel", "availability-closure")
                         .with(authentication.platformAdminJwt()))
@@ -202,7 +202,7 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
                         .param("longitude", "18.4241")
                         .param("radiusKm", "10"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].branchId", contains(fixture.nearBranch())));
+                .andExpect(jsonPath("$.content[*].branchId", contains(fixture.nearBranch())));
     }
 
     @Test
@@ -237,8 +237,8 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
         mockMvc.perform(get("/api/availability/branches")
                         .with(reader()).param("serviceId", serviceId).param("at", requestedAt))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].branchId", contains(branchId)))
-                .andExpect(jsonPath("$[0].availableStartAt").value(requestedAt));
+                .andExpect(jsonPath("$.content[*].branchId", contains(branchId)))
+                .andExpect(jsonPath("$.content[0].availableStartAt").value(requestedAt));
 
         CreateBookingRequest booking = BookingFixtureBuilder.valid(
                         ids, user.userId(), vehicle.vehicleId(), branchId, offeringId)
@@ -248,7 +248,7 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
         mockMvc.perform(get("/api/availability/branches")
                         .with(reader()).param("serviceId", serviceId).param("at", requestedAt))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.content.length()").value(0));
     }
 
     @Test
@@ -284,7 +284,7 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
             mockMvc.perform(get("/api/availability/branches")
                             .with(reader()).param("serviceId", serviceId).param("at", requestedAt))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].branchId", contains(branchId)));
+                    .andExpect(jsonPath("$.content[*].branchId", contains(branchId)));
             api.createBooking(BookingFixtureBuilder.valid(
                             ids, user.userId(), vehicle.vehicleId(), branchId, offeringId)
                     .scheduledDateTime(localStart)
