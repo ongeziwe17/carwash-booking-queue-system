@@ -1,5 +1,8 @@
 package com.carwash.notification.application;
 
+import com.carwash.shared.application.Telemetry;
+import com.carwash.shared.application.Telemetry.Operation;
+
 import com.carwash.booking.domain.Booking;
 import com.carwash.notification.domain.Notification;
 import com.carwash.identity.domain.User;
@@ -31,6 +34,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class NotificationManagementService implements BookingNotificationPublisher {
+    private final Telemetry telemetry;
+
 
     private static final String DEFAULT_CHANNEL = "IN_APP";
 
@@ -49,6 +54,19 @@ public class NotificationManagementService implements BookingNotificationPublish
                                          NotificationIdGenerator notificationIdGenerator,
                                          NotificationPolicyProperties notificationPolicy,
                                          Clock clock) {
+        this(notificationRepository, userRepository, bookingRepository, coordinator, notificationIdGenerator, notificationPolicy, clock, Telemetry.NONE);
+    }
+
+    public NotificationManagementService(NotificationRepository notificationRepository,
+                                         UserRepository userRepository,
+                                         BookingRepository bookingRepository,
+                                         DataTransactionOperations coordinator,
+                                         NotificationIdGenerator notificationIdGenerator,
+                                         NotificationPolicyProperties notificationPolicy,
+                                         Clock clock,
+            Telemetry telemetry
+    ) {
+        this.telemetry = Objects.requireNonNull(telemetry, "Telemetry is required");
         this.notificationRepository = Objects.requireNonNull(notificationRepository,
                 "Notification repository is required");
         this.userRepository = userRepository;
@@ -61,22 +79,26 @@ public class NotificationManagementService implements BookingNotificationPublish
     }
 
     Notification createNotification(User user, Booking booking, String type, String message) {
-        return coordinator.write(() -> {
-            User canonicalUser = resolveUser(user);
-            Booking canonicalBooking = resolveBooking(booking);
-            return createInside(canonicalUser, canonicalBooking, type, message);
+        return telemetry.observe(Operation.NOTIFICATION_CREATE, () -> {
+            return coordinator.write(() -> {
+                User canonicalUser = resolveUser(user);
+                Booking canonicalBooking = resolveBooking(booking);
+                return createInside(canonicalUser, canonicalBooking, type, message);
+            });
         });
     }
 
     @Override
     public Notification publishForAuthorizedBooking(
             Booking authorizedBooking, String type, String message) {
-        return coordinator.write(() -> {
-            if (authorizedBooking == null) {
-                throw new BusinessRuleViolationException("Authorized notification booking is required");
-            }
-            User canonicalUser = resolveUser(authorizedBooking.getUser());
-            return createInside(canonicalUser, authorizedBooking, type, message);
+        return telemetry.observe(Operation.NOTIFICATION_CREATE, () -> {
+            return coordinator.write(() -> {
+                if (authorizedBooking == null) {
+                    throw new BusinessRuleViolationException("Authorized notification booking is required");
+                }
+                User canonicalUser = resolveUser(authorizedBooking.getUser());
+                return createInside(canonicalUser, authorizedBooking, type, message);
+            });
         });
     }
 

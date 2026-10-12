@@ -20,6 +20,7 @@ import com.carwash.booking.infrastructure.InMemoryBookingRepository;
 import com.carwash.shared.infrastructure.InMemoryDataCoordinator;
 import com.carwash.shared.infrastructure.InMemoryMutationLock;
 import com.carwash.shared.application.DataTransactionOperations;
+import com.carwash.shared.application.Telemetry;
 import com.carwash.shared.application.MutationLock;
 import com.carwash.notification.infrastructure.InMemoryNotificationRepository;
 import com.carwash.marketplace.infrastructure.InMemoryCarWashBranchRepository;
@@ -85,8 +86,8 @@ public class ApplicationCompositionConfig {
 
     @Bean
     @Profile("!postgres")
-    public InMemoryDataCoordinator inMemoryDataCoordinator() {
-        return new InMemoryDataCoordinator();
+    public InMemoryDataCoordinator inMemoryDataCoordinator(Telemetry telemetry) {
+        return new InMemoryDataCoordinator(telemetry);
     }
 
     @Bean
@@ -255,13 +256,15 @@ public class ApplicationCompositionConfig {
             ServiceRepository serviceRepository,
             BookingSlotPolicyService bookingSlotPolicyService,
             BookingPolicyProperties bookingPolicy,
-            DataTransactionOperations coordinator
+            DataTransactionOperations coordinator,
+            Telemetry telemetry
     ) {
         return new AvailabilityService(
                 serviceRepository,
                 bookingSlotPolicyService,
                 bookingPolicy,
-                coordinator
+                coordinator,
+                telemetry
         );
     }
 
@@ -273,7 +276,8 @@ public class ApplicationCompositionConfig {
             ServiceOfferingQuery serviceOfferingQuery,
             ServiceDefinitionQuery serviceDefinitionQuery,
             BookingPolicyProperties bookingPolicy,
-            Clock clock
+            Clock clock,
+            Telemetry telemetry
     ) {
         return new BranchAvailabilityDecisionService(
                 bookingRepository,
@@ -282,7 +286,8 @@ public class ApplicationCompositionConfig {
                 serviceOfferingQuery,
                 serviceDefinitionQuery,
                 bookingPolicy,
-                clock
+                clock,
+                telemetry
         );
     }
 
@@ -295,7 +300,8 @@ public class ApplicationCompositionConfig {
             QueueQuery queueQuery,
             DistanceCalculator distanceCalculator,
             DataTransactionOperations coordinator,
-            Clock clock
+            Clock clock,
+            Telemetry telemetry
     ) {
         return new BranchAvailabilitySearchService(
                 marketplaceQuery,
@@ -305,7 +311,8 @@ public class ApplicationCompositionConfig {
                 queueQuery,
                 distanceCalculator,
                 coordinator,
-                clock
+                clock,
+                telemetry
         );
     }
 
@@ -336,12 +343,14 @@ public class ApplicationCompositionConfig {
             DistanceRecommendationMetricProvider distance,
             QueueWaitRecommendationMetricProvider queueWait,
             TotalTimeRecommendationMetricProvider totalTime,
-            PriceRecommendationMetricProvider price
+            PriceRecommendationMetricProvider price,
+            Telemetry telemetry
     ) {
         return new RecommendationService(
                 candidateQuery,
                 recommendationProperties,
-                java.util.List.of(distance, queueWait, totalTime, price)
+                java.util.List.of(distance, queueWait, totalTime, price),
+                telemetry
         );
     }
 
@@ -496,7 +505,8 @@ public class ApplicationCompositionConfig {
             DataTransactionOperations coordinator,
             NotificationIdGenerator notificationIdGenerator,
             NotificationPolicyProperties notificationPolicy,
-            Clock clock
+            Clock clock,
+            Telemetry telemetry
     ) {
         return new NotificationManagementService(
                 notificationRepository,
@@ -505,7 +515,8 @@ public class ApplicationCompositionConfig {
                 coordinator,
                 notificationIdGenerator,
                 notificationPolicy,
-                clock
+                clock,
+                telemetry
         );
     }
 
@@ -527,7 +538,8 @@ public class ApplicationCompositionConfig {
             BookingSlotPolicyService bookingSlotPolicyService,
             BranchAvailabilityDecisionService branchAvailabilityDecisionService,
             Clock clock,
-            AuditOperations audit
+            AuditOperations audit,
+            Telemetry telemetry
     ) {
         return new BookingManagementService(
                 bookingRepository,
@@ -546,7 +558,8 @@ public class ApplicationCompositionConfig {
                 bookingSlotPolicyService,
                 branchAvailabilityDecisionService,
                 clock,
-                audit
+                audit,
+                telemetry
         );
     }
 
@@ -561,7 +574,8 @@ public class ApplicationCompositionConfig {
             MutationLock mutationLock,
             QueueOrderingService queueOrderingService,
             Clock clock,
-            AuditOperations audit
+            AuditOperations audit,
+            Telemetry telemetry
     ) {
         return new QueueManagementService(
                 queueEntryRepository,
@@ -573,7 +587,8 @@ public class ApplicationCompositionConfig {
                 mutationLock,
                 queueOrderingService,
                 clock,
-                audit
+                audit,
+                telemetry
         );
     }
 

@@ -208,8 +208,8 @@ public class ApiExceptionHandler {
             Exception ex,
             ServletWebRequest request
     ) {
-        log.error("Unexpected API failure for {} {}", request.getRequest().getMethod(),
-                request.getRequest().getRequestURI(), ex);
+        log.error("api_failure exceptionType={} location={}", ex.getClass().getSimpleName(),
+                com.carwash.shared.application.SafeDiagnostics.location(ex));
         return response(HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorCode.INTERNAL_ERROR,
                 "An unexpected error occurred", request);
     }

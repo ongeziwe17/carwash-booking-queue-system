@@ -40,4 +40,10 @@ public interface DataTransactionOperations {
     void compensate(RuntimeException failure, Runnable compensation);
 
     void afterCommitBestEffort(Runnable action, Consumer<RuntimeException> failureHandler);
+
+    /** Runs a non-mutating callback after the current outer transaction completes.
+     * Implementations must suppress callback failures. With no transaction, completion is successful. */
+    default void afterCompletion(Consumer<Boolean> callback) {
+        try { callback.accept(true); } catch (RuntimeException ignored) { /* best effort */ }
+    }
 }

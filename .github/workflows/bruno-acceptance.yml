@@ -103,6 +103,23 @@ jobs:
             echo "BRUNO_TEST_USER_PASSWORD=${test_user_password}"
           } >> "${GITHUB_ENV}"
 
+      - name: Provision temporary management scrape credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/setup-observability.py
+          python3 - <<'PYCODE'
+          import os, base64
+          from pathlib import Path
+          password = Path('.observability/scrape-password').read_text().strip()
+          hashed = Path('.observability/compose.env').read_text().split("'", 2)[1]
+          basic = base64.b64encode(('scraper:' + password).encode()).decode()
+          for secret in [password, hashed, basic]:
+              print('::add-mask::' + secret)
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write('CARWASH_SCRAPE_USERNAME=scraper\nCARWASH_SCRAPE_PASSWORD_HASH=' + hashed + '\nBRUNO_SCRAPE_BASIC=' + basic + '\n')
+          PYCODE
+
       - name: Start verified API for Bruno
         shell: bash
         env:
@@ -123,8 +140,9 @@ jobs:
 
           for _ in {1..30}; do
             if curl --silent --show-error --fail \
-              http://127.0.0.1:8080/v3/api-docs \
-              --output target/bruno-openapi.json; then
+              http://127.0.0.1:8080/actuator/health/readiness \
+              --output /dev/null; then
+              curl --silent --show-error --fail http://127.0.0.1:8080/v3/api-docs --output target/bruno-openapi.json
               exit 0
             fi
 
@@ -165,6 +183,13 @@ jobs:
             --reporter-skip-all-headers \
             --reporter-skip-body
 
+      - name: Run separate management access collection
+        working-directory: tests/bruno/carwash-management
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          bru run --env ci --reporter-junit results/management-junit.xml --reporter-skip-all-headers --reporter-skip-body
+
       - name: Upload Bruno reports
         if: always()
         uses: actions/upload-artifact@v7
@@ -174,6 +199,7 @@ jobs:
             tests/bruno/carwash-api/results/bruno-report.html
             tests/bruno/carwash-api/results/bruno-report.json
             tests/bruno/carwash-api/results/bruno-junit.xml
+            tests/bruno/carwash-management/results/management-junit.xml
           if-no-files-found: ignore
           retention-days: 14
 

@@ -1,0 +1,75 @@
+groups:
+  - name: carwash-operations
+    rules:
+      - alert: CarwashHttpLatency
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job="carwash",uri!~"/actuator/.*|unmatched"}[5m]))) > 1 and sum(rate(http_server_requests_seconds_count{job="carwash",uri!~"/actuator/.*|unmatched"}[5m])) > 0.1
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: Business API p95 latency exceeds one second
+          description: Sustained latency with at least six requests per minute. Inspect workflow spans and pool pressure.
+          runbook_url: https://github.com/ongeziwe17/carwash-booking-queue-system/blob/staging/documentation/OBSERVABILITY.md#alerts
+      - alert: CarwashHttpErrors
+        expr: sum(rate(http_server_requests_seconds_count{job="carwash",status=~"5..",uri!~"/actuator/.*|unmatched"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{job="carwash",uri!~"/actuator/.*|unmatched"}[5m])), 0.001) > 0.05 and sum(rate(http_server_requests_seconds_count{job="carwash",uri!~"/actuator/.*|unmatched"}[5m])) > 0.1
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: Business API server error rate exceeds five percent
+          description: Inspect safe failure events, readiness and workflow outcomes; identify the failing route template.
+          runbook_url: https://github.com/ongeziwe17/carwash-booking-queue-system/blob/staging/documentation/OBSERVABILITY.md#alerts
+      - alert: CarwashScrapeUnavailable
+        expr: up{job="carwash"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: Application telemetry scrape is unavailable
+          description: Check process, reachability, scrape credentials and rotation before attributing this to application failure.
+          runbook_url: https://github.com/ongeziwe17/carwash-booking-queue-system/blob/staging/documentation/OBSERVABILITY.md#alerts
+      - alert: CarwashNotReady
+        expr: probe_success{job="carwash-readiness"} == 0 or up{job="carwash-readiness"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: Application readiness probe fails
+          description: Check PostgreSQL connectivity and pool exhaustion. Compare liveness; do not restart healthy processes for database outages.
+          runbook_url: https://github.com/ongeziwe17/carwash-booking-queue-system/blob/staging/documentation/OBSERVABILITY.md#alerts
+      - alert: CarwashPoolPressure
+        expr: hikaricp_connections_active{job="carwash"} / clamp_min(hikaricp_connections_max{job="carwash"}, 1) > 0.9 and hikaricp_connections_pending{job="carwash"} > 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: Database pool is saturated and callers are waiting
+          description: Inspect slow transactions and database locks before increasing the pool size; compare PostgreSQL connection limits.
+          runbook_url: https://github.com/ongeziwe17/carwash-booking-queue-system/blob/staging/documentation/OBSERVABILITY.md#alerts
+      - alert: CarwashQueueBacklog
+        expr: max(carwash_queue_depth{job="carwash"}) > 100 and max(carwash_queue_snapshot_age_seconds{job="carwash"}) < 60
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: Current active queue exceeds the example backlog threshold
+          description: Check queue lifecycle outcomes and branch operations through authorized tools; tune this global threshold for branch count.
+          runbook_url: https://github.com/ongeziwe17/carwash-booking-queue-system/blob/staging/documentation/OBSERVABILITY.md#alerts
+      - alert: CarwashQueueWait
+        expr: max(carwash_queue_estimated_wait_seconds{job="carwash"}) > 1800 and max(carwash_queue_depth{job="carwash"}) > 5 and max(carwash_queue_snapshot_age_seconds{job="carwash"}) < 60
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: Average estimated active queue wait exceeds thirty minutes
+          description: Inspect staffing, service durations and stalled lifecycle transitions through tenant-authorized operations.
+          runbook_url: https://github.com/ongeziwe17/carwash-booking-queue-system/blob/staging/documentation/OBSERVABILITY.md#alerts
+      - alert: CarwashQueueSnapshotStale
+        expr: carwash_queue_snapshot_age_seconds{job="carwash"} > 60 or carwash_queue_snapshot_available{job="carwash"} == 0
+        for: 3m
+        labels: {severity: warning}
+        annotations:
+          summary: Queue state aggregate is unavailable or stale
+          description: Check database readiness, query timeout and scheduler activity. Cached depth is not authoritative until freshness recovers.
+          runbook_url: https://github.com/ongeziwe17/carwash-booking-queue-system/blob/staging/documentation/OBSERVABILITY.md#alerts
+      - alert: CarwashInAppNotificationFailures
+        expr: sum(increase(carwash_workflow_outcomes_total{job="carwash",operation="notification_create",outcome="failed"}[10m])) >= 3 and sum(increase(carwash_workflow_attempts_total{job="carwash",operation="notification_create"}[10m])) >= 5
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: In-app notification creation repeatedly fails
+          description: Check notification persistence and audit outcomes. This signal does not measure external email or SMS delivery.
+          runbook_url: https://github.com/ongeziwe17/carwash-booking-queue-system/blob/staging/documentation/OBSERVABILITY.md#alerts

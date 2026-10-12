@@ -292,3 +292,12 @@ and representative 400, 401, 403, 404, and 500 responses.
 - [Product Backlog](documentation/PRODUCT-BACKLOG.md)
 - [Delivery and Docker Workflow](documentation/DELIVERY-AND-DOCKER.md)
 - [Coverage Baseline](documentation/COVERAGE.md)
+
+## Observability
+
+Production probes, a dedicated authenticated Prometheus scrape, private structured logs,
+transaction-aware workflow metrics and optional OpenTelemetry export are available.
+See [the observability guide](documentation/OBSERVABILITY.md) for the endpoint access matrix,
+metric inventory, credential provisioning/rotation, local Grafana/Prometheus/Tempo stack,
+alerts, commands and operational trade-offs. The optional stack does not require a domain
+or external delivery/payment services.

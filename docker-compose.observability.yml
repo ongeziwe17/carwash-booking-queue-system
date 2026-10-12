@@ -1,0 +1,73 @@
+# Optional override. Requires Docker Compose >= 2.24.4 for !override.
+services:
+  postgres:
+    ports: !override
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+  carwash-api:
+    ports: !override
+      - "127.0.0.1:${SERVER_PORT:-8080}:${SERVER_PORT:-8080}"
+    environment:
+      CARWASH_SCRAPE_USERNAME: scraper
+      CARWASH_SCRAPE_PASSWORD_HASH: "${CARWASH_SCRAPE_PASSWORD_HASH:?Run tools/setup-observability.py first}"
+      CARWASH_TRACE_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
+      CARWASH_TRACE_SAMPLE_PROBABILITY: "${CARWASH_TRACE_SAMPLE_PROBABILITY:-0.1}"
+  prometheus:
+    image: prom/prometheus:v3.5.5
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=48h"]
+    ports: ["127.0.0.1:9090:9090"]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - observability-prometheus:/prometheus
+    secrets: [scrape_password]
+    depends_on: [carwash-api, blackbox]
+  blackbox:
+    image: prom/blackbox-exporter:v0.27.0
+    command: ["--config.file=/etc/blackbox/config.yml"]
+    volumes: ["./observability/blackbox.yml:/etc/blackbox/config.yml:ro"]
+  grafana:
+    image: grafana/grafana:12.2.0
+    ports: ["127.0.0.1:3000:3000"]
+    environment:
+      GF_SECURITY_ADMIN_USER: observability-admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_password
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    secrets: [grafana_password]
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - observability-grafana:/var/lib/grafana
+    depends_on: [prometheus, tempo]
+  otel-collector:
+    image: otel/opentelemetry-collector:0.136.0
+    command: ["--config=/etc/otelcol/config.yml"]
+    ports: ["127.0.0.1:4318:4318"]
+    volumes: ["./observability/collector.yml:/etc/otelcol/config.yml:ro"]
+    depends_on: [tempo]
+  tempo:
+    image: grafana/tempo:2.9.0
+    command: ["-config.file=/etc/tempo/config.yml"]
+    volumes:
+      - ./observability/tempo.yml:/etc/tempo/config.yml:ro
+      - observability-tempo:/var/tempo
+    ports: ["127.0.0.1:3200:3200"]
+    depends_on:
+      tempo-init:
+        condition: service_completed_successfully
+  tempo-init:
+    image: alpine:3.22.2
+    user: "0:0"
+    command: ["chown", "-R", "10001:10001", "/var/tempo"]
+    volumes: ["observability-tempo:/var/tempo"]
+secrets:
+  scrape_password:
+    file: .observability/scrape-password
+  grafana_password:
+    file: .observability/grafana-password
+volumes:
+  observability-prometheus:
+  observability-grafana:
+  observability-tempo:

@@ -1,5 +1,8 @@
 package com.carwash.queue.application;
 
+import com.carwash.shared.application.Telemetry;
+import com.carwash.shared.application.Telemetry.Operation;
+
 import com.carwash.booking.domain.Booking;
 import com.carwash.booking.domain.BookingRepository;
 import com.carwash.booking.domain.BookingStatus;
@@ -36,6 +39,8 @@ import com.carwash.audit.domain.AuditAction;
 import com.carwash.audit.domain.AuditSource;
 
 public class QueueManagementService implements QueueQuery {
+    private final Telemetry telemetry;
+
 
     private static final Logger LOGGER = LoggerFactory.getLogger(QueueManagementService.class);
 
@@ -92,6 +97,23 @@ public class QueueManagementService implements QueueQuery {
             Clock clock,
             AuditOperations audit
     ) {
+        this(queueEntryRepository, bookingRepository, serviceOfferingQuery, marketplaceQuery, notificationPublisher, coordinator, mutationLock, queueOrdering, clock, audit, Telemetry.NONE);
+    }
+
+    public QueueManagementService(
+            QueueEntryRepository queueEntryRepository,
+            BookingRepository bookingRepository,
+            ServiceOfferingQuery serviceOfferingQuery,
+            MarketplaceQuery marketplaceQuery,
+            BookingNotificationPublisher notificationPublisher,
+            DataTransactionOperations coordinator,
+            MutationLock mutationLock,
+            QueueOrderingService queueOrdering,
+            Clock clock,
+            AuditOperations audit,
+            Telemetry telemetry
+    ) {
+        this.telemetry = Objects.requireNonNull(telemetry, "Telemetry is required");
         this.queueEntryRepository = Objects.requireNonNull(queueEntryRepository, "Queue repository is required");
         this.bookingRepository = Objects.requireNonNull(bookingRepository, "Booking repository is required");
         this.serviceOfferingQuery = Objects.requireNonNull(serviceOfferingQuery, "Service offering query is required");
@@ -105,11 +127,13 @@ public class QueueManagementService implements QueueQuery {
     }
 
     QueueEntry createQueueEntry(String queueEntryId, String bookingId, String serviceId) {
-        Booking booking = new Booking();
-        booking.setBookingId(bookingId);
-        Service service = new Service();
-        service.setServiceId(serviceId);
-        return createQueueEntry(new QueueEntry(queueEntryId, booking, service));
+        return telemetry.observe(Operation.QUEUE_CREATE, () -> {
+            Booking booking = new Booking();
+            booking.setBookingId(bookingId);
+            Service service = new Service();
+            service.setServiceId(serviceId);
+            return createQueueEntry(new QueueEntry(queueEntryId, booking, service));
+        });
     }
 
     public QueueEntry createQueueEntry(
@@ -118,17 +142,21 @@ public class QueueManagementService implements QueueQuery {
             String bookingId,
             String serviceId
     ) {
-        Booking booking = new Booking();
-        booking.setBookingId(bookingId);
-        Service service = new Service();
-        service.setServiceId(serviceId);
-        QueueEntry queueEntry = new QueueEntry(queueEntryId, booking, service);
-        return audit.execute(event(access, AuditAction.QUEUE_CREATED, "QUEUE_ENTRY", queueEntryId),
-                () -> coordinator.write(() -> createQueueEntryInside(access, queueEntry)));
+        return telemetry.observe(Operation.QUEUE_CREATE, () -> {
+            Booking booking = new Booking();
+            booking.setBookingId(bookingId);
+            Service service = new Service();
+            service.setServiceId(serviceId);
+            QueueEntry queueEntry = new QueueEntry(queueEntryId, booking, service);
+            return audit.execute(event(access, AuditAction.QUEUE_CREATED, "QUEUE_ENTRY", queueEntryId),
+                    () -> coordinator.write(() -> createQueueEntryInside(access, queueEntry)));
+        });
     }
 
     QueueEntry createQueueEntry(QueueEntry queueEntry) {
-        return coordinator.write(() -> createQueueEntryInside(null, queueEntry));
+        return telemetry.observe(Operation.QUEUE_CREATE, () -> {
+            return coordinator.write(() -> createQueueEntryInside(null, queueEntry));
+        });
     }
 
     private QueueEntry createQueueEntryInside(TenantAccessContext access, QueueEntry queueEntry) {
@@ -294,7 +322,9 @@ public class QueueManagementService implements QueueQuery {
     }
 
     QueueEntry updatePosition(String queueEntryId, int position) {
-        return coordinator.write(() -> updatePositionInside(null, queueEntryId, position));
+        return telemetry.observe(Operation.QUEUE_MOVE, () -> {
+            return coordinator.write(() -> updatePositionInside(null, queueEntryId, position));
+        });
     }
 
     private QueueEntry updatePositionInside(
@@ -320,23 +350,29 @@ public class QueueManagementService implements QueueQuery {
     }
 
     public QueueEntry updatePosition(TenantAccessContext access, String queueEntryId, int position) {
-        return audit.execute(event(access, AuditAction.QUEUE_POSITION_OVERRIDDEN, "QUEUE_ENTRY", queueEntryId),
-                () -> coordinator.write(() -> {
-            requireOperationalAccess(access);
-            return updatePositionInside(access, queueEntryId, position);
-        }));
+        return telemetry.observe(Operation.QUEUE_MOVE, () -> {
+            return audit.execute(event(access, AuditAction.QUEUE_POSITION_OVERRIDDEN, "QUEUE_ENTRY", queueEntryId),
+                    () -> coordinator.write(() -> {
+                requireOperationalAccess(access);
+                return updatePositionInside(access, queueEntryId, position);
+            }));
+        });
     }
 
     QueueEntry callNext(String branchId) {
-        return coordinator.write(() -> callNextInside(null, branchId));
+        return telemetry.observe(Operation.QUEUE_CALL, () -> {
+            return coordinator.write(() -> callNextInside(null, branchId));
+        });
     }
 
     public QueueEntry callNext(TenantAccessContext access, String branchId) {
-        return audit.execute(event(access, AuditAction.QUEUE_CALLED_NEXT, "BRANCH_QUEUE", branchId),
-                () -> coordinator.write(() -> {
-            requireOperationalAccess(access);
-            return callNextInside(access, branchId);
-        }));
+        return telemetry.observe(Operation.QUEUE_CALL, () -> {
+            return audit.execute(event(access, AuditAction.QUEUE_CALLED_NEXT, "BRANCH_QUEUE", branchId),
+                    () -> coordinator.write(() -> {
+                requireOperationalAccess(access);
+                return callNextInside(access, branchId);
+            }));
+        });
     }
 
     private QueueEntry callNextInside(TenantAccessContext access, String branchId) {
@@ -357,15 +393,19 @@ public class QueueManagementService implements QueueQuery {
     }
 
     QueueEntry callQueueEntry(String queueEntryId) {
-        return coordinator.write(() -> callQueueEntryInside(null, queueEntryId));
+        return telemetry.observe(Operation.QUEUE_CALL, () -> {
+            return coordinator.write(() -> callQueueEntryInside(null, queueEntryId));
+        });
     }
 
     public QueueEntry callQueueEntry(TenantAccessContext access, String queueEntryId) {
-        return audit.execute(event(access, AuditAction.QUEUE_CALLED, "QUEUE_ENTRY", queueEntryId),
-                () -> coordinator.write(() -> {
-            requireOperationalAccess(access);
-            return callQueueEntryInside(access, queueEntryId);
-        }));
+        return telemetry.observe(Operation.QUEUE_CALL, () -> {
+            return audit.execute(event(access, AuditAction.QUEUE_CALLED, "QUEUE_ENTRY", queueEntryId),
+                    () -> coordinator.write(() -> {
+                requireOperationalAccess(access);
+                return callQueueEntryInside(access, queueEntryId);
+            }));
+        });
     }
 
     private QueueEntry callQueueEntryInside(TenantAccessContext access, String queueEntryId) {
@@ -376,7 +416,9 @@ public class QueueManagementService implements QueueQuery {
     }
 
     QueueEntry startService(String queueEntryId) {
-        return coordinator.write(() -> startServiceInside(null, queueEntryId));
+        return telemetry.observe(Operation.QUEUE_START, () -> {
+            return coordinator.write(() -> startServiceInside(null, queueEntryId));
+        });
     }
 
     private QueueEntry startServiceInside(TenantAccessContext access, String queueEntryId) {
@@ -414,15 +456,19 @@ public class QueueManagementService implements QueueQuery {
     }
 
     public QueueEntry startService(TenantAccessContext access, String queueEntryId) {
-        return audit.execute(event(access, AuditAction.QUEUE_SERVICE_STARTED, "QUEUE_ENTRY", queueEntryId),
-                () -> coordinator.write(() -> {
-            requireOperationalAccess(access);
-            return startServiceInside(access, queueEntryId);
-        }));
+        return telemetry.observe(Operation.QUEUE_START, () -> {
+            return audit.execute(event(access, AuditAction.QUEUE_SERVICE_STARTED, "QUEUE_ENTRY", queueEntryId),
+                    () -> coordinator.write(() -> {
+                requireOperationalAccess(access);
+                return startServiceInside(access, queueEntryId);
+            }));
+        });
     }
 
     QueueEntry completeQueueEntry(String queueEntryId) {
-        return coordinator.write(() -> completeQueueEntryInside(null, queueEntryId));
+        return telemetry.observe(Operation.QUEUE_COMPLETE, () -> {
+            return coordinator.write(() -> completeQueueEntryInside(null, queueEntryId));
+        });
     }
 
     private QueueEntry completeQueueEntryInside(TenantAccessContext access, String queueEntryId) {
@@ -464,15 +510,19 @@ public class QueueManagementService implements QueueQuery {
     }
 
     public QueueEntry completeQueueEntry(TenantAccessContext access, String queueEntryId) {
-        return audit.execute(event(access, AuditAction.QUEUE_SERVICE_COMPLETED, "QUEUE_ENTRY", queueEntryId),
-                () -> coordinator.write(() -> {
-            requireOperationalAccess(access);
-            return completeQueueEntryInside(access, queueEntryId);
-        }));
+        return telemetry.observe(Operation.QUEUE_COMPLETE, () -> {
+            return audit.execute(event(access, AuditAction.QUEUE_SERVICE_COMPLETED, "QUEUE_ENTRY", queueEntryId),
+                    () -> coordinator.write(() -> {
+                requireOperationalAccess(access);
+                return completeQueueEntryInside(access, queueEntryId);
+            }));
+        });
     }
 
     void deleteQueueEntry(String queueEntryId) {
-        coordinator.write(() -> deleteQueueEntryInside(null, queueEntryId));
+        telemetry.observe(Operation.QUEUE_DELETE, () -> {
+            coordinator.write(() -> deleteQueueEntryInside(null, queueEntryId));
+        });
     }
 
     private void deleteQueueEntryInside(TenantAccessContext access, String queueEntryId) {
@@ -505,11 +555,13 @@ public class QueueManagementService implements QueueQuery {
     }
 
     public void deleteQueueEntry(TenantAccessContext access, String queueEntryId) {
-        audit.execute(event(access, AuditAction.QUEUE_REMOVED, "QUEUE_ENTRY", queueEntryId),
-                () -> coordinator.write(() -> {
-            requireOperationalAccess(access);
-            deleteQueueEntryInside(access, queueEntryId);
-        }));
+        telemetry.observe(Operation.QUEUE_DELETE, () -> {
+            audit.execute(event(access, AuditAction.QUEUE_REMOVED, "QUEUE_ENTRY", queueEntryId),
+                    () -> coordinator.write(() -> {
+                requireOperationalAccess(access);
+                deleteQueueEntryInside(access, queueEntryId);
+            }));
+        });
     }
 
     private AuditCommand event(TenantAccessContext access, AuditAction action, String targetType, String targetId) {
@@ -790,8 +842,9 @@ public class QueueManagementService implements QueueQuery {
     private void notifyCustomerBestEffort(QueueEntry queueEntry, String type, String message) {
         coordinator.afterCommitBestEffort(
                 () -> notifyCustomer(queueEntry, type, message),
-                exception -> LOGGER.warn("Unable to create {} notification for queue entry {}",
-                        type, queueEntry.getQueueEntryId(), exception));
+                exception -> LOGGER.warn("notification_creation_failed exceptionType={} location={}",
+                        exception.getClass().getSimpleName(),
+                        com.carwash.shared.application.SafeDiagnostics.location(exception)));
     }
 
     private Booking lockQueueCreation(TenantAccessContext access, QueueEntry queueEntry) {

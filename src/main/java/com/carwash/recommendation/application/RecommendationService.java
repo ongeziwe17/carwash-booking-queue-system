@@ -1,5 +1,8 @@
 package com.carwash.recommendation.application;
 
+import com.carwash.shared.application.Telemetry;
+import com.carwash.shared.application.Telemetry.Operation;
+
 import com.carwash.booking.application.BranchAvailabilityCandidateQuery;
 import com.carwash.booking.application.BranchAvailabilityCandidateSnapshot;
 import com.carwash.booking.application.BranchAvailabilitySearchCriteria;
@@ -16,6 +19,8 @@ import java.util.Map;
 import java.util.Objects;
 
 public final class RecommendationService {
+    private final Telemetry telemetry;
+
 
     public static final int RESPONSE_SCORE_SCALE = 6;
     public static final int RESPONSE_DISTANCE_SCALE = 2;
@@ -38,6 +43,16 @@ public final class RecommendationService {
             RecommendationProperties properties,
             List<RecommendationMetricProvider> metricProviders
     ) {
+        this(candidateQuery, properties, metricProviders, Telemetry.NONE);
+    }
+
+    public RecommendationService(
+            BranchAvailabilityCandidateQuery candidateQuery,
+            RecommendationProperties properties,
+            List<RecommendationMetricProvider> metricProviders,
+            Telemetry telemetry
+    ) {
+        this.telemetry = Objects.requireNonNull(telemetry, "Telemetry is required");
         this.candidateQuery = Objects.requireNonNull(candidateQuery, "Availability candidate query is required");
         this.properties = Objects.requireNonNull(properties, "Recommendation properties are required");
         Objects.requireNonNull(metricProviders, "Recommendation metric providers are required");
@@ -56,28 +71,31 @@ public final class RecommendationService {
     }
 
     public List<RecommendationSnapshot> recommend(RecommendationSearchCriteria criteria) {
-        Objects.requireNonNull(criteria, "Recommendation search criteria are required");
-        Objects.requireNonNull(criteria.preference(), "Recommendation preference is required");
-        BigDecimal effectiveRadius = effectiveRadius(criteria.requestedMaxRadiusKm());
-        List<BranchAvailabilityCandidateSnapshot> candidates = candidateQuery.findEligibleCandidates(
-                new BranchAvailabilitySearchCriteria(
-                        criteria.serviceId(), criteria.startsAt(), criteria.latitude(), criteria.longitude(),
-                        effectiveRadius));
-        if (candidates.isEmpty()) {
-            return List.of();
-        }
+        return telemetry.observe(Operation.RECOMMENDATION, () -> {
+            Objects.requireNonNull(criteria, "Recommendation search criteria are required");
+            Objects.requireNonNull(criteria.preference(), "Recommendation preference is required");
+            BigDecimal effectiveRadius = effectiveRadius(criteria.requestedMaxRadiusKm());
+            List<BranchAvailabilityCandidateSnapshot> candidates = candidateQuery.findEligibleCandidates(
+                    new BranchAvailabilitySearchCriteria(
+                            criteria.serviceId(), criteria.startsAt(), criteria.latitude(), criteria.longitude(),
+                            effectiveRadius));
+            telemetry.candidates(candidates.size());
+            if (candidates.isEmpty()) {
+                return List.of();
+            }
 
-        List<CandidateScore> scores = candidates.stream().map(this::rawScore).toList();
-        normalize(scores);
-        List<CandidateScore> ordered = scores.stream()
-                .sorted(order(criteria.preference()))
-                .toList();
+            List<CandidateScore> scores = candidates.stream().map(this::rawScore).toList();
+            normalize(scores);
+            List<CandidateScore> ordered = scores.stream()
+                    .sorted(order(criteria.preference()))
+                    .toList();
 
-        List<RecommendationSnapshot> result = new ArrayList<>(ordered.size());
-        for (int index = 0; index < ordered.size(); index++) {
-            result.add(snapshot(index + 1, criteria.preference(), ordered.get(index)));
-        }
-        return List.copyOf(result);
+            List<RecommendationSnapshot> result = new ArrayList<>(ordered.size());
+            for (int index = 0; index < ordered.size(); index++) {
+                result.add(snapshot(index + 1, criteria.preference(), ordered.get(index)));
+            }
+            return List.copyOf(result);
+        });
     }
 
     private BigDecimal effectiveRadius(BigDecimal requestedRadius) {

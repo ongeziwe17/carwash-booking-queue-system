@@ -72,6 +72,18 @@ jobs:
             exit 1
           fi
 
+      - name: Validate observability definitions and semantic configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install PyYAML==6.0.2
+          python3 tools/validate-observability.py
+          docker compose -f docker-compose.yml -f docker-compose.observability.yml config --no-env-resolution --no-interpolate --quiet
+          docker run --rm --entrypoint /bin/promtool -v "${PWD}/observability:/etc/prometheus:ro" prom/prometheus:v3.5.5 check config --syntax-only /etc/prometheus/prometheus.yml
+          docker run --rm --entrypoint /bin/promtool -v "${PWD}/observability:/etc/prometheus:ro" prom/prometheus:v3.5.5 check rules /etc/prometheus/alerts.yml
+          docker run --rm --entrypoint /bin/promtool -v "${PWD}/observability:/etc/prometheus:ro" -w /etc/prometheus prom/prometheus:v3.5.5 test rules alerts.test.yml
+          docker run --rm -v "${PWD}/observability:/etc/otelcol:ro" otel/opentelemetry-collector:0.136.0 validate --config=/etc/otelcol/collector.yml
+
       - name: Audit test isolation patterns
         shell: bash
         run: |
@@ -152,6 +164,21 @@ jobs:
             exit 1
           fi
 
+      - name: Verify Spring Framework security alignment
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mvnw --batch-mode dependency:tree '-Dincludes=org.springframework:*' -DoutputFile=target/framework-dependency-tree.txt
+          python3 - <<'PYCODE'
+          import re
+          from pathlib import Path
+          tree = Path('target/framework-dependency-tree.txt').read_text()
+          versions = set(re.findall(r'org\.springframework:[^:]+:jar:([^:]+):', tree))
+          assert versions == {'7.0.9'}, f'Framework artifacts must align to the security patch: {versions}'
+          assert 'spring-webmvc' in tree and 'spring-core' in tree
+          print('Spring Framework artifacts uniformly resolve to 7.0.9.')
+          PYCODE
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7
@@ -195,8 +222,9 @@ jobs:
 
           for _ in {1..30}; do
             if curl --silent --show-error --fail \
-              http://127.0.0.1:8080/v3/api-docs \
-              --output openapi.json; then
+              http://127.0.0.1:8080/actuator/health/readiness \
+              --output /dev/null; then
+              curl --silent --show-error --fail http://127.0.0.1:8080/v3/api-docs --output openapi.json
               exit 0
             fi
 
@@ -363,6 +391,12 @@ jobs:
       - name: Run RBAC integration test independently
         run: ./mvnw --batch-mode -Djacoco.skip=true -Dit.test=RbacAuthorizationIntegrationTest verify
 
+      - name: Run management observability test independently
+        run: ./mvnw --batch-mode -Djacoco.skip=true -Dit.test=ManagementObservabilityIntegrationTest verify
+
+      - name: Run tracing observability test independently
+        run: ./mvnw --batch-mode -Djacoco.skip=true -Dit.test=TracingObservabilityIntegrationTest verify
+
       - name: Upload selected-test reports on failure
         if: failure()
         uses: actions/upload-artifact@v7
@@ -496,15 +530,17 @@ jobs:
           set -euo pipefail
           docker compose up --detach --build --wait
           for _ in {1..40}; do
-            if curl --silent --show-error --fail http://127.0.0.1:8080/v3/api-docs --output /dev/null; then
+            if curl --silent --show-error --fail http://127.0.0.1:8080/actuator/health/readiness --output /dev/null; then
               break
             fi
             sleep 2
           done
+          curl --silent --show-error --fail http://127.0.0.1:8080/actuator/health/readiness --output /dev/null
           curl --silent --show-error --fail http://127.0.0.1:8080/v3/api-docs --output /dev/null
           docker compose restart carwash-api
           for _ in {1..40}; do
-            if curl --silent --show-error --fail http://127.0.0.1:8080/v3/api-docs --output /dev/null; then
+            if curl --silent --show-error --fail http://127.0.0.1:8080/actuator/health/readiness --output /dev/null; then
+              curl --silent --show-error --fail http://127.0.0.1:8080/v3/api-docs --output /dev/null
               exit 0
             fi
             sleep 2
@@ -538,8 +574,9 @@ jobs:
 
           for _ in {1..30}; do
             if curl --silent --show-error --fail \
-              http://127.0.0.1:18080/v3/api-docs \
+              http://127.0.0.1:18080/actuator/health/readiness \
               --output /dev/null; then
+              curl --silent --show-error --fail http://127.0.0.1:18080/v3/api-docs --output /dev/null
               exit 0
             fi
 
@@ -554,6 +591,15 @@ jobs:
 
           echo "Timed out waiting for the smoke-test container."
           exit 1
+
+      - name: Verify optional observability stack end to end
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/setup-observability.py
+          docker compose --env-file .env --env-file .observability/compose.env -f docker-compose.yml -f docker-compose.observability.yml config --quiet
+          docker compose --env-file .env --env-file .observability/compose.env -f docker-compose.yml -f docker-compose.observability.yml up --detach --no-build
+          python3 tools/smoke-observability.py
 
       - name: Generate vulnerability baseline
         uses: aquasecurity/trivy-action@v0.36.0
@@ -586,7 +632,12 @@ jobs:
       - name: Stop Compose stack and remove ephemeral CI data
         if: always()
         run: |
-          docker compose down --volumes --remove-orphans || true
+          if [[ -f .observability/compose.env ]]; then
+            docker compose --env-file .env --env-file .observability/compose.env -f docker-compose.yml -f docker-compose.observability.yml down --volumes --remove-orphans || true
+          else
+            docker compose down --volumes --remove-orphans || true
+          fi
+          rm -rf .observability
           rm -f .env
 
   publish-container:

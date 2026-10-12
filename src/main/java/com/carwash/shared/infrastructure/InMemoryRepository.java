@@ -21,11 +21,16 @@ public abstract class InMemoryRepository<T, ID extends Comparable<? super ID>> i
 
     protected abstract ID getId(T entity);
 
+    /** Called while the repository guard is held, after a successful storage mutation. */
+    protected void stored(ID id, T entity) { }
+
     @Override
     public boolean insert(T entity) {
         ID id = requireEntityId(entity);
         synchronized (repositoryMonitor) {
-            return storage.putIfAbsent(id, entity) == null;
+            boolean changed = storage.putIfAbsent(id, entity) == null;
+            if (changed) stored(id, entity);
+            return changed;
         }
     }
 
@@ -33,7 +38,9 @@ public abstract class InMemoryRepository<T, ID extends Comparable<? super ID>> i
     public boolean update(T entity) {
         ID id = requireEntityId(entity);
         synchronized (repositoryMonitor) {
-            return storage.replace(id, entity) != null;
+            boolean changed = storage.replace(id, entity) != null;
+            if (changed) stored(id, entity);
+            return changed;
         }
     }
 
@@ -54,7 +61,9 @@ public abstract class InMemoryRepository<T, ID extends Comparable<? super ID>> i
     public boolean deleteById(ID id) {
         requireId(id);
         synchronized (repositoryMonitor) {
-            return storage.remove(id) != null;
+            boolean changed = storage.remove(id) != null;
+            if (changed) stored(id, null);
+            return changed;
         }
     }
 
@@ -115,6 +124,7 @@ public abstract class InMemoryRepository<T, ID extends Comparable<? super ID>> i
             T current = storage.get(id);
             if (current == null || !predicate.test(current)) return false;
             storage.put(id, entity);
+            stored(id, entity);
             return true;
         }
     }
@@ -127,7 +137,9 @@ public abstract class InMemoryRepository<T, ID extends Comparable<? super ID>> i
         synchronized (repositoryMonitor) {
             T current = storage.get(id);
             if (current == null || !predicate.test(current)) return Optional.empty();
-            return Optional.ofNullable(mutation.apply(current));
+            R result = mutation.apply(current);
+            stored(id, current);
+            return Optional.ofNullable(result);
         }
     }
 
@@ -140,6 +152,7 @@ public abstract class InMemoryRepository<T, ID extends Comparable<? super ID>> i
                     .sorted(Map.Entry.comparingByKey()).toList()) {
                 if (predicate.test(entry.getValue())) {
                     mutation.accept(entry.getValue());
+                    stored(entry.getKey(), entry.getValue());
                     affected++;
                 }
             }
@@ -153,7 +166,9 @@ public abstract class InMemoryRepository<T, ID extends Comparable<? super ID>> i
         synchronized (repositoryMonitor) {
             T current = storage.get(id);
             if (current == null || !predicate.test(current)) return false;
-            return storage.remove(id, current);
+            boolean changed = storage.remove(id, current);
+            if (changed) stored(id, null);
+            return changed;
         }
     }
 
@@ -168,7 +183,7 @@ public abstract class InMemoryRepository<T, ID extends Comparable<? super ID>> i
                     .map(Map.Entry::getKey)
                     .sorted()
                     .toList();
-            matchingIds.forEach(storage::remove);
+            matchingIds.forEach(id -> { storage.remove(id); stored(id, null); });
             return matchingIds.size();
         }
     }

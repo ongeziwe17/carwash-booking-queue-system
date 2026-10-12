@@ -1,5 +1,8 @@
 package com.carwash.audit.application;
 
+import com.carwash.shared.application.Telemetry;
+import com.carwash.shared.application.Telemetry.Operation;
+
 import com.carwash.audit.domain.*;
 import com.carwash.shared.application.DataTransactionOperations;
 import com.carwash.shared.exception.ResourceNotFoundException;
@@ -15,6 +18,8 @@ import java.util.function.Supplier;
 
 /** Authoritative append service. Mandatory success records participate in the protected transaction. */
 public final class AuditService implements AuditOperations {
+    private final Telemetry telemetry;
+
     private static final Logger LOGGER = LoggerFactory.getLogger(AuditService.class);
     private final AuditRepository repository;
     private final DataTransactionOperations transactions;
@@ -24,6 +29,14 @@ public final class AuditService implements AuditOperations {
 
     public AuditService(AuditRepository repository, DataTransactionOperations transactions,
                         AuditMetadataPolicy metadataPolicy, AuditIdGenerator ids, Clock clock) {
+        this(repository, transactions, metadataPolicy, ids, clock, Telemetry.NONE);
+    }
+
+    public AuditService(AuditRepository repository, DataTransactionOperations transactions,
+                        AuditMetadataPolicy metadataPolicy, AuditIdGenerator ids, Clock clock,
+            Telemetry telemetry
+    ) {
+        this.telemetry = Objects.requireNonNull(telemetry, "Telemetry is required");
         this.repository = Objects.requireNonNull(repository);
         this.transactions = Objects.requireNonNull(transactions);
         this.metadataPolicy = Objects.requireNonNull(metadataPolicy);
@@ -96,23 +109,22 @@ public final class AuditService implements AuditOperations {
 
     private AuditRecord append(Prepared prepared, AuditOutcome outcome, String reasonCode, AuditAction action) {
         if (!AuditRequestContext.markOnce(action + ":" + outcome + ":" + prepared.command().targetId())) return null;
-        AuditActor actor = prepared.command().actor();
-        AuditRecord record = new AuditRecord(ids.nextId(), Instant.now(clock), actor.type(), actor.userId(),
-                actor.role(), prepared.command().businessId(), action, prepared.command().targetType(),
-                prepared.command().targetId(), outcome, safeCode(reasonCode), prepared.correlationId(),
-                prepared.metadata(), prepared.command().source());
-        repository.append(record);
-        return record;
+        return telemetry.observe(Operation.AUDIT_APPEND, () -> {
+            AuditActor actor = prepared.command().actor();
+            AuditRecord record = new AuditRecord(ids.nextId(), Instant.now(clock), actor.type(), actor.userId(),
+                    actor.role(), prepared.command().businessId(), action, prepared.command().targetType(),
+                    prepared.command().targetId(), outcome, safeCode(reasonCode), prepared.correlationId(),
+                    prepared.metadata(), prepared.command().source());
+            repository.append(record);
+            return record;
+        });
     }
 
     private void logAfterCommit(AuditRecord record) {
         if (record == null) return;
-        transactions.afterCommitBestEffort(() -> LOGGER.info(
-                "audit_event auditId={} action={} outcome={} actorType={} actorUserId={} businessId={} targetType={} targetId={} source={} correlationId={}",
-                record.auditId(), record.action(), record.outcome(), record.actorType(), record.actorUserId(),
-                record.businessId(), record.targetType(), record.targetId(), record.source(), record.correlationId()),
-                failure -> LOGGER.error("audit_structured_log_failure auditId={} correlationId={}",
-                        record.auditId(), record.correlationId()));
+        transactions.afterCompletion(committed -> { if (committed) LOGGER.info(
+                "audit_event action={} outcome={} source={} correlationId={}",
+                record.action(), record.outcome(), record.source(), record.correlationId()); });
     }
 
     private Prepared prepare(AuditCommand command) {

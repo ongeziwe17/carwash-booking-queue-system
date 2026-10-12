@@ -1,0 +1,21 @@
+info:
+  name: root-health-denied
+  type: http
+  seq: 6
+http:
+  method: GET
+  url: "{{baseUrl}}/actuator/health"
+  headers:
+    - name: Authorization
+      value: "Basic {{process.env.BRUNO_SCRAPE_BASIC}}"
+  auth:
+    type: none
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("HTTP 403", function() { expect(res.status).to.equal(403); });
+settings:
+  encodeUrl: true
+  timeout: 15000
+  followRedirects: false
