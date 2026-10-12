@@ -13,7 +13,7 @@ runtime:
       code: |-
         test("status and pagination contract", function() {
           expect(res.status).to.equal(200);
-          
+
           expect(res.body.content).to.deep.equal([]); expect(res.body.totalElements).to.equal(0); expect(res.body.page).to.equal(100);
         });
         test("no sensitive diagnostics", function() {

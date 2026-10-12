@@ -243,7 +243,9 @@ class PostgresPersistenceIntegrationTest {
         var scope=new com.carwash.shared.application.ListScope("page-eligibility-business",f.branchId,null,false);
         var exact=com.carwash.marketplace.application.ClosureListPolicy.POLICY.parse(java.util.Map.of(
                 "from",java.util.List.of(start.toString()),"to",java.util.List.of(start.toString()),"status",java.util.List.of("ACTIVE"))).scoped(scope);
-        var mem=new com.carwash.marketplace.infrastructure.InMemoryTemporaryBranchClosureRepository();
+        var memBranches=new com.carwash.marketplace.infrastructure.InMemoryCarWashBranchRepository();
+        memBranches.insert(branchRepository.findById(f.branchId).orElseThrow());
+        var mem=new com.carwash.marketplace.infrastructure.InMemoryTemporaryBranchClosureRepository(memBranches);
         mem.insert(closureRepository.findById("page-closure").orElseThrow());
         assertEquals(mem.findPage(exact).totalElements(),transactions.readSnapshot(() -> closureRepository.findPage(exact).totalElements()));
         var after=com.carwash.marketplace.application.ClosureListPolicy.POLICY.parse(java.util.Map.of("from",java.util.List.of(start.plusNanos(1).toString()))).scoped(scope);
@@ -261,14 +263,14 @@ class PostgresPersistenceIntegrationTest {
         assertEquals(0,transactions.readSnapshot(() -> branchRepository.findPage(branchQuery).totalElements()));
     }
 
-    @Test void representativeListPlansUseExistingIndexesAndKeepLimitsInSql() throws Exception {
+    @Test void representativeListPlansRetainLimitsInSql() throws Exception {
         var f=fixture("page-plan",1);
         bookings.createBooking(ADMIN,"page-plan-booking",f.user.getUserId(),f.vehicle.getVehicleId(),f.branchId,f.offeringId,
                 LocalDateTime.of(2089,1,17,10,0),null);
         var plans=new java.util.ArrayList<java.util.Map<String,Object>>();
         for(String sql:java.util.List.of(
-                "select booking_id from bookings where branch_id='page-plan-branch' order by scheduled_at, scheduled_at_nano_remainder, booking_id limit 20",
-                "select vehicle_id from vehicles v where exists(select 1 from bookings bk join branches b on b.branch_id=bk.branch_id where bk.vehicle_id=v.vehicle_id and b.business_id='page-plan-business') order by vehicle_id limit 20")) {
+                "select booking_id from bookings where branch_id='page-plan-branch' order by scheduled_at, scheduled_at_nano_remainder, booking_id collate \"C\" limit 20",
+                "select vehicle_id from vehicles v where exists(select 1 from bookings bk join branches b on b.branch_id=bk.branch_id where bk.vehicle_id=v.vehicle_id and b.business_id='page-plan-business') order by vehicle_id collate \"C\" limit 20")) {
             String plan=jdbc.queryForObject("explain (analyze, buffers, format json) "+sql,String.class);
             assertTrue(plan.contains("Limit"));
             // Only structural plan data is exported; no query/filter literals or customer data.
