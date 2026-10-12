@@ -24,6 +24,7 @@ public record ListPolicy(Set<String> sortFields, List<SortOrder> defaultSort,
         else {
             if (provided.isEmpty() || provided.size() > 3) throw invalid();
             for (String expression : provided) {
+                if (expression == null || expression.isBlank()) throw invalid();
                 String[] parts = expression.split(",", -1);
                 if (parts.length != 2 || !sortFields.contains(parts[0]) || !seen.add(parts[0])) throw invalid();
                 String direction = parts[1].toLowerCase(Locale.ROOT);
@@ -60,8 +61,17 @@ public record ListPolicy(Set<String> sortFields, List<SortOrder> defaultSort,
         if (!set.contains(value)) throw invalid(); return value; }; }
     public static final Function<String, Object> BOOLEAN = value -> {
         if (!value.equals("true") && !value.equals("false")) throw invalid(); return Boolean.valueOf(value); };
-    public static final Function<String, Object> LOCAL_TIME = LocalDateTime::parse;
-    public static final Function<String, Object> INSTANT = value -> OffsetDateTime.parse(value).toInstant();
+    public static final Function<String, Object> LOCAL_TIME = value -> {
+        var time = LocalDateTime.parse(value);
+        // Keep the public calendar range portable across PostgreSQL and in-memory adapters.
+        if (time.getYear() < 1 || time.getYear() > 9999) throw invalid();
+        return time;
+    };
+    public static final Function<String, Object> INSTANT = value -> {
+        var time = OffsetDateTime.parse(value);
+        if (time.getYear() < 1 || time.getYear() > 9999) throw invalid();
+        return time.toInstant();
+    };
     private static BusinessRuleViolationException invalid() {
         return new BusinessRuleViolationException("Invalid list query; check the documented pagination, filter and sort allowlists");
     }

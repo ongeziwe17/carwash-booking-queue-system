@@ -68,6 +68,11 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
                 .andExpect(jsonPath("$.content[1].estimatedDurationMin").value(60))
                 .andExpect(jsonPath("$.content[1].concurrentCapacity").value(2));
 
+        mockMvc.perform(get("/api/availability/branches").with(reader()).param("serviceId",fixture.serviceId()).param("at",AT)
+                        .param("latitude","-33.9249").param("longitude","18.4241").param("page","1").param("size","1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[0].branchId").value(fixture.farBranch()));
+
         CreateBookingRequest booking = BookingFixtureBuilder.valid(
                         ids, fixture.userId(), fixture.vehicleId(), fixture.nearBranch(), fixture.nearOffering())
                 .scheduledDateTime(LocalDateTime.of(2090, 1, 15, 9, 0))
@@ -76,6 +81,11 @@ class BranchAvailabilityWorkflowIntegrationTest extends ApiIntegrationTestSuppor
         search(fixture.serviceId(), AT)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[*].branchId", contains(fixture.farBranch())));
+
+        mockMvc.perform(get("/api/availability/branches").with(reader()).param("serviceId",fixture.serviceId()).param("at",AT)
+                        .param("latitude","-33.9249").param("longitude","18.4241").param("page","1").param("size","1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content.length()").value(0)).andExpect(jsonPath("$.page").value(1));
 
         mockMvc.perform(post("/api/bookings/{id}/cancel", booking.bookingId())
                         .with(authentication.platformAdminJwt()))

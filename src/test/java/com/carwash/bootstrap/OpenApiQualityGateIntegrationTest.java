@@ -122,6 +122,12 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
             JsonNode size = findParameter(operation.path("parameters"), "query", "size").path("schema");
             assertEquals(1,size.path("minimum").asInt(),path); assertEquals(100,size.path("maximum").asInt(),path);
             assertEquals("20",size.path("default").asText(),path);
+            if (!Set.of("/api/marketplace/branches/discoverable/nearby", "/api/availability/branches", "/api/recommendations/branches").contains(path)) {
+                JsonNode sort=findParameter(operation.path("parameters"),"query","sort");
+                assertEquals("array",sort.path("schema").path("type").asText(),path);
+                assertTrue(sort.path("explode").asBoolean(),path);
+                assertEquals(3,sort.path("schema").path("maxItems").asInt(),path);
+            }
             assertEquals("#/components/schemas/ApiErrorResponse", responseSchemaRef(operation.path("responses").path("400")),path);
         }
         for(String type: Set.of("BookingListResponse", "QueueListResponse")) {

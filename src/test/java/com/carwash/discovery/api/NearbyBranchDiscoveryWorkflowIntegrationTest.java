@@ -49,6 +49,12 @@ class NearbyBranchDiscoveryWorkflowIntegrationTest extends ApiIntegrationTestSup
                 .andExpect(jsonPath("$.content[0].publicDiscoveryEnabled").doesNotExist())
                 .andExpect(jsonPath("$.content[0].offerings").doesNotExist());
 
+        mockMvc.perform(get("/api/marketplace/branches/discoverable/nearby").with(reader("customer", "CUSTOMER"))
+                        .param("latitude", "-33.9249").param("longitude", "18.4241").param("sort", "distance")
+                        .param("page", "1").param("size", "1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[0].branchId").value(fixture.johannesburgBranch()));
+
         mockMvc.perform(get("/api/marketplace/branches/discoverable/nearby")
                         .with(reader("staff", "STAFF"))
                         .param("latitude", "-33.9249")

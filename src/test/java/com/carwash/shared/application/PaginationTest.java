@@ -37,9 +37,12 @@ class PaginationTest {
                 Map.of("size",List.of("20","21")),Map.of("sort",List.of("password,asc")),
                 Map.of("sort",List.of("id,sideways")),Map.of("sort",List.of("id")),Map.of("sort",List.of("id,asc","id,desc")),
                 Map.of("sort",List.of("name,asc","price,asc","at,asc","id,asc")),Map.of("all",List.of("true")),
-                Map.of("from",List.of("bad-date")),Map.of("from",List.of("2089-01-02T10:00:00"),"to",List.of("2089-01-01T10:00:00"))))
+                Map.of("from",List.of("bad-date")),Map.of("from",List.of("+999999999-01-01T10:00:00")),Map.of("from",List.of("0000-01-01T10:00:00")),Map.of("from",List.of("2089-01-02T10:00:00"),"to",List.of("2089-01-01T10:00:00"))))
             assertThrows(BusinessRuleViolationException.class, () -> POLICY.parse(entry),entry.toString());
         assertThrows(BusinessRuleViolationException.class, () -> new PageRequest(-1,20));
+        assertThrows(BusinessRuleViolationException.class, () -> POLICY.parse(Map.of("sort",Collections.singletonList(null))));
+        assertThrows(BusinessRuleViolationException.class, () -> ListPolicy.INSTANT.apply("+999999999-01-01T10:00:00Z"));
+        assertEquals(java.time.Instant.parse("2089-01-01T08:00:00.123456789Z"), ListPolicy.INSTANT.apply("2089-01-01T10:00:00.123456789+02:00"));
     }
     @Test void multiSortTiesNullsUnicodeAndFullNanosecondRangesAreStable() {
         var at = LocalDateTime.of(2089,1,1,10,0,0,123456789);
