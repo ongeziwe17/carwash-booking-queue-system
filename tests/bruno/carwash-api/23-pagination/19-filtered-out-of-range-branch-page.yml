@@ -1,0 +1,10 @@
+info: { name: Owner filtered out-of-range branch totals remain scoped, type: http, seq: 19, tags: [pagination, regression, tenant] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/businesses/{{marketplaceBusinessId}}/branches?city=Cape%20Town&status=ACTIVE&page=100&size=1&sort=name,desc"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: test("out-of-range page retains the authorized filtered count", function() { expect(res.status).to.equal(200); expect(res.body.content).to.deep.equal([]); expect(res.body.page).to.equal(100); expect(res.body.size).to.equal(1); expect(res.body.totalElements).to.equal(Number(bru.getVar("branchPaginationTotal"))); expect(res.body.hasPrevious).to.equal(true); expect(res.body.hasNext).to.equal(false); });
+settings: { encodeUrl: false, timeout: 15000, followRedirects: false }

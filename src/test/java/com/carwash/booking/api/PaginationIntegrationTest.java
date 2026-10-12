@@ -72,6 +72,46 @@ class PaginationIntegrationTest extends ApiIntegrationTestSupport {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test void branchPageResolvesBusinessBeforeCountingAndKeepsTenantErrorsPrivate() throws Exception {
+        var own = new BookingApiFixture(api, ids).createResources();
+        var secondClient = new ApiTestClient(mockMvc, objectMapper, authentication);
+        var foreign = new BookingApiFixture(secondClient, ids).createResources();
+        String emptyId = ids.business();
+        api.createBusiness(new com.carwash.marketplace.api.dto.CreateBusinessRequest(
+                emptyId, "Empty business", "empty@example.test", "0123456789", ids.business()))
+                .andExpect(status().isCreated());
+        String ownId = own.business().businessId();
+        var owner = authentication.tenantRoleJwt("page-owner", "BUSINESS_OWNER", ownId,
+                "ROLE_BUSINESS_OWNER", "PERM_MARKETPLACE_MANAGE");
+        String path = "/api/marketplace/businesses/{businessId}/branches";
+
+        mockMvc.perform(get(path, "unavailable-business").with(authentication.platformAdminJwt()))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+        mockMvc.perform(get(path, emptyId).with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(0))
+                .andExpect(jsonPath("$.totalElements").value(0)).andExpect(jsonPath("$.size").value(20));
+
+        var canonical = mockMvc.perform(get(path, ownId).with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1)).andReturn();
+        var padded = mockMvc.perform(get(path, " " + ownId + " ").with(authentication.platformAdminJwt()))
+                .andExpect(status().isOk()).andReturn();
+        assertEquals(objectMapper.readTree(canonical.getResponse().getContentAsString()),
+                objectMapper.readTree(padded.getResponse().getContentAsString()));
+        mockMvc.perform(get(path, " " + ownId + " ").with(owner))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].branchId").value(own.branch().branchId()))
+                .andExpect(jsonPath("$.totalElements").value(1));
+        for (String inaccessible : java.util.List.of(foreign.business().businessId(), "unavailable-business"))
+            mockMvc.perform(get(path, inaccessible).with(owner))
+                    .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                    .andExpect(jsonPath("$.message").value("Business not found"));
+        mockMvc.perform(get(path, ownId).with(owner).param("city", "Cape Town")
+                        .param("status", "ACTIVE").param("sort", "name,desc", "id,asc")
+                        .param("page", "3").param("size", "1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(0))
+                .andExpect(jsonPath("$.totalElements").value(1)).andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.hasPrevious").value(true)).andExpect(jsonPath("$.hasNext").value(false));
+    }
+
     @Test void serviceSortTiesAndFilterCombinationsKeepStableIdsAndFilteredTotals() throws Exception {
         for(int i=0;i<23;i++) api.createService(new com.carwash.catalog.api.dto.CreateServiceRequest(
                 "page-service-"+String.format("%02d",i),"Identical name","Description",new java.math.BigDecimal("12.34"),20))

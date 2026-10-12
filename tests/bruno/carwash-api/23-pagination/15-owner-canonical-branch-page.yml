@@ -1,0 +1,17 @@
+info: { name: Owner sees canonical scoped branches, type: http, seq: 15, tags: [pagination, regression, marketplace] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/marketplace/businesses/{{marketplaceBusinessId}}/branches?sort=name,desc&sort=id,asc"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("owned canonical page has authorized totals", function() {
+          expect(res.status).to.equal(200);
+          expect(res.body.content.some(branch => branch.branchId === bru.getVar("marketplaceBranchId"))).to.equal(true);
+          expect(res.body.content.every(branch => branch.businessId === bru.getVar("marketplaceBusinessId"))).to.equal(true);
+          expect(res.body.totalElements).to.equal(res.body.content.length);
+          bru.setVar("branchPaginationTotal", res.body.totalElements);
+        });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
