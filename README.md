@@ -35,7 +35,7 @@ Spring Boot backend foundation for car wash booking, queue management, Marketpla
 - Nearby distance is straight-line only; no routing, traffic, geocoding, or external maps provider is used.
 - Payments, capacity reservations, concurrent bay/staff scheduling, production observability, backups/restore automation, and deployment hardening remain future work.
 - Recommendations are point-in-time rules only; personalization, machine learning, sponsored ranking, dynamic pricing, traffic-aware routing, and holds are not implemented.
-- The application does not yet expose dedicated Actuator liveness or readiness endpoints.
+- The application exposes minimal liveness/readiness endpoints; the PostgreSQL profile includes database health in readiness only.
 
 ## Tech stack
 
@@ -232,6 +232,8 @@ Pull requests into `staging`, `develop`, and `master` run Maven, workflow, test-
 
 See [Delivery and Docker Workflow](documentation/DELIVERY-AND-DOCKER.md) for branch protection recommendations, image tags, required secrets, CI jobs, artifacts, and local Docker guidance.
 
+For the portable Kubernetes reference, durable staging/production profiles, externally managed credentials, probes, least-privilege runtime and release/rollback procedure, see [Production Deployment Reference](documentation/PRODUCTION-DEPLOYMENT.md). Its render/validate examples do not change a cluster; applying the rendered manifest does. The reference does not choose a hosting provider or provision production infrastructure.
+
 ## Authentication and authorization
 
 1. Register through `POST /api/users`.
@@ -291,6 +293,7 @@ and representative 400, 401, 403, 404, and 500 responses.
 - [User Stories](documentation/USER-STORIES.md)
 - [Product Backlog](documentation/PRODUCT-BACKLOG.md)
 - [Delivery and Docker Workflow](documentation/DELIVERY-AND-DOCKER.md)
+- [Production Deployment Reference](documentation/PRODUCTION-DEPLOYMENT.md)
 - [Coverage Baseline](documentation/COVERAGE.md)
 
 ## Observability
