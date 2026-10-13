@@ -90,6 +90,15 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
             "POST /api/marketplace/offerings/{offeringId}/deactivate",
             "GET /api/marketplace/branches/{branchId}/offerings/discoverable",
             "GET /api/audit-records"
+            , "POST /api/feedback/reviews", "GET /api/feedback/bookings/{bookingId}/review",
+            "GET /api/feedback/businesses/{businessId}/reviews",
+            "GET /api/feedback/branches/{branchId}/summary",
+            "GET /api/feedback/offerings/{offeringId}/summary",
+            "POST /api/feedback/reviews/{reviewId}/reports",
+            "GET /api/feedback/businesses/{businessId}/reports",
+            "POST /api/feedback/reviews/{reviewId}/hide",
+            "POST /api/feedback/reviews/{reviewId}/restore",
+            "POST /api/feedback/reports/{reportId}/resolve"
     );
 
     @Autowired UserRepository users;

@@ -38,6 +38,16 @@ def normalize_bruno_path(url: str) -> str:
     if path.startswith("/api/marketplace/offerings/"):
         return re.sub(r"^/api/marketplace/offerings/\{\{[^}]+\}\}",
                       "/api/marketplace/offerings/{offeringId}", path)
+    for prefix, identifier in (
+            ("/api/feedback/bookings/", "bookingId"),
+            ("/api/feedback/branches/", "branchId"),
+            ("/api/feedback/businesses/", "businessId"),
+            ("/api/feedback/offerings/", "offeringId"),
+            ("/api/feedback/reviews/", "reviewId"),
+            ("/api/feedback/reports/", "reportId")):
+        if path.startswith(prefix):
+            return re.sub(r"^" + re.escape(prefix) + r"\{\{[^}]+\}\}",
+                          prefix + "{" + identifier + "}", path)
     return re.sub(r"/\{\{[^}]+\}\}", "/{id}", path)
 
 

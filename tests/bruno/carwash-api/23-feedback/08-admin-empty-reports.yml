@@ -1,0 +1,12 @@
+info: { name: 08 admin empty reports, type: http, seq: 8, tags: [feedback, verification] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/feedback/businesses/{{opsBusinessId}}/reports?state=OPEN"
+  auth: { type: bearer, token: "{{adminToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("HTTP 200", function() { expect(res.status).to.equal(200); });
+        test("bounded empty page", function() { expect(res.body.content).to.deep.equal([]); expect(res.body.totalElements).to.equal(0); expect(res.body.size).to.be.within(1,100); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

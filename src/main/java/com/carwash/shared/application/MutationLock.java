@@ -31,6 +31,10 @@ public interface MutationLock {
         return "00:booking:" + bookingId;
     }
 
+    static String feedbackReview(String reviewId) { return "00:feedback-review:" + reviewId; }
+
+    static String feedbackReport(String reportId) { return "00:feedback-report:" + reportId; }
+
     static String customer(String userId) {
         return "04:customer:" + userId;
     }

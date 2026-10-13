@@ -1,0 +1,29 @@
+# Verified ratings and service feedback
+
+The feedback capability owns reviews, reports, moderation state, and rating summaries. It reads a single owner-scoped booking eligibility projection and published Marketplace/Catalog projections; it does not access their repositories. V7 adds `feedback_reviews` and `feedback_reports`; V1–V6 are untouched. Review associations are constrained against the canonical booking and branch and use restrictive foreign keys. Completed bookings cannot be deleted by the booking API. Historical reviews remain available privately when a business, branch, service, or offering later becomes inactive.
+
+## Access and operations
+
+| Operation | Path | Authorized actor |
+|---|---|---|
+| Submit | `POST /api/feedback/reviews` | Owning customer of a completed booking |
+| Own review | `GET /api/feedback/bookings/{bookingId}/review` | Owning customer |
+| Private page | `GET /api/feedback/businesses/{businessId}/reviews` | Owner of that business, or administrator with explicit business |
+| Branch summary | `GET /api/feedback/branches/{branchId}/summary` | Authenticated Marketplace reader; discoverable branch |
+| Offering summary | `GET /api/feedback/offerings/{offeringId}/summary` | Authenticated Marketplace reader; discoverable offering and branch |
+| Report | `POST /api/feedback/reviews/{reviewId}/reports` | Review author or owner of its business |
+| Reports page | `GET /api/feedback/businesses/{businessId}/reports` | Platform administrator with explicit business |
+| Hide, restore | `POST /api/feedback/reviews/{reviewId}/hide`, `/restore` | Platform administrator, reason required |
+| Resolve report | `POST /api/feedback/reports/{reportId}/resolve` | Platform administrator, reason required |
+
+Only canonical `COMPLETED` bookings scheduled no later than the server clock in the branch timezone qualify. Created, confirmed, in-service, cancelled and future bookings do not. A review is immutable customer content: integer rating 1–5, optional plain text comment up to 1,000 characters, one per booking. Customers cannot edit or delete. Unknown request fields, including ownership and moderation overrides, are rejected. Missing and foreign customer bookings both return the same 404; duplicates return 409 `RESOURCE_CONFLICT`. The booking lock serializes review eligibility with booking lifecycle decisions, and the database unique booking constraint backs concurrent insertion. In-memory insertion is atomic with rollback hooks.
+
+Eligible reviews publish initially. A report creates one independent OPEN flag per review and actor; duplicate reports return 409. Reporting never removes a rating. Administrators hide or restore with a reason, actor and time; original content remains. Report resolution has its own reason, actor and time. Owners can see private content and publication status but cannot see report reasons or change publication. Administrator report pages expose report reasons only to administrators. Audit events for submission, reporting and moderation carry bounded action and target metadata, without comment or report text. Feedback telemetry uses fixed operation names and outcome tags, never user or resource IDs.
+
+Summaries count only PUBLISHED reviews of currently discoverable resources. They return count, average rounded to two decimals with `HALF_UP`, and a five-element distribution ordered ratings 1 through 5. Zero reviews return count 0, null average, and five zeros. A report does not change these values; hide and restore do. PostgreSQL groups directly over the authoritative review table inside one repeatable-read snapshot; there is no aggregate cache. Public DTOs contain no customer ID, contacts, vehicle or booking details. Authenticated Marketplace-read permission is required; no anonymous endpoint is added. Ratings do not affect recommendations.
+
+Review and report lists use `PageResponse` with default page 0 and size 20, size 1–100, stable ID tie-breaking, filtered authorized totals and consistent snapshots. Review filters: `branchId`, `offeringId`, `rating`, `publication`; sorts: `id`, `createdAt`, `rating`. Report filter: `state`; sorts: `id`, `createdAt`. Unknown, repeated scalar, tenant and actor override query parameters fail validation. Out-of-range pages retain matching totals. Owners may inspect historical feedback even when the associated resource is inactive; public summaries still require present discovery eligibility.
+
+## Verification commands
+
+With Java 21 and Docker, `./mvnw --batch-mode clean verify` compiles, tests, runs PostgreSQL Testcontainers and checks coverage; it changes local build outputs and disposable database state, not deployed state. `./mvnw --batch-mode -Dtest.order.seed=11001 clean verify` and seed `11002` repeat the gate with different order, replacing local outputs and disposable data. The Bruno commands in `tests/bruno/README.md` run API requests against the configured server and **change the server's fixture data**, so use the local disposable acceptance environment. The feedback folder checks eligibility, validation, authorization, zero summaries, private pages and missing moderation resources; valid publication and moderation are covered by HTTP and PostgreSQL integration tests with controlled completion time.

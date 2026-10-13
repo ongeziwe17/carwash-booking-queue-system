@@ -24,7 +24,7 @@ class ModularMonolithArchitectureTest {
             .importPackages("com.carwash");
     private static final String[] BUSINESS_MODULES = {
             "access", "booking", "catalog", "discovery", "identity", "marketplace", "notification", "queue", "reporting",
-            "recommendation", "vehicle", "audit"
+            "recommendation", "vehicle", "audit", "feedback"
     };
 
     @Test
@@ -68,6 +68,16 @@ class ModularMonolithArchitectureTest {
     }
 
     @Test
+    void feedback_uses_published_booking_marketplace_and_catalog_contracts() {
+        noClasses().that().resideInAPackage("com.carwash.feedback..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.carwash.booking.api..", "com.carwash.booking.infrastructure..",
+                        "com.carwash.marketplace.api..", "com.carwash.marketplace.infrastructure..",
+                        "com.carwash.catalog.api..", "com.carwash.catalog.infrastructure..")
+                .check(APPLICATION);
+    }
+
+    @Test
     void modules_do_not_depend_on_bootstrap() {
         noClasses().that().resideInAnyPackage(businessPackages())
                 .should().dependOnClassesThat().resideInAPackage("com.carwash.bootstrap..")
@@ -81,7 +91,7 @@ class ModularMonolithArchitectureTest {
                         "com.carwash.access..", "com.carwash.booking..", "com.carwash.catalog..",
                         "com.carwash.discovery..", "com.carwash.identity..", "com.carwash.marketplace..",
                         "com.carwash.notification..", "com.carwash.queue..", "com.carwash.reporting..",
-                        "com.carwash.recommendation..", "com.carwash.vehicle..")
+                        "com.carwash.recommendation..", "com.carwash.vehicle..", "com.carwash.feedback..")
                 .check(APPLICATION);
     }
 

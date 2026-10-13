@@ -370,6 +370,14 @@ public class BookingManagementService implements BookingQuery {
     }
 
     @Override
+    public Optional<BookingReviewEligibility> findReviewEligibility(String bookingId, String customerId) {
+        return coordinator.read(() -> bookingRepository.findByIdAndUserId(bookingId, customerId)
+                .map(b -> new BookingReviewEligibility(b.getBookingId(), customerId, b.getBranchId(),
+                        b.getServiceOfferingId(), b.getService().getServiceId(),
+                        b.getScheduledDateTime(), b.getStatus())));
+    }
+
+    @Override
     public boolean existsByUserId(String userId) {
         return coordinator.read(() -> bookingRepository.existsByUserId(userId));
     }

@@ -1,0 +1,12 @@
+info: { name: 03 own missing, type: http, seq: 3, tags: [feedback, verification] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/feedback/bookings/{{bookingId}}/review"
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("HTTP 404", function() { expect(res.status).to.equal(404); });
+        test("stable error schema", function() { expect(res.body.code).to.equal("RESOURCE_NOT_FOUND"); expect(res.body.path).to.include("/api/feedback/"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

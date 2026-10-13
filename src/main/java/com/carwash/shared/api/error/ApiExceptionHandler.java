@@ -6,6 +6,7 @@ import com.carwash.shared.api.error.ApiErrorCode;
 import com.carwash.shared.api.error.ApiErrorResponseFactory;
 import com.carwash.shared.exception.BusinessRuleViolationException;
 import com.carwash.shared.exception.ResourceNotFoundException;
+import com.carwash.shared.exception.ResourceConflictException;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -154,6 +155,12 @@ public class ApiExceptionHandler {
     ) {
         return response(HttpStatus.BAD_REQUEST, ApiErrorCode.BUSINESS_RULE_VIOLATION,
                 ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(ResourceConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleFeedbackConflict(
+            ResourceConflictException ex, ServletWebRequest request) {
+        return response(HttpStatus.CONFLICT, ApiErrorCode.RESOURCE_CONFLICT, ex.getMessage(), request);
     }
 
     @ExceptionHandler({DataIntegrityViolationException.class, OptimisticLockingFailureException.class,
