@@ -32,6 +32,8 @@ public class PostgresBookingReportQuery implements BookingReportQuery {
     }
     @Override public BigDecimal bookedMinutes(String branchId, LocalDate day, Map<String,Integer> durations) {
         // Use the authorized, snapshot-consistent active offering projection supplied by the caller.
+        // Clip timestamp(6) intervals in SQL, then adjust the two exposed endpoints by their
+        // stored nano remainders. A timestamp expression would round those remainders away.
         if (durations.isEmpty()) return BigDecimal.ZERO.setScale(2);
         var values = new StringJoiner(",");
         List<Object> arguments = new ArrayList<>();
@@ -42,21 +44,30 @@ public class PostgresBookingReportQuery implements BookingReportQuery {
         });
         arguments.add(Timestamp.valueOf(day.plusDays(1).atStartOfDay()));
         arguments.add(Timestamp.valueOf(day.atStartOfDay()));
+        arguments.add(Timestamp.valueOf(day.plusDays(1).atStartOfDay()));
+        arguments.add(Timestamp.valueOf(day.atStartOfDay()));
         arguments.add(branchId);
         arguments.add(Timestamp.valueOf(day.minusDays(1).atStartOfDay()));
         arguments.add(Timestamp.valueOf(day.plusDays(1).atStartOfDay()));
         arguments.add(Timestamp.valueOf(day.atStartOfDay()));
-        BigDecimal seconds = jdbc.queryForObject("""
+        arguments.add(Timestamp.valueOf(day.atStartOfDay()));
+        BigDecimal nanoseconds = jdbc.queryForObject("""
                 WITH active_offerings(offering_id, minutes) AS (VALUES %s)
                 SELECT coalesce(sum(EXTRACT(EPOCH FROM (
                     LEAST(b.scheduled_at + make_interval(mins => a.minutes), ?) -
-                    GREATEST(b.scheduled_at, ?)))),0)
+                    GREATEST(b.scheduled_at, ?))) * 1000000000::numeric
+                    + CASE WHEN b.scheduled_at + make_interval(mins => a.minutes) < ?
+                           THEN b.scheduled_at_nano_remainder::numeric ELSE 0 END
+                    - CASE WHEN b.scheduled_at >= ?
+                           THEN b.scheduled_at_nano_remainder::numeric ELSE 0 END),0)
                 FROM bookings b JOIN active_offerings a ON a.offering_id=b.offering_id
                 WHERE b.branch_id=? AND b.booking_status<>'CANCELLED'
                   AND b.scheduled_at>=? AND b.scheduled_at<?
-                  AND b.scheduled_at + make_interval(mins => a.minutes)>?
+                  AND (b.scheduled_at + make_interval(mins => a.minutes)>?
+                       OR (b.scheduled_at + make_interval(mins => a.minutes)=?
+                           AND b.scheduled_at_nano_remainder>0))
                 """.formatted(values), BigDecimal.class, arguments.toArray());
-        return (seconds == null ? BigDecimal.ZERO : seconds)
-                .divide(BigDecimal.valueOf(60), 2, java.math.RoundingMode.HALF_UP);
+        return (nanoseconds == null ? BigDecimal.ZERO : nanoseconds)
+                .divide(BigDecimal.valueOf(60_000_000_000L), 2, java.math.RoundingMode.HALF_UP);
     }
 }

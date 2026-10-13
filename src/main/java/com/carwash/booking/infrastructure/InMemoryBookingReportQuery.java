@@ -31,7 +31,7 @@ public class InMemoryBookingReportQuery implements BookingReportQuery {
     }
     @Override public BigDecimal bookedMinutes(String branchId, LocalDate day, Map<String,Integer> durations) {
         LocalDateTime from = day.atStartOfDay(), to = day.plusDays(1).atStartOfDay();
-        long seconds = 0;
+        BigDecimal nanoseconds = BigDecimal.ZERO;
         for (var booking : bookings.findByBranchId(branchId)) {
             if (booking.getStatus() == BookingStatus.CANCELLED || booking.getScheduledDateTime() == null) continue;
             Integer minutes = durations.get(booking.getServiceOfferingId());
@@ -39,8 +39,9 @@ public class InMemoryBookingReportQuery implements BookingReportQuery {
             var at = booking.getScheduledDateTime();
             var until = at.plusMinutes(minutes);
             if (at.isBefore(to) && until.isAfter(from))
-                seconds += Duration.between(at.isAfter(from) ? at : from, until.isBefore(to) ? until : to).getSeconds();
+                nanoseconds = nanoseconds.add(BigDecimal.valueOf(Duration.between(
+                        at.isAfter(from) ? at : from, until.isBefore(to) ? until : to).toNanos()));
         }
-        return BigDecimal.valueOf(seconds).divide(BigDecimal.valueOf(60), 2, java.math.RoundingMode.HALF_UP);
+        return nanoseconds.divide(BigDecimal.valueOf(60_000_000_000L), 2, java.math.RoundingMode.HALF_UP);
     }
 }

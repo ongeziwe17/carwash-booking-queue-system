@@ -141,6 +141,165 @@ class PostgresPersistenceIntegrationTest {
     @Autowired com.carwash.queue.application.QueueReportQuery queueReports;
     @Autowired com.carwash.reporting.application.OperationalReportService operationalReports;
 
+    @Test void queueReportPreservesNanosecondDurationBoundariesAcrossAdapters() throws Exception {
+        Fixture f=fixture("report-precision",10);
+        var day=java.time.LocalDate.of(2089,1,17);
+        record PrecisionCase(String name, LocalDateTime joined, LocalDateTime started,
+                             LocalDateTime completed, Long waitSeconds, Long serviceSeconds) { }
+        var cases=List.of(
+                new PrecisionCase("below",reportTime(day,1,0,999),reportTime(day,1,1,0),
+                        reportTime(day,1,1,999999999),0L,0L),
+                new PrecisionCase("exact",reportTime(day,2,0,999),reportTime(day,2,1,999),
+                        reportTime(day,2,2,999),1L,1L),
+                new PrecisionCase("above",reportTime(day,3,0,1),reportTime(day,3,1,2),
+                        reportTime(day,3,3,3),1L,2L),
+                new PrecisionCase("submicro",reportTime(day,4,0,1),reportTime(day,4,0,999),
+                        reportTime(day,4,0,1001),0L,0L),
+                new PrecisionCase("equal",reportTime(day,5,0,123456789),reportTime(day,5,0,123456789),
+                        reportTime(day,5,0,123456789),0L,0L),
+                new PrecisionCase("reverse-wait",reportTime(day,6,0,123456999),reportTime(day,6,0,123456001),
+                        reportTime(day,6,1,123456001),null,1L),
+                new PrecisionCase("reverse-service",reportTime(day,7,0,123456001),reportTime(day,7,1,123456999),
+                        reportTime(day,7,1,123456001),1L,null),
+                new PrecisionCase("missing-start",reportTime(day,8,0,7),null,
+                        reportTime(day,8,10,8),null,null));
+        var memory=new com.carwash.queue.infrastructure.InMemoryQueueEntryRepository();
+        for(int i=0;i<cases.size();i++) {
+            var value=cases.get(i);
+            QueueEntry persisted=persistReportEntry(f,"precision-"+value.name(),day.atTime(10+i,0),
+                    value.joined(),value.started(),value.completed());
+            assertEquals(value.joined(),persisted.getJoinedAt());
+            assertEquals(value.started(),persisted.getStartedAt());
+            assertEquals(value.completed(),persisted.getCompletedAt());
+            assertTrue(memory.insert(persisted));
+        }
+        assertEquals(999,jdbc.queryForObject("select joined_at_nano_remainder from queue_entries "
+                +"where queue_entry_id='report-precision-entry-precision-below'",Integer.class));
+        assertEquals(0,jdbc.queryForObject("select started_at_nano_remainder from queue_entries "
+                +"where queue_entry_id='report-precision-entry-precision-below'",Integer.class));
+        var actual=queueReports.events(f.branchId,day,day.plusDays(1),java.time.ZoneOffset.UTC,java.time.ZoneOffset.UTC);
+        var expected=new com.carwash.queue.infrastructure.InMemoryQueueReportQuery(memory)
+                .events(f.branchId,day,day.plusDays(1),java.time.ZoneOffset.UTC,java.time.ZoneOffset.UTC);
+        assertEquals(new java.util.HashSet<>(expected),new java.util.HashSet<>(actual));
+        for(int i=0;i<cases.size();i++) {
+            var value=cases.get(i);int hour=i+1;
+            assertReportSample(actual,hour,com.carwash.queue.application.QueueReportBucket.Event.STARTED,
+                    value.started()==null?0:1,value.waitSeconds());
+            assertReportSample(actual,hour,com.carwash.queue.application.QueueReportBucket.Event.COMPLETED,
+                    1,value.serviceSeconds());
+        }
+        var metrics=operationalReports.generate(ADMIN,day,day,f.branchId,null).summary();
+        assertEquals(8,metrics.queueJoined());assertEquals(7,metrics.serviceStarts());
+        assertEquals(8,metrics.queueCompletions());
+        assertEquals(6,metrics.actualWait().sampleCount());
+        assertEquals(new BigDecimal("0.50"),metrics.actualWait().averageSeconds());
+        assertEquals(1L,metrics.actualWait().maximumSeconds());
+        assertEquals(6,metrics.serviceDuration().sampleCount());
+        assertEquals(new BigDecimal("0.67"),metrics.serviceDuration().averageSeconds());
+        assertEquals(2L,metrics.serviceDuration().maximumSeconds());
+        var adminJwt=org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt()
+                .jwt(jwt->jwt.subject("report-precision-admin").claim("role","PLATFORM_ADMIN"))
+                .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN"));
+        managementMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                        "/api/reports/period-summary").with(adminJwt).param("startDate",day.toString())
+                        .param("endDate",day.toString()).param("branchId",f.branchId))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        "$.metrics.actualWait.sampleCount").value(6))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        "$.metrics.actualWait.averageSeconds").value(0.5))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        "$.metrics.actualServiceDuration.averageSeconds").value(0.67));
+    }
+
+    private static LocalDateTime reportTime(java.time.LocalDate day,int hour,int second,int nano) {
+        return day.atTime(hour,0,second,nano);
+    }
+
+    private QueueEntry persistReportEntry(Fixture f,String suffix,LocalDateTime bookingAt,
+            LocalDateTime joined,LocalDateTime started,LocalDateTime completed) {
+        String bookingId="report-precision-booking-"+suffix;
+        Booking booking=bookings.createBooking(ADMIN,bookingId,f.user.getUserId(),f.vehicle.getVehicleId(),
+                f.branchId,f.offeringId,bookingAt,null);
+        bookings.confirmBooking(ADMIN,booking.getBookingId());
+        QueueEntry queue=queues.createQueueEntry(ADMIN,"report-precision-entry-"+suffix,
+                bookingId,f.service.getServiceId());
+        queue.setJoinedAt(joined);queue.setStartedAt(started);queue.setCompletedAt(completed);
+        queue.setQueueStatus(com.carwash.queue.domain.QueueStatus.COMPLETED);
+        assertTrue(transactions.write(()->queueRepository.update(queue)));
+        return queueRepository.findById(queue.getQueueEntryId()).orElseThrow();
+    }
+
+    private static void assertReportSample(List<com.carwash.queue.application.QueueReportBucket> buckets,int hour,
+            com.carwash.queue.application.QueueReportBucket.Event event,long count,Long elapsed) {
+        var matching=buckets.stream().filter(bucket->bucket.hour()==hour && bucket.event()==event).toList();
+        if(count==0) {assertTrue(matching.isEmpty());return;}
+        var bucket=matching.getFirst();assertEquals(1,matching.size());
+        assertEquals(count,bucket.count());assertEquals(elapsed==null?0:1,bucket.sampleCount());
+        assertEquals(elapsed==null?0:elapsed,bucket.totalSeconds());assertEquals(elapsed,bucket.maximumSeconds());
+    }
+
+    @Test void queueReportPrecisionPreservesDstAndHalfOpenLocalDays() {
+        Fixture f=fixture("report-precision-zone",3);
+        var memory=new com.carwash.queue.infrastructure.InMemoryQueueEntryRepository();
+        assertTrue(memory.insert(persistReportEntry(f,"overlap",LocalDateTime.of(2089,1,17,10,0),
+                LocalDateTime.of(2026,11,1,1,59,59,999999999),LocalDateTime.of(2026,11,1,2,0),
+                LocalDateTime.of(2026,11,1,2,0,1,0))));
+        assertTrue(memory.insert(persistReportEntry(f,"gap",LocalDateTime.of(2089,1,17,11,0),
+                LocalDateTime.of(2026,3,8,2,15,0,999),LocalDateTime.of(2026,3,8,3,15,0,1000),
+                LocalDateTime.of(2026,3,8,3,15,1,1000))));
+        var memoryQuery=new com.carwash.queue.infrastructure.InMemoryQueueReportQuery(memory);
+        var newYork=java.time.ZoneId.of("America/New_York");var utc=java.time.ZoneOffset.UTC;
+        for(var date:List.of(java.time.LocalDate.of(2026,11,1),java.time.LocalDate.of(2026,3,8))) {
+            var db=queueReports.events(f.branchId,date,date.plusDays(1),utc,newYork);
+            assertEquals(new java.util.HashSet<>(memoryQuery.events(f.branchId,date,date.plusDays(1),utc,newYork)),
+                    new java.util.HashSet<>(db));
+            var starts=db.stream().filter(bucket->bucket.event()==
+                    com.carwash.queue.application.QueueReportBucket.Event.STARTED).findFirst().orElseThrow();
+            assertEquals(7,starts.hour());
+            assertEquals(date.getMonthValue()==3?0:1,starts.sampleCount());
+            if(date.getMonthValue()==3) assertEquals(0,db.stream().filter(bucket->bucket.event()==
+                    com.carwash.queue.application.QueueReportBucket.Event.JOINED).count());
+        }
+        assertTrue(memory.insert(persistReportEntry(f,"midnight",LocalDateTime.of(2089,1,17,12,0),
+                LocalDateTime.of(2026,11,1,3,59,59,999999999),LocalDateTime.of(2026,11,1,4,0),
+                LocalDateTime.of(2026,11,2,5,0))));
+        var first=java.time.LocalDate.of(2026,11,1);var second=first.plusDays(1);
+        var firstDb=queueReports.events(f.branchId,first,second,newYork,utc);
+        var secondDb=queueReports.events(f.branchId,second,second.plusDays(1),newYork,utc);
+        assertEquals(new java.util.HashSet<>(memoryQuery.events(f.branchId,first,second,newYork,utc)),
+                new java.util.HashSet<>(firstDb));
+        assertEquals(new java.util.HashSet<>(memoryQuery.events(f.branchId,second,second.plusDays(1),newYork,utc)),
+                new java.util.HashSet<>(secondDb));
+        assertReportSample(firstDb,0,com.carwash.queue.application.QueueReportBucket.Event.STARTED,1,0L);
+        assertEquals(0,firstDb.stream().filter(bucket->bucket.event()==
+                com.carwash.queue.application.QueueReportBucket.Event.COMPLETED && bucket.hour()==0).count());
+        assertReportSample(secondDb,0,com.carwash.queue.application.QueueReportBucket.Event.COMPLETED,1,90000L);
+    }
+
+    @Test void prospectiveBookedMinutesUseFullPrecisionAtMidnightClipping() {
+        Fixture f=fixture("report-capacity-precision",1);
+        var first=java.time.LocalDate.of(2089,1,17);var second=first.plusDays(2);
+        Booking low=bookings.createBooking(ADMIN,"report-capacity-low",f.user.getUserId(),f.vehicle.getVehicleId(),
+                f.branchId,f.offeringId,first.atTime(10,0),null);
+        Booking high=bookings.createBooking(ADMIN,"report-capacity-high",f.user.getUserId(),f.vehicle.getVehicleId(),
+                f.branchId,f.offeringId,second.atTime(10,0),null);
+        low.setScheduledDateTime(first.atTime(23,59,59,700000001));
+        high.setScheduledDateTime(second.atTime(23,59,59,699999999));
+        transactions.write(()->{assertTrue(bookingRepository.update(low));assertTrue(bookingRepository.update(high));});
+        var memory=new com.carwash.booking.infrastructure.InMemoryBookingRepository();
+        assertTrue(memory.insert(bookingRepository.findById(low.getBookingId()).orElseThrow()));
+        assertTrue(memory.insert(bookingRepository.findById(high.getBookingId()).orElseThrow()));
+        var inMemory=new com.carwash.booking.infrastructure.InMemoryBookingReportQuery(memory);
+        var durations=java.util.Map.of(f.offeringId,30);
+        assertEquals(new BigDecimal("0.00"),inMemory.bookedMinutes(f.branchId,first,durations));
+        assertEquals(new BigDecimal("0.01"),inMemory.bookedMinutes(f.branchId,second,durations));
+        assertEquals(inMemory.bookedMinutes(f.branchId,first,durations),
+                bookingReports.bookedMinutes(f.branchId,first,durations));
+        assertEquals(inMemory.bookedMinutes(f.branchId,second,durations),
+                bookingReports.bookedMinutes(f.branchId,second,durations));
+    }
+
     @Test void operationalReportAggregatesMatchInMemoryAndUseIndexedBoundedEvents() throws Exception {
         Fixture f=fixture("operational-report-sql",1);
         LocalDateTime at=LocalDateTime.of(2089,1,17,10,0);
