@@ -4,6 +4,9 @@ import com.carwash.access.application.TenantAccessContext;
 import com.carwash.audit.application.AuditOperations;
 import com.carwash.audit.application.AuditCommand;
 import com.carwash.audit.domain.AuditOutcome;
+import com.carwash.audit.domain.*;
+import com.carwash.audit.application.*;
+import com.carwash.audit.infrastructure.InMemoryAuditRepository;
 import com.carwash.booking.application.*;
 import com.carwash.booking.domain.BookingStatus;
 import com.carwash.catalog.application.*;
@@ -65,7 +68,8 @@ class FeedbackServiceTest {
         @Override public void appendIsolated(AuditCommand command, AuditOutcome outcome, String code) { }
     };
     private final FeedbackService service = new FeedbackService(repository, bookings, marketplace, offerings,
-            tx, MutationLock.noOp(), audit, Telemetry.NONE, clock);
+            tx, MutationLock.noOp(), audit, Telemetry.NONE, clock,
+            id -> Optional.of(org.mockito.Mockito.mock(com.carwash.identity.domain.User.class)));
 
     @BeforeEach void fixtures() {
         branchFixtures.put("branch",branch(true));
@@ -177,11 +181,44 @@ class FeedbackServiceTest {
             @Override public void appendIsolated(AuditCommand command, AuditOutcome outcome, String code) { }
         };
         var protectedService = new FeedbackService(repository,bookings,marketplace,offerings,tx,
-                MutationLock.noOp(),failing,Telemetry.NONE,clock);
+                MutationLock.noOp(),failing,Telemetry.NONE,clock,
+                id -> Optional.of(org.mockito.Mockito.mock(com.carwash.identity.domain.User.class)));
         var error = assertThrows(IllegalStateException.class,
                 () -> protectedService.submit(customer,"audit-failure",4,"original"));
         assertEquals("audit failed",error.getMessage());
         assertTrue(repository.byBooking("audit-failure").isEmpty());
         assertEquals(0,service.branchSummary("branch").reviewCount());
+    }
+
+    @Test void realAuditPersistenceScopesSuccessAndRollsBackFailedModeration() {
+        completed("audit-review");
+        Review review = service.submit(customer,"audit-review",5,"private comment");
+        AuditMetadataPolicy policy = new AuditMetadataPolicy(new AuditProperties(Duration.ofDays(30),20,100,
+                Duration.ofDays(30),8,64,256,2048));
+        InMemoryAuditRepository records = new InMemoryAuditRepository(tx,policy);
+        AuditService realAudit = new AuditService(records,tx,policy,() -> UUID.randomUUID().toString(),clock);
+        InMemoryFeedbackRepository failingUpdate = org.mockito.Mockito.spy(repository);
+        FeedbackService audited = new FeedbackService(failingUpdate,bookings,marketplace,offerings,tx,
+                MutationLock.noOp(),realAudit,Telemetry.NONE,clock,
+                id -> Optional.of(org.mockito.Mockito.mock(com.carwash.identity.domain.User.class)));
+        audited.report(owner,review.id(),"private report reason");
+        assertThrows(ResourceConflictException.class,() -> audited.report(owner,review.id(),"duplicate"));
+        org.mockito.Mockito.doThrow(new IllegalStateException("storage unavailable"))
+                .when(failingUpdate).update(org.mockito.ArgumentMatchers.any(Review.class));
+        assertEquals("storage unavailable",assertThrows(IllegalStateException.class,
+                () -> audited.moderate(admin,review.id(),PublicationState.HIDDEN,"private moderation reason")).getMessage());
+        assertEquals(PublicationState.PUBLISHED,repository.byId(review.id()).orElseThrow().publication());
+        AuditQuery all = new AuditQuery(null,null,null,null,null,Instant.EPOCH,
+                clock.instant().plusSeconds(60),null,100);
+        var tenant = records.queryByBusinessId("business",all);
+        assertEquals(1,tenant.size());
+        assertEquals(AuditAction.FEEDBACK_REPORTED,tenant.getFirst().action());
+        assertEquals(AuditOutcome.SUCCESS,tenant.getFirst().outcome());
+        assertEquals("owner",tenant.getFirst().actorUserId());
+        assertTrue(tenant.getFirst().metadata().isEmpty());
+        assertTrue(records.queryByBusinessId("other",all).isEmpty());
+        var failures = records.queryPlatform(all).stream().filter(r -> r.outcome() == AuditOutcome.FAILURE).toList();
+        assertEquals(2,failures.size());
+        assertTrue(failures.stream().allMatch(r -> r.businessId() == null && r.metadata().isEmpty()));
     }
 }

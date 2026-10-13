@@ -1,0 +1,15 @@
+info: { name: 14 owner feedback audit scope, type: http, seq: 14, tags: [feedback, audit, tenant] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/audit-records?action=FEEDBACK_REPORTED&limit=25"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("owner audit scope is canonical", function() {
+          expect(res.status).to.equal(200);
+          expect(res.body.records).to.be.an("array");
+          expect(res.body.records.every(item => item.businessId === bru.getVar("marketplaceBusinessId"))).to.equal(true);
+        });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

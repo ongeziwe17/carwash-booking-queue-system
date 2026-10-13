@@ -16,4 +16,5 @@ public interface FeedbackRepository {
     Optional<ReviewReport> reportById(String id);
     PageResult<ReviewReport> reports(ListQuery query);
     void updateReport(ReviewReport report);
+    boolean referencesUser(String userId);
 }

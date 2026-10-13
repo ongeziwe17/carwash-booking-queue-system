@@ -137,6 +137,8 @@ Errors do not echo request bodies, Java exception names, stack traces, passwords
 
 `UpdateUserRequest` accepts only `fullName`, `email`, and `phone`; the path `{id}` remains authoritative. `AssignRoleRequest` accepts one required `roleName`: `CUSTOMER`, `STAFF`, `BUSINESS_OWNER`, or `PLATFORM_ADMIN`. The last active platform administrator cannot be demoted or deleted.
 
+Account deletion returns the existing safe HTTP 400 `BUSINESS_RULE_VIOLATION` when a historical feedback report or moderation action references that user. The account, tenant membership and notifications remain intact. This check applies equally to the in-memory and PostgreSQL profiles; feedback history is retained.
+
 `UserResponse` contains `userId`, `fullName`, `email`, `phone`, `accountStatus`, `createdAt`, `lastLoginAt`, and `roleName`. It never contains `password`, `encodedPassword`, `passwordHash`, a signing secret, or internal vehicle/booking/notification collections.
 
 User deletion is rejected while vehicles or bookings still reference the user; associated notifications may be cleaned only after those dependency rules permit deletion.

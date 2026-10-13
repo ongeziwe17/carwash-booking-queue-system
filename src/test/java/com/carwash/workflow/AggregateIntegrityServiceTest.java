@@ -137,7 +137,7 @@ class AggregateIntegrityServiceTest {
         queueManagement = new QueueManagementService(
                 queues, bookings, offeringService, marketplace, notificationManagement, coordinator, queueOrdering, clock);
         userManagement = new UserManagementService(users, mock(UserCredentialService.class), vehicles,
-                bookings, notifications, coordinator);
+                bookings, notifications, coordinator, ignored -> false);
     }
 
     @Test

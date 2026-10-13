@@ -76,6 +76,15 @@ public class PostgresFeedbackRepository implements FeedbackRepository {
         jdbc.update("UPDATE feedback_reports SET report_state=?,resolution_reason=?,resolved_by=?,resolved_at=? WHERE report_id=?",
                 r.state().name(),r.resolutionReason(),r.resolvedBy(),Timestamp.from(r.resolvedAt()),r.id());
     }
+    @Override public boolean referencesUser(String userId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1 FROM feedback_reviews WHERE moderator_id=?
+                    UNION ALL
+                    SELECT 1 FROM feedback_reports WHERE actor_id=? OR resolved_by=?
+                )
+                """, Boolean.class, userId, userId, userId));
+    }
     private SqlFilter filter(ListQuery query, boolean report) {
         StringBuilder where = new StringBuilder("business_id=?");
         List<Object> args = new ArrayList<>(); args.add(query.scope().businessId());

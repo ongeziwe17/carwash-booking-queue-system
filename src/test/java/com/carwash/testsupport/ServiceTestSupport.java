@@ -120,7 +120,7 @@ public abstract class ServiceTestSupport {
         UserCredentialService credentialService = new UserCredentialService(
                 new BCryptPasswordEncoder(4), new PasswordSecurityProperties(4, 12, 72));
         userService = new UserManagementService(userRepository, credentialService,
-                vehicleRepository, bookingRepository, notificationRepository, coordinator);
+                vehicleRepository, bookingRepository, notificationRepository, coordinator, ignored -> false);
         vehicleService = new VehicleManagementService(vehicleRepository, userRepository, bookingRepository, coordinator);
         branchSchedulingService = new BranchSchedulingService(
                 businessRepository, branchRepository, scheduleRepository, closureRepository, coordinator, clock);

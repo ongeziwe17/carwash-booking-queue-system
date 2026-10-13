@@ -35,6 +35,9 @@ public interface MutationLock {
 
     static String feedbackReport(String reportId) { return "00:feedback-report:" + reportId; }
 
+    /** Serializes account deletion with creation of historical feedback actor references. */
+    static String feedbackActor(String userId) { return "00:feedback-actor:" + userId; }
+
     static String customer(String userId) {
         return "04:customer:" + userId;
     }

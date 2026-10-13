@@ -45,7 +45,7 @@ class UserManagementSecurityTest {
                 null,
                 null,
                 null,
-                new InMemoryDataCoordinator()
+                new InMemoryDataCoordinator(), ignored -> false
         );
     }
 
