@@ -44,6 +44,71 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class TenantIsolationIntegrationTest extends ApiIntegrationTestSupport {
 
     @Test
+    void operationalDashboardsAuthorizeBeforeAggregationAndKeepPagedTotals() throws Exception {
+        Fixture f=fixture();
+        String day=f.tenantA().scheduledAt().toLocalDate().toString();
+        String next=f.tenantA().scheduledAt().toLocalDate().plusDays(1).toString();
+        RequestPostProcessor ownerA=owner("report-owner",f.tenantA().businessId());
+        mockMvc.perform(get("/api/reports/period-summary").with(ownerA)
+                        .param("startDate",day).param("endDate",day).param("businessId",f.tenantA().businessId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scopeId").value(f.tenantA().businessId()))
+                .andExpect(jsonPath("$.timezoneSemantics").value("BRANCH_LOCAL_DAYS"))
+                .andExpect(jsonPath("$.metrics.bookingVolume").value(1))
+                .andExpect(jsonPath("$.metrics.bookingStatus.CONFIRMED").value(1))
+                .andExpect(jsonPath("$.metrics.actualWait.sampleCount").value(0))
+                .andExpect(jsonPath("$.metrics.actualWait.averageSeconds").isEmpty())
+                .andExpect(jsonPath("$.metrics.queueCompletions").value(0));
+        mockMvc.perform(get("/api/reports/daily-breakdown").with(ownerA)
+                        .param("startDate",day).param("endDate",next)
+                        .param("branchId",f.tenantA().branchId()).param("page","10000").param("size","1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.results.totalElements").value(2))
+                .andExpect(jsonPath("$.results.content.length()").value(0));
+        mockMvc.perform(get("/api/reports/branches").with(ownerA)
+                        .param("startDate",day).param("endDate",day).param("businessId",f.tenantA().businessId()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.results.totalElements").value(1))
+                .andExpect(jsonPath("$.results.content[0].branchId").value(f.tenantA().branchId()));
+        mockMvc.perform(get("/api/reports/offerings").with(ownerA)
+                        .param("startDate",day).param("endDate",day).param("businessId",f.tenantA().businessId()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.results.totalElements").value(1))
+                .andExpect(jsonPath("$.results.content[0].offeringId").value(f.tenantA().offeringId()));
+        mockMvc.perform(get("/api/reports/peak-hours").with(ownerA)
+                        .param("startDate",day).param("endDate",day).param("businessId",f.tenantA().businessId()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.results.totalElements").value(24));
+        for (String endpoint:List.of("period-summary","daily-breakdown","branches","offerings","peak-hours")) {
+            var request=get("/api/reports/"+endpoint).with(ownerA)
+                    .param("startDate",day).param("endDate",day).param("branchId",f.tenantB().branchId());
+            mockMvc.perform(request).andExpect(status().isNotFound());
+        }
+        mockMvc.perform(get("/api/reports/period-summary").with(authentication.platformAdminJwt())
+                        .param("startDate",f.tenantB().scheduledAt().toLocalDate().toString())
+                        .param("endDate",f.tenantB().scheduledAt().toLocalDate().toString())
+                        .param("businessId",f.tenantB().businessId()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.scopeId").value(f.tenantB().businessId()))
+                .andExpect(jsonPath("$.metrics.bookingVolume").value(1));
+        mockMvc.perform(get("/api/reports/period-summary").with(ownerA)
+                        .param("startDate",day).param("endDate",day).param("businessId","missing"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/reports/period-summary").with(ownerA)
+                        .param("startDate",day).param("endDate",day).param("branchId",f.tenantA().branchId())
+                        .param("businessId",f.tenantA().businessId())).andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/reports/period-summary").with(ownerA)
+                        .param("startDate",day).param("endDate",f.tenantA().scheduledAt().toLocalDate()
+                                .plusDays(90).toString()).param("branchId",f.tenantA().branchId()))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/reports/offerings").with(ownerA)
+                        .param("startDate",day).param("endDate",day).param("businessId",f.tenantA().businessId())
+                        .param("serviceId","missing")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.results.totalElements").value(0));
+        mockMvc.perform(get("/api/reports/offerings").with(ownerA)
+                        .param("startDate",day).param("endDate",day).param("branchId",f.tenantA().branchId())
+                        .param("sort","unknown,asc")).andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/reports/period-summary").with(authentication.customerJwt(f.customerId()))
+                        .param("startDate",day).param("endDate",day).param("branchId",f.tenantA().branchId()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void paginationSortingAndForeignFiltersCannotChangeMandatoryScopeOrCounts() throws Exception {
         Fixture f=fixture();
         for (String endpoint : java.util.List.of("/api/bookings","/api/queue-entries","/api/vehicles")) {

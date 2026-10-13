@@ -1,0 +1,11 @@
+info: { name: 14 admin explicit scope required, type: http, seq: 14, tags: [reporting, validation] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/reports/period-summary?startDate={{testDate}}&endDate={{testDate}}"
+  auth: { type: bearer, token: "{{adminToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("administrator must provide explicit scope", function() { expect(res.status).to.equal(400); expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

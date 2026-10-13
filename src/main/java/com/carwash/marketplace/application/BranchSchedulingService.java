@@ -35,7 +35,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
-public final class BranchSchedulingService implements BranchScheduleQuery {
+public final class BranchSchedulingService implements BranchScheduleQuery, BranchReportingConfigurationQuery {
     public PageResult<TemporaryBranchClosureSnapshot> findClosuresPage(TenantAccessContext access, String branchId, ListQuery query) {
         return coordinator.readSnapshot(() -> {
             CarWashBranch branch = access.isPlatformAdministrator() ? requireBranch(branchId)
@@ -99,6 +99,19 @@ public final class BranchSchedulingService implements BranchScheduleQuery {
         this.mutationLock = Objects.requireNonNull(mutationLock, "Mutation lock is required");
         this.clock = Objects.requireNonNull(clock, "Application clock is required");
         this.audit = Objects.requireNonNull(audit, "Audit operations are required");
+    }
+
+    @Override public BranchReportingConfiguration currentConfiguration(String branchId) {
+        return coordinator.read(() -> {
+            var schedule = scheduleRepository.findById(branchId);
+            return new BranchReportingConfiguration(
+                    schedule.map(value -> value.getIntervals().stream()
+                            .map(WeeklyOperatingIntervalSnapshot::from).toList()).orElseGet(java.util.List::of),
+                    closureRepository.findByBranchId(branchId).stream().filter(TemporaryBranchClosure::isActive)
+                            .map(value -> new BranchReportingConfiguration.Closure(value.getStartAt(),value.getEndAt()))
+                            .toList(),
+                    schedule.map(BranchOperatingSchedule::getUpdatedAt).orElse(null));
+        });
     }
 
     public BranchOperatingScheduleSnapshot getOperatingSchedule(String branchId) {

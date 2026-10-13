@@ -1,6 +1,6 @@
 # Car Wash Booking Queue System
 
-Spring Boot backend foundation for car wash booking, queue management, Marketplace onboarding/scheduling, and immutable security/operational auditing. The code is organized as a capability-based modular monolith with explicit `bootstrap`, `shared`, `identity`, `access`, `audit`, `vehicle`, `catalog`, `booking`, `queue`, `notification`, `reporting`, `marketplace`, `discovery`, and `recommendation` boundaries enforced by ArchUnit. The current codebase exposes APIs for users, vehicles, reusable global services, branch-specific offerings, bookings, queues, notifications, daily reporting, Marketplace businesses, physical branches, weekly branch hours, temporary closures, timezone-aware open-status decisions, authenticated nearby branch discovery, branch-aware availability, explainable rule-based recommendations, and scoped audit reads. Storage is selectable: the lightweight default/test profile uses in-memory adapters, while the `postgres` profile uses durable module-owned JPA/JDBC adapters and Flyway migrations.
+Spring Boot backend foundation for car wash booking, queue management, Marketplace onboarding/scheduling, and immutable security/operational auditing. The code is organized as a capability-based modular monolith with explicit `bootstrap`, `shared`, `identity`, `access`, `audit`, `vehicle`, `catalog`, `booking`, `queue`, `notification`, `reporting`, `feedback`, `marketplace`, `discovery`, and `recommendation` boundaries enforced by ArchUnit. The current codebase exposes APIs for users, vehicles, reusable global services, branch-specific offerings, bookings, queues, notifications, daily and tenant-aware operational reporting, Marketplace businesses, physical branches, weekly branch hours, temporary closures, timezone-aware open-status decisions, authenticated nearby branch discovery, branch-aware availability, explainable rule-based recommendations, and scoped audit reads. Storage is selectable: the lightweight default/test profile uses in-memory adapters, while the `postgres` profile uses durable module-owned JPA/JDBC adapters and Flyway migrations.
 
 ## Current backend foundation
 
@@ -16,7 +16,7 @@ Spring Boot backend foundation for car wash booking, queue management, Marketpla
 - Branch-partitioned queue lifecycle, ordering, call-next, and offering-duration wait estimation.
 - Complete in-app notification inbox lifecycle with bounded scalar records, exact keyset pagination, unread counts,
   idempotent recipient-only read state, and tenant-scoped operator/platform-administrator reads.
-- Explicit branch- or business-scoped daily summary reporting.
+- Explicit branch- or business-scoped daily summary reporting and bounded operational dashboards (see [measurement rules](documentation/OPERATIONAL-REPORTING.md)).
 - Marketplace business/branch registration, bounded lifecycle management, coordinates, timezones, and basic active/public branch discovery.
 - Marketplace branch scheduling with atomic weekly intervals, overnight/week-boundary support, temporary closure history, and explicit-instant open-status decisions.
 - Catalog-owned branch service offerings with independent price, duration, configured concurrent capacity, lifecycle, and parent-aware discovery.
@@ -148,9 +148,7 @@ Booking, availability, notification, queue, recommendation, and application-time
 
 ## Testing
 
-The NOTIFY-001 source inventory is 423 unit/architecture tests, 213 integration tests (including 28 PostgreSQL 17.6
-Testcontainers tests), exactly 75 OpenAPI operations, and 562 Bruno requests with 1,746 explicit assertions. No prior
-test is removed, skipped, disabled, or weakened; Flyway V1-V5 remain byte-for-byte unchanged and V6 is additive.
+The OpenAPI operation inventory, authorization matrix, Bruno collection, Java 21 tests and PostgreSQL Testcontainers gates are checked in CI. No prior test or coverage threshold is removed or weakened; Flyway V1–V7 remain byte-for-byte unchanged and V8 adds bounded reporting event indexes. See [operational reporting](documentation/OPERATIONAL-REPORTING.md) for metric definitions and the deliberate absence of revenue, payment and refund values.
 
 The test suite has two Maven responsibilities:
 

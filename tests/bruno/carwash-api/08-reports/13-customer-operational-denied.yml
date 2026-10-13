@@ -1,0 +1,11 @@
+info: { name: 13 customer operational denied, type: http, seq: 13, tags: [reporting, authorization] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/reports/period-summary?startDate={{testDate}}&endDate={{testDate}}&branchId={{opsBranchId}}"
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("customer cannot read operational reporting", function() { expect(res.status).to.equal(403); expect(res.body.code).to.equal("ACCESS_DENIED"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

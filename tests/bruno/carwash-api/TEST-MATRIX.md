@@ -35,6 +35,11 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 | `POST` | `/api/queue-entries/{id}/start` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
 | `GET` | `/api/recommendations/branches` | ✅ — all five preferences | ✅ — coordinates/service/time/preference/server radius | ✅ | N/A — all current roles have MARKETPLACE_READ | N/A — public discovery view | ✅ — shared AVAIL-002 eligibility/raw metrics/null estimates/ties | ✅ — recommendation remains booking-valid |
 | `GET` | `/api/reports/daily-summary` | ✅ | ✅ — exactly one scope | ✅ | ✅ | ✅ — owner tenant or explicit admin scope | ✅ — repository tenant isolation | ✅ |
+| `GET` | `/api/reports/period-summary` | ✅ | ✅ — 1–90 days and one scope | ✅ | ✅ | ✅ — owner tenant / admin explicit | ✅ — canonical pre-aggregation scope | ✅ |
+| `GET` | `/api/reports/daily-breakdown` | ✅ | ✅ — date/page/sort bounds | ✅ | ✅ | ✅ — owner tenant / admin explicit | ✅ — authorized snapshot | ✅ |
+| `GET` | `/api/reports/branches` | ✅ | ✅ — date/page/sort bounds | ✅ | ✅ | ✅ — owner tenant / admin explicit | ✅ — authorized snapshot | ✅ |
+| `GET` | `/api/reports/offerings` | ✅ | ✅ — service filter and page bounds | ✅ | ✅ | ✅ — owner tenant / admin explicit | ✅ — authorized filtered totals | ✅ |
+| `GET` | `/api/reports/peak-hours` | ✅ | ✅ — date/page/sort bounds | ✅ | ✅ | ✅ — owner tenant / admin explicit | ✅ — authorized snapshot | ✅ |
 | `GET` | `/api/services` | ✅ | ✅ | ✅ | N/A — public or no wrong-role case | N/A — not user-owned | N/A — no state/dependency mutation | ✅ |
 | `POST` | `/api/services` | ✅ | ✅ | ✅ | ✅ | N/A — not user-owned | ✅ | ✅ |
 | `DELETE` | `/api/services/{id}` | ✅ | N/A — no request body/typed input case | ✅ | ✅ | N/A — not user-owned | ✅ | N/A — not needed in multi-step journey |
@@ -82,11 +87,10 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 
 ## Totals
 
-- API operations: **85** (all represented in Bruno and the OpenAPI coverage gate)
-- Existing happy-path functional coverage: **75/75**; the ten feedback operations have explicit validation, authorization, zero-summary, empty-page and missing-resource Bruno requests. Owner and explicitly scoped administrator feedback-audit reads are also checked. A controlled completed booking, audit tenancy, publication, moderation and guarded account deletion are exercised by Java HTTP integration tests; the run-scoped Bruno bookings are scheduled in the future.
-- Existing 401 coverage: **73/73 protected operations** (2 public operations are N/A); feedback endpoints are protected in the OpenAPI/security gate.
-- RBAC/403, subject/tenant ownership, validation, integrity, and multi-step workflow applicability are covered wherever meaningful in the matrix above.
-- Bruno requests/assertions: **at least 577 requests / at least 1,774 assertions**, including the feedback folder and two additional audit-scope probes.
+- API operations: **90**, enumerated in the OpenAPI operation gate and endpoint inventory.
+- Five new dashboard operations have owner happy-path, unauthenticated, validation and safe-scope requests in `08-reports` and the authentication coverage folder. Existing happy-path and feedback workflow checks remain.
+- Customer/staff denial and owner/admin tenant boundaries are exercised by Java HTTP tests and focused Bruno requests; PostgreSQL parity is covered by Testcontainers verification.
+- The Bruno source currently contains 655 YAML files and 1,879 explicit `test(...)` declarations; business and management runner totals are reported separately by CI.
 
 The full authorization suite also exercises each significant role/capability allow/deny cell rather than relying only on per-operation counts.
 

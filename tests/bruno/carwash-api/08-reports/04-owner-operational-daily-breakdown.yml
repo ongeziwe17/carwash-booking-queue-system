@@ -1,0 +1,27 @@
+info:
+  name: 04 owner operational daily-breakdown
+  type: http
+  seq: 4
+  tags: [reporting, tenant, dashboard]
+http:
+  method: GET
+  url: "{{baseUrl}}/api/reports/daily-breakdown?startDate={{testDate}}&endDate={{testDate}}&branchId={{opsBranchId}}"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("authorized operational report", function() {
+          expect(res.status).to.equal(200);
+          expect(res.body.scopeType).to.equal("BRANCH");
+          expect(res.body.scopeId).to.equal(bru.getVar("opsBranchId"));
+          expect(res.body.results.totalElements).to.be.a("number");
+          expect(res.body.timezoneSemantics).to.equal("Africa/Johannesburg");
+        });
+        test("operational aggregate excludes private customer fields", function() {
+          const result = JSON.stringify(res.body).toLowerCase();
+          for (const privateField of ["customerid", "userid", "vehiclenumber", "platenumber", "specialrequest", "comment", "notificationcontent"]) {
+            expect(result).to.not.include(privateField);
+          }
+        });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

@@ -1,0 +1,11 @@
+info: { name: 09 conflicting operational scope, type: http, seq: 9, tags: [reporting, validation] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/reports/period-summary?startDate={{testDate}}&endDate={{testDate}}&branchId={{opsBranchId}}&businessId={{marketplaceBusinessId}}"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("rejects conflicting scopes", function() { expect(res.status).to.equal(400); expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

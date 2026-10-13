@@ -1,0 +1,11 @@
+info: { name: 11 operational page filter, type: http, seq: 11, tags: [reporting, pagination] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/reports/offerings?startDate={{testDate}}&endDate={{testDate}}&branchId={{opsBranchId}}&serviceId=absent-{{runId}}&page=999&size=1&sort=bookings,desc"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("empty filtered page retains authorized totals", function() { expect(res.status).to.equal(200); expect(res.body.results.totalElements).to.equal(0); expect(res.body.results.content).to.deep.equal([]); expect(res.body.results.page).to.equal(999); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

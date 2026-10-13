@@ -1,6 +1,6 @@
 # Current Endpoint Inventory
 
-Inventory source: the controllers and OpenAPI quality gate through NOTIFY-001. Generated `/v3/api-docs` is authoritative when wording differs.
+Inventory source: the controllers and OpenAPI quality gate through REPORT-001. Generated `/v3/api-docs` is authoritative when wording differs.
 
 **Total HTTP operations: 85.**
 
@@ -54,6 +54,11 @@ The repair adds owner and explicitly tenant-scoped administrator audit reads for
 | `PUT` | `/api/queue-entries/{id}/position` | Bearer | STAFF, BUSINESS_OWNER, PLATFORM_ADMIN | Operational access | `UpdateQueuePositionRequest` | 200 | 400,401,403,404 | Move a WAITING entry within branch active size and rebalance only that branch. |
 | `POST` | `/api/queue-entries/{id}/start` | Bearer | STAFF, BUSINESS_OWNER, PLATFORM_ADMIN | Operational access | `—` | 200 | 400,401,403,404 | CALLED -> IN_PROGRESS. |
 | `GET` | `/api/reports/daily-summary` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Owner tenant or explicit admin scope | Query `date` plus `branchId` or `businessId` | 200 | 400,401,403,404 | Scoped repository queries; foreign/missing scope is safe 404; branch-local date semantics. |
+| `GET` | `/api/reports/period-summary` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Canonical branch or business | Required `startDate`, `endDate`, exactly one scope | 200 | 400,401,403,404 | Current-status scheduled cohorts, queue lifecycle events and prospective capacity metadata. |
+| `GET` | `/api/reports/daily-breakdown` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Canonical branch or business | Dates/scope, page/size/sort | 200 | 400,401,403,404 | Zero days, branch-local aggregation, authorized `results` page. |
+| `GET` | `/api/reports/branches` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Canonical branch or business | Dates/scope, page/size/sort | 200 | 400,401,403,404 | Historical inactive branch rows remain privately visible. |
+| `GET` | `/api/reports/offerings` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Canonical branch or business | Dates/scope, `serviceId`, page/size/sort | 200 | 400,401,403,404 | Noncancelled offering booking volume, authorized filtered totals. |
+| `GET` | `/api/reports/peak-hours` | Bearer | BUSINESS_OWNER, PLATFORM_ADMIN | Canonical branch or business | Dates/scope, page/size/sort | 200 | 400,401,403,404 | 24 local clock-hour buckets; DST overlaps combine both occurrences. |
 | `GET` | `/api/services` | Bearer | All roles via SERVICE_READ | N/A | `—` | 200 | 400,401,403 | Optional active Boolean filter. |
 | `POST` | `/api/services` | Bearer | PLATFORM_ADMIN | Global catalogue admin path | `CreateServiceRequest` | 201 | 400,401,403 | Duplicate ID rejected; server controls active/createdAt. |
 | `DELETE` | `/api/services/{id}` | Bearer | PLATFORM_ADMIN | Global catalogue admin path | `—` | 204 | 400,401,403,404 | Booking, queue, or active/inactive offering references prevent deletion; deactivate instead. |
