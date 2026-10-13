@@ -143,3 +143,5 @@ safe defaults, dotenv hash quoting, secret rotation and local tooling.
 # Feedback configuration
 
 Feedback uses the existing application `Clock`, transaction coordinator, audit service and fixed-operation telemetry. No new environment variable, external service, notification integration or schema configuration is required. Flyway applies additive V7 in the PostgreSQL profile; the default profile uses the module's in-memory adapter. See [FEEDBACK.md](FEEDBACK.md).
+
+Operational reporting uses the existing `carwash.runtime.time-zone` for stored queue lifecycle local timestamps (UTC by default). Keep this configured zone stable: legacy runtime timestamps do not store their original zone. No new secret or external service is required. Flyway V8 adds only three branch/event indexes; see [operational reporting](OPERATIONAL-REPORTING.md).

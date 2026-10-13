@@ -137,6 +137,79 @@ class PostgresPersistenceIntegrationTest {
 
     @Autowired PageStatements pageStatements;
 
+    @Autowired com.carwash.booking.application.BookingReportQuery bookingReports;
+    @Autowired com.carwash.queue.application.QueueReportQuery queueReports;
+    @Autowired com.carwash.reporting.application.OperationalReportService operationalReports;
+
+    @Test void operationalReportAggregatesMatchInMemoryAndUseIndexedBoundedEvents() throws Exception {
+        Fixture f=fixture("operational-report-sql",1);
+        LocalDateTime at=LocalDateTime.of(2089,1,17,10,0);
+        Booking booking=bookings.createBooking(ADMIN,"operational-report-booking",f.user.getUserId(),
+                f.vehicle.getVehicleId(),f.branchId,f.offeringId,at,null);
+        booking=bookings.confirmBooking(ADMIN,booking.getBookingId());
+        QueueEntry queue=queues.createQueueEntry(ADMIN,"operational-report-entry",booking.getBookingId(),f.service.getServiceId());
+        queue.setJoinedAt(LocalDateTime.of(2089,1,17,9,0));
+        queue.setCalledAt(LocalDateTime.of(2089,1,17,9,2));
+        queue.setStartedAt(LocalDateTime.of(2089,1,17,9,10));
+        queue.setCompletedAt(LocalDateTime.of(2089,1,17,9,30));
+        queue.setQueueStatus(com.carwash.queue.domain.QueueStatus.COMPLETED);
+        Booking finalBooking=booking;
+        transactions.write(()->{
+            assertTrue(queueRepository.update(queue));
+            finalBooking.setStatus(BookingStatus.COMPLETED);
+            assertTrue(bookingRepository.update(finalBooking));
+        });
+        var memoryBookings=new com.carwash.booking.infrastructure.InMemoryBookingRepository();
+        var memoryQueue=new com.carwash.queue.infrastructure.InMemoryQueueEntryRepository();
+        assertTrue(memoryBookings.insert(bookingRepository.findById(booking.getBookingId()).orElseThrow()));
+        assertTrue(memoryQueue.insert(queueRepository.findById(queue.getQueueEntryId()).orElseThrow()));
+        var memoryBookingQuery=new com.carwash.booking.infrastructure.InMemoryBookingReportQuery(memoryBookings);
+        var memoryQueueQuery=new com.carwash.queue.infrastructure.InMemoryQueueReportQuery(memoryQueue);
+        var day=at.toLocalDate();
+        assertEquals(new java.util.HashSet<>(memoryBookingQuery.scheduledCohorts(f.branchId,day,day.plusDays(1))),
+                new java.util.HashSet<>(bookingReports.scheduledCohorts(f.branchId,day,day.plusDays(1))));
+        assertEquals(new java.util.HashSet<>(memoryQueueQuery.events(f.branchId,day,day.plusDays(1),
+                        java.time.ZoneOffset.UTC,java.time.ZoneOffset.UTC)),
+                new java.util.HashSet<>(queueReports.events(f.branchId,day,day.plusDays(1),
+                        java.time.ZoneOffset.UTC,java.time.ZoneOffset.UTC)));
+        assertEquals(memoryBookingQuery.bookedMinutes(f.branchId,day,java.util.Map.of(f.offeringId,30)),
+                bookingReports.bookedMinutes(f.branchId,day,java.util.Map.of(f.offeringId,30)));
+        assertEquals(memoryBookingQuery.bookedMinutes(f.branchId,day,java.util.Map.of(f.offeringId,45)),
+                bookingReports.bookedMinutes(f.branchId,day,java.util.Map.of(f.offeringId,45)));
+        assertEquals(BigDecimal.ZERO.setScale(2),bookingReports.bookedMinutes(f.branchId,day,
+                java.util.Map.of("unrelated-offering",30)));
+        var report=operationalReports.generate(ADMIN,day,day,f.branchId,null);
+        assertEquals(1,report.summary().bookingVolume());
+        assertEquals(1,report.summary().queueCompletions());
+        assertEquals(new BigDecimal("600.00"),report.summary().actualWait().averageSeconds());
+        assertEquals(new BigDecimal("1200.00"),report.summary().serviceDuration().averageSeconds());
+        assertEquals(3,jdbc.queryForObject("""
+                SELECT count(*) FROM pg_indexes WHERE schemaname=current_schema()
+                AND indexname IN ('ix_queue_report_joined','ix_queue_report_started','ix_queue_report_completed')
+                """,Integer.class));
+        transactions.readSnapshot(() -> {
+            // The tiny fixture normally favors a table scan; check that each bounded predicate can use an index.
+            jdbc.execute("SET LOCAL enable_seqscan = off");
+            for (String column:List.of("joined_at","started_at","completed_at")) {
+                String plan=String.join("\n",jdbc.queryForList("EXPLAIN SELECT queue_entry_id FROM queue_entries "
+                        +"WHERE branch_id=? AND "+column+">=? AND "+column+"<?",String.class,
+                        f.branchId,java.sql.Timestamp.valueOf(day.atStartOfDay()),
+                        java.sql.Timestamp.valueOf(day.plusDays(1).atStartOfDay())));
+                assertTrue(plan.contains("Index"),plan);
+            }
+            return null;
+        });
+        var adminJwt=org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt()
+                .jwt(jwt->jwt.subject("operational-report-admin").claim("role","PLATFORM_ADMIN"))
+                .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN"));
+        managementMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                        "/api/reports/period-summary").with(adminJwt).param("startDate",day.toString())
+                        .param("endDate",day.toString()).param("branchId",f.branchId))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        "$.metrics.queueCompletions").value(1));
+    }
+
     @Test void feedbackMigrationConstraintsParityAndConcurrentDuplicateSafety() throws Exception {
         var f = fixture("verified-feedback", 1);
         var booking = bookings.createBooking(ADMIN,"feedback-booking",f.user.getUserId(),f.vehicle.getVehicleId(),
@@ -574,9 +647,9 @@ class PostgresPersistenceIntegrationTest {
     @AfterEach void cleanMutableData(){jdbc.execute("truncate table audit_records, users, businesses, service_definitions cascade");}
 
     @Test void emptyDatabaseMigratesAndValidatesToLatest(){
-        assertEquals("7",flyway.info().current().getVersion().getVersion());
+        assertEquals("8",flyway.info().current().getVersion().getVersion());
         assertTrue(flyway.validateWithResult().validationSuccessful);
-        assertEquals(7,jdbc.queryForObject("select count(*) from flyway_schema_history where success",Integer.class));
+        assertEquals(8,jdbc.queryForObject("select count(*) from flyway_schema_history where success",Integer.class));
         assertEquals(2,jdbc.queryForObject("select count(*) from information_schema.tables where table_schema=current_schema() and table_name in ('feedback_reviews','feedback_reports')",Integer.class));
         assertEquals(4,jdbc.queryForObject("select count(*) from roles",Integer.class));
     }
@@ -595,7 +668,7 @@ class PostgresPersistenceIntegrationTest {
                 statement.execute("insert into "+schema+".notifications(notification_id,user_id,notification_type,message,channel,sent_at,delivery_status) values ('legacy-notification','legacy-unassigned-staff','LEGACY','preserved','IN_APP',timestamp '2089-01-01','SENT')");
             }
             Flyway latest=Flyway.configure().dataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword()).schemas(schema).defaultSchema(schema).locations("classpath:db/migration").cleanDisabled(true).load();
-            assertEquals(2,latest.migrate().migrationsExecuted);
+            assertEquals(3,latest.migrate().migrationsExecuted);
             assertTrue(latest.validateWithResult().validationSuccessful);
             assertEquals(1,jdbc.queryForObject("select count(*) from "+schema+".businesses where business_id='upgrade-business'",Integer.class));
             assertEquals(0,jdbc.queryForObject("select count(*) from "+schema+".tenant_memberships where user_id='legacy-unassigned-staff'",Integer.class));

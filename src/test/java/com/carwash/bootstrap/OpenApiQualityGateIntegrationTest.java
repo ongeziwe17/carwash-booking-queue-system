@@ -59,6 +59,8 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
             "GET /api/availability", "GET /api/availability/branches", "GET /api/recommendations/branches",
             "GET /api/bookings", "POST /api/bookings", "POST /api/bookings/{id}/confirm",
             "POST /api/bookings/{id}/cancel", "POST /api/auth/login", "GET /api/reports/daily-summary",
+            "GET /api/reports/period-summary", "GET /api/reports/daily-breakdown",
+            "GET /api/reports/branches", "GET /api/reports/offerings", "GET /api/reports/peak-hours",
             "GET /api/queue-entries/{id}", "DELETE /api/queue-entries/{id}",
             "GET /api/notifications/user/{userId}",
             "GET /api/notifications/user/{userId}/inbox",
@@ -100,6 +102,35 @@ class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
             "POST /api/feedback/reviews/{reviewId}/restore",
             "POST /api/feedback/reports/{reportId}/resolve"
     );
+
+    @Test void operationalReportingContractIsBoundedTenantScopedAndPrivacySafe() throws Exception {
+        JsonNode document=openApi();
+        for (String path : Set.of("/api/reports/period-summary","/api/reports/daily-breakdown",
+                "/api/reports/branches","/api/reports/offerings","/api/reports/peak-hours")) {
+            JsonNode operation=document.path("paths").path(path).path("get");
+            assertEquals("#/components/schemas/ApiErrorResponse",
+                    responseSchemaRef(operation.path("responses").path("400")),path);
+            assertEquals("#/components/schemas/ApiErrorResponse",
+                    responseSchemaRef(operation.path("responses").path("404")),path);
+            for (String date: Set.of("startDate","endDate"))
+                assertTrue(findParameter(operation.path("parameters"),"query",date)
+                        .path("required").asBoolean(),path+" "+date);
+            assertFalse(operation.path("security").isEmpty() && document.path("security").isEmpty(),path);
+            if (!path.endsWith("period-summary")) {
+                JsonNode size=findParameter(operation.path("parameters"),"query","size").path("schema");
+                assertEquals(1,size.path("minimum").asInt(),path);
+                assertEquals(100,size.path("maximum").asInt(),path);
+                assertEquals("20",size.path("default").asText(),path);
+            }
+        }
+        JsonNode schemas=document.path("components").path("schemas");
+        for (String name:Set.of("OperationalMetricsResponse","DurationResponse","CapacityResponse")) {
+            JsonNode properties=schemas.path(name).path("properties");
+            for (String sensitive:Set.of("customerId","userId","vehicle","plate","comment",
+                    "specialRequest","notification","email","phone"))
+                assertFalse(properties.has(sensitive),name+" exposed "+sensitive);
+        }
+    }
 
     @Autowired UserRepository users;
     @Autowired VehicleRepository vehicles;

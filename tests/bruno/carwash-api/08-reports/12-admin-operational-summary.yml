@@ -1,0 +1,11 @@
+info: { name: 12 admin operational summary, type: http, seq: 12, tags: [reporting, admin] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/reports/period-summary?startDate={{testDate}}&endDate={{testDate}}&branchId={{opsBranchId}}"
+  auth: { type: bearer, token: "{{adminToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("admin supplies explicit scope", function() { expect(res.status).to.equal(200); expect(res.body.scopeId).to.equal(bru.getVar("opsBranchId")); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

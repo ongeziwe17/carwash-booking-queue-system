@@ -1,0 +1,11 @@
+info: { name: 10 missing operational scope, type: http, seq: 10, tags: [reporting, tenant] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/reports/period-summary?startDate={{testDate}}&endDate={{testDate}}&businessId=missing-{{runId}}"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("missing scope has a safe 404", function() { expect(res.status).to.equal(404); expect(res.body.code).to.equal("RESOURCE_NOT_FOUND"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

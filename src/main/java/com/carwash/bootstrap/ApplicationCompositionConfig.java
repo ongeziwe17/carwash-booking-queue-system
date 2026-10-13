@@ -625,4 +625,18 @@ public class ApplicationCompositionConfig {
                 coordinator
         );
     }
+
+    @Bean
+    public com.carwash.reporting.application.OperationalReportService operationalReportService(
+            com.carwash.booking.application.BookingReportQuery bookings,
+            com.carwash.queue.application.QueueReportQuery queue,
+            MarketplaceQuery marketplace,
+            com.carwash.catalog.application.ServiceOfferingQuery offerings,
+            com.carwash.marketplace.application.BranchReportingConfigurationQuery configuration,
+            DataTransactionOperations transactions,
+            Clock clock,
+            Telemetry telemetry) {
+        return new com.carwash.reporting.application.OperationalReportService(
+                bookings, queue, marketplace, offerings, configuration, transactions, clock, telemetry);
+    }
 }

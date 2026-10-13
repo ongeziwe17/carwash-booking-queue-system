@@ -1,0 +1,11 @@
+info: { name: Owner cannot read foreign operational report, type: http, seq: 92, tags: [reporting, tenant] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/reports/period-summary?startDate={{testDate}}&endDate={{testDate}}&businessId={{marketplaceSecondBusinessId}}"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("foreign tenant operational report has a safe 404", function() { expect(res.status).to.equal(404); expect(res.body.code).to.equal("RESOURCE_NOT_FOUND"); expect(res.body.message).to.equal("Business not found"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

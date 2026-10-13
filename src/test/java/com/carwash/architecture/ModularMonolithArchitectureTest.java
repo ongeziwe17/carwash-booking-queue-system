@@ -78,6 +78,17 @@ class ModularMonolithArchitectureTest {
     }
 
     @Test
+    void operational_reporting_uses_published_queries_without_foreign_api_or_infrastructure() {
+        noClasses().that().resideInAPackage("com.carwash.reporting..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.carwash.booking.api..", "com.carwash.booking.infrastructure..",
+                        "com.carwash.queue.api..", "com.carwash.queue.infrastructure..",
+                        "com.carwash.marketplace.api..", "com.carwash.marketplace.infrastructure..",
+                        "com.carwash.catalog.api..", "com.carwash.catalog.infrastructure..")
+                .check(APPLICATION);
+    }
+
+    @Test
     void modules_do_not_depend_on_bootstrap() {
         noClasses().that().resideInAnyPackage(businessPackages())
                 .should().dependOnClassesThat().resideInAPackage("com.carwash.bootstrap..")
