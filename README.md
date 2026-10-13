@@ -232,7 +232,7 @@ Pull requests into `staging`, `develop`, and `master` run Maven, workflow, test-
 
 See [Delivery and Docker Workflow](documentation/DELIVERY-AND-DOCKER.md) for branch protection recommendations, image tags, required secrets, CI jobs, artifacts, and local Docker guidance.
 
-For the portable Kubernetes reference, durable staging/production profiles, externally managed credentials, probes, least-privilege runtime and release/rollback procedure, see [Production Deployment Reference](documentation/PRODUCTION-DEPLOYMENT.md). Its render/validate examples do not change a cluster; applying the rendered manifest does. The reference does not choose a hosting provider or provision production infrastructure.
+For the hardened container, durable staging/production profiles, required configuration and runtime checks, see [Production Runtime Guide](documentation/PRODUCTION-DEPLOYMENT.md). Local Compose remains a development and CI fixture. Cloud VM, network, database and deployment configuration will be designed later in a separate infrastructure repository.
 
 ## Authentication and authorization
 

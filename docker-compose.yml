@@ -38,7 +38,7 @@ services:
     mem_limit: 768m
     stop_grace_period: 45s
     environment:
-      SPRING_PROFILES_ACTIVE: postgres
+      SPRING_PROFILES_ACTIVE: "${CARWASH_RUNTIME_PROFILE:-postgres}"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/${POSTGRES_DB:-carwash}"
       SPRING_DATASOURCE_USERNAME: "${POSTGRES_USER:-carwash}"
       SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
