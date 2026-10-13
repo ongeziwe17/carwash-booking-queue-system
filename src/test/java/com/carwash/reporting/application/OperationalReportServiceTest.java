@@ -78,6 +78,16 @@ class OperationalReportServiceTest extends ServiceTestSupport {
         assertEquals(new BigDecimal("15.00"),second.summary().capacity().bookedMinutes());
     }
 
+    @Test void prospectiveBookedMinutesRoundOnlyAfterPreciseMidnightClipping() {
+        String branch=ensureDefaultBranch();var booking=createSavedBooking(TestDates.futureDays(10),BookingStatus.CONFIRMED);
+        var day=LocalDate.of(2089,1,17);var durations=Map.of(booking.getServiceOfferingId(),30);
+        var query=new InMemoryBookingReportQuery(bookingRepository);
+        booking.setScheduledDateTime(day.atTime(23,59,59,700000001));bookingRepository.update(booking);
+        assertEquals(new BigDecimal("0.00"),query.bookedMinutes(branch,day,durations));
+        booking.setScheduledDateTime(day.atTime(23,59,59,699999999));bookingRepository.update(booking);
+        assertEquals(new BigDecimal("0.01"),query.bookedMinutes(branch,day,durations));
+    }
+
     @Test void ownerAndAdministratorScopeAreCanonicalBeforeReadingAggregates() {
         String branch=ensureDefaultBranch();LocalDate date=TestDates.futureDays(10).toLocalDate();
         createSavedBooking(TestDates.futureDays(10),BookingStatus.CONFIRMED);

@@ -22,23 +22,28 @@ public class PostgresQueueReportQuery implements QueueReportQuery {
                 .addValue("start",Timestamp.valueOf(boundsStart.minusDays(1)))
                 .addValue("end",Timestamp.valueOf(boundsEnd.plusDays(1)))
                 .addValue("source",sourceZone.getId()).addValue("destination",branchZone.getId());
-        // Each lifecycle timestamp is an independent event; do not join bookings or count status twice.
+        // Each lifecycle timestamp is an independent event. Keep the sub-microsecond remainder
+        // separate from timestamp(6): adding it to a timestamp can round it away again.
         return jdbc.query("""
                 WITH events AS (
-                  SELECT joined_at AS event_at, 'JOINED' AS kind, NULL::timestamp AS prior
+                  SELECT joined_at AS event_at, joined_at_nano_remainder AS event_nano,
+                         'JOINED' AS kind, NULL::timestamp AS prior, NULL::smallint AS prior_nano
                   FROM queue_entries WHERE branch_id=:branch AND joined_at>=:start AND joined_at<:end
                   UNION ALL
-                  SELECT started_at, 'STARTED', joined_at
+                  SELECT started_at, started_at_nano_remainder, 'STARTED', joined_at, joined_at_nano_remainder
                   FROM queue_entries WHERE branch_id=:branch AND started_at>=:start AND started_at<:end
                   UNION ALL
-                  SELECT completed_at, 'COMPLETED', started_at
+                  SELECT completed_at, completed_at_nano_remainder, 'COMPLETED', started_at, started_at_nano_remainder
                   FROM queue_entries WHERE branch_id=:branch AND completed_at>=:start AND completed_at<:end
                 ), localized AS (
                   SELECT (event_at AT TIME ZONE :source AT TIME ZONE :destination) AS local_at, kind,
                     CASE WHEN prior IS NOT NULL
                                    AND prior = ((prior AT TIME ZONE :source) AT TIME ZONE :source)
-                                   AND (event_at AT TIME ZONE :source) >= (prior AT TIME ZONE :source)
-                         THEN FLOOR(EXTRACT(EPOCH FROM ((event_at AT TIME ZONE :source) - (prior AT TIME ZONE :source))))::bigint
+                                   AND ROW((event_at AT TIME ZONE :source), event_nano)
+                                       >= ROW((prior AT TIME ZONE :source), prior_nano)
+                         THEN FLOOR((EXTRACT(EPOCH FROM ((event_at AT TIME ZONE :source)
+                                   - (prior AT TIME ZONE :source))) * 1000000000::numeric
+                                   + event_nano::numeric - prior_nano::numeric) / 1000000000::numeric)::bigint
                          ELSE NULL END AS elapsed
                   FROM events WHERE event_at = ((event_at AT TIME ZONE :source) AT TIME ZONE :source)
                 )
