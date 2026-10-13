@@ -1,0 +1,12 @@
+info: { name: 06 public offering zero, type: http, seq: 6, tags: [feedback, verification] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/feedback/offerings/{{marketplaceOfferingId}}/summary"
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("HTTP 200", function() { expect(res.status).to.equal(200); });
+        test("zero rating and private data absent", function() { expect(res.body.reviewCount).to.equal(0); expect(res.body.averageRating).to.equal(null); expect(res.body.distribution).to.deep.equal([0,0,0,0,0]); for(const key of ["customerId","bookingId","comment","vehicleId"]) expect(res.body).to.not.have.property(key); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

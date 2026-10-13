@@ -1,0 +1,12 @@
+info: { name: 04 owner empty page, type: http, seq: 4, tags: [feedback, verification] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/feedback/businesses/{{marketplaceBusinessId}}/reviews?page=3&size=1"
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("HTTP 200", function() { expect(res.status).to.equal(200); });
+        test("bounded empty page", function() { expect(res.body.content).to.deep.equal([]); expect(res.body.totalElements).to.equal(0); expect(res.body.size).to.be.within(1,100); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

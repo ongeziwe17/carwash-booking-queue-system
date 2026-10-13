@@ -672,3 +672,6 @@ For the broader sequencing, see the [Product Roadmap](ROADMAP.md). For executabl
 ## Bounded collection responses
 
 The fourteen offset list endpoints documented in [API pagination](API-PAGINATION.md) now return `content` plus page metadata. The default is page 0, size 20 (maximum 100). Booking/queue list items use scalar IDs. Existing audit/inbox cursor contracts, bounded recent notifications and aggregate responses remain unchanged. Consult the inventory for the intentional array-to-envelope compatibility changes and endpoint-specific filters/sorts.
+# Verified feedback API
+
+The ten authenticated feedback operations, access matrix, validation, 409 duplicate error, bounded list parameters and publication summary contract are documented in [FEEDBACK.md](FEEDBACK.md) and the generated `/v3/api-docs` contract. Feedback request bodies reject unknown ownership and moderation fields. Existing paths and error schemas remain intact.

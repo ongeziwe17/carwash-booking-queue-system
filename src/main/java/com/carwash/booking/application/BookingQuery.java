@@ -16,6 +16,9 @@ public interface BookingQuery {
 
     Optional<String> findOwnerId(String bookingId);
 
+    /** Single owner-scoped eligibility lookup; callers hold the booking mutation lock. */
+    Optional<BookingReviewEligibility> findReviewEligibility(String bookingId, String customerId);
+
     boolean existsByUserId(String userId);
 
     boolean existsByVehicleId(String vehicleId);

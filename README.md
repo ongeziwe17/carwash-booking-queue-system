@@ -284,6 +284,7 @@ and representative 400, 401, 403, 404, and 500 responses.
 - [Roadmap](documentation/ROADMAP.md)
 - [API Documentation](documentation/API-DOCUMENTATION.md)
 - [List Pagination, Filtering and Sorting](documentation/API-PAGINATION.md)
+- [Verified Ratings and Feedback](documentation/FEEDBACK.md)
 - [Runtime Policy Configuration](documentation/CONFIGURATION.md)
 - [Testing](documentation/TESTING.md)
 - [Bruno API Acceptance Suite](tests/bruno/carwash-api/README.md)

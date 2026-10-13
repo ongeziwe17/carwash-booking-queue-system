@@ -80,9 +80,19 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
 import java.time.Clock;
+import com.carwash.feedback.application.FeedbackService;
+import com.carwash.feedback.domain.FeedbackRepository;
+import com.carwash.booking.application.BookingQuery;
 
 @Configuration
 public class ApplicationCompositionConfig {
+
+    @Bean
+    public FeedbackService feedbackService(FeedbackRepository repository, BookingQuery bookings,
+            MarketplaceQuery marketplace, ServiceOfferingQuery offerings, DataTransactionOperations transactions,
+            MutationLock locks, AuditOperations audit, Telemetry telemetry, Clock clock) {
+        return new FeedbackService(repository, bookings, marketplace, offerings, transactions, locks, audit, telemetry, clock);
+    }
 
     @Bean
     @Profile("!postgres")

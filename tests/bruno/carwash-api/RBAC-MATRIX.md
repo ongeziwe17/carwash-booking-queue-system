@@ -33,6 +33,8 @@ This matrix is derived from `RoleCatalog`, controller `@PreAuthorize` expression
 
 ## Permission catalogue
 
+Feedback: only the booking's owning CUSTOMER submits or reads that review; BUSINESS_OWNER sees/reports reviews in the canonical tenant; PLATFORM_ADMIN reads an explicitly scoped moderation queue and hides/restores/resolves with reasons. Authenticated `MARKETPLACE_READ` allows discoverable rating summaries. STAFF has no private feedback or moderation authority. See [FEEDBACK.md](../../../documentation/FEEDBACK.md).
+
 - **CUSTOMER:** `USER_SELF_MANAGE`, `VEHICLE_SELF_MANAGE`, `SERVICE_READ`, `BOOKING_SELF_MANAGE`, `QUEUE_SELF_READ`, `NOTIFICATION_SELF_READ`, `MARKETPLACE_READ`
 - **STAFF:** all CUSTOMER permissions plus `VEHICLE_OPERATE`, `BOOKING_OPERATE`, `QUEUE_OPERATE`
 - **BUSINESS_OWNER:** all STAFF permissions plus `REPORT_READ` and `MARKETPLACE_MANAGE`; no global `SERVICE_MANAGE`

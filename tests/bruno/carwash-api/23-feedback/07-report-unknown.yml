@@ -1,0 +1,17 @@
+info: { name: 07 report unknown, type: http, seq: 7, tags: [feedback, verification] }
+http:
+  method: POST
+  url: "{{baseUrl}}/api/feedback/reviews/{{bookingId}}/reports"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body:
+    type: json
+    data: |-
+      {"reason":"Concern"}
+  auth: { type: bearer, token: "{{ownerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("HTTP 404", function() { expect(res.status).to.equal(404); });
+        test("stable error schema", function() { expect(res.body.code).to.equal("RESOURCE_NOT_FOUND"); expect(res.body.path).to.include("/api/feedback/"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

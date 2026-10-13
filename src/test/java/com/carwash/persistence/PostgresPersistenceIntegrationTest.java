@@ -128,12 +128,70 @@ class PostgresPersistenceIntegrationTest {
     }
 
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.carwash.feedback.application.FeedbackService feedbackService;
+    @Autowired com.carwash.feedback.domain.FeedbackRepository feedbackRepository;
     @Autowired Flyway flyway;
     @Autowired org.springframework.test.web.servlet.MockMvc managementMvc;
     @Autowired com.carwash.queue.infrastructure.QueueTelemetrySampler telemetrySampler;
     @Autowired io.micrometer.core.instrument.MeterRegistry telemetryMeters;
 
     @Autowired PageStatements pageStatements;
+
+    @Test void feedbackMigrationConstraintsParityAndConcurrentDuplicateSafety() throws Exception {
+        var f = fixture("verified-feedback", 1);
+        var booking = bookings.createBooking(ADMIN,"feedback-booking",f.user.getUserId(),f.vehicle.getVehicleId(),
+                f.branchId,f.offeringId,LocalDateTime.of(2089,1,17,10,0),null);
+        booking.setStatus(BookingStatus.COMPLETED);
+        booking.setScheduledDateTime(LocalDateTime.of(2020,1,1,10,0));
+        transactions.write(() -> assertTrue(bookingRepository.update(booking)));
+        var customer = new TenantAccessContext(f.user.getUserId(),RoleName.CUSTOMER,null);
+        assertThrows(DataIntegrityViolationException.class, () -> transactions.write(() -> jdbc.update("""
+                INSERT INTO feedback_reviews(review_id,booking_id,customer_id,business_id,branch_id,offering_id,
+                  service_id,rating,created_at,publication_state) VALUES(?,?,?,?,?,?,?,?,?,?)
+                ""","invalid-rating",booking.getBookingId(),f.user.getUserId(),"verified-feedback-business",
+                f.branchId,f.offeringId,f.service.getServiceId(),0,java.sql.Timestamp.from(Instant.now()),"PUBLISHED")));
+        CyclicBarrier barrier = new CyclicBarrier(2);
+        try(var executor=Executors.newFixedThreadPool(2)) {
+            var attempts = List.of(executor.submit(() -> {barrier.await();return feedbackService.submit(customer,booking.getBookingId(),5,"verified");}),
+                    executor.submit(() -> {barrier.await();return feedbackService.submit(customer,booking.getBookingId(),4,"other");}));
+            int success = 0, conflict = 0;
+            for (var attempt : attempts) {
+                try { attempt.get(15,TimeUnit.SECONDS); success++; }
+                catch (java.util.concurrent.ExecutionException failure) {
+                    assertTrue(failure.getCause() instanceof com.carwash.shared.exception.ResourceConflictException); conflict++;
+                }
+            }
+            assertEquals(1,success); assertEquals(1,conflict);
+        }
+        var stored = feedbackRepository.byBooking(booking.getBookingId()).orElseThrow();
+        assertEquals(1,feedbackService.branchSummary(f.branchId).reviewCount());
+        assertEquals("verified-feedback-business",stored.businessId());
+        var memoryTx = new com.carwash.shared.infrastructure.InMemoryDataCoordinator();
+        var memory = new com.carwash.feedback.infrastructure.InMemoryFeedbackRepository(memoryTx);
+        memoryTx.write(() -> assertTrue(memory.insert(stored)));
+        for(int page : List.of(0,1,20)) {
+            var query = com.carwash.feedback.application.FeedbackListPolicy.REVIEWS.parse(java.util.Map.of(
+                    "rating",List.of(Integer.toString(stored.rating())),"page",List.of(Integer.toString(page)),
+                    "size",List.of("1"))).scoped(new com.carwash.shared.application.ListScope(stored.businessId(),null,null,false));
+            var db = transactions.readSnapshot(() -> feedbackRepository.reviews(query));
+            var mem = memory.reviews(query);
+            assertEquals(mem.totalElements(),db.totalElements());
+            assertEquals(mem.content().stream().map(com.carwash.feedback.domain.Review::id).toList(),
+                    db.content().stream().map(com.carwash.feedback.domain.Review::id).toList());
+        }
+        var report = feedbackService.report(customer,stored.id(),"Needs review");
+        assertEquals(1,feedbackService.branchSummary(f.branchId).reviewCount());
+        assertThrows(com.carwash.shared.exception.ResourceConflictException.class,
+                () -> feedbackService.report(customer,stored.id(),"Duplicate"));
+        var moderator = new TenantAccessContext(f.user.getUserId(),RoleName.PLATFORM_ADMIN,null);
+        feedbackService.moderate(moderator,stored.id(),com.carwash.feedback.domain.PublicationState.HIDDEN,"Investigated");
+        assertEquals(0,feedbackService.branchSummary(f.branchId).reviewCount());
+        feedbackService.resolve(moderator,report.id(),"Handled");
+        assertEquals(com.carwash.feedback.domain.ReportState.RESOLVED,
+                feedbackRepository.reportById(report.id()).orElseThrow().state());
+        feedbackService.moderate(moderator,stored.id(),com.carwash.feedback.domain.PublicationState.PUBLISHED,"Restored");
+        assertEquals(1,feedbackService.offeringSummary(f.offeringId).reviewCount());
+    }
 
     @org.springframework.boot.test.context.TestConfiguration(proxyBeanMethods=false)
     static class PageStatementConfiguration {
@@ -413,9 +471,10 @@ class PostgresPersistenceIntegrationTest {
     @AfterEach void cleanMutableData(){jdbc.execute("truncate table audit_records, users, businesses, service_definitions cascade");}
 
     @Test void emptyDatabaseMigratesAndValidatesToLatest(){
-        assertEquals("6",flyway.info().current().getVersion().getVersion());
+        assertEquals("7",flyway.info().current().getVersion().getVersion());
         assertTrue(flyway.validateWithResult().validationSuccessful);
-        assertEquals(6,jdbc.queryForObject("select count(*) from flyway_schema_history where success",Integer.class));
+        assertEquals(7,jdbc.queryForObject("select count(*) from flyway_schema_history where success",Integer.class));
+        assertEquals(2,jdbc.queryForObject("select count(*) from information_schema.tables where table_schema=current_schema() and table_name in ('feedback_reviews','feedback_reports')",Integer.class));
         assertEquals(4,jdbc.queryForObject("select count(*) from roles",Integer.class));
     }
 
@@ -433,7 +492,7 @@ class PostgresPersistenceIntegrationTest {
                 statement.execute("insert into "+schema+".notifications(notification_id,user_id,notification_type,message,channel,sent_at,delivery_status) values ('legacy-notification','legacy-unassigned-staff','LEGACY','preserved','IN_APP',timestamp '2089-01-01','SENT')");
             }
             Flyway latest=Flyway.configure().dataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword()).schemas(schema).defaultSchema(schema).locations("classpath:db/migration").cleanDisabled(true).load();
-            assertEquals(1,latest.migrate().migrationsExecuted);
+            assertEquals(2,latest.migrate().migrationsExecuted);
             assertTrue(latest.validateWithResult().validationSuccessful);
             assertEquals(1,jdbc.queryForObject("select count(*) from "+schema+".businesses where business_id='upgrade-business'",Integer.class));
             assertEquals(0,jdbc.queryForObject("select count(*) from "+schema+".tenant_memberships where user_id='legacy-unassigned-staff'",Integer.class));
@@ -1111,6 +1170,15 @@ class PostgresPersistenceIntegrationTest {
         String prefix="restart";
         try(ConfigurableApplicationContext first=startContext()){
             Fixture fixture=fixture(first,prefix,2);Booking booking=createConfirmed(first,fixture,"restart-booking","restart-user",fixture.vehicle,"restart-vehicle",LocalDateTime.of(2089,1,17,10,0));first.getBean(QueueManagementService.class).createQueueEntry(ADMIN,"restart-queue",booking.getBookingId(),fixture.service.getServiceId());
+            var completed = first.getBean(BookingManagementService.class).createBooking(ADMIN,"restart-reviewed-booking",
+                    fixture.user.getUserId(),fixture.vehicle.getVehicleId(),fixture.branchId,fixture.offeringId,
+                    LocalDateTime.of(2089,1,18,10,0),null);
+            completed.setStatus(BookingStatus.COMPLETED);
+            completed.setScheduledDateTime(LocalDateTime.of(2020,1,1,10,0));
+            first.getBean(DataTransactionOperations.class).write(() -> assertTrue(first.getBean(BookingRepository.class).update(completed)));
+            first.getBean(com.carwash.feedback.application.FeedbackService.class).submit(
+                    new TenantAccessContext(fixture.user.getUserId(),RoleName.CUSTOMER,null),
+                    completed.getBookingId(),5,"Persistent review");
         }
         try(ConfigurableApplicationContext second=startContext()){
             var authentication=second.getBean(UserAuthenticationService.class).authenticate("restart@example.test",PASSWORD);
@@ -1119,6 +1187,10 @@ class PostgresPersistenceIntegrationTest {
             assertEquals("restart-booking",second.getBean(BookingManagementService.class).findById("restart-booking").getBookingId());
             assertEquals("restart-queue",second.getBean(QueueManagementService.class).findById("restart-queue").getQueueEntryId());
             assertFalse(second.getBean(NotificationManagementService.class).findByUserId("restart-user").isEmpty());
+            assertEquals("Persistent review",second.getBean(com.carwash.feedback.domain.FeedbackRepository.class)
+                    .byBooking("restart-reviewed-booking").orElseThrow().comment());
+            assertEquals(1,second.getBean(com.carwash.feedback.application.FeedbackService.class)
+                    .branchSummary("restart-branch").reviewCount());
             assertFalse(second.getBean(BranchAvailabilitySearchService.class).findAvailableBranches(new BranchAvailabilitySearchCriteria("restart-service",Instant.parse("2089-01-17T11:00:00Z"),BigDecimal.ZERO,BigDecimal.ZERO,new BigDecimal("10"))).isEmpty());
             var recommendations=second.getBean(RecommendationService.class).recommend(new RecommendationSearchCriteria(BigDecimal.ZERO,BigDecimal.ZERO,"restart-service",Instant.parse("2089-01-17T11:00:00Z"),RecommendationPreference.BEST_OVERALL,new BigDecimal("10")));
             assertFalse(recommendations.isEmpty());assertEquals("restart-branch",recommendations.getFirst().branchId());

@@ -1,0 +1,17 @@
+info: { name: 01 future completed rejected, type: http, seq: 1, tags: [feedback, verification] }
+http:
+  method: POST
+  url: "{{baseUrl}}/api/feedback/reviews"
+  headers: [{ name: Content-Type, value: "application/json" }]
+  body:
+    type: json
+    data: |-
+      {"bookingId":"{{bookingId}}","rating":5,"comment":"Premature"}
+  auth: { type: bearer, token: "{{customerToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("HTTP 400", function() { expect(res.status).to.equal(400); });
+        test("stable error schema", function() { expect(res.body.code).to.equal("BUSINESS_RULE_VIOLATION"); expect(res.body.path).to.include("/api/feedback/"); });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }

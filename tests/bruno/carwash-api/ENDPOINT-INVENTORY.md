@@ -2,7 +2,22 @@
 
 Inventory source: the controllers and OpenAPI quality gate through NOTIFY-001. Generated `/v3/api-docs` is authoritative when wording differs.
 
-**Total HTTP operations: 75.**
+**Total HTTP operations: 85.**
+
+The ten FEEDBACK-001 operations are included in the exact OpenAPI operation inventory and `23-feedback` Bruno folder:
+
+| Method | Path | Actor | Scope / rule |
+|---|---|---|---|
+| POST | `/api/feedback/reviews` | Customer | Owned completed nonfuture booking; 409 duplicate |
+| GET | `/api/feedback/bookings/{bookingId}/review` | Customer | Own booking, safe 404 |
+| GET | `/api/feedback/businesses/{businessId}/reviews` | Owner/admin | Canonical tenant page, authorized totals |
+| GET | `/api/feedback/branches/{branchId}/summary` | Marketplace reader | Discoverable, published only |
+| GET | `/api/feedback/offerings/{offeringId}/summary` | Marketplace reader | Discoverable, published only |
+| POST | `/api/feedback/reviews/{reviewId}/reports` | Author/owner | One report per actor, no automatic hiding |
+| GET | `/api/feedback/businesses/{businessId}/reports` | Admin | Explicit tenant moderation page |
+| POST | `/api/feedback/reviews/{reviewId}/hide` | Admin | Required reason |
+| POST | `/api/feedback/reviews/{reviewId}/restore` | Admin | Required reason |
+| POST | `/api/feedback/reports/{reportId}/resolve` | Admin | Required reason |
 
 | Method | Path | Authentication | Role / permission | Ownership | Request DTO | Success | 400/401/403/404 | Important rules |
 |---|---|---|---|---|---|---:|---|---|
