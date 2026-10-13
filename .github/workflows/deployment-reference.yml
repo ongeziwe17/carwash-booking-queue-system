@@ -75,7 +75,7 @@ jobs:
             echo 'Unsafe in-memory production startup unexpectedly succeeded'
             exit 1
           fi
-          grep --quiet 'Invalid staging/production deployment configuration' target/deployment/invalid-profile.log
+          grep --quiet 'DeploymentProfileGuard' target/deployment/invalid-profile.log
       - name: Prepare ephemeral PostgreSQL and external secret
         run: |
           set -euo pipefail
