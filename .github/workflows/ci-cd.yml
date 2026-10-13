@@ -553,6 +553,70 @@ jobs:
           echo "Compose API did not recover after restart."
           exit 1
 
+      - name: Verify staging and production profiles with disposable PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target
+          wait_ready() {
+            for _ in {1..50}; do
+              if curl --silent --fail --max-time 5 http://127.0.0.1:8080/actuator/health/readiness > /dev/null; then
+                return 0
+              fi
+              sleep 2
+            done
+            echo "API did not become ready"
+            return 1
+          }
+          for profile in production staging; do
+            CARWASH_RUNTIME_PROFILE="${profile}" docker compose up --no-deps --detach --force-recreate carwash-api
+            wait_ready
+            curl --silent --fail http://127.0.0.1:8080/actuator/health/liveness > /dev/null
+            case "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8080/v3/api-docs)" in
+              403|404) ;;
+              *) echo "API docs exposed under ${profile}"; exit 1 ;;
+            esac
+            test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8080/actuator/prometheus)" = 401
+            curl --silent --dump-header target/runtime-headers.txt --output /dev/null \
+              -H 'X-Forwarded-Proto: https' -H 'X-Forwarded-Host: untrusted.example.invalid' \
+              http://127.0.0.1:8080/actuator/health/liveness
+            grep --ignore-case --quiet 'x-content-type-options: nosniff' target/runtime-headers.txt
+            grep --ignore-case --quiet 'x-frame-options: DENY' target/runtime-headers.txt
+          done
+          CARWASH_RUNTIME_PROFILE=production docker compose up --no-deps --detach --force-recreate carwash-api
+          wait_ready
+          docker compose stop postgres
+          database_unready=false
+          for _ in {1..35}; do
+            status="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 8 \
+              http://127.0.0.1:8080/actuator/health/readiness || true)"
+            if [[ "${status}" == 503 ]]; then database_unready=true; break; fi
+            sleep 2
+          done
+          test "${database_unready}" = true
+          curl --silent --fail http://127.0.0.1:8080/actuator/health/liveness > /dev/null
+          docker compose up --detach --wait postgres
+          wait_ready
+          docker compose up --no-deps --detach --force-recreate carwash-api
+          wait_ready
+          curl --silent --fail http://127.0.0.1:8080/v3/api-docs > /dev/null
+
+      - name: Reject an unsafe production startup
+        shell: bash
+        run: |
+          set -euo pipefail
+          if docker run --rm --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+              --cap-drop ALL --security-opt no-new-privileges \
+              --env SPRING_PROFILES_ACTIVE=production \
+              --env SPRING_APP_NAME=carwash-booking-queue-system \
+              --env SERVER_PORT=8080 \
+              "${LOCAL_IMAGE}" > target/invalid-production-profile.log 2>&1; then
+            echo "Production started without durable configuration"
+            exit 1
+          fi
+          grep --quiet 'DeploymentProfileGuard' target/invalid-production-profile.log
+          rm -f target/invalid-production-profile.log
+
       - name: Smoke test Docker image
         shell: bash
         run: |
@@ -564,6 +628,12 @@ jobs:
 
           docker run --detach \
             --name "${container_name}" \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=64m,uid=10001,gid=10001 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 256 \
+            --memory 768m \
             --publish 18080:8080 \
             --env SPRING_PROFILES_ACTIVE=test \
             --env SPRING_APP_NAME=carwash-booking-queue-system \
