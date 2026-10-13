@@ -83,10 +83,10 @@ Every documented controller/OpenAPI operation is represented by at least one exe
 ## Totals
 
 - API operations: **85** (all represented in Bruno and the OpenAPI coverage gate)
-- Existing happy-path functional coverage: **75/75**; the ten feedback operations have explicit validation, authorization, zero-summary, empty-page and missing-resource Bruno requests. A controlled completed booking, publication and moderation are exercised by Java HTTP integration tests; the run-scoped Bruno bookings are scheduled in the future.
+- Existing happy-path functional coverage: **75/75**; the ten feedback operations have explicit validation, authorization, zero-summary, empty-page and missing-resource Bruno requests. Owner and explicitly scoped administrator feedback-audit reads are also checked. A controlled completed booking, audit tenancy, publication, moderation and guarded account deletion are exercised by Java HTTP integration tests; the run-scoped Bruno bookings are scheduled in the future.
 - Existing 401 coverage: **73/73 protected operations** (2 public operations are N/A); feedback endpoints are protected in the OpenAPI/security gate.
 - RBAC/403, subject/tenant ownership, validation, integrity, and multi-step workflow applicability are covered wherever meaningful in the matrix above.
-- Bruno requests/assertions: **575 requests / at least 1,772 assertions**, including the feedback folder.
+- Bruno requests/assertions: **at least 577 requests / at least 1,774 assertions**, including the feedback folder and two additional audit-scope probes.
 
 The full authorization suite also exercises each significant role/capability allow/deny cell rather than relying only on per-operation counts.
 

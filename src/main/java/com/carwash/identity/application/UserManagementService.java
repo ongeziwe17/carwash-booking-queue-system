@@ -14,6 +14,7 @@ import com.carwash.identity.domain.TenantMembershipRepository;
 import com.carwash.vehicle.domain.VehicleRepository;
 import com.carwash.shared.application.DataTransactionOperations;
 import com.carwash.shared.application.MutationLock;
+import com.carwash.feedback.application.FeedbackUserReferenceQuery;
 import com.carwash.identity.domain.RoleCatalog;
 import com.carwash.identity.domain.RoleName;
 import com.carwash.identity.application.CreateUserCommand;
@@ -41,6 +42,7 @@ public class UserManagementService implements UserQuery {
     private final TenantMembershipRepository tenantMembershipRepository;
     private final DataTransactionOperations coordinator;
     private final MutationLock mutationLock;
+    private final FeedbackUserReferenceQuery feedbackReferences;
 
 
     public UserManagementService(
@@ -49,10 +51,11 @@ public class UserManagementService implements UserQuery {
             VehicleRepository vehicleRepository,
             BookingRepository bookingRepository,
             NotificationRepository notificationRepository,
-            DataTransactionOperations coordinator
+            DataTransactionOperations coordinator,
+            FeedbackUserReferenceQuery feedbackReferences
     ) {
         this(userRepository, credentialService, vehicleRepository, bookingRepository,
-                notificationRepository, null, coordinator, MutationLock.noOp());
+                notificationRepository, null, coordinator, MutationLock.noOp(), feedbackReferences);
     }
 
     public UserManagementService(
@@ -62,10 +65,11 @@ public class UserManagementService implements UserQuery {
             BookingRepository bookingRepository,
             NotificationRepository notificationRepository,
             DataTransactionOperations coordinator,
-            MutationLock mutationLock
+            MutationLock mutationLock,
+            FeedbackUserReferenceQuery feedbackReferences
     ) {
         this(userRepository, credentialService, vehicleRepository, bookingRepository,
-                notificationRepository, null, coordinator, mutationLock);
+                notificationRepository, null, coordinator, mutationLock, feedbackReferences);
     }
 
     public UserManagementService(
@@ -76,7 +80,8 @@ public class UserManagementService implements UserQuery {
             NotificationRepository notificationRepository,
             TenantMembershipRepository tenantMembershipRepository,
             DataTransactionOperations coordinator,
-            MutationLock mutationLock
+            MutationLock mutationLock,
+            FeedbackUserReferenceQuery feedbackReferences
     ) {
         this.userRepository = Objects.requireNonNull(userRepository, "User repository is required");
         this.credentialService = Objects.requireNonNull(credentialService, "Credential service is required");
@@ -86,6 +91,7 @@ public class UserManagementService implements UserQuery {
         this.tenantMembershipRepository = tenantMembershipRepository;
         this.coordinator = Objects.requireNonNull(coordinator, "Data coordinator is required");
         this.mutationLock = Objects.requireNonNull(mutationLock, "Mutation lock is required");
+        this.feedbackReferences = Objects.requireNonNull(feedbackReferences, "Feedback reference query is required");
     }
 
     public User createUser(CreateUserCommand command) {
@@ -147,7 +153,7 @@ public class UserManagementService implements UserQuery {
 
     public void deleteUser(String userId) {
         coordinator.write(() -> {
-            mutationLock.acquire(MutationLock.platformAdministrators());
+            mutationLock.acquire(List.of(MutationLock.platformAdministrators(), MutationLock.feedbackActor(userId)));
             User user = requireUser(userId);
             if (isLastActivePlatformAdministrator(user)) {
                 throw new BusinessRuleViolationException("The last active platform administrator cannot be deleted");
@@ -159,6 +165,9 @@ public class UserManagementService implements UserQuery {
             if (hasVehicles || hasBookings) {
                 throw new BusinessRuleViolationException(
                         "User cannot be deleted while vehicles or bookings still reference it");
+            }
+            if (feedbackReferences.referencesUser(userId)) {
+                throw new BusinessRuleViolationException("User cannot be deleted while feedback references it");
             }
             if (notificationRepository != null) notificationRepository.deleteByUserId(userId);
             user.clearNotifications();

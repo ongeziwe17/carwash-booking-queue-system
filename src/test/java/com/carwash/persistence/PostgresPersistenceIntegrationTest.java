@@ -193,6 +193,109 @@ class PostgresPersistenceIntegrationTest {
         assertEquals(1,feedbackService.offeringSummary(f.offeringId).reviewCount());
     }
 
+    @Test void feedbackActorsKeepHistoricalRowsAndAccountStateAcrossRejectedHttpDeletion() throws Exception {
+        var f=fixture("feedback-actors",1);
+        var booking=bookings.createBooking(ADMIN,"feedback-actors-booking",f.user.getUserId(),f.vehicle.getVehicleId(),
+                f.branchId,f.offeringId,LocalDateTime.of(2089,1,17,10,0),null);
+        booking.setStatus(BookingStatus.COMPLETED);booking.setScheduledDateTime(LocalDateTime.of(2020,1,1,10,0));
+        transactions.write(()->assertTrue(bookingRepository.update(booking)));
+        var review=feedbackService.submit(new TenantAccessContext(f.user.getUserId(),RoleName.CUSTOMER,null),
+                booking.getBookingId(),5,"Original comment");
+        createUser("feedback-actors-owner","feedback-actors-owner@example.test");
+        tenantMemberships.assignRole("feedback-actors-owner",RoleName.BUSINESS_OWNER,"feedback-actors-business");
+        createUser("feedback-actors-moderator","feedback-actors-moderator@example.test");
+        users.assignRole("feedback-actors-moderator",RoleName.PLATFORM_ADMIN);
+        createUser("feedback-actors-resolver","feedback-actors-resolver@example.test");
+        users.assignRole("feedback-actors-resolver",RoleName.PLATFORM_ADMIN);
+        createUser("feedback-actors-spare","feedback-actors-spare@example.test");
+        users.assignRole("feedback-actors-spare",RoleName.PLATFORM_ADMIN);
+        var owner=new TenantAccessContext("feedback-actors-owner",RoleName.BUSINESS_OWNER,"feedback-actors-business");
+        var moderator=new TenantAccessContext("feedback-actors-moderator",RoleName.PLATFORM_ADMIN,null);
+        var resolver=new TenantAccessContext("feedback-actors-resolver",RoleName.PLATFORM_ADMIN,null);
+        var notice=new Notification("feedback-actors-notice",userRepository.findById(owner.userId()).orElseThrow(),
+                null,"SYSTEM","Keep notification","IN_APP");
+        transactions.write(()->assertTrue(notificationRepository.insert(notice)));
+        var report=feedbackService.report(owner,review.id(),"Original report");
+        assertThrows(com.carwash.shared.exception.ResourceConflictException.class,
+                ()->feedbackService.report(owner,review.id(),"Duplicate report"));
+        assertThrows(ResourceNotFoundException.class,()->feedbackService.report(
+                new TenantAccessContext(owner.userId(),RoleName.BUSINESS_OWNER,"other-business"),review.id(),"Foreign"));
+        feedbackService.moderate(moderator,review.id(),com.carwash.feedback.domain.PublicationState.HIDDEN,"Investigated");
+        assertThrows(com.carwash.shared.exception.ResourceConflictException.class,()->feedbackService.moderate(
+                moderator,review.id(),com.carwash.feedback.domain.PublicationState.HIDDEN,"Duplicate"));
+        feedbackService.resolve(resolver,report.id(),"Resolved");
+        assertThrows(com.carwash.shared.exception.ResourceConflictException.class,
+                ()->feedbackService.resolve(resolver,report.id(),"Duplicate resolution"));
+        assertThrows(IllegalStateException.class,()->transactions.write(()->{
+            feedbackService.moderate(moderator,review.id(),com.carwash.feedback.domain.PublicationState.PUBLISHED,"Rollback");
+            throw new IllegalStateException("outer transaction failed");
+        }));
+        assertEquals(com.carwash.feedback.domain.PublicationState.HIDDEN,
+                feedbackRepository.byId(review.id()).orElseThrow().publication());
+        var memoryTx=new com.carwash.shared.infrastructure.InMemoryDataCoordinator();
+        var memoryFeedback=new com.carwash.feedback.infrastructure.InMemoryFeedbackRepository(memoryTx);
+        memoryTx.write(()->{
+            assertTrue(memoryFeedback.insert(feedbackRepository.byId(review.id()).orElseThrow()));
+            assertTrue(memoryFeedback.insertReport(feedbackRepository.reportById(report.id()).orElseThrow()));
+        });
+        for(String actor:List.of(owner.userId(),moderator.userId(),resolver.userId(),"feedback-actors-free"))
+            assertEquals(memoryFeedback.referencesUser(actor),feedbackRepository.referencesUser(actor));
+        var scoped=auditRepository.queryByBusinessId("feedback-actors-business",new AuditQuery(null,null,
+                AuditOutcome.SUCCESS,null,null,Instant.EPOCH,Instant.now().plusSeconds(60),null,100));
+        assertTrue(scoped.stream().anyMatch(r->r.action()==AuditAction.FEEDBACK_REPORTED && r.actorUserId().equals(owner.userId())));
+        assertTrue(scoped.stream().anyMatch(r->r.action()==AuditAction.FEEDBACK_HIDDEN && r.actorUserId().equals(moderator.userId())));
+        assertTrue(scoped.stream().anyMatch(r->r.action()==AuditAction.FEEDBACK_REPORT_RESOLVED && r.actorUserId().equals(resolver.userId())));
+        assertTrue(scoped.stream().filter(r->r.action().name().startsWith("FEEDBACK_")).allMatch(r->r.metadata().isEmpty()));
+        assertFalse(scoped.stream().anyMatch(r->r.action()==AuditAction.FEEDBACK_RESTORED));
+        assertEquals(1,scoped.stream().filter(r->r.action()==AuditAction.FEEDBACK_REPORTED).count());
+        assertTrue(auditRepository.queryPlatform(new AuditQuery(null,AuditAction.FEEDBACK_REPORTED,
+                AuditOutcome.DENIED,"REVIEW",review.id(),Instant.EPOCH,Instant.now().plusSeconds(60),null,100))
+                .stream().anyMatch(r->r.businessId()==null));
+        assertTrue(auditRepository.queryByBusinessId("feedback-actors-other",new AuditQuery(null,null,null,
+                null,null,Instant.EPOCH,Instant.now().plusSeconds(60),null,100)).isEmpty());
+        var adminJwt=org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt()
+                .jwt(jwt->jwt.subject("feedback-actors-spare").claim("role","PLATFORM_ADMIN"))
+                .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN"));
+        for(String id:List.of(owner.userId(),moderator.userId(),resolver.userId())) {
+            managementMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/users/{id}",id)
+                    .with(adminJwt))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
+            assertTrue(userRepository.findById(id).isPresent());
+            assertTrue(feedbackRepository.referencesUser(id));
+        }
+        assertEquals("feedback-actors-business",tenantMembershipRepository.findById(owner.userId()).orElseThrow().businessId());
+        assertEquals(1,notificationRepository.findByUserId(owner.userId()).size());
+        assertEquals("Original report",feedbackRepository.reportById(report.id()).orElseThrow().reason());
+        createUser("feedback-actors-free","feedback-actors-free@example.test");
+        managementMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                "/api/users/feedback-actors-free").with(adminJwt))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNoContent());
+        assertTrue(userRepository.findById("feedback-actors-free").isEmpty());
+    }
+
+    @Test void concurrentReporterReferenceAndDeletionSerializeWithoutOrphans() throws Exception {
+        var f=fixture("feedback-race",1);
+        var booking=bookings.createBooking(ADMIN,"feedback-race-booking",f.user.getUserId(),f.vehicle.getVehicleId(),
+                f.branchId,f.offeringId,LocalDateTime.of(2089,1,17,10,0),null);
+        booking.setStatus(BookingStatus.COMPLETED);booking.setScheduledDateTime(LocalDateTime.of(2020,1,1,10,0));
+        transactions.write(()->assertTrue(bookingRepository.update(booking)));
+        var review=feedbackService.submit(new TenantAccessContext(f.user.getUserId(),RoleName.CUSTOMER,null),
+                booking.getBookingId(),5,null);
+        createUser("feedback-race-owner","feedback-race-owner@example.test");
+        tenantMemberships.assignRole("feedback-race-owner",RoleName.BUSINESS_OWNER,"feedback-race-business");
+        var owner=new TenantAccessContext("feedback-race-owner",RoleName.BUSINESS_OWNER,"feedback-race-business");
+        CyclicBarrier barrier=new CyclicBarrier(2);
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            Future<?> report=pool.submit(()->{barrier.await();try{feedbackService.report(owner,review.id(),"Concern");}
+                    catch(ResourceNotFoundException deletedFirst){}return null;});
+            Future<?> deletion=pool.submit(()->{barrier.await();try{users.deleteUser(owner.userId());}
+                    catch(BusinessRuleViolationException reportedFirst){}return null;});
+            report.get(15,TimeUnit.SECONDS);deletion.get(15,TimeUnit.SECONDS);
+        }
+        assertEquals(userRepository.findById(owner.userId()).isPresent(),feedbackRepository.referencesUser(owner.userId()));
+    }
+
     @org.springframework.boot.test.context.TestConfiguration(proxyBeanMethods=false)
     static class PageStatementConfiguration {
         @org.springframework.context.annotation.Bean PageStatements pageStatements() { return new PageStatements(); }

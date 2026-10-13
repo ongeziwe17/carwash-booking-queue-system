@@ -7,6 +7,7 @@ import com.carwash.booking.application.*;
 import com.carwash.booking.domain.BookingStatus;
 import com.carwash.catalog.application.ServiceOfferingQuery;
 import com.carwash.feedback.domain.*;
+import com.carwash.identity.application.UserQuery;
 import com.carwash.marketplace.application.*;
 import com.carwash.shared.application.*;
 import com.carwash.shared.exception.*;
@@ -26,13 +27,15 @@ public final class FeedbackService {
     private final AuditOperations audit;
     private final Telemetry telemetry;
     private final Clock clock;
+    private final UserQuery users;
 
     public FeedbackService(FeedbackRepository repository, BookingQuery bookings, MarketplaceQuery marketplace,
             ServiceOfferingQuery offerings, DataTransactionOperations transactions, MutationLock locks,
-            AuditOperations audit, Telemetry telemetry, Clock clock) {
+            AuditOperations audit, Telemetry telemetry, Clock clock, UserQuery users) {
         this.repository = repository; this.bookings = bookings; this.marketplace = marketplace;
         this.offerings = offerings; this.transactions = transactions; this.locks = locks;
         this.audit = audit; this.telemetry = telemetry; this.clock = clock;
+        this.users = Objects.requireNonNull(users);
     }
 
     public Review submit(TenantAccessContext access, String bookingId, int rating, String comment) {
@@ -103,13 +106,19 @@ public final class FeedbackService {
     public ReviewReport report(TenantAccessContext access, String reviewId, String reason) {
         String id = identifier(reviewId); String text = reason(reason);
         String reportId = UUID.randomUUID().toString();
-        return telemetry.observe(Telemetry.Operation.FEEDBACK_REPORT, () -> audit.execute(
-                event(access, AuditAction.FEEDBACK_REPORTED, null, "REVIEW", id), () -> {
+        final Review[] authorized = new Review[1];
+        return telemetry.observe(Telemetry.Operation.FEEDBACK_REPORT, () -> audit.executeDeferred(() -> {
+            locks.acquire(MutationLock.feedbackActor(access.userId()));
+            requireActor(access.userId());
             Review review = repository.byId(id).orElseThrow(() -> new ResourceNotFoundException("Review not found"));
             if (!(access.isCustomer() && access.userId().equals(review.customerId()))
                     && !(access.role() == com.carwash.identity.domain.RoleName.BUSINESS_OWNER
                          && access.requireBusinessId().equals(review.businessId())))
                 throw new ResourceNotFoundException("Review not found");
+            authorized[0] = review;
+            return event(access, AuditAction.FEEDBACK_REPORTED, review.businessId(), "REVIEW", id);
+        }, event(access, AuditAction.FEEDBACK_REPORTED, null, "REVIEW", id), () -> {
+            Review review = authorized[0];
             ReviewReport report = new ReviewReport(reportId, id, review.businessId(), access.userId(), text,
                     clock.instant(), ReportState.OPEN, null, null, null);
             if (!repository.insertReport(report)) throw new ResourceConflictException("Review already reported by actor");
@@ -126,26 +135,38 @@ public final class FeedbackService {
     public Review moderate(TenantAccessContext access, String reviewId, PublicationState state, String reason) {
         access.requirePlatformAdministrator(); String id = identifier(reviewId); String text = reason(reason);
         AuditAction action = state == PublicationState.HIDDEN ? AuditAction.FEEDBACK_HIDDEN : AuditAction.FEEDBACK_RESTORED;
-        return telemetry.observe(Telemetry.Operation.FEEDBACK_MODERATE, () -> audit.execute(
-                event(access, action, null, "REVIEW", id), () -> {
-            locks.acquire(MutationLock.feedbackReview(id));
+        final Review[] authorized = new Review[1];
+        return telemetry.observe(Telemetry.Operation.FEEDBACK_MODERATE, () -> audit.executeDeferred(() -> {
+            locks.acquire(java.util.List.of(MutationLock.feedbackActor(access.userId()), MutationLock.feedbackReview(id)));
+            requireActor(access.userId());
             Review review = repository.byId(id).orElseThrow(() -> new ResourceNotFoundException("Review not found"));
             if (review.publication() == state) throw new ResourceConflictException("Review already has that publication state");
-            Review changed = review.moderate(state, text, access.userId(), clock.instant());
+            authorized[0] = review;
+            return event(access, action, review.businessId(), "REVIEW", id);
+        }, event(access, action, null, "REVIEW", id), () -> {
+            Review changed = authorized[0].moderate(state, text, access.userId(), clock.instant());
             repository.update(changed); return changed;
         }));
     }
 
     public ReviewReport resolve(TenantAccessContext access, String reportId, String reason) {
         access.requirePlatformAdministrator(); String id = identifier(reportId); String text = reason(reason);
-        return telemetry.observe(Telemetry.Operation.FEEDBACK_MODERATE, () -> audit.execute(
-                event(access, AuditAction.FEEDBACK_REPORT_RESOLVED, null, "REPORT", id), () -> {
-            locks.acquire(MutationLock.feedbackReport(id));
+        final ReviewReport[] authorized = new ReviewReport[1];
+        return telemetry.observe(Telemetry.Operation.FEEDBACK_MODERATE, () -> audit.executeDeferred(() -> {
+            locks.acquire(java.util.List.of(MutationLock.feedbackActor(access.userId()), MutationLock.feedbackReport(id)));
+            requireActor(access.userId());
             ReviewReport report = repository.reportById(id).orElseThrow(() -> new ResourceNotFoundException("Report not found"));
             if (report.state() == ReportState.RESOLVED) throw new ResourceConflictException("Report already resolved");
-            ReviewReport changed = report.resolve(text, access.userId(), clock.instant());
+            authorized[0] = report;
+            return event(access, AuditAction.FEEDBACK_REPORT_RESOLVED, report.businessId(), "REPORT", id);
+        }, event(access, AuditAction.FEEDBACK_REPORT_RESOLVED, null, "REPORT", id), () -> {
+            ReviewReport changed = authorized[0].resolve(text, access.userId(), clock.instant());
             repository.updateReport(changed); return changed;
         }));
+    }
+
+    private void requireActor(String userId) {
+        if (users.findOptionalById(userId).isEmpty()) throw new ResourceNotFoundException("User not found");
     }
 
     private String business(TenantAccessContext access, String requested) {

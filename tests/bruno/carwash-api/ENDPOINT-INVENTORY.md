@@ -6,6 +6,8 @@ Inventory source: the controllers and OpenAPI quality gate through NOTIFY-001. G
 
 The ten FEEDBACK-001 operations are included in the exact OpenAPI operation inventory and `23-feedback` Bruno folder:
 
+The repair adds owner and explicitly tenant-scoped administrator audit reads for feedback actions using the existing `GET /api/audit-records` operation. Valid completed-review audit events and referenced-account deletion are verified in both Java HTTP profiles; the run-scoped Bruno bookings remain future scheduled.
+
 | Method | Path | Actor | Scope / rule |
 |---|---|---|---|
 | POST | `/api/feedback/reviews` | Customer | Owned completed nonfuture booking; 409 duplicate |

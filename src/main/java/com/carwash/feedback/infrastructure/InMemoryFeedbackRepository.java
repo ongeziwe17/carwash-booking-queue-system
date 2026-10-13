@@ -68,4 +68,9 @@ public class InMemoryFeedbackRepository implements FeedbackRepository {
         ReviewReport previous = reports.put(report.id(), report);
         transactions.onRollback(() -> reports.put(report.id(), previous));
     }
+    @Override public boolean referencesUser(String userId) {
+        return reviews.values().stream().anyMatch(r -> userId.equals(r.moderatorId()))
+                || reports.values().stream().anyMatch(r -> userId.equals(r.actorId())
+                        || userId.equals(r.resolvedBy()));
+    }
 }

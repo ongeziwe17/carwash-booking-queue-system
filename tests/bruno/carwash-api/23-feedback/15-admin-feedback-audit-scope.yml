@@ -1,0 +1,15 @@
+info: { name: 15 admin feedback audit scope, type: http, seq: 15, tags: [feedback, audit, tenant] }
+http:
+  method: GET
+  url: "{{baseUrl}}/api/audit-records?scope=TENANT&businessId={{marketplaceBusinessId}}&action=FEEDBACK_REPORTED&limit=25"
+  auth: { type: bearer, token: "{{adminToken}}" }
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("administrator audit scope is explicit", function() {
+          expect(res.status).to.equal(200);
+          expect(res.body.records).to.be.an("array");
+          expect(res.body.records.every(item => item.businessId === bru.getVar("marketplaceBusinessId"))).to.equal(true);
+        });
+settings: { encodeUrl: true, timeout: 15000, followRedirects: false }
