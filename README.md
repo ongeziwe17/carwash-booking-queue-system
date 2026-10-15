@@ -237,6 +237,7 @@ v* release tag
 Pull requests into `staging`, `develop`, and `master` run Maven, workflow, test-repeatability, Docker Compose, Docker image, smoke-test, and vulnerability validation. Registry login and publishing run only for approved branch or tag pushes.
 
 See [Delivery and Docker Workflow](documentation/DELIVERY-AND-DOCKER.md) for branch protection recommendations, image tags, required secrets, CI jobs, artifacts, and local Docker guidance.
+See [CI/CD Architecture](documentation/CI-CD-ARCHITECTURE.md) for the workflow responsibility graph, release gates, troubleshooting and the planned reusable-pipeline boundary.
 
 ## Authentication and authorization
 
@@ -297,6 +298,7 @@ and representative 400, 401, 403, 404, and 500 responses.
 - [User Stories](documentation/USER-STORIES.md)
 - [Product Backlog](documentation/PRODUCT-BACKLOG.md)
 - [Delivery and Docker Workflow](documentation/DELIVERY-AND-DOCKER.md)
+- [CI/CD Architecture](documentation/CI-CD-ARCHITECTURE.md)
 - [Coverage Baseline](documentation/COVERAGE.md)
 
 ## Observability
