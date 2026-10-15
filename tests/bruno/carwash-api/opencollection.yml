@@ -1,7 +1,7 @@
 opencollection: 1.0.0
 
 info:
-  name: Car Wash API Acceptance Suite
+  name: HlambaQ API Acceptance Suite
 bundled: false
 extensions:
   bruno:

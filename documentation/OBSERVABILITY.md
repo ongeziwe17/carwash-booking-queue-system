@@ -1,5 +1,7 @@
 # Production observability
 
+The application reports the OpenTelemetry `service.name` as `hlambaq-api`. Local Compose DNS uses the same backend service name. Prometheus `job="carwash"`, `job="carwash-readiness"`, and `carwash_*` metric names are retained so existing dashboards, alerts and external queries keep working. Trace searches keyed to the previous service name must select `hlambaq-api` after an updated application starts.
+
 Actuator, Prometheus metrics, Logstash JSON logs and Micrometer/OpenTelemetry traces cover the capabilities currently implemented. No production vendor, purchased domain or external notification/payment account is needed. The application remains Java 21 / Spring Boot 4.0.6 with the existing Tomcat alignment. V1–V6 are unchanged.
 
 ## Endpoint access policy

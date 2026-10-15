@@ -25,7 +25,7 @@ RUN addgroup -S appgroup \
     && adduser -S -G appgroup appuser
 
 COPY --from=builder --chown=appuser:appgroup \
-    /workspace/target/carwash-api.jar /app/app.jar
+    /workspace/target/hlambaq-api.jar /app/app.jar
 
 USER appuser
 

@@ -11,10 +11,10 @@
     </parent>
 
     <groupId>com.carwash</groupId>
-    <artifactId>carwash-booking-queue-system</artifactId>
+    <artifactId>hlambaq-api</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>carwash-booking-queue-system</name>
-    <description>Web-Based Car Wash Booking and Queue Management System</description>
+    <name>HlambaQ API</name>
+    <description>HlambaQ - Car Wash Marketplace, Booking and Queue Management Platform</description>
     <url>https://github.com/ongeziwe17/carwash-booking-queue-system</url>
 
     <properties>
@@ -131,7 +131,7 @@
     </dependencies>
 
     <build>
-        <finalName>carwash-api</finalName>
+        <finalName>hlambaq-api</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

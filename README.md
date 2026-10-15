@@ -1,6 +1,12 @@
-# Car Wash Booking Queue System
+# HlambaQ
 
-Spring Boot backend foundation for car wash booking, queue management, Marketplace onboarding/scheduling, and immutable security/operational auditing. The code is organized as a capability-based modular monolith with explicit `bootstrap`, `shared`, `identity`, `access`, `audit`, `vehicle`, `catalog`, `booking`, `queue`, `notification`, `reporting`, `feedback`, `marketplace`, `discovery`, and `recommendation` boundaries enforced by ArchUnit. The current codebase exposes APIs for users, vehicles, reusable global services, branch-specific offerings, bookings, queues, notifications, daily and tenant-aware operational reporting, Marketplace businesses, physical branches, weekly branch hours, temporary closures, timezone-aware open-status decisions, authenticated nearby branch discovery, branch-aware availability, explainable rule-based recommendations, and scoped audit reads. Storage is selectable: the lightweight default/test profile uses in-memory adapters, while the `postgres` profile uses durable module-owned JPA/JDBC adapters and Flyway migrations.
+**Car Wash Marketplace, Booking and Queue Management Platform**
+
+HlambaQ connects customers with car wash businesses and supports bookings, queues, branch operations and platform administration. This repository contains its Java 21 Spring Boot backend, built as a capability-based modular monolith. The planned public domain is `hlambaq.co.za`; no domain, hosting or frontend is configured here.
+
+The [naming and repository transition guide](documentation/HLAMBAQ-NAMING.md) records the identifiers deliberately retained for compatibility and the future GitHub organization/repository checklist.
+
+The code has explicit `bootstrap`, `shared`, `identity`, `access`, `audit`, `vehicle`, `catalog`, `booking`, `queue`, `notification`, `reporting`, `feedback`, `marketplace`, `discovery`, and `recommendation` boundaries enforced by ArchUnit. The current backend exposes APIs for users, vehicles, reusable global services, branch-specific offerings, bookings, queues, notifications, daily and tenant-aware operational reporting, Marketplace businesses, physical branches, weekly branch hours, temporary closures, timezone-aware open-status decisions, authenticated nearby branch discovery, branch-aware availability, explainable rule-based recommendations, and scoped audit reads. Storage is selectable: the lightweight default/test profile uses in-memory adapters, while the `postgres` profile uses durable module-owned JPA/JDBC adapters and Flyway migrations.
 
 ## Current backend foundation
 
@@ -33,9 +39,9 @@ Spring Boot backend foundation for car wash booking, queue management, Marketpla
 - External SMS, email, push delivery, and marketing campaigns are not implemented; notification creation remains
   internal to booking and queue workflows.
 - Nearby distance is straight-line only; no routing, traffic, geocoding, or external maps provider is used.
-- Payments, capacity reservations, concurrent bay/staff scheduling, production observability, backups/restore automation, and deployment hardening remain future work.
+- Payments, capacity reservations, concurrent bay/staff scheduling, production monitoring infrastructure, backups/restore automation, and deployment hardening remain future work.
 - Recommendations are point-in-time rules only; personalization, machine learning, sponsored ranking, dynamic pricing, traffic-aware routing, and holds are not implemented.
-- The application does not yet expose dedicated Actuator liveness or readiness endpoints.
+- The backend has minimal Actuator liveness/readiness endpoints; production hosting and alert operations are not configured by this repository.
 
 ## Tech stack
 
@@ -111,7 +117,7 @@ docker compose up --build -d
 Follow application logs:
 
 ```bash
-docker compose logs -f carwash-api
+docker compose logs -f hlambaq-api
 ```
 
 Inspect PostgreSQL and applied migrations:
@@ -202,7 +208,7 @@ Generated outputs include:
 - `target/surefire-reports/`
 - `target/failsafe-reports/`
 - `target/site/jacoco/`
-- `target/carwash-api.jar`
+- `target/hlambaq-api.jar`
 
 GitHub Actions uploads Surefire/Failsafe reports, JaCoCo coverage, the verified application JAR, OpenAPI JSON, and Docker vulnerability results from the main verification path. The repeatability matrix uploads seed-labelled test reports when a seed fails, making the failing order reproducible without rerunning Docker validation for each seed.
 

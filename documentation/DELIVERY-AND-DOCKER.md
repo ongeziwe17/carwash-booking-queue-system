@@ -127,7 +127,7 @@ docker compose up --build -d
 Logs:
 
 ```bash
-docker compose logs -f carwash-api
+docker compose logs -f hlambaq-api
 
 docker compose exec postgres psql -U "${POSTGRES_USER:-carwash}" -d "${POSTGRES_DB:-carwash}"
 ```
@@ -144,7 +144,7 @@ Remove stopped services and orphan containers without deleting persistent data:
 docker compose down --remove-orphans
 ```
 
-The named PostgreSQL volume survives ordinary `down`/restart. Deliberately erase local database data only with `docker compose down --volumes`; this is destructive and cannot be recovered without a backup. PostgreSQL has a database health check and the API waits for it. The API still has no dedicated liveness/readiness endpoint, so CI smoke testing uses the public OpenAPI endpoint; production health endpoints remain OBS-001/DEPLOY-001 work.
+The named PostgreSQL volume `carwash-postgres-data` survives ordinary `down`/restart. Deliberately erase local database data only with `docker compose down --volumes`; this is destructive and cannot be recovered without a backup. PostgreSQL has a database health check and the API waits for it. The backend exposes minimal `/actuator/health/liveness` and `/actuator/health/readiness` endpoints; CI also checks the public OpenAPI contract.
 
 ## Docker image design
 
@@ -154,7 +154,7 @@ The Dockerfile uses:
 - Dependency-definition layers before source code for improved caching.
 - Maven BuildKit cache mounts.
 - Packaging with tests skipped because Maven verification runs first in CI.
-- A predictable `target/carwash-api.jar` artifact.
+- A predictable `target/hlambaq-api.jar` artifact.
 - An Eclipse Temurin Java 21 JRE runtime stage.
 - A dedicated non-root `appuser`.
 - Only the application JAR copied into the runtime image.

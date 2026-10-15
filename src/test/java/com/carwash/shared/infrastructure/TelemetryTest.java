@@ -74,6 +74,8 @@ class TelemetryTest {
                 assertTrue(span.getEvents().isEmpty());
                 assertTrue(span.getStatus().getDescription().isEmpty());
                 assertFalse(span.getAttributes().toString().contains("email@example.test"));
+                assertEquals("hlambaq-api", span.getResource().getAttribute(
+                        io.opentelemetry.api.common.AttributeKey.stringKey("service.name")));
             }
             var raw = provider.get("controlled-test").spanBuilder("/api/customer@example.test?token=secret").startSpan();
             raw.setAttribute("url.full", "https://host/?password=secret");

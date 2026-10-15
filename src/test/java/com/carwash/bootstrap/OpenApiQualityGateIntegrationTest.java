@@ -38,6 +38,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class OpenApiQualityGateIntegrationTest extends ApiIntegrationTestSupport {
 
+    @Test void productIdentityIsExposedWithoutChangingTheApiVersion() throws Exception {
+        JsonNode info = openApi().path("info");
+        assertEquals("HlambaQ API", info.path("title").asText());
+        assertEquals("1.0", info.path("version").asText());
+        assertTrue(info.path("description").asText().contains("car wash marketplace"));
+        assertTrue(info.path("description").asText().contains("tenant-scoped"));
+    }
+
     private static final Set<String> HTTP_METHODS = Set.of("get", "post", "put", "delete", "patch");
     private static final Pattern PATH_PLACEHOLDER = Pattern.compile("\\{([^}/]+)}");
     private static final Set<String> EXPECTED_OPERATIONS = Set.of(

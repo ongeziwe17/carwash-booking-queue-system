@@ -1,5 +1,7 @@
 # Modular Monolith Architecture
 
+HlambaQ is the product name; `hlambaq-api` is this backend application. Existing Java packages under `com.carwash` describe the established code structure and remain unchanged by the application rebrand.
+
 ## Deployment view
 
 The system remains one repository, one Maven project, one Spring Boot application, one JVM, and one deployment unit. No module is independently deployed.
@@ -25,7 +27,8 @@ flowchart TD
 | `booking` | Canonically branch/offering-scoped bookings, immutable `BookingSnapshot` queries, scheduling/availability policies, persistence, and booking/availability HTTP APIs |
 | `queue` | Branch-scoped queue entries, immutable `QueueEntrySnapshot` queries, partitioned ordering/lifecycle policies, persistence, and queue HTTP API |
 | `notification` | Internal creation, scalar snapshots, scope-bound keyset inbox queries, idempotent recipient read state, ID generation, policy, persistence, and HTTP API |
-| `reporting` | Explicit branch/business daily summaries composed from published immutable queries and report HTTP API |
+| `reporting` | Explicit branch/business daily summaries and bounded operational aggregates composed from published queries and report HTTP API |
+| `feedback` | Completed-booking verified reviews, tenant feedback reads, customer summaries, reports, moderation and owned persistence |
 | `marketplace` | Business/branch aggregates, weekly schedules, temporary closures, `MarketplaceQuery`/`BranchScheduleQuery`, lifecycle/scheduling services, module-owned repositories, bounded DTO mapping, and Marketplace HTTP APIs |
 | `discovery` | Nearby-search orchestration, immutable coordinate/search/result values, the `DistanceCalculator` port, Haversine adapter, and bounded discovery HTTP API |
 | `recommendation` | Rule-based ranking orchestration, replaceable metric-provider ports, validated weights/radius, detached score projections, and bounded recommendation HTTP API |
