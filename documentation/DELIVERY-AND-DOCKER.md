@@ -59,6 +59,8 @@ GitHub Container Registry authentication uses the workflow `GITHUB_TOKEN`. The p
 
 ## CI validation
 
+The workflow responsibilities, trigger matrix, publishing dependency graph and troubleshooting guide are documented in [CI/CD Architecture](CI-CD-ARCHITECTURE.md). The observability definition check runs independently; publishing waits for it and all prior verification jobs.
+
 Pull requests into `staging`, `develop`, and `master` run:
 
 1. GitHub Actions workflow syntax validation with actionlint.

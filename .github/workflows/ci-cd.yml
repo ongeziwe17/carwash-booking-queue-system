@@ -72,6 +72,20 @@ jobs:
             exit 1
           fi
 
+      - name: Validate pipeline safety contract
+        run: |
+          python3 -m pip install PyYAML==6.0.2
+          python3 tools/ci/validate-pipeline.py
+          python3 tools/ci/test-pipeline-contract.py
+          bash -n tools/ci/container-runtime.sh
+
+  observability-validation:
+    name: Observability configuration validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
       - name: Validate observability definitions and semantic configuration
         shell: bash
         run: |
@@ -83,27 +97,6 @@ jobs:
           docker run --rm --entrypoint /bin/promtool -v "${PWD}/observability:/etc/prometheus:ro" prom/prometheus:v3.5.5 check rules /etc/prometheus/alerts.yml
           docker run --rm --entrypoint /bin/promtool -v "${PWD}/observability:/etc/prometheus:ro" -w /etc/prometheus prom/prometheus:v3.5.5 test rules alerts.test.yml
           docker run --rm -v "${PWD}/observability:/etc/otelcol:ro" otel/opentelemetry-collector:0.136.0 validate --config=/etc/otelcol/collector.yml
-
-      - name: Audit test isolation patterns
-        shell: bash
-        run: |
-          set -u
-          echo '--- fixed short IDs ---'
-          grep -R '"u1"\|"u2"\|"s1"\|"s2"\|"v1"\|"v2"\|"b1"\|"b2"' -n src/test || true
-          echo '--- static repositories ---'
-          grep -R "static.*Repository" -n src/test || true
-          echo '--- static AtomicLong ---'
-          grep -R "static.*AtomicLong" -n src/main src/test || true
-          echo '--- explicit test ordering ---'
-          grep -R "@Order" -n src/test || true
-          echo '--- sleeps ---'
-          grep -R "Thread.sleep" -n src/test || true
-          echo '--- context resets ---'
-          grep -R "@DirtiesContext" -n src/test || true
-          echo '--- HashMap fixtures ---'
-          grep -R "new HashMap" -n src/test || true
-          echo '--- misplaced configuration reference ---'
-          grep -R "api.dto.ApplicationServiceConfig" -n src || true
 
   maven-verification:
     name: Maven verification
@@ -365,6 +358,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Audit test isolation patterns
+        shell: bash
+        run: |
+          set -u
+          echo '--- fixed short IDs ---'
+          grep -R '"u1"\|"u2"\|"s1"\|"s2"\|"v1"\|"v2"\|"b1"\|"b2"' -n src/test || true
+          echo '--- static repositories ---'
+          grep -R "static.*Repository" -n src/test || true
+          echo '--- static AtomicLong ---'
+          grep -R "static.*AtomicLong" -n src/main src/test || true
+          echo '--- explicit test ordering ---'
+          grep -R "@Order" -n src/test || true
+          echo '--- sleeps ---'
+          grep -R "Thread.sleep" -n src/test || true
+          echo '--- context resets ---'
+          grep -R "@DirtiesContext" -n src/test || true
+          echo '--- HashMap fixtures ---'
+          grep -R "new HashMap" -n src/test || true
+          echo '--- misplaced configuration reference ---'
+          grep -R "api.dto.ApplicationServiceConfig" -n src || true
+
       - name: Set up Java 21
         uses: actions/setup-java@v5
         with:
@@ -499,6 +513,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Reuse verified image in Compose
+        run: docker image tag "${LOCAL_IMAGE}" hlambaq-api:local
+
       - name: Verify non-root runtime user
         shell: bash
         run: |
@@ -531,80 +548,15 @@ jobs:
 
       - name: Start persistent-profile Compose stack and verify restart recovery
         shell: bash
-        run: |
-          set -euo pipefail
-          docker compose up --detach --build --wait
-          for _ in {1..40}; do
-            if curl --silent --show-error --fail http://127.0.0.1:8080/actuator/health/readiness --output /dev/null; then
-              break
-            fi
-            sleep 2
-          done
-          curl --silent --show-error --fail http://127.0.0.1:8080/actuator/health/readiness --output /dev/null
-          curl --silent --show-error --fail http://127.0.0.1:8080/v3/api-docs --output /dev/null
-          docker compose restart hlambaq-api
-          for _ in {1..40}; do
-            if curl --silent --show-error --fail http://127.0.0.1:8080/actuator/health/readiness --output /dev/null; then
-              curl --silent --show-error --fail http://127.0.0.1:8080/v3/api-docs --output /dev/null
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Compose API did not recover after restart."
-          exit 1
+        run: bash tools/ci/container-runtime.sh compose-restart
 
       - name: Smoke test Docker image
         shell: bash
-        run: |
-          set -euo pipefail
-
-          container_name="hlambaq-api-smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-
-          trap 'docker logs "${container_name}" || true; docker rm --force "${container_name}" || true' EXIT
-
-          docker run --detach \
-            --name "${container_name}" \
-            --publish 18080:8080 \
-            --env SPRING_PROFILES_ACTIVE=test \
-            --env SPRING_APP_NAME=hlambaq-api \
-            --env SERVER_PORT=8080 \
-            --env SECURE_PASSWORD_BCRYPT_STRENGTH=4 \
-            --env SECURE_PASSWORD_MIN_LENGTH=12 \
-            --env SECURE_PASSWORD_MAX_UTF8_BYTES=72 \
-            --env SECURE_JWT_ISSUER=carwash-booking-queue-system-ci \
-            --env SECURE_JWT_ACCESS_TOKEN_TTL=20m \
-            --env SECURE_JWT_SECRET="${CI_JWT_SECRET}" \
-            --env SECURE_BOOTSTRAP_ADMIN_ENABLED=false \
-            "${LOCAL_IMAGE}"
-
-          for _ in {1..30}; do
-            if curl --silent --show-error --fail \
-              http://127.0.0.1:18080/actuator/health/readiness \
-              --output /dev/null; then
-              curl --silent --show-error --fail http://127.0.0.1:18080/v3/api-docs --output /dev/null
-              exit 0
-            fi
-
-            if ! docker inspect --format '{{.State.Running}}' "${container_name}" \
-              | grep --quiet true; then
-              echo "Smoke-test container stopped before becoming ready."
-              exit 1
-            fi
-
-            sleep 2
-          done
-
-          echo "Timed out waiting for the smoke-test container."
-          exit 1
+        run: bash tools/ci/container-runtime.sh image-smoke
 
       - name: Verify optional observability stack end to end
         shell: bash
-        run: |
-          set -euo pipefail
-          python3 tools/setup-observability.py
-          docker compose --env-file .env --env-file .observability/compose.env -f docker-compose.yml -f docker-compose.observability.yml config --quiet
-          docker compose --env-file .env --env-file .observability/compose.env -f docker-compose.yml -f docker-compose.observability.yml up --detach --no-build
-          python3 tools/smoke-observability.py
+        run: bash tools/ci/container-runtime.sh observability
 
       - name: Generate vulnerability baseline
         uses: aquasecurity/trivy-action@v0.36.0
@@ -654,6 +606,7 @@ jobs:
       - postgres-verification
       - test-repeatability
       - isolated-test-selection
+      - observability-validation
       - docker-validation
     if: >-
       github.event_name == 'push' &&
