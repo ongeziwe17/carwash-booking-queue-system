@@ -1,6 +1,6 @@
-# Car Wash API Bruno Acceptance Suite
+# HlambaQ API Bruno Acceptance Suite
 
-This directory contains the external HTTP acceptance suite for the Car Wash Booking and Queue Management API. It complements—rather than replaces—the Java unit, repository, service, and Spring integration tests.
+This directory contains the external HTTP acceptance suite for the HlambaQ API. It complements—rather than replaces—the Java unit, repository, service, and Spring integration tests.
 
 The collection uses Bruno **OpenCollection YAML** (`opencollection.yml` plus `.yml` request files) so requests, tests, environments, RBAC expectations, and workflows are reviewable in Git.
 

@@ -10,13 +10,13 @@ scrape_configs:
       username: scraper
       password_file: /run/secrets/scrape_password
     static_configs:
-      - targets: [carwash-api:8080]
+      - targets: [hlambaq-api:8080]
   - job_name: carwash-readiness
     metrics_path: /probe
     params:
       module: [http_2xx]
     static_configs:
-      - targets: [http://carwash-api:8080/actuator/health/readiness]
+      - targets: [http://hlambaq-api:8080/actuator/health/readiness]
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

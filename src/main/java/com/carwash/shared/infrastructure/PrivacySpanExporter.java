@@ -56,7 +56,7 @@ public final class PrivacySpanExporter implements SpanExporter {
             @Override public List<LinkData> getLinks() { return List.of(); }
             @Override public StatusData getStatus() { return StatusData.create(span.getStatus().getStatusCode(), ""); }
             @Override public Resource getResource() {
-                return Resource.create(Attributes.of(AttributeKey.stringKey("service.name"), "carwash-booking-queue-system"));
+                return Resource.create(Attributes.of(AttributeKey.stringKey("service.name"), "hlambaq-api"));
             }
             @Override public int getTotalRecordedEvents() { return 0; }
             @Override public int getTotalRecordedLinks() { return 0; }

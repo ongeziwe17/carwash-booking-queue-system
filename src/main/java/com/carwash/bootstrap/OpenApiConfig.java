@@ -14,15 +14,15 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
     @Bean
-    public OpenAPI carwashOpenAPI() {
+    public OpenAPI hlambaqOpenAPI() {
         return new OpenAPI()
                 .components(new Components().addSecuritySchemes("bearerAuth", new SecurityScheme()
                         .type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")))
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
-                .info(new Info().title("Car Wash Booking and Queue Management API").version("1.0")
-                        .description("Register and login publicly, then use a bearer token for protected APIs. "
-                                + "JWT authentication, RBAC, and ownership authorization are implemented. "
-                                + "Marketplace tenant isolation is not yet implemented, so elevated operational "
-                                + "access is currently global."));
+                .info(new Info().title("HlambaQ API").version("1.0")
+                        .description("HlambaQ is a car wash marketplace, booking and queue management platform. "
+                                + "It connects customers with car wash businesses and supports tenant-scoped "
+                                + "branch operations and platform administration. Register and login publicly; "
+                                + "protected APIs require a bearer JWT and enforce role, ownership and tenant scope."));
     }
 }

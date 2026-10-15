@@ -22,7 +22,7 @@ concurrency:
 env:
   JDK_VERSION: '21'
   SPRING_PROFILES_ACTIVE: test
-  SPRING_APP_NAME: carwash-booking-queue-system
+  SPRING_APP_NAME: hlambaq-api
   SERVER_PORT: '8080'
   SECURE_PASSWORD_BCRYPT_STRENGTH: '4'
   SECURE_PASSWORD_MIN_LENGTH: '12'
@@ -129,7 +129,7 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: bruno-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           set -euo pipefail
-          java -jar target/carwash-api.jar > target/bruno-application.log 2>&1 &
+          java -jar target/hlambaq-api.jar > target/bruno-application.log 2>&1 &
           echo "$!" > target/bruno-application.pid
 
       - name: Wait for API readiness and capture OpenAPI
